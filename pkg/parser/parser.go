@@ -134,6 +134,9 @@ func (p *Parser) parseStatement() Statement {
 	if p.curToken.Type == ECHO || p.curToken.Type == PRINT {
 		return p.parseEchoStatement()
 	}
+	if p.curToken.Type == ECHO || p.curToken.Type == PRINT {
+		return p.parseEchoStatement()
+	}
 	// Check for variable declaration: type $name = value
 	if p.curToken.Type == IDENT && p.peekToken.Type == VAR {
 		return p.parseLetStatement()
@@ -199,19 +202,6 @@ func (p *Parser) parseInitStatement() *InitStatement {
 	if !p.expectPeek(IDENT) { // main
 		return nil
 	}
-	stmt.Name = &Identifier{Token: p.curToken, Value: p.curToken.Literal}
-
-	if !p.expectPeek(LPAREN) {
-		return nil
-	}
-	if !p.expectPeek(RPAREN) {
-		return nil
-	}
-
-	if !p.expectPeek(LBRACE) {
-		return nil
-	}
-
 	stmt.Body = p.parseBlockStatement()
 
 	return stmt
@@ -498,8 +488,18 @@ func (p *Parser) parseTernaryExpression(condition Expression) Expression {
 		}
 	}
 
+	// Allow newlines before colon
+	for p.peekToken.Type == NEWLINE {
+		p.nextToken()
+	}
+
 	if !p.expectPeek(COLON) {
 		return nil
+	}
+
+	// Allow newlines after colon
+	for p.peekToken.Type == NEWLINE {
+		p.nextToken()
 	}
 
 	if p.peekToken.Type == LBRACE {

@@ -1,0 +1,34 @@
+class Main {
+    Init main() {
+        $auth = new Auth()
+        $db = new GranMySQL()
+        
+        string $email = "joss_ternary@example.com"
+        string $pass = "securePass123"
+        string $name = "Joss Ternary"
+
+        // Cleanup
+        $db.query("DELETE FROM users WHERE email = '" + $email + "'")
+
+        // Register
+        print("--- Registrando ---")
+        ($auth.create([$email, $pass, $name])) ? { print("Registrado.") } : { print("Error registro.") }
+
+        // Login Success
+        print("--- Login OK ---")
+        $token = $auth.attempt($email, $pass)
+        ($token) ? { print("Token: " + $token) } : { print("Fallo inesperado.") }
+
+        // Login Fail
+        print("--- Login Fail ---")
+        $fail = $auth.attempt($email, "wrong")
+        ($fail) ? { print("Fallo inesperado (dio token).") } : { print("Fallo esperado (correcto).") }
+        
+        // Verify DB
+        print("--- Verificando DB ---")
+        $db.tabla = "users"
+        $db.comparar = "email"
+        $db.comparable = $email
+        print($db.where("json"))
+    }
+}

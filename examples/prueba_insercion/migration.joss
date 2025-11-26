@@ -1,0 +1,37 @@
+class Main {
+    Init main() {
+        $db = new GranMySQL()
+        
+        // Create Users Table
+        $sqlUsers = "CREATE TABLE IF NOT EXISTS users (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            name VARCHAR(255) NOT NULL,
+            email VARCHAR(255) NOT NULL UNIQUE,
+            password VARCHAR(255) NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+        )"
+        
+        print("Migrando tabla 'users'...")
+        if ($db.query($sqlUsers)) {
+            print("Tabla 'users' creada o ya existe.")
+        } else {
+            print("Error creando tabla 'users'.")
+        }
+
+        // Create Cron Tasks Table
+        $sqlCron = "CREATE TABLE IF NOT EXISTS cron_tasks (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            task_name VARCHAR(255) NOT NULL UNIQUE,
+            last_run TIMESTAMP NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )"
+
+        print("Migrando tabla 'cron_tasks'...")
+        if ($db.query($sqlCron)) {
+            print("Tabla 'cron_tasks' creada o ya existe.")
+        } else {
+            print("Error creando tabla 'cron_tasks'.")
+        }
+    }
+}

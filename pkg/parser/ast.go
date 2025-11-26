@@ -162,9 +162,10 @@ func (es *EchoStatement) String() string {
 }
 
 type InitStatement struct {
-	Token Token       // INIT
-	Name  *Identifier // main
-	Body  *BlockStatement
+	Token      Token       // INIT
+	Name       *Identifier // main
+	Parameters []*Identifier
+	Body       *BlockStatement
 }
 
 func (is *InitStatement) statementNode()       {}
@@ -173,7 +174,13 @@ func (is *InitStatement) String() string {
 	var out bytes.Buffer
 	out.WriteString("Init ")
 	out.WriteString(is.Name.String())
-	out.WriteString("() ")
+	out.WriteString("(")
+	params := []string{}
+	for _, p := range is.Parameters {
+		params = append(params, p.String())
+	}
+	out.WriteString(strings.Join(params, ", "))
+	out.WriteString(") ")
 	out.WriteString(is.Body.String())
 	return out.String()
 }

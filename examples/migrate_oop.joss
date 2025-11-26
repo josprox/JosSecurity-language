@@ -1,0 +1,43 @@
+class MigrationRunner {
+    Init run($name, $sql) {
+        $db = new GranMySQL()
+        $db.tabla = "migrations"
+        $db.comparar = "migration"
+        $db.comparable = $name
+        
+        $check = $db.where("json")
+        
+        ($check == "[]") ? {
+            print("Ejecutando: " + $name)
+            $this.executeMigration($name, $sql)
+        } : {
+            print("Saltado: " + $name)
+        }
+    }
+
+    Init executeMigration($name, $sql) {
+        $db = new GranMySQL()
+        $db.query($sql) ? {
+            $db.query("INSERT INTO migrations (migration) VALUES ('" + $name + "')")
+            print("Exito: " + $name)
+        } : {
+            print("Error: " + $name)
+        }
+    }
+}
+
+class Main {
+    Init main() {
+        $runner = new MigrationRunner()
+        $db = new GranMySQL()
+
+        // Ensure migrations table
+        $sqlMig = "CREATE TABLE IF NOT EXISTS migrations (id INT AUTO_INCREMENT PRIMARY KEY, migration VARCHAR(255) NOT NULL UNIQUE, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)"
+        $db.query($sqlMig) ? { print("Tabla migrations OK") } : { print("Error migrations") }
+
+        // Run Migrations
+        $runner.run("001_create_users_table", "CREATE TABLE IF NOT EXISTS users (id INT AUTO_INCREMENT PRIMARY KEY, name VARCHAR(255), email VARCHAR(255) UNIQUE, password VARCHAR(255), created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP)")
+        
+        $runner.run("002_create_cron_tasks_table", "CREATE TABLE IF NOT EXISTS cron_tasks (id INT AUTO_INCREMENT PRIMARY KEY, task_name VARCHAR(255) UNIQUE, last_run TIMESTAMP NULL, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)")
+    }
+}

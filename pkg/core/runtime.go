@@ -1,10 +1,12 @@
 package core
 
 import (
+	"database/sql"
 	"fmt"
 	"os"
 	"strconv"
 
+	_ "github.com/go-sql-driver/mysql"
 	"github.com/jossecurity/joss/pkg/parser"
 )
 
@@ -13,6 +15,7 @@ type Runtime struct {
 	Env       map[string]string
 	Variables map[string]interface{}
 	Classes   map[string]*parser.ClassStatement
+	DB        *sql.DB
 }
 
 type Instance struct {
@@ -47,7 +50,27 @@ func (r *Runtime) LoadEnv() {
 	// Simulation of decryption
 	r.Env["APP_ENV"] = "dev"
 	r.Env["PORT"] = "8000"
+	r.Env["PORT"] = "8000"
 	r.Env["DB_HOST"] = "localhost"
+	r.Env["DB_USER"] = "root"
+	r.Env["DB_PASS"] = ""
+	r.Env["DB_NAME"] = "prueba_joss"
+
+	// Connect to DB
+	dsn := fmt.Sprintf("%s:%s@tcp(%s:3306)/%s", r.Env["DB_USER"], r.Env["DB_PASS"], r.Env["DB_HOST"], r.Env["DB_NAME"])
+	db, err := sql.Open("mysql", dsn)
+	if err != nil {
+		fmt.Printf("[GranMySQL] Error conectando a DB: %v\n", err)
+	} else {
+		// Test connection
+		err = db.Ping()
+		if err != nil {
+			fmt.Printf("[GranMySQL] Error ping DB: %v\n", err)
+		} else {
+			fmt.Println("[GranMySQL] Conexión establecida con éxito")
+			r.DB = db
+		}
+	}
 }
 
 // Execute runs the parsed program
@@ -423,10 +446,22 @@ func (r *Runtime) evaluateMember(me *parser.MemberExpression) interface{} {
 		return val
 	}
 
-	// Check methods
+	// Check methods (Function and Init)
 	for _, stmt := range instance.Class.Body.Statements {
 		if method, ok := stmt.(*parser.MethodStatement); ok {
 			if method.Name.Value == propName {
+				return &BoundMethod{Method: method, Instance: instance}
+			}
+		}
+		if initStmt, ok := stmt.(*parser.InitStatement); ok {
+			if initStmt.Name.Value == propName {
+				// Convert InitStatement to MethodStatement for compatibility
+				method := &parser.MethodStatement{
+					Token:      initStmt.Token,
+					Name:       initStmt.Name,
+					Parameters: initStmt.Parameters,
+					Body:       initStmt.Body,
+				}
 				return &BoundMethod{Method: method, Instance: instance}
 			}
 		}
