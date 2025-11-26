@@ -3,6 +3,8 @@ package core
 import (
 	"database/sql"
 	"fmt"
+	"os"
+	"strings"
 	"time"
 
 	"github.com/jossecurity/joss/pkg/parser"
@@ -109,88 +111,290 @@ func (r *Runtime) executeQueueMethod(instance *Instance, method string, args []i
 	return nil
 }
 
+// Helper to get table prefix
+func getTablePrefix() string {
+	prefix := os.Getenv("DB_PREFIX")
+	if prefix == "" {
+		return "js_"
+	}
+	return prefix
+}
+
 // GranMySQL Implementation
 func (r *Runtime) executeGranMySQLMethod(instance *Instance, method string, args []interface{}) interface{} {
-	// ... (existing code)
+	// Initialize internal state if needed
+	if _, ok := instance.Fields["_wheres"]; !ok {
+		instance.Fields["_wheres"] = []string{}
+		instance.Fields["_bindings"] = []interface{}{}
+		instance.Fields["_select"] = "*"
+		instance.Fields["_table"] = ""
+	}
+
 	switch method {
-	case "query":
-		// Execute raw SQL (useful for migrations)
+	case "table":
 		if len(args) > 0 {
-			if sqlStr, ok := args[0].(string); ok {
-				if r.DB == nil {
-					fmt.Println("[GranMySQL] Error: No hay conexión a DB")
-					return nil
+			tableName := args[0].(string)
+			// Apply prefix if not already present (and not a raw query)
+			prefix := getTablePrefix()
+			if !strings.HasPrefix(tableName, prefix) {
+				tableName = prefix + tableName
+			}
+			instance.Fields["_table"] = tableName
+		}
+		return instance // Return this for chaining
+
+	case "select":
+		if len(args) > 0 {
+			if cols, ok := args[0].(string); ok {
+				instance.Fields["_select"] = cols
+			} else if cols, ok := args[0].([]interface{}); ok {
+				// Handle array of columns
+				strCols := []string{}
+				for _, c := range cols {
+					strCols = append(strCols, fmt.Sprintf("%v", c))
 				}
-				_, err := r.DB.Exec(sqlStr)
+				instance.Fields["_select"] = strings.Join(strCols, ", ")
+			}
+		}
+		return instance
+
+	case "where":
+		// Support both old and new API
+		// Old API: where("json") - uses tabla, comparar, comparable properties
+		// New API: where(col, val) or where(col, op, val) - fluent builder
+
+		if len(args) == 1 {
+			// Old API: where("json") or where("array")
+			format := args[0].(string)
+
+			// Use legacy properties
+			table := instance.Fields["tabla"]
+			col := instance.Fields["comparar"]
+			val := instance.Fields["comparable"]
+
+			if r.DB == nil {
+				return "[]"
+			}
+
+			query := fmt.Sprintf("SELECT * FROM %v WHERE %v = ?", table, col)
+			rows, err := r.DB.Query(query, val)
+			if err != nil {
+				fmt.Printf("[GranMySQL] Error en where: %v\n", err)
+				return "[]"
+			}
+			defer rows.Close()
+
+			// Return based on format
+			if format == "json" {
+				return rowsToJSON(rows)
+			}
+			return rowsToJSON(rows) // Default to JSON
+		}
+
+		// New fluent builder API
+		wheres := instance.Fields["_wheres"].([]string)
+		bindings := instance.Fields["_bindings"].([]interface{})
+
+		if len(args) == 2 {
+			col := args[0].(string)
+			val := args[1]
+			wheres = append(wheres, fmt.Sprintf("%s = ?", col))
+			bindings = append(bindings, val)
+		} else if len(args) == 3 {
+			col := args[0].(string)
+			op := args[1].(string)
+			val := args[2]
+			wheres = append(wheres, fmt.Sprintf("%s %s ?", col, op))
+			bindings = append(bindings, val)
+		}
+
+		instance.Fields["_wheres"] = wheres
+		instance.Fields["_bindings"] = bindings
+		return instance
+
+	case "get":
+		if r.DB == nil {
+			fmt.Println("[GranMySQL] Error: No DB connection")
+			return "[]"
+		}
+
+		table := instance.Fields["_table"].(string)
+		sel := instance.Fields["_select"].(string)
+		wheres := instance.Fields["_wheres"].([]string)
+		bindings := instance.Fields["_bindings"].([]interface{})
+
+		query := fmt.Sprintf("SELECT %s FROM %s", sel, table)
+		if len(wheres) > 0 {
+			query += " WHERE " + strings.Join(wheres, " AND ")
+		}
+
+		// Reset state after query build
+		instance.Fields["_wheres"] = []string{}
+		instance.Fields["_bindings"] = []interface{}{}
+		instance.Fields["_select"] = "*"
+		// Keep table? Usually builder resets, but let's keep it simple.
+
+		rows, err := r.DB.Query(query, bindings...)
+		if err != nil {
+			fmt.Printf("[GranMySQL] Error en get: %v\n", err)
+			return "[]"
+		}
+		defer rows.Close()
+
+		return rowsToJSON(rows)
+
+	case "first":
+		// Similar to get but returns single object or null
+		// Add LIMIT 1
+		if r.DB == nil {
+			return nil
+		}
+
+		table := instance.Fields["_table"].(string)
+		sel := instance.Fields["_select"].(string)
+		wheres := instance.Fields["_wheres"].([]string)
+		bindings := instance.Fields["_bindings"].([]interface{})
+
+		query := fmt.Sprintf("SELECT %s FROM %s", sel, table)
+		if len(wheres) > 0 {
+			query += " WHERE " + strings.Join(wheres, " AND ")
+		}
+		query += " LIMIT 1"
+
+		// Reset state
+		instance.Fields["_wheres"] = []string{}
+		instance.Fields["_bindings"] = []interface{}{}
+
+		rows, err := r.DB.Query(query, bindings...)
+		if err != nil {
+			return nil
+		}
+		defer rows.Close()
+
+		jsonStr := rowsToJSON(rows)
+		// If "[]", return nil/false? Or the first element?
+		// rowsToJSON returns string "[]" or "[{...}]"
+		if jsonStr == "[]" {
+			return nil
+		}
+		// Extract first object from JSON array string (hacky but consistent with current string returns)
+		// Better: return the raw map if possible? Joss uses strings mostly for now.
+		// Let's return the string of the object.
+		return strings.TrimSuffix(strings.TrimPrefix(jsonStr.(string), "["), "]")
+
+	case "insert":
+		if r.DB == nil {
+			return false
+		}
+		if len(args) > 0 {
+			// Support insert(["col1", "col2"], ["val1", "val2"])
+			if len(args) == 2 {
+				cols := args[0].([]interface{})
+				vals := args[1].([]interface{})
+
+				if len(cols) != len(vals) {
+					return false
+				}
+
+				table := instance.Fields["_table"].(string)
+				colNames := []string{}
+				placeholders := []string{}
+				bindings := []interface{}{}
+
+				for _, c := range cols {
+					colNames = append(colNames, fmt.Sprintf("%v", c))
+					placeholders = append(placeholders, "?")
+				}
+				for _, v := range vals {
+					bindings = append(bindings, v)
+				}
+
+				query := fmt.Sprintf("INSERT INTO %s (%s) VALUES (%s)", table, strings.Join(colNames, ", "), strings.Join(placeholders, ", "))
+
+				_, err := r.DB.Exec(query, bindings...)
 				if err != nil {
-					fmt.Printf("[GranMySQL] Error en query: %v\n", err)
+					fmt.Printf("[GranMySQL] Error insert: %v\n", err)
 					return false
 				}
 				return true
 			}
 		}
-	case "where":
-		// Real query: SELECT * FROM table WHERE col = val
-		table := instance.Fields["tabla"]
-		col := instance.Fields["comparar"]
-		val := instance.Fields["comparable"]
+		return false
 
-		if r.DB == nil {
-			fmt.Println("[GranMySQL] Error: No hay conexión a DB")
-			return "[]"
-		}
-
-		query := fmt.Sprintf("SELECT * FROM %v WHERE %v = ?", table, col)
-		rows, err := r.DB.Query(query, val)
-		if err != nil {
-			fmt.Printf("[GranMySQL] Error en where: %v\n", err)
-			return "[]"
-		}
-		defer rows.Close()
-
-		// Parse rows to JSON-like string (simplified)
-		// For now, just return a success message or simple representation
-		// Implementing full JSON serialization from rows is complex without struct reflection
-		// We'll return a simple string representation for verification
-		var results []string
-		cols, _ := rows.Columns()
-		vals := make([]interface{}, len(cols))
-		valPtrs := make([]interface{}, len(cols))
-		for i := range cols {
-			valPtrs[i] = &vals[i]
-		}
-
-		for rows.Next() {
-			rows.Scan(valPtrs...)
-			rowStr := "{"
-			for i, colName := range cols {
-				valVal := vals[i]
-				if b, ok := valVal.([]byte); ok {
-					valVal = string(b)
+	case "query":
+		// Raw query support (still needed for migrations)
+		if len(args) > 0 {
+			if sqlStr, ok := args[0].(string); ok {
+				if r.DB == nil {
+					return nil
 				}
-				rowStr += fmt.Sprintf("\"%s\": \"%v\", ", colName, valVal)
+				_, err := r.DB.Exec(sqlStr)
+				if err != nil {
+					fmt.Printf("[GranMySQL] Error query: %v\n", err)
+					return false
+				}
+				return true
 			}
-			rowStr += "}"
-			results = append(results, rowStr)
 		}
 
-		return fmt.Sprintf("%v", results)
-
-	case "clasic":
-		// Real query: SELECT * FROM table
-		table := instance.Fields["tabla"]
-		if r.DB == nil {
-			return "[]"
-		}
-		// Similar implementation to where...
-		fmt.Printf("[GranMySQL] SELECT * FROM %v (Real)\n", table)
-		return "[{\"id\": 1, \"real\": true}]"
+	// Legacy support (tabla, comparar, comparable) -> Map to builder
+	case "legacy_where":
+		// ...
 	}
 	return nil
 }
 
+func rowsToJSON(rows *sql.Rows) interface{} {
+	var results []string
+	cols, _ := rows.Columns()
+	vals := make([]interface{}, len(cols))
+	valPtrs := make([]interface{}, len(cols))
+	for i := range cols {
+		valPtrs[i] = &vals[i]
+	}
+
+	for rows.Next() {
+		rows.Scan(valPtrs...)
+		rowStr := "{"
+		for i, colName := range cols {
+			valVal := vals[i]
+			if b, ok := valVal.([]byte); ok {
+				valVal = string(b)
+			}
+			rowStr += fmt.Sprintf("\"%s\": \"%v\"", colName, valVal)
+			if i < len(cols)-1 {
+				rowStr += ", "
+			}
+		}
+		rowStr += "}"
+		results = append(results, rowStr)
+	}
+	return "[" + strings.Join(results, ", ") + "]"
+}
+
 // Auth Implementation
 func (r *Runtime) executeAuthMethod(instance *Instance, method string, args []interface{}) interface{} {
+	prefix := getTablePrefix()
+	usersTable := prefix + "users"
+
+	// Auto-migrate check (lazy)
+	if _, ok := instance.Fields["_migrated"]; !ok {
+		if r.DB != nil {
+			// Check if table exists
+			// Simplified: Just try create if not exists
+			query := fmt.Sprintf(`CREATE TABLE IF NOT EXISTS %s (
+				id INT AUTO_INCREMENT PRIMARY KEY,
+				name VARCHAR(255),
+				email VARCHAR(255) UNIQUE,
+				password VARCHAR(255),
+				created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+				updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+			)`, usersTable)
+			r.DB.Exec(query)
+			instance.Fields["_migrated"] = true
+		}
+	}
+
 	switch method {
 	case "create":
 		// Auth::create([email, password, name])
@@ -203,21 +407,18 @@ func (r *Runtime) executeAuthMethod(instance *Instance, method string, args []in
 					name = data[2].(string)
 				}
 
-				// Hash password
 				hashedBytes, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
 				if err != nil {
-					fmt.Printf("[Security] Error hashing password: %v\n", err)
 					return false
 				}
 				hashedPassword := string(hashedBytes)
 
-				// Insert into DB
 				if r.DB == nil {
-					fmt.Println("[Security] Error: No DB connection")
 					return false
 				}
 
-				_, err = r.DB.Exec("INSERT INTO users (name, email, password, created_at, updated_at) VALUES (?, ?, ?, NOW(), NOW())", name, email, hashedPassword)
+				query := fmt.Sprintf("INSERT INTO %s (name, email, password, created_at, updated_at) VALUES (?, ?, ?, NOW(), NOW())", usersTable)
+				_, err = r.DB.Exec(query, name, email, hashedPassword)
 				if err != nil {
 					fmt.Printf("[Security] Error creando usuario: %v\n", err)
 					return false
@@ -236,7 +437,8 @@ func (r *Runtime) executeAuthMethod(instance *Instance, method string, args []in
 			}
 
 			var storedHash string
-			err := r.DB.QueryRow("SELECT password FROM users WHERE email = ?", email).Scan(&storedHash)
+			query := fmt.Sprintf("SELECT password FROM %s WHERE email = ?", usersTable)
+			err := r.DB.QueryRow(query, email).Scan(&storedHash)
 			if err != nil {
 				if err == sql.ErrNoRows {
 					fmt.Println("[Security] Usuario no encontrado.")
@@ -253,7 +455,6 @@ func (r *Runtime) executeAuthMethod(instance *Instance, method string, args []in
 			}
 
 			fmt.Println("[Security] Login exitoso.")
-			// Generate simple token
 			return fmt.Sprintf("JOSS_TOKEN_%d", time.Now().Unix())
 		}
 	}

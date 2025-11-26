@@ -1,5 +1,0 @@
-class Main {
-    Init main() {
-        printf("Hello %s\n", "Printf")
-    }
-}

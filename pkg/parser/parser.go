@@ -202,6 +202,19 @@ func (p *Parser) parseInitStatement() *InitStatement {
 	if !p.expectPeek(IDENT) { // main
 		return nil
 	}
+	stmt.Name = &Identifier{Token: p.curToken, Value: p.curToken.Literal}
+
+	if !p.expectPeek(LPAREN) {
+		return nil
+	}
+
+	// Parse parameters
+	stmt.Parameters = p.parseFunctionParameters()
+
+	if !p.expectPeek(LBRACE) {
+		return nil
+	}
+
 	stmt.Body = p.parseBlockStatement()
 
 	return stmt
