@@ -176,6 +176,14 @@ func (r *Runtime) executeStatement(stmt parser.Statement) interface{} {
 	case *parser.EchoStatement:
 		val := r.evaluateExpression(s.Value)
 		fmt.Println(val)
+	case *parser.WhileStatement:
+		return r.executeWhile(s)
+	case *parser.DoWhileStatement:
+		return r.executeDoWhile(s)
+	case *parser.TryCatchStatement:
+		return r.executeTryCatch(s)
+	case *parser.ThrowStatement:
+		return r.executeThrow(s)
 	}
 	return nil
 }
@@ -381,6 +389,12 @@ func (r *Runtime) evaluateInfix(ie *parser.InfixExpression) interface{} {
 			return lInt > rInt
 		case ">=":
 			return lInt >= rInt
+		case "<=":
+			return lInt <= rInt
+		case "==":
+			return lInt == rInt
+		case "!=":
+			return lInt != rInt
 		}
 	}
 
@@ -636,4 +650,58 @@ func (r *Runtime) executeCall(call *parser.CallExpression) interface{} {
 		}
 	}
 	return nil
+}
+
+func (r *Runtime) executeWhile(ws *parser.WhileStatement) interface{} {
+	for {
+		cond := r.evaluateExpression(ws.Condition)
+		if !isTruthy(cond) {
+			break
+		}
+		r.executeBlock(ws.Body)
+	}
+	return nil
+}
+
+func (r *Runtime) executeDoWhile(dws *parser.DoWhileStatement) interface{} {
+	for {
+		r.executeBlock(dws.Body)
+		cond := r.evaluateExpression(dws.Condition)
+		if !isTruthy(cond) {
+			break
+		}
+	}
+	return nil
+}
+
+func (r *Runtime) executeTryCatch(tcs *parser.TryCatchStatement) (result interface{}) {
+	defer func() {
+		if err := recover(); err != nil {
+			// Catch the error
+			// If err is a string (from throw "msg"), use it.
+			// If it's a runtime panic, convert to string.
+			var errVal interface{} = err
+			if e, ok := err.(error); ok {
+				errVal = e.Error()
+			}
+
+			// Bind error variable
+			r.Variables[tcs.CatchVar] = errVal
+
+			// Execute catch block
+			result = r.executeBlock(tcs.CatchBlock)
+		}
+	}()
+
+	return r.executeBlock(tcs.TryBlock)
+}
+
+func (r *Runtime) executeThrow(ts *parser.ThrowStatement) interface{} {
+	val := r.evaluateExpression(ts.Value)
+	panic(val)
+	return nil
+}
+
+func isTruthy(val interface{}) bool {
+	return !isFalsy(val)
 }

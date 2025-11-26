@@ -62,11 +62,18 @@ const (
 	THIS      = "THIS"
 	ISSET     = "ISSET"
 	EMPTY     = "EMPTY"
+	// Control Structures
+	WHILE = "WHILE"
+	DO    = "DO"
+	TRY   = "TRY"
+	CATCH = "CATCH"
+	THROW = "THROW"
 )
 
 type Token struct {
 	Type    TokenType
 	Literal string
+	Line    int
 }
 
 var keywords = map[string]TokenType{
@@ -88,6 +95,11 @@ var keywords = map[string]TokenType{
 	"print":     PRINT,
 	"isset":     ISSET,
 	"empty":     EMPTY,
+	"while":     WHILE,
+	"do":        DO,
+	"try":       TRY,
+	"catch":     CATCH,
+	"throw":     THROW,
 }
 
 func LookupIdent(ident string) TokenType {

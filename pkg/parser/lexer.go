@@ -9,10 +9,11 @@ type Lexer struct {
 	position     int  // current position in input (points to current char)
 	readPosition int  // current reading position in input (after current char)
 	ch           byte // current char under examination
+	line         int  // current line number
 }
 
 func NewLexer(input string) *Lexer {
-	l := &Lexer{input: input}
+	l := &Lexer{input: input, line: 1}
 	l.readChar()
 	return l
 }
@@ -45,104 +46,108 @@ func (l *Lexer) NextToken() Token {
 			ch := l.ch
 			l.readChar()
 			literal := string(ch) + string(l.ch)
-			tok = Token{Type: EQ, Literal: literal}
+			tok = Token{Type: EQ, Literal: literal, Line: l.line}
 		} else {
-			tok = newToken(ASSIGN, l.ch)
+			tok = l.newToken(ASSIGN, l.ch)
 		}
 	case ';':
-		tok = newToken(SEMICOLON, l.ch)
+		tok = l.newToken(SEMICOLON, l.ch)
 	case '\n':
-		tok = newToken(NEWLINE, l.ch)
+		tok = l.newToken(NEWLINE, l.ch)
+		l.line++ // Increment line on newline token
 	case '(':
-		tok = newToken(LPAREN, l.ch)
+		tok = l.newToken(LPAREN, l.ch)
 	case ')':
-		tok = newToken(RPAREN, l.ch)
+		tok = l.newToken(RPAREN, l.ch)
 	case ',':
-		tok = newToken(COMMA, l.ch)
+		tok = l.newToken(COMMA, l.ch)
 	case ':':
-		tok = newToken(COLON, l.ch)
+		tok = l.newToken(COLON, l.ch)
 	case '?':
-		tok = newToken(QUESTION, l.ch)
+		tok = l.newToken(QUESTION, l.ch)
 	case '!':
 		if l.peekChar() == '=' {
 			ch := l.ch
 			l.readChar()
 			literal := string(ch) + string(l.ch)
-			tok = Token{Type: NOT_EQ, Literal: literal}
+			tok = Token{Type: NOT_EQ, Literal: literal, Line: l.line}
 		} else {
-			tok = newToken(BANG, l.ch)
+			tok = l.newToken(BANG, l.ch)
 		}
 	case '<':
 		if l.peekChar() == '=' {
 			ch := l.ch
 			l.readChar()
 			literal := string(ch) + string(l.ch)
-			tok = Token{Type: LTE, Literal: literal}
+			tok = Token{Type: LTE, Literal: literal, Line: l.line}
 		} else if l.peekChar() == '<' {
 			ch := l.ch
 			l.readChar()
 			literal := string(ch) + string(l.ch)
-			tok = Token{Type: SHIFT_LEFT, Literal: literal}
+			tok = Token{Type: SHIFT_LEFT, Literal: literal, Line: l.line}
 		} else {
-			tok = newToken(LT, l.ch)
+			tok = l.newToken(LT, l.ch)
 		}
 	case '>':
 		if l.peekChar() == '=' {
 			ch := l.ch
 			l.readChar()
 			literal := string(ch) + string(l.ch)
-			tok = Token{Type: GTE, Literal: literal}
+			tok = Token{Type: GTE, Literal: literal, Line: l.line}
 		} else if l.peekChar() == '>' {
 			ch := l.ch
 			l.readChar()
 			literal := string(ch) + string(l.ch)
-			tok = Token{Type: SHIFT_RIGHT, Literal: literal}
+			tok = Token{Type: SHIFT_RIGHT, Literal: literal, Line: l.line}
 		} else {
-			tok = newToken(GT, l.ch)
+			tok = l.newToken(GT, l.ch)
 		}
 	case '+':
-		tok = newToken(PLUS, l.ch)
+		tok = l.newToken(PLUS, l.ch)
 	case '-':
-		tok = newToken(MINUS, l.ch)
+		tok = l.newToken(MINUS, l.ch)
 	case '*':
-		tok = newToken(ASTERISK, l.ch)
+		tok = l.newToken(ASTERISK, l.ch)
 	case '/':
 		if l.peekChar() == '/' {
 			l.skipComment()
 			return l.NextToken()
 		}
-		tok = newToken(SLASH, l.ch)
+		tok = l.newToken(SLASH, l.ch)
 	case '{':
-		tok = newToken(LBRACE, l.ch)
+		tok = l.newToken(LBRACE, l.ch)
 	case '}':
-		tok = newToken(RBRACE, l.ch)
+		tok = l.newToken(RBRACE, l.ch)
 	case '[':
-		tok = newToken(LBRACKET, l.ch)
+		tok = l.newToken(LBRACKET, l.ch)
 	case ']':
-		tok = newToken(RBRACKET, l.ch)
+		tok = l.newToken(RBRACKET, l.ch)
 	case '.':
-		tok = newToken(DOT, l.ch)
+		tok = l.newToken(DOT, l.ch)
 	case '$':
-		tok.Type = VAR
-		tok.Literal = "$"
+		tok = Token{Type: VAR, Literal: "$", Line: l.line}
 	case '"':
 		tok.Type = STRING
 		tok.Literal = l.readString()
+		tok.Line = l.line
 	case 0:
 		tok.Literal = ""
 		tok.Type = EOF
+		tok.Line = l.line
 	default:
 		if isLetter(l.ch) {
 			tok.Literal = l.readIdentifier()
 			tok.Type = LookupIdent(tok.Literal)
+			tok.Line = l.line
 			return tok
 		} else if isDigit(l.ch) {
 			tok.Type = INT
 			tok.Literal = l.readNumber()
+			tok.Line = l.line
 			return tok
 		} else {
 			fmt.Printf("ILLEGAL CHAR: %q (%d)\n", l.ch, l.ch)
-			tok = newToken(ILLEGAL, l.ch)
+			tok = l.newToken(ILLEGAL, l.ch)
 		}
 	}
 
@@ -157,8 +162,8 @@ func (l *Lexer) skipComment() {
 	l.skipWhitespace()
 }
 
-func newToken(tokenType TokenType, ch byte) Token {
-	return Token{Type: tokenType, Literal: string(ch)}
+func (l *Lexer) newToken(tokenType TokenType, ch byte) Token {
+	return Token{Type: tokenType, Literal: string(ch), Line: l.line}
 }
 
 func (l *Lexer) readIdentifier() string {

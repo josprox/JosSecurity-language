@@ -1,0 +1,57 @@
+class Main {
+    Init main() {
+        print("=== INICIO DE PRUEBAS ===")
+
+        // 1. Prueba de While
+        print("\n--- Prueba de While ---")
+        $i = 0
+        while ($i < 3) {
+            print("While iteración: " + $i)
+            $i = $i + 1
+        }
+
+        // 2. Prueba de Do-While
+        print("\n--- Prueba de Do-While ---")
+        $j = 0
+        do {
+            print("Do-While iteración: " + $j)
+            $j = $j + 1
+        } while ($j < 3);
+
+        // 3. Prueba de Try-Catch y Throw
+        print("\n--- Prueba de Try-Catch y Throw ---")
+        try {
+            print("Intentando ejecutar código peligroso...")
+            throw "Error simulado!"
+            print("Esto no debería imprimirse")
+        } catch ($e) {
+            print("Excepción capturada: " + $e)
+        }
+
+        // 4. Prueba de CRUD con While (Simulado si no hay DB real, pero usando GranMySQL)
+        print("\n--- Prueba de CRUD con While ---")
+        $db = new GranMySQL()
+        
+        // Crear tabla temporal para pruebas (con prefijo js_ por defecto)
+        $db.query("CREATE TABLE IF NOT EXISTS js_test_users (id INT AUTO_INCREMENT PRIMARY KEY, name VARCHAR(255))")
+        
+        // Insertar usuarios con while
+        $k = 1
+        while ($k <= 3) {
+            $name = "Usuario " + $k
+            print("Insertando: " + $name)
+            $db.table("test_users").insert(["name"], [$name])
+            $k = $k + 1
+        }
+
+        // Leer usuarios
+        print("Leyendo usuarios:")
+        $users = $db.table("test_users").get()
+        print($users)
+        
+        // Limpiar
+        $db.query("DROP TABLE js_test_users")
+
+        print("\n=== PRUEBAS FINALIZADAS ===")
+    }
+}

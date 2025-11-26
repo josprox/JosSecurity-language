@@ -442,3 +442,76 @@ func (ee *EmptyExpression) String() string {
 	out.WriteString(")")
 	return out.String()
 }
+
+type WhileStatement struct {
+	Token     Token // WHILE
+	Condition Expression
+	Body      *BlockStatement
+}
+
+func (ws *WhileStatement) statementNode()       {}
+func (ws *WhileStatement) TokenLiteral() string { return ws.Token.Literal }
+func (ws *WhileStatement) String() string {
+	var out bytes.Buffer
+	out.WriteString("while (")
+	out.WriteString(ws.Condition.String())
+	out.WriteString(") ")
+	out.WriteString(ws.Body.String())
+	return out.String()
+}
+
+type DoWhileStatement struct {
+	Token     Token // DO
+	Condition Expression
+	Body      *BlockStatement
+}
+
+func (dws *DoWhileStatement) statementNode()       {}
+func (dws *DoWhileStatement) TokenLiteral() string { return dws.Token.Literal }
+func (dws *DoWhileStatement) String() string {
+	var out bytes.Buffer
+	out.WriteString("do ")
+	out.WriteString(dws.Body.String())
+	out.WriteString(" while (")
+	out.WriteString(dws.Condition.String())
+	out.WriteString(");")
+	return out.String()
+}
+
+type TryCatchStatement struct {
+	Token      Token // TRY
+	TryBlock   *BlockStatement
+	CatchToken Token  // CATCH
+	CatchVar   string // The variable name for the error, e.g. "e"
+	CatchBlock *BlockStatement
+}
+
+func (tcs *TryCatchStatement) statementNode()       {}
+func (tcs *TryCatchStatement) TokenLiteral() string { return tcs.Token.Literal }
+func (tcs *TryCatchStatement) String() string {
+	var out bytes.Buffer
+	out.WriteString("try ")
+	out.WriteString(tcs.TryBlock.String())
+	out.WriteString(" catch ($")
+	out.WriteString(tcs.CatchVar)
+	out.WriteString(") ")
+	out.WriteString(tcs.CatchBlock.String())
+	return out.String()
+}
+
+type ThrowStatement struct {
+	Token Token // THROW
+	Value Expression
+}
+
+func (ts *ThrowStatement) statementNode()       {}
+func (ts *ThrowStatement) TokenLiteral() string { return ts.Token.Literal }
+func (ts *ThrowStatement) String() string {
+	var out bytes.Buffer
+	out.WriteString("throw ")
+	if ts.Value != nil {
+		out.WriteString(ts.Value.String())
+	}
+	out.WriteString(";")
+	return out.String()
+}

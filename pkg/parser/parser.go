@@ -137,6 +137,18 @@ func (p *Parser) parseStatement() Statement {
 	if p.curToken.Type == ECHO || p.curToken.Type == PRINT {
 		return p.parseEchoStatement()
 	}
+	if p.curToken.Type == WHILE {
+		return p.parseWhileStatement()
+	}
+	if p.curToken.Type == DO {
+		return p.parseDoWhileStatement()
+	}
+	if p.curToken.Type == TRY {
+		return p.parseTryCatchStatement()
+	}
+	if p.curToken.Type == THROW {
+		return p.parseThrowStatement()
+	}
 	// Check for variable declaration: type $name = value
 	if p.curToken.Type == IDENT && p.peekToken.Type == VAR {
 		return p.parseLetStatement()
@@ -737,4 +749,111 @@ func (p *Parser) registerPrefix(tokenType TokenType, fn prefixParseFn) {
 
 func (p *Parser) registerInfix(tokenType TokenType, fn infixParseFn) {
 	p.infixParseFns[tokenType] = fn
+}
+
+func (p *Parser) parseWhileStatement() *WhileStatement {
+	stmt := &WhileStatement{Token: p.curToken}
+
+	if !p.expectPeek(LPAREN) {
+		return nil
+	}
+
+	p.nextToken()
+	stmt.Condition = p.parseExpression(LOWEST)
+
+	if !p.expectPeek(RPAREN) {
+		return nil
+	}
+
+	if !p.expectPeek(LBRACE) {
+		return nil
+	}
+
+	stmt.Body = p.parseBlockStatement()
+
+	return stmt
+}
+
+func (p *Parser) parseDoWhileStatement() *DoWhileStatement {
+	stmt := &DoWhileStatement{Token: p.curToken}
+
+	if !p.expectPeek(LBRACE) {
+		return nil
+	}
+
+	stmt.Body = p.parseBlockStatement()
+
+	if !p.expectPeek(WHILE) {
+		return nil
+	}
+
+	if !p.expectPeek(LPAREN) {
+		return nil
+	}
+
+	p.nextToken()
+	stmt.Condition = p.parseExpression(LOWEST)
+
+	if !p.expectPeek(RPAREN) {
+		return nil
+	}
+
+	if p.peekToken.Type == SEMICOLON {
+		p.nextToken()
+	}
+
+	return stmt
+}
+
+func (p *Parser) parseTryCatchStatement() *TryCatchStatement {
+	stmt := &TryCatchStatement{Token: p.curToken}
+
+	if !p.expectPeek(LBRACE) {
+		return nil
+	}
+
+	stmt.TryBlock = p.parseBlockStatement()
+
+	if !p.expectPeek(CATCH) {
+		return nil
+	}
+	stmt.CatchToken = p.curToken
+
+	if !p.expectPeek(LPAREN) {
+		return nil
+	}
+
+	// Expect variable: $e
+	if !p.expectPeek(VAR) {
+		return nil
+	}
+	if !p.expectPeek(IDENT) {
+		return nil
+	}
+	stmt.CatchVar = p.curToken.Literal
+
+	if !p.expectPeek(RPAREN) {
+		return nil
+	}
+
+	if !p.expectPeek(LBRACE) {
+		return nil
+	}
+
+	stmt.CatchBlock = p.parseBlockStatement()
+
+	return stmt
+}
+
+func (p *Parser) parseThrowStatement() *ThrowStatement {
+	stmt := &ThrowStatement{Token: p.curToken}
+
+	p.nextToken()
+	stmt.Value = p.parseExpression(LOWEST)
+
+	if p.peekToken.Type == SEMICOLON {
+		p.nextToken()
+	}
+
+	return stmt
 }
