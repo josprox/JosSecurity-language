@@ -20,12 +20,17 @@ Soporte completo del lenguaje JosSecurity (.joss) para Visual Studio Code.
 Snippets inteligentes para acelerar el desarrollo:
 
 - `class` - Crear clase con Init
+- `classext` - Clase con herencia (extends)
 - `init` - Método Init
 - `tern` - Operador ternario con bloques
 - `terni` - Ternario inline
 - `foreach` - Bucle foreach
 - `print` - Print statement
 - `var` - Declarar variable
+- `async` - Async task con await
+- `asyncfn` - Función async
+- `map` - Map literal `{ key: value }`
+- `try` - Try-catch block
 - `authcreate` - Crear usuario con Auth
 - `authlogin` - Login con Auth
 - `dbquery` - Query con GranMySQL
@@ -81,6 +86,12 @@ dbquery // Tab
 ## Características del Lenguaje
 
 ### ✅ Soportado
+- ✅ **Concurrencia**: async/await con Goroutines
+- ✅ **Smart Numerics**: División automática a float
+- ✅ **Maps Nativos**: Sintaxis `{ key: value }`
+- ✅ **Autoloading**: Carga automática de clases
+- ✅ **Herencia**: extends para clases
+- ✅ **Try-Catch**: Manejo de errores
 - ✅ Ternarios (NO if/else/switch)
 - ✅ Foreach
 - ✅ OOP (Clases, Init, Métodos)

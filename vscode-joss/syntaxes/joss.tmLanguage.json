@@ -32,11 +32,11 @@
       "patterns": [
         {
           "name": "keyword.control.joss",
-          "match": "\\b(foreach|as|return|break|continue|new|this)\\b"
+          "match": "\\b(foreach|as|return|break|continue|new|this|try|catch|throw|extends|async|await)\\b"
         },
         {
           "name": "keyword.other.joss",
-          "match": "\\b(class|Init|Import|Namespace|public|private|protected)\\b"
+          "match": "\\b(class|Init|Import|Namespace|public|private|protected|function)\\b"
         },
         {
           "name": "keyword.operator.logical.joss",
@@ -130,7 +130,7 @@
       "patterns": [
         {
           "name": "entity.name.function.joss",
-          "match": "\\b(print|echo|printf|env|isset|empty|len|count)\\b"
+          "match": "\\b(print|echo|printf|env|isset|empty|len|count|async|await)\\b"
         },
         {
           "name": "support.function.joss",

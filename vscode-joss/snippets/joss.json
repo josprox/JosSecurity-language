@@ -114,5 +114,52 @@
       "}"
     ],
     "description": "Main class entry point"
+  },
+  "Async Task": {
+    "prefix": "async",
+    "body": [
+      "\\$${1:future} = async(${2:expression})",
+      "\\$${3:result} = await(\\$${1:future})"
+    ],
+    "description": "Create async task with await"
+  },
+  "Async Function": {
+    "prefix": "asyncfn",
+    "body": [
+      "\\$${1:future} = async(${2:10 + 20})",
+      "$0"
+    ],
+    "description": "Async function call"
+  },
+  "Map Literal": {
+    "prefix": "map",
+    "body": [
+      "\\$${1:config} = {",
+      "\\t\"${2:key}\": \"${3:value}\"$0",
+      "}"
+    ],
+    "description": "Create a map literal"
+  },
+  "Try Catch": {
+    "prefix": "try",
+    "body": [
+      "try {",
+      "\\t${1:// code}",
+      "} catch (\\$${2:e}) {",
+      "\\tprint(\"Error: \" + \\$${2:e})",
+      "}"
+    ],
+    "description": "Try-catch block"
+  },
+  "Class with Inheritance": {
+    "prefix": "classext",
+    "body": [
+      "class ${1:ChildClass} extends ${2:ParentClass} {",
+      "\\tInit constructor(${3:params}) {",
+      "\\t\\t$0",
+      "\\t}",
+      "}"
+    ],
+    "description": "Class with inheritance"
   }
 }
