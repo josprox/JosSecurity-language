@@ -1,0 +1,118 @@
+{
+  "Class": {
+    "prefix": "class",
+    "body": [
+      "class ${1:ClassName} {",
+      "\tInit ${2:main}() {",
+      "\t\t$0",
+      "\t}",
+      "}"
+    ],
+    "description": "Create a new class with Init method"
+  },
+  "Init Method": {
+    "prefix": "init",
+    "body": [
+      "Init ${1:methodName}() {",
+      "\t$0",
+      "}"
+    ],
+    "description": "Create an Init method"
+  },
+  "Ternary": {
+    "prefix": "tern",
+    "body": [
+      "(${1:condition}) ? {",
+      "\t${2:// true}",
+      "} : {",
+      "\t${3:// false}",
+      "}"
+    ],
+    "description": "Ternary operator with blocks"
+  },
+  "Ternary Inline": {
+    "prefix": "terni",
+    "body": [
+      "${1:variable} = (${2:condition}) ? ${3:trueValue} : ${4:falseValue}"
+    ],
+    "description": "Inline ternary assignment"
+  },
+  "Foreach": {
+    "prefix": "foreach",
+    "body": [
+      "foreach (${1:array} as ${2:item}) {",
+      "\t$0",
+      "}"
+    ],
+    "description": "Foreach loop"
+  },
+  "Print": {
+    "prefix": "print",
+    "body": [
+      "print(${1:\"message\"})"
+    ],
+    "description": "Print statement"
+  },
+  "Variable": {
+    "prefix": "var",
+    "body": [
+      "${1:type} \\$${2:name} = ${3:value}"
+    ],
+    "description": "Declare a variable"
+  },
+  "Auth Create": {
+    "prefix": "authcreate",
+    "body": [
+      "\\$auth = new Auth()",
+      "\\$auth.create([${1:email}, ${2:password}, ${3:name}])"
+    ],
+    "description": "Create user with Auth"
+  },
+  "Auth Login": {
+    "prefix": "authlogin",
+    "body": [
+      "\\$auth = new Auth()",
+      "\\$token = \\$auth.attempt(${1:email}, ${2:password})"
+    ],
+    "description": "Login with Auth"
+  },
+  "GranMySQL Query": {
+    "prefix": "dbquery",
+    "body": [
+      "\\$db = new GranMySQL()",
+      "\\$db.table(\"${1:tableName}\")",
+      "\\$db.where(\"${2:column}\", ${3:value})",
+      "\\$result = \\$db.get()"
+    ],
+    "description": "Query database with GranMySQL"
+  },
+  "GranMySQL Insert": {
+    "prefix": "dbinsert",
+    "body": [
+      "\\$db = new GranMySQL()",
+      "\\$db.table(\"${1:tableName}\")",
+      "\\$db.insert([${2:columns}], [${3:values}])"
+    ],
+    "description": "Insert into database"
+  },
+  "Comment Block": {
+    "prefix": "comment",
+    "body": [
+      "// ===== ${1:SECTION} =====",
+      "$0"
+    ],
+    "description": "Section comment"
+  },
+  "Main Class": {
+    "prefix": "main",
+    "body": [
+      "class Main {",
+      "\tInit main() {",
+      "\t\tprint(\"${1:Hello JosSecurity}\")",
+      "\t\t$0",
+      "\t}",
+      "}"
+    ],
+    "description": "Main class entry point"
+  }
+}

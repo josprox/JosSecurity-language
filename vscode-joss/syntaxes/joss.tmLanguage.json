@@ -1,0 +1,162 @@
+{
+  "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+  "name": "JosSecurity",
+  "scopeName": "source.joss",
+  "patterns": [
+    { "include": "#comments" },
+    { "include": "#keywords" },
+    { "include": "#storage-types" },
+    { "include": "#strings" },
+    { "include": "#numbers" },
+    { "include": "#operators" },
+    { "include": "#variables" },
+    { "include": "#functions" },
+    { "include": "#classes" },
+    { "include": "#constants" }
+  ],
+  "repository": {
+    "comments": {
+      "patterns": [
+        {
+          "name": "comment.line.double-slash.joss",
+          "match": "//.*$"
+        },
+        {
+          "name": "comment.block.joss",
+          "begin": "/\\*",
+          "end": "\\*/"
+        }
+      ]
+    },
+    "keywords": {
+      "patterns": [
+        {
+          "name": "keyword.control.joss",
+          "match": "\\b(foreach|as|return|break|continue|new|this)\\b"
+        },
+        {
+          "name": "keyword.other.joss",
+          "match": "\\b(class|Init|Import|Namespace|public|private|protected)\\b"
+        },
+        {
+          "name": "keyword.operator.logical.joss",
+          "match": "\\b(and|or|not)\\b"
+        }
+      ]
+    },
+    "storage-types": {
+      "patterns": [
+        {
+          "name": "storage.type.joss",
+          "match": "\\b(int|float|string|bool|array|var|pointer|mixed)\\b"
+        }
+      ]
+    },
+    "strings": {
+      "patterns": [
+        {
+          "name": "string.quoted.double.joss",
+          "begin": "\"",
+          "end": "\"",
+          "patterns": [
+            {
+              "name": "constant.character.escape.joss",
+              "match": "\\\\."
+            },
+            {
+              "name": "variable.other.joss",
+              "match": "\\$[a-zA-Z_][a-zA-Z0-9_]*"
+            }
+          ]
+        },
+        {
+          "name": "string.quoted.single.joss",
+          "begin": "'",
+          "end": "'",
+          "patterns": [
+            {
+              "name": "constant.character.escape.joss",
+              "match": "\\\\."
+            }
+          ]
+        }
+      ]
+    },
+    "numbers": {
+      "patterns": [
+        {
+          "name": "constant.numeric.joss",
+          "match": "\\b\\d+(\\.\\d+)?\\b"
+        }
+      ]
+    },
+    "operators": {
+      "patterns": [
+        {
+          "name": "keyword.operator.comparison.joss",
+          "match": "(==|!=|<=|>=|<|>)"
+        },
+        {
+          "name": "keyword.operator.arithmetic.joss",
+          "match": "(\\+|\\-|\\*|\\/|%)"
+        },
+        {
+          "name": "keyword.operator.assignment.joss",
+          "match": "="
+        },
+        {
+          "name": "keyword.operator.ternary.joss",
+          "match": "(\\?|:)"
+        },
+        {
+          "name": "keyword.operator.logical.joss",
+          "match": "(&&|\\|\\||!)"
+        },
+        {
+          "name": "keyword.operator.member.joss",
+          "match": "(-\\>|\\.)"
+        }
+      ]
+    },
+    "variables": {
+      "patterns": [
+        {
+          "name": "variable.other.joss",
+          "match": "\\$[a-zA-Z_][a-zA-Z0-9_]*"
+        }
+      ]
+    },
+    "functions": {
+      "patterns": [
+        {
+          "name": "entity.name.function.joss",
+          "match": "\\b(print|echo|printf|env|isset|empty|len|count)\\b"
+        },
+        {
+          "name": "support.function.joss",
+          "match": "\\b[a-zA-Z_][a-zA-Z0-9_]*(?=\\s*\\()"
+        }
+      ]
+    },
+    "classes": {
+      "patterns": [
+        {
+          "name": "entity.name.type.class.joss",
+          "match": "\\b(Auth|GranMySQL|Stack|Queue|Main)\\b"
+        },
+        {
+          "name": "support.class.joss",
+          "match": "\\b[A-Z][a-zA-Z0-9_]*\\b"
+        }
+      ]
+    },
+    "constants": {
+      "patterns": [
+        {
+          "name": "constant.language.joss",
+          "match": "\\b(true|false|null)\\b"
+        }
+      ]
+    }
+  }
+}

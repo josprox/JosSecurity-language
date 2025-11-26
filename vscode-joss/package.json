@@ -1,0 +1,57 @@
+{
+  "name": "joss-language",
+  "displayName": "JosSecurity Language Support",
+  "description": "Syntax highlighting, snippets, and language support for JosSecurity (.joss)",
+  "version": "1.0.0",
+  "publisher": "jossecurity",
+  "engines": {
+    "vscode": "^1.80.0"
+  },
+  "categories": [
+    "Programming Languages",
+    "Snippets",
+    "Themes"
+  ],
+  "keywords": [
+    "joss",
+    "jossecurity",
+    "security",
+    "web",
+    "backend"
+  ],
+  "contributes": {
+    "languages": [
+      {
+        "id": "joss",
+        "aliases": ["JosSecurity", "joss"],
+        "extensions": [".joss"],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "joss",
+        "scopeName": "source.joss",
+        "path": "./syntaxes/joss.tmLanguage.json"
+      }
+    ],
+    "snippets": [
+      {
+        "language": "joss",
+        "path": "./snippets/joss.json"
+      }
+    ],
+    "themes": [
+      {
+        "label": "JosSecurity Dark",
+        "uiTheme": "vs-dark",
+        "path": "./themes/joss-dark.json"
+      }
+    ]
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/jossecurity/joss"
+  },
+  "license": "MIT"
+}
