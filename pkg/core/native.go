@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/jossecurity/joss/pkg/parser"
 	"golang.org/x/crypto/bcrypt"
 )
@@ -437,8 +438,10 @@ func (r *Runtime) executeAuthMethod(instance *Instance, method string, args []in
 			}
 
 			var storedHash string
-			query := fmt.Sprintf("SELECT password FROM %s WHERE email = ?", usersTable)
-			err := r.DB.QueryRow(query, email).Scan(&storedHash)
+			var userId int
+			var userName string
+			query := fmt.Sprintf("SELECT id, name, password FROM %s WHERE email = ?", usersTable)
+			err := r.DB.QueryRow(query, email).Scan(&userId, &userName, &storedHash)
 			if err != nil {
 				if err == sql.ErrNoRows {
 					fmt.Println("[Security] Usuario no encontrado.")
@@ -455,8 +458,100 @@ func (r *Runtime) executeAuthMethod(instance *Instance, method string, args []in
 			}
 
 			fmt.Println("[Security] Login exitoso.")
-			return fmt.Sprintf("JOSS_TOKEN_%d", time.Now().Unix())
+
+			// Generate JWT token with 3 months expiration (initial login)
+			return r.generateJWT(userId, email, userName, false)
+
+		}
+	case "refresh":
+		// Refresh JWT token with 6 months expiration
+		if len(args) >= 1 {
+			tokenString := args[0].(string)
+
+			jwtSecret := os.Getenv("JWT_SECRET")
+			if jwtSecret == "" {
+				jwtSecret = "joss_default_secret_change_in_production"
+			}
+
+			// Parse and validate existing token
+			token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
+				if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+					return nil, fmt.Errorf("unexpected signing method")
+				}
+				return []byte(jwtSecret), nil
+			})
+
+			if err != nil || !token.Valid {
+				fmt.Printf("[Security] Token inválido: %v\n", err)
+				return false
+			}
+
+			claims, ok := token.Claims.(jwt.MapClaims)
+			if !ok {
+				fmt.Println("[Security] Error parseando claims")
+				return false
+			}
+
+			// Extract user info from claims
+			userIdFloat, _ := claims["user_id"].(float64)
+			userId := int(userIdFloat)
+			email, _ := claims["email"].(string)
+			userName, _ := claims["name"].(string)
+
+			fmt.Println("[Security] Token refrescado exitosamente.")
+			// Generate new token with 6 months expiration (refresh)
+			return r.generateJWT(userId, email, userName, true)
 		}
 	}
 	return nil
+}
+
+// generateJWT creates a JWT token with configurable expiration
+func (r *Runtime) generateJWT(userId int, email string, userName string, isRefresh bool) interface{} {
+	jwtSecret := os.Getenv("JWT_SECRET")
+	if jwtSecret == "" {
+		jwtSecret = "joss_default_secret_change_in_production"
+	}
+
+	// Get expiration time from env or use defaults
+	var expirationMonths int
+	if isRefresh {
+		// Refresh token: 6 months default
+		refreshMonths := os.Getenv("JWT_REFRESH_EXPIRY_MONTHS")
+		if refreshMonths != "" {
+			fmt.Sscanf(refreshMonths, "%d", &expirationMonths)
+		} else {
+			expirationMonths = 6
+		}
+	} else {
+		// Initial token: 3 months default
+		initialMonths := os.Getenv("JWT_INITIAL_EXPIRY_MONTHS")
+		if initialMonths != "" {
+			fmt.Sscanf(initialMonths, "%d", &expirationMonths)
+		} else {
+			expirationMonths = 3
+		}
+	}
+
+	// Calculate expiration time (approximate: 30 days per month)
+	expirationDuration := time.Duration(expirationMonths) * 30 * 24 * time.Hour
+
+	// Create claims
+	claims := jwt.MapClaims{
+		"user_id": userId,
+		"email":   email,
+		"name":    userName,
+		"exp":     time.Now().Add(expirationDuration).Unix(),
+		"iat":     time.Now().Unix(),
+	}
+
+	// Create token
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+	tokenString, err := token.SignedString([]byte(jwtSecret))
+	if err != nil {
+		fmt.Printf("[Security] Error generando JWT: %v\n", err)
+		return false
+	}
+
+	return tokenString
 }
