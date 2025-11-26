@@ -9,6 +9,7 @@ const (
 	// Identifiers + literals
 	IDENT  = "IDENT"  // add, foobar, x, y, ...
 	INT    = "INT"    // 1343456
+	FLOAT  = "FLOAT"  // 12.34
 	STRING = "STRING" // "foobar"
 
 	// Operators and delimiters
@@ -41,6 +42,7 @@ const (
 	LBRACKET = "["
 	RBRACKET = "]"
 	DOT      = "."
+	ARROW    = "->"
 
 	// Keywords
 	FUNCTION  = "FUNCTION"
@@ -63,11 +65,12 @@ const (
 	ISSET     = "ISSET"
 	EMPTY     = "EMPTY"
 	// Control Structures
-	WHILE = "WHILE"
-	DO    = "DO"
-	TRY   = "TRY"
-	CATCH = "CATCH"
-	THROW = "THROW"
+	WHILE   = "WHILE"
+	DO      = "DO"
+	TRY     = "TRY"
+	CATCH   = "CATCH"
+	THROW   = "THROW"
+	EXTENDS = "EXTENDS"
 )
 
 type Token struct {
@@ -100,6 +103,7 @@ var keywords = map[string]TokenType{
 	"try":       TRY,
 	"catch":     CATCH,
 	"throw":     THROW,
+	"extends":   EXTENDS,
 }
 
 func LookupIdent(ident string) TokenType {

@@ -184,6 +184,15 @@ func (r *Runtime) executeStatement(stmt parser.Statement) interface{} {
 		return r.executeTryCatch(s)
 	case *parser.ThrowStatement:
 		return r.executeThrow(s)
+	case *parser.ReturnStatement:
+		return r.executeReturn(s)
+	}
+	return nil
+}
+
+func (r *Runtime) executeReturn(rs *parser.ReturnStatement) interface{} {
+	if rs.ReturnValue != nil {
+		return r.evaluateExpression(rs.ReturnValue)
 	}
 	return nil
 }
@@ -235,6 +244,8 @@ func (r *Runtime) evaluateExpression(exp parser.Expression) interface{} {
 	case *parser.StringLiteral:
 		return e.Value
 	case *parser.IntegerLiteral:
+		return e.Value
+	case *parser.FloatLiteral:
 		return e.Value
 	case *parser.Boolean:
 		return e.Value
@@ -403,6 +414,12 @@ func (r *Runtime) evaluateInfix(ie *parser.InfixExpression) interface{} {
 	if ie.Operator == "+" {
 		return lStr + rStr
 	}
+	if ie.Operator == "==" {
+		return lStr == rStr
+	}
+	if ie.Operator == "!=" {
+		return lStr != rStr
+	}
 
 	return nil
 }
@@ -425,10 +442,26 @@ func (r *Runtime) evaluateNew(ne *parser.NewExpression) interface{} {
 		Fields: make(map[string]interface{}),
 	}
 
-	// Initialize properties
-	for _, stmt := range classStmt.Body.Statements {
-		if let, ok := stmt.(*parser.LetStatement); ok {
-			instance.Fields[let.Name.Value] = r.evaluateExpression(let.Value)
+	// Collect inheritance chain
+	chain := []*parser.ClassStatement{classStmt}
+	curr := classStmt
+	for curr.SuperClass != nil {
+		parentName := curr.SuperClass.Value
+		if parent, ok := r.Classes[parentName]; ok {
+			chain = append(chain, parent)
+			curr = parent
+		} else {
+			break
+		}
+	}
+
+	// Initialize properties (Parent -> Child)
+	for i := len(chain) - 1; i >= 0; i-- {
+		cls := chain[i]
+		for _, stmt := range cls.Body.Statements {
+			if let, ok := stmt.(*parser.LetStatement); ok {
+				instance.Fields[let.Name.Value] = r.evaluateExpression(let.Value)
+			}
 		}
 	}
 
@@ -436,6 +469,19 @@ func (r *Runtime) evaluateNew(ne *parser.NewExpression) interface{} {
 	for _, stmt := range classStmt.Body.Statements {
 		if method, ok := stmt.(*parser.MethodStatement); ok {
 			if method.Name.Value == "constructor" {
+				r.callMethod(method, instance, ne.Arguments)
+				break
+			}
+		}
+		if initStmt, ok := stmt.(*parser.InitStatement); ok {
+			if initStmt.Name.Value == "constructor" {
+				// Convert to MethodStatement
+				method := &parser.MethodStatement{
+					Token:      initStmt.Token,
+					Name:       initStmt.Name,
+					Parameters: initStmt.Parameters,
+					Body:       initStmt.Body,
+				}
 				r.callMethod(method, instance, ne.Arguments)
 				break
 			}
@@ -461,23 +507,40 @@ func (r *Runtime) evaluateMember(me *parser.MemberExpression) interface{} {
 	}
 
 	// Check methods (Function and Init)
-	for _, stmt := range instance.Class.Body.Statements {
-		if method, ok := stmt.(*parser.MethodStatement); ok {
-			if method.Name.Value == propName {
-				return &BoundMethod{Method: method, Instance: instance}
+	// Check methods (Function and Init)
+	currentClass := instance.Class
+	for currentClass != nil {
+		for _, stmt := range currentClass.Body.Statements {
+			if method, ok := stmt.(*parser.MethodStatement); ok {
+				if method.Name.Value == propName {
+					return &BoundMethod{Method: method, Instance: instance}
+				}
+			}
+			if initStmt, ok := stmt.(*parser.InitStatement); ok {
+				if initStmt.Name.Value == propName {
+					// Convert InitStatement to MethodStatement for compatibility
+					method := &parser.MethodStatement{
+						Token:      initStmt.Token,
+						Name:       initStmt.Name,
+						Parameters: initStmt.Parameters,
+						Body:       initStmt.Body,
+					}
+					return &BoundMethod{Method: method, Instance: instance}
+				}
 			}
 		}
-		if initStmt, ok := stmt.(*parser.InitStatement); ok {
-			if initStmt.Name.Value == propName {
-				// Convert InitStatement to MethodStatement for compatibility
-				method := &parser.MethodStatement{
-					Token:      initStmt.Token,
-					Name:       initStmt.Name,
-					Parameters: initStmt.Parameters,
-					Body:       initStmt.Body,
-				}
-				return &BoundMethod{Method: method, Instance: instance}
+
+		// Move to parent
+		if currentClass.SuperClass != nil {
+			parentName := currentClass.SuperClass.Value
+			if parent, ok := r.Classes[parentName]; ok {
+				currentClass = parent
+			} else {
+				// fmt.Printf("Error: Clase padre '%s' no encontrada\n", parentName)
+				currentClass = nil
 			}
+		} else {
+			currentClass = nil
 		}
 	}
 

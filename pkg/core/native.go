@@ -33,10 +33,12 @@ func (r *Runtime) RegisterNativeClasses() {
 	})
 
 	// Auth
-	r.registerClass(&parser.ClassStatement{
+	authClass := &parser.ClassStatement{
 		Name: &parser.Identifier{Value: "Auth"},
 		Body: &parser.BlockStatement{},
-	})
+	}
+	r.registerClass(authClass)
+	r.Variables["Auth"] = &Instance{Class: authClass, Fields: make(map[string]interface{})}
 }
 
 func (r *Runtime) executeNativeMethod(instance *Instance, method string, args []interface{}) interface{} {

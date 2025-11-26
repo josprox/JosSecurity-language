@@ -35,6 +35,7 @@ var precedences = map[TokenType]int{
 	LPAREN:      CALL,
 	LBRACKET:    INDEX,
 	DOT:         INDEX,
+	ARROW:       INDEX,
 }
 
 type (
@@ -62,6 +63,7 @@ func NewParser(l *Lexer) *Parser {
 	p.registerPrefix(IDENT, p.parseIdentifier)
 	p.registerPrefix(VAR, p.parseVarExpression) // Handle $name
 	p.registerPrefix(INT, p.parseIntegerLiteral)
+	p.registerPrefix(FLOAT, p.parseFloatLiteral)
 	p.registerPrefix(STRING, p.parseStringLiteral)
 	p.registerPrefix(TRUE, p.parseBoolean)
 	p.registerPrefix(FALSE, p.parseBoolean)
@@ -87,6 +89,7 @@ func NewParser(l *Lexer) *Parser {
 	p.registerInfix(QUESTION, p.parseTernaryExpression)
 	p.registerInfix(LBRACKET, p.parseIndexExpression)
 	p.registerInfix(DOT, p.parseMemberExpression)
+	p.registerInfix(ARROW, p.parseMemberExpression)
 	p.registerInfix(ASSIGN, p.parseAssignExpression)
 
 	// Read two tokens, so curToken and peekToken are both set
@@ -149,11 +152,32 @@ func (p *Parser) parseStatement() Statement {
 	if p.curToken.Type == THROW {
 		return p.parseThrowStatement()
 	}
+	if p.curToken.Type == RETURN {
+		return p.parseReturnStatement()
+	}
 	// Check for variable declaration: type $name = value
 	if p.curToken.Type == IDENT && p.peekToken.Type == VAR {
 		return p.parseLetStatement()
 	}
 	return p.parseExpressionStatement()
+}
+
+func (p *Parser) parseReturnStatement() *ReturnStatement {
+	stmt := &ReturnStatement{Token: p.curToken}
+
+	p.nextToken()
+
+	if p.curToken.Type == SEMICOLON {
+		return stmt
+	}
+
+	stmt.ReturnValue = p.parseExpression(LOWEST)
+
+	if p.peekToken.Type == SEMICOLON {
+		p.nextToken()
+	}
+
+	return stmt
 }
 
 func (p *Parser) parseClassStatement() *ClassStatement {
@@ -164,6 +188,12 @@ func (p *Parser) parseClassStatement() *ClassStatement {
 	}
 
 	stmt.Name = &Identifier{Token: p.curToken, Value: p.curToken.Literal}
+
+	if p.peekToken.Type == EXTENDS {
+		p.nextToken()
+		p.nextToken()
+		stmt.SuperClass = &Identifier{Token: p.curToken, Value: p.curToken.Literal}
+	}
 
 	if !p.expectPeek(LBRACE) {
 		return nil
@@ -336,6 +366,20 @@ func (p *Parser) parseIntegerLiteral() Expression {
 	value, err := strconv.ParseInt(p.curToken.Literal, 0, 64)
 	if err != nil {
 		msg := fmt.Sprintf("could not parse %q as integer", p.curToken.Literal)
+		p.errors = append(p.errors, msg)
+		return nil
+	}
+
+	lit.Value = value
+	return lit
+}
+
+func (p *Parser) parseFloatLiteral() Expression {
+	lit := &FloatLiteral{Token: p.curToken}
+
+	value, err := strconv.ParseFloat(p.curToken.Literal, 64)
+	if err != nil {
+		msg := fmt.Sprintf("could not parse %q as float", p.curToken.Literal)
 		p.errors = append(p.errors, msg)
 		return nil
 	}

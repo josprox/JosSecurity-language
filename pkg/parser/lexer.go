@@ -105,7 +105,14 @@ func (l *Lexer) NextToken() Token {
 	case '+':
 		tok = l.newToken(PLUS, l.ch)
 	case '-':
-		tok = l.newToken(MINUS, l.ch)
+		if l.peekChar() == '>' {
+			ch := l.ch
+			l.readChar()
+			literal := string(ch) + string(l.ch)
+			tok = Token{Type: ARROW, Literal: literal, Line: l.line}
+		} else {
+			tok = l.newToken(MINUS, l.ch)
+		}
 	case '*':
 		tok = l.newToken(ASTERISK, l.ch)
 	case '/':
@@ -141,8 +148,14 @@ func (l *Lexer) NextToken() Token {
 			tok.Line = l.line
 			return tok
 		} else if isDigit(l.ch) {
-			tok.Type = INT
 			tok.Literal = l.readNumber()
+			if l.ch == '.' && isDigit(l.peekChar()) {
+				l.readChar()
+				tok.Literal += "." + l.readNumber()
+				tok.Type = FLOAT
+			} else {
+				tok.Type = INT
+			}
 			tok.Line = l.line
 			return tok
 		} else {

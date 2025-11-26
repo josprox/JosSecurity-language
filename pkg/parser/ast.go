@@ -114,9 +114,10 @@ func (ce *CallExpression) String() string {
 }
 
 type ClassStatement struct {
-	Token Token // CLASS
-	Name  *Identifier
-	Body  *BlockStatement
+	Token      Token // CLASS
+	Name       *Identifier
+	SuperClass *Identifier
+	Body       *BlockStatement
 }
 
 func (cs *ClassStatement) statementNode()       {}
@@ -125,6 +126,10 @@ func (cs *ClassStatement) String() string {
 	var out bytes.Buffer
 	out.WriteString("class ")
 	out.WriteString(cs.Name.String())
+	if cs.SuperClass != nil {
+		out.WriteString(" extends ")
+		out.WriteString(cs.SuperClass.String())
+	}
 	out.WriteString(" ")
 	out.WriteString(cs.Body.String())
 	return out.String()
@@ -258,6 +263,15 @@ type IntegerLiteral struct {
 func (il *IntegerLiteral) expressionNode()      {}
 func (il *IntegerLiteral) TokenLiteral() string { return il.Token.Literal }
 func (il *IntegerLiteral) String() string       { return il.Token.Literal }
+
+type FloatLiteral struct {
+	Token Token
+	Value float64
+}
+
+func (fl *FloatLiteral) expressionNode()      {}
+func (fl *FloatLiteral) TokenLiteral() string { return fl.Token.Literal }
+func (fl *FloatLiteral) String() string       { return fl.Token.Literal }
 
 type ArrayLiteral struct {
 	Token    Token // '['
@@ -511,6 +525,23 @@ func (ts *ThrowStatement) String() string {
 	out.WriteString("throw ")
 	if ts.Value != nil {
 		out.WriteString(ts.Value.String())
+	}
+	out.WriteString(";")
+	return out.String()
+}
+
+type ReturnStatement struct {
+	Token       Token // 'return'
+	ReturnValue Expression
+}
+
+func (rs *ReturnStatement) statementNode()       {}
+func (rs *ReturnStatement) TokenLiteral() string { return rs.Token.Literal }
+func (rs *ReturnStatement) String() string {
+	var out bytes.Buffer
+	out.WriteString(rs.TokenLiteral() + " ")
+	if rs.ReturnValue != nil {
+		out.WriteString(rs.ReturnValue.String())
 	}
 	out.WriteString(";")
 	return out.String()
