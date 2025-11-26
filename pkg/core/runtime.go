@@ -4,7 +4,6 @@ import (
 	"database/sql"
 	"fmt"
 	"os"
-	"strconv"
 
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/jossecurity/joss/pkg/parser"
@@ -25,6 +24,22 @@ type Instance struct {
 
 type Cout struct{}
 type Cin struct{}
+
+// Future represents an asynchronous computation
+type Future struct {
+	done   chan bool
+	result interface{}
+	err    error
+}
+
+// Wait blocks until the Future completes and returns the result
+func (f *Future) Wait() interface{} {
+	<-f.done
+	if f.err != nil {
+		panic(f.err)
+	}
+	return f.result
+}
 
 func (c *Cout) String() string { return "cout" }
 func (c *Cin) String() string  { return "cin" }
@@ -262,6 +277,8 @@ func (r *Runtime) evaluateExpression(exp parser.Expression) interface{} {
 		return r.evaluateInfix(e)
 	case *parser.ArrayLiteral:
 		return r.evaluateArray(e)
+	case *parser.MapLiteral:
+		return r.evaluateMap(e)
 	case *parser.IndexExpression:
 		return r.evaluateIndex(e)
 	case *parser.NewExpression:
@@ -308,6 +325,20 @@ func (r *Runtime) evaluateArray(al *parser.ArrayLiteral) []interface{} {
 	return elements
 }
 
+func (r *Runtime) evaluateMap(ml *parser.MapLiteral) map[string]interface{} {
+	m := make(map[string]interface{})
+	for k, v := range ml.Pairs {
+		key := r.evaluateExpression(k)
+		val := r.evaluateExpression(v)
+		if keyStr, ok := key.(string); ok {
+			m[keyStr] = val
+		} else {
+			fmt.Printf("Error: Clave de mapa inválida: %v (se espera string)\n", key)
+		}
+	}
+	return m
+}
+
 func (r *Runtime) evaluateIndex(ie *parser.IndexExpression) interface{} {
 	left := r.evaluateExpression(ie.Left)
 	index := r.evaluateExpression(ie.Index)
@@ -321,9 +352,21 @@ func (r *Runtime) evaluateIndex(ie *parser.IndexExpression) interface{} {
 		} else {
 			fmt.Println("Error: El índice debe ser un entero")
 		}
-	} else {
-		fmt.Println("Error: No se puede indexar algo que no es un array")
+		return nil
 	}
+
+	if m, ok := left.(map[string]interface{}); ok {
+		if key, ok := index.(string); ok {
+			if val, exists := m[key]; exists {
+				return val
+			}
+			return nil
+		}
+		fmt.Println("Error: El índice de un mapa debe ser string")
+		return nil
+	}
+
+	fmt.Println("Error: No se puede indexar algo que no es un array o mapa")
 	return nil
 }
 
@@ -376,36 +419,80 @@ func (r *Runtime) evaluateInfix(ie *parser.InfixExpression) interface{} {
 		}
 	}
 
-	toInt := func(val interface{}) (int64, bool) {
+	// Smart Numerics: Auto-promote to float if needed
+	toFloat := func(val interface{}) (float64, bool) {
 		if i, ok := val.(int64); ok {
-			return i, true
+			return float64(i), true
 		}
-		if s, ok := val.(string); ok {
-			i, err := strconv.ParseInt(s, 10, 64)
-			return i, err == nil
+		if f, ok := val.(float64); ok {
+			return f, true
 		}
 		return 0, false
 	}
 
-	lInt, lOk := toInt(left)
-	rInt, rOk := toInt(right)
+	lFloat, lIsNum := toFloat(left)
+	rFloat, rIsNum := toFloat(right)
 
-	if lOk && rOk {
-		switch ie.Operator {
-		case "+":
-			return lInt + rInt
-		case "<":
-			return lInt < rInt
-		case ">":
-			return lInt > rInt
-		case ">=":
-			return lInt >= rInt
-		case "<=":
-			return lInt <= rInt
-		case "==":
-			return lInt == rInt
-		case "!=":
-			return lInt != rInt
+	if lIsNum && rIsNum {
+		// If division, always float
+		if ie.Operator == "/" {
+			return lFloat / rFloat
+		}
+
+		// If any operand is float, result is float
+		isFloatOp := false
+		if _, ok := left.(float64); ok {
+			isFloatOp = true
+		}
+		if _, ok := right.(float64); ok {
+			isFloatOp = true
+		}
+
+		if isFloatOp {
+			switch ie.Operator {
+			case "+":
+				return lFloat + rFloat
+			case "-":
+				return lFloat - rFloat
+			case "*":
+				return lFloat * rFloat
+			case "<":
+				return lFloat < rFloat
+			case ">":
+				return lFloat > rFloat
+			case ">=":
+				return lFloat >= rFloat
+			case "<=":
+				return lFloat <= rFloat
+			case "==":
+				return lFloat == rFloat
+			case "!=":
+				return lFloat != rFloat
+			}
+		} else {
+			// Integer operations
+			lInt := int64(lFloat)
+			rInt := int64(rFloat)
+			switch ie.Operator {
+			case "+":
+				return lInt + rInt
+			case "-":
+				return lInt - rInt
+			case "*":
+				return lInt * rInt
+			case "<":
+				return lInt < rInt
+			case ">":
+				return lInt > rInt
+			case ">=":
+				return lInt >= rInt
+			case "<=":
+				return lInt <= rInt
+			case "==":
+				return lInt == rInt
+			case "!=":
+				return lInt != rInt
+			}
 		}
 	}
 
@@ -710,6 +797,41 @@ func (r *Runtime) executeCall(call *parser.CallExpression) interface{} {
 				}
 			}
 			return int64(0)
+		}
+		// async function - executes code in goroutine
+		if ident.Value == "async" {
+			if len(call.Arguments) == 1 {
+				future := &Future{
+					done: make(chan bool),
+				}
+
+				// Execute the argument in a goroutine
+				go func() {
+					defer func() {
+						if r := recover(); r != nil {
+							future.err = fmt.Errorf("%v", r)
+						}
+						close(future.done)
+					}()
+
+					// Evaluate the argument
+					future.result = r.evaluateExpression(call.Arguments[0])
+				}()
+
+				return future
+			}
+			return nil
+		}
+		// await function - waits for a Future
+		if ident.Value == "await" {
+			if len(call.Arguments) == 1 {
+				futureVal := r.evaluateExpression(call.Arguments[0])
+				if future, ok := futureVal.(*Future); ok {
+					return future.Wait()
+				}
+				fmt.Println("Error: await expects a Future")
+			}
+			return nil
 		}
 	}
 	return nil

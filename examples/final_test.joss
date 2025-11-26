@@ -31,7 +31,7 @@ class Dog extends Animal {
 
 class Main {
     Init main() {
-        print("=== FINAL JOSSECURITY TEST ===")
+        print("=== COMPREHENSIVE JOSSECURITY TEST ===")
         
         // 1. Inheritance & POO
         print("\n[1] Testing Inheritance & POO")
@@ -39,15 +39,34 @@ class Main {
         print("Type: " + $d->getType())
         $d->makeSound()
         
-        // 2. Printing Modes
-        print("\n[2] Testing Print Modes")
+        // 2. Smart Numerics (NEW)
+        print("\n[2] Testing Smart Numerics")
+        $a = 10
+        $b = 3
+        $div = $a / $b
+        print("10 / 3 = " + $div)
+        $mixed = 10 + 2.5
+        print("10 + 2.5 = " + $mixed)
+        
+        // 3. Maps (NEW)
+        print("\n[3] Testing Native Maps")
+        $config = {
+            "host": "localhost",
+            "port": 3306,
+            "user": "root"
+        }
+        print("DB Host: " + $config["host"])
+        print("DB Port: " + $config["port"])
+        
+        // 4. Printing Modes
+        print("\n[4] Testing Print Modes")
         print("This is print")
         echo "This is echo"
         cout << "This is cout" << "\n"
         printf("This is printf: %s\n", "Formatted")
         
-        // 3. Auth & JWT
-        print("\n[3] Testing Auth")
+        // 5. Auth & JWT
+        print("\n[5] Testing Auth")
         $email = "test_final@joss.com"
         $pass = "secret123"
         
@@ -55,7 +74,6 @@ class Main {
         $db.query("DELETE FROM js_users WHERE email = '" + $email + "'")
         
         print("Creating user...")
-        // Auth.create expects [email, password, name]
         Auth.create([$email, $pass, "Test User"])
         
         print("Attempting login...")
@@ -66,8 +84,8 @@ class Main {
             print("Login failed!")
         }
         
-        // 4. Sales CRUD (GranMySQL)
-        print("\n[4] Testing Sales CRUD")
+        // 6. Sales CRUD (GranMySQL)
+        print("\n[6] Testing Sales CRUD")
         $db.query("CREATE TABLE IF NOT EXISTS js_sales (id INT AUTO_INCREMENT PRIMARY KEY, item VARCHAR(255), amount DECIMAL(10,2))")
         $db.query("TRUNCATE TABLE js_sales")
         
@@ -79,8 +97,8 @@ class Main {
         $sales = $db.table("sales").where("amount", ">", 100).get()
         print($sales)
         
-        // 5. Try-Catch & Throw
-        print("\n[5] Testing Try-Catch")
+        // 7. Try-Catch & Throw
+        print("\n[7] Testing Try-Catch")
         try {
             print("Throwing error...")
             throw "Critical Error"
@@ -88,22 +106,30 @@ class Main {
             print("Caught: " + $e)
         }
         
-        // 6. Ternary Ladder
-        print("\n[6] Testing Ternary Ladder")
+        // 8. Ternary Ladder
+        print("\n[8] Testing Ternary Ladder")
         $score = 85
         $grade = ($score >= 90) ? "A" :
                  ($score >= 80) ? "B" :
                  ($score >= 70) ? "C" : "F"
         print("Score: " + $score + ", Grade: " + $grade)
         
-        // 7. Block Ternary
-        print("\n[7] Testing Block Ternary")
+        // 9. Block Ternary
+        print("\n[9] Testing Block Ternary")
         ($score > 50) ? {
             print("Passed!")
         } : {
             print("Failed!")
         }
         
-        print("\n=== TEST COMPLETE ===")
+        // 10. Async/Await (NEW - Phase 3)
+        print("\n[10] Testing Async/Await")
+        print("Starting async task...")
+        $future = async(10 + 20)
+        print("Task running in background...")
+        $result = await($future)
+        print("Async result: " + $result)
+        
+        print("\n=== ALL TESTS COMPLETE ===")
     }
 }

@@ -1,64 +1,40 @@
-# Examples Directory
+# JosSecurity Examples
 
-Este directorio contiene scripts de prueba para verificar las funcionalidades de JosSecurity.
+Este directorio contiene ejemplos de uso del lenguaje JosSecurity.
 
-## Scripts Disponibles
+## Ejemplos Principales
 
-### 1. test_complete.joss
-**Prueba completa de Auth y GranMySQL**
-- Verifica auto-creación de tabla `js_users`
-- Prueba registro de usuarios
-- Prueba login exitoso y fallido
-- Verifica fluent builder API
-- Prueba insert con builder
+### final_test.joss
+Test comprehensivo que demuestra todas las características del lenguaje:
+- Herencia y POO
+- Smart Numerics (división automática a float)
+- Maps nativos con sintaxis `{ key: value }`
+- Modos de impresión (print, echo, cout, printf)
+- Autenticación con JWT
+- CRUD con GranMySQL
+- Try-Catch y manejo de errores
+- Operadores ternarios
+- **Concurrencia con async/await**
 
-```bash
-go run ../cmd/joss/main.go run test_complete.joss
-```
+### jwt_test.joss
+Demostración de generación de tokens JWT con el módulo Auth.
 
-### 2. oop_test.joss
-**Prueba de OOP (Programación Orientada a Objetos)**
-- Clases y métodos
-- Instanciación con `new`
-- Llamadas a métodos
+### jwt_refresh_test.joss
+Ejemplo de tokens JWT con expiración configurable y refresh tokens.
 
-```bash
-go run ../cmd/joss/main.go run oop_test.joss
-```
-
-### 3. helpers_test.joss
-**Prueba de funciones helper**
-- `isset()` - Verifica si variable está definida
-- `empty()` - Verifica si variable está vacía
-- `len()` - Longitud de arrays
-- `count()` - Cuenta elementos
+## Cómo Ejecutar
 
 ```bash
-go run ../cmd/joss/main.go run helpers_test.joss
+# Ejecutar el test comprehensivo
+go run cmd/joss/main.go run examples/final_test.joss
+
+# Ejecutar tests de JWT
+go run cmd/joss/main.go run examples/jwt_test.joss
+go run cmd/joss/main.go run examples/jwt_refresh_test.joss
 ```
 
-### 4. polyglot_test.joss
-**Prueba de I/O Polyglot**
-- `echo` / `print` (PHP/Python style)
-- `cout <<` (C++ style)
-- `cin >>` (C++ style)
-- `printf` (C style)
+## Características Demostradas
 
-```bash
-go run ../cmd/joss/main.go run polyglot_test.joss
-```
-
-### 5. prueba_insercion/
-**Directorio con tests de Auth y DB**
-- `test_auth_db.joss` - Test completo de Auth con ternarios
-- `migration.joss` - Script de migración de tablas
-
-## Características Verificadas
-
-✅ **GranMySQL con Prefijos**: Todas las tablas usan `js_` prefix  
-✅ **Auth Auto-Migración**: Tabla `js_users` se crea automáticamente  
-✅ **Fluent Builder API**: Sintaxis encadenada funcional  
-✅ **Prepared Statements**: Protección contra SQL injection  
-✅ **OOP**: Clases, métodos, instanciación  
-✅ **Helpers**: isset, empty, len, count  
-✅ **Polyglot I/O**: Múltiples estilos de entrada/salida  
+- **Fase 1**: Smart Numerics y Maps nativos
+- **Fase 2**: Autoloading de clases desde `./classes/`
+- **Fase 3**: Concurrencia con `async` y `await`

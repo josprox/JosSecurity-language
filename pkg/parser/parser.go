@@ -24,6 +24,9 @@ var precedences = map[TokenType]int{
 	ASSIGN:      ASSIGNMENT,
 	QUESTION:    TERNARY,
 	PLUS:        SUM,
+	MINUS:       SUM,
+	SLASH:       PRODUCT,
+	ASTERISK:    PRODUCT,
 	LT:          LESSGREATER,
 	GT:          LESSGREATER,
 	EQ:          EQUALS,
@@ -69,6 +72,7 @@ func NewParser(l *Lexer) *Parser {
 	p.registerPrefix(FALSE, p.parseBoolean)
 	p.registerPrefix(LPAREN, p.parseGroupedExpression)
 	p.registerPrefix(LBRACKET, p.parseArrayLiteral)
+	p.registerPrefix(LBRACE, p.parseMapLiteral) // Maps { key: val }
 	p.registerPrefix(NEW, p.parseNewExpression)
 	p.registerPrefix(NEW, p.parseNewExpression)
 	p.registerPrefix(THIS, p.parseIdentifier)
@@ -77,6 +81,9 @@ func NewParser(l *Lexer) *Parser {
 
 	p.infixParseFns = make(map[TokenType]infixParseFn)
 	p.registerInfix(PLUS, p.parseInfixExpression)
+	p.registerInfix(MINUS, p.parseInfixExpression)
+	p.registerInfix(SLASH, p.parseInfixExpression)
+	p.registerInfix(ASTERISK, p.parseInfixExpression)
 	p.registerInfix(LT, p.parseInfixExpression)
 	p.registerInfix(GT, p.parseInfixExpression)
 	p.registerInfix(EQ, p.parseInfixExpression)
@@ -409,6 +416,52 @@ func (p *Parser) parseArrayLiteral() Expression {
 	array := &ArrayLiteral{Token: p.curToken}
 	array.Elements = p.parseExpressionList(RBRACKET)
 	return array
+}
+
+func (p *Parser) parseMapLiteral() Expression {
+	mapLit := &MapLiteral{Token: p.curToken}
+	mapLit.Pairs = make(map[Expression]Expression)
+
+	for !p.peekTokenIs(RBRACE) {
+		if p.peekTokenIs(NEWLINE) {
+			p.nextToken()
+			continue
+		}
+
+		p.nextToken()
+		key := p.parseExpression(LOWEST)
+
+		if !p.expectPeek(COLON) {
+			return nil
+		}
+
+		p.nextToken()
+		value := p.parseExpression(LOWEST)
+
+		mapLit.Pairs[key] = value
+
+		if p.peekTokenIs(RBRACE) {
+			break
+		}
+
+		if p.peekTokenIs(NEWLINE) {
+			p.nextToken()
+		}
+
+		if p.peekTokenIs(COMMA) {
+			p.nextToken()
+		}
+
+		if p.peekTokenIs(NEWLINE) {
+			p.nextToken()
+		}
+	}
+
+	if !p.expectPeek(RBRACE) {
+		return nil
+	}
+
+	return mapLit
 }
 
 func (p *Parser) parseExpressionList(end TokenType) []Expression {
