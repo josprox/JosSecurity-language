@@ -1,5 +1,3 @@
-Import "System.Core"
-
 class Animal {
     string $type = "Animal"
     
