@@ -1,0 +1,13 @@
+class Main {
+    Init main() {
+        print("--- Testing Auth ---")
+        $auth = new Auth()
+        
+        // Simulate Create
+        $auth.create(["user@test.com", "secret123"])
+        
+        // Simulate Attempt
+        $token = $auth.attempt("user@test.com", "secret123")
+        print("Token: " + $token)
+    }
+}

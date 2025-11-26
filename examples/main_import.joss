@@ -1,0 +1,7 @@
+Import "config.joss"
+
+class Main {
+    Init main() {
+        print("Conectando a: " + $db_host)
+    }
+}

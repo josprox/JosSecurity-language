@@ -1,0 +1,18 @@
+class Persona {
+    string $nombre
+    
+    function constructor($n) {
+        $this.nombre = $n
+    }
+    
+    function saludar() {
+        print("Hola, soy " + $this.nombre)
+    }
+}
+
+class Main {
+    Init main() {
+        $p = new Persona("Joss")
+        $p.saludar()
+    }
+}

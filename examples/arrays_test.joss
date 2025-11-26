@@ -1,0 +1,9 @@
+class Main {
+    Init main() {
+        int $numeros = [1, 2, 3, 4]
+        foreach ($numeros as $num) {
+            print($num)
+        }
+        print($numeros[0])
+    }
+}

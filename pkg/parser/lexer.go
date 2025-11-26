@@ -78,6 +78,11 @@ func (l *Lexer) NextToken() Token {
 			l.readChar()
 			literal := string(ch) + string(l.ch)
 			tok = Token{Type: LTE, Literal: literal}
+		} else if l.peekChar() == '<' {
+			ch := l.ch
+			l.readChar()
+			literal := string(ch) + string(l.ch)
+			tok = Token{Type: SHIFT_LEFT, Literal: literal}
 		} else {
 			tok = newToken(LT, l.ch)
 		}
@@ -87,15 +92,36 @@ func (l *Lexer) NextToken() Token {
 			l.readChar()
 			literal := string(ch) + string(l.ch)
 			tok = Token{Type: GTE, Literal: literal}
+		} else if l.peekChar() == '>' {
+			ch := l.ch
+			l.readChar()
+			literal := string(ch) + string(l.ch)
+			tok = Token{Type: SHIFT_RIGHT, Literal: literal}
 		} else {
 			tok = newToken(GT, l.ch)
 		}
 	case '+':
 		tok = newToken(PLUS, l.ch)
+	case '-':
+		tok = newToken(MINUS, l.ch)
+	case '*':
+		tok = newToken(ASTERISK, l.ch)
+	case '/':
+		if l.peekChar() == '/' {
+			l.skipComment()
+			return l.NextToken()
+		}
+		tok = newToken(SLASH, l.ch)
 	case '{':
 		tok = newToken(LBRACE, l.ch)
 	case '}':
 		tok = newToken(RBRACE, l.ch)
+	case '[':
+		tok = newToken(LBRACKET, l.ch)
+	case ']':
+		tok = newToken(RBRACKET, l.ch)
+	case '.':
+		tok = newToken(DOT, l.ch)
 	case '$':
 		tok.Type = VAR
 		tok.Literal = "$"
@@ -122,6 +148,13 @@ func (l *Lexer) NextToken() Token {
 
 	l.readChar()
 	return tok
+}
+
+func (l *Lexer) skipComment() {
+	for l.ch != '\n' && l.ch != 0 {
+		l.readChar()
+	}
+	l.skipWhitespace()
 }
 
 func newToken(tokenType TokenType, ch byte) Token {

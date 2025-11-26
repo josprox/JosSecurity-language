@@ -1,0 +1,5 @@
+class Main {
+    Init main() {
+        echo "Hello Echo"
+    }
+}

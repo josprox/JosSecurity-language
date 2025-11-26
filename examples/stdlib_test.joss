@@ -1,0 +1,26 @@
+class Main {
+    Init main() {
+        print("--- Testing Stack ---")
+        $s = new Stack()
+        $s.push(10)
+        $s.push(20)
+        print("Pop: " + $s.pop())
+        print("Peek: " + $s.peek())
+
+        print("\n--- Testing Queue ---")
+        $q = new Queue()
+        $q.enqueue("First")
+        $q.enqueue("Second")
+        print("Dequeue: " + $q.dequeue())
+        print("Peek: " + $q.peek())
+
+        print("\n--- Testing GranMySQL ---")
+        $db = new GranMySQL()
+        $db.tabla = "users"
+        $db.comparar = "role"
+        $db.comparable = "admin"
+        
+        print("Where JSON: " + $db.where("json"))
+        print("Clasic: " + $db.clasic())
+    }
+}

@@ -1,0 +1,28 @@
+class Main {
+    Init main() {
+        // Test isset
+        string $defined = "yes"
+        print("isset($defined): " + isset($defined)) // true
+        print("isset($undefined): " + isset($undefined)) // false
+
+        int $arr = [1, 2]
+        print("isset($arr[0]): " + isset($arr[0])) // true
+        print("isset($arr[99]): " + isset($arr[99])) // false
+
+        // Test empty
+        string $emptyStr = ""
+        string $zeroStr = "0"
+        int $zeroInt = 0
+        int $emptyArr = []
+        
+        print("empty($emptyStr): " + empty($emptyStr)) // true
+        print("empty($zeroStr): " + empty($zeroStr)) // true
+        print("empty($zeroInt): " + empty($zeroInt)) // true
+        print("empty($emptyArr): " + empty($emptyArr)) // true
+        print("empty($defined): " + empty($defined)) // false
+
+        // Test len/count
+        print("len('hello'): " + len("hello")) // 5
+        print("count([1, 2, 3]): " + count([1, 2, 3])) // 3
+    }
+}

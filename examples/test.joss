@@ -1,0 +1,6 @@
+class Main {
+    Init main() {
+        string $mensaje = "Hola Joss"
+        print($mensaje)
+    }
+}

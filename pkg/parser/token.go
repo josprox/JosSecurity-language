@@ -19,12 +19,14 @@ const (
 	ASTERISK = "*"
 	SLASH    = "/"
 
-	LT     = "<"
-	GT     = ">"
-	EQ     = "=="
-	NOT_EQ = "!="
-	LTE    = "<="
-	GTE    = ">="
+	LT          = "<"
+	GT          = ">"
+	EQ          = "=="
+	NOT_EQ      = "!="
+	LTE         = "<="
+	GTE         = ">="
+	SHIFT_LEFT  = "<<"
+	SHIFT_RIGHT = ">>"
 
 	COMMA     = ","
 	SEMICOLON = ";"
@@ -32,10 +34,13 @@ const (
 	QUESTION  = "?"
 	NEWLINE   = "NEWLINE"
 
-	LPAREN = "("
-	RPAREN = ")"
-	LBRACE = "{"
-	RBRACE = "}"
+	LPAREN   = "("
+	RPAREN   = ")"
+	LBRACE   = "{"
+	RBRACE   = "}"
+	LBRACKET = "["
+	RBRACKET = "]"
+	DOT      = "."
 
 	// Keywords
 	FUNCTION  = "FUNCTION"
@@ -46,11 +51,17 @@ const (
 	ELSE      = "ELSE"
 	RETURN    = "RETURN"
 	PRINT     = "PRINT"
+	ECHO      = "ECHO"
 	CLASS     = "CLASS"
 	INIT      = "INIT"
 	NAMESPACE = "NAMESPACE"
 	IMPORT    = "IMPORT"
 	NEW       = "NEW"
+	FOREACH   = "FOREACH"
+	AS        = "AS"
+	THIS      = "THIS"
+	ISSET     = "ISSET"
+	EMPTY     = "EMPTY"
 )
 
 type Token struct {
@@ -69,6 +80,14 @@ var keywords = map[string]TokenType{
 	"Namespace": NAMESPACE,
 	"Import":    IMPORT,
 	"new":       NEW,
+	"foreach":   FOREACH,
+	"as":        AS,
+	"function":  FUNCTION,
+	"this":      THIS,
+	"echo":      ECHO,
+	"print":     PRINT,
+	"isset":     ISSET,
+	"empty":     EMPTY,
 }
 
 func LookupIdent(ident string) TokenType {
