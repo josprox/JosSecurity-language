@@ -104,6 +104,8 @@ var keywords = map[string]TokenType{
 	"catch":     CATCH,
 	"throw":     THROW,
 	"extends":   EXTENDS,
+	"@import":   IMPORT,
+	"import":    IMPORT,
 }
 
 func LookupIdent(ident string) TokenType {

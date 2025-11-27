@@ -138,6 +138,9 @@ func (p *Parser) parseStatement() Statement {
 	if p.curToken.Type == FOREACH {
 		return p.parseForeachStatement()
 	}
+	if p.curToken.Type == FUNCTION {
+		return p.parseMethodStatement()
+	}
 	if p.curToken.Type == IMPORT {
 		return p.parseImportStatement()
 	}

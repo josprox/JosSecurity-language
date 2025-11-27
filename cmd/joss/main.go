@@ -88,11 +88,19 @@ func main() {
 func buildProject() {
 	fmt.Println("Iniciando compilación de JosSecurity...")
 
-	// 1. Validate Structure
-	required := []string{"main.joss", "env.joss", "app", "config"}
+	// 1. Validate Structure (Strict Topology)
+	required := []string{
+		"main.joss",
+		"env.joss",
+		"app",
+		"config",
+		"api.joss",
+		"routes.joss",
+	}
 	for _, f := range required {
 		if _, err := os.Stat(f); os.IsNotExist(err) {
-			fmt.Printf("Error: Falta archivo/directorio requerido '%s'\n", f)
+			fmt.Printf("Error de Arquitectura: Falta archivo/directorio requerido '%s'\n", f)
+			fmt.Println("La Biblia de JosSecurity requiere una estructura estricta.")
 			return
 		}
 	}

@@ -15,6 +15,7 @@ type Runtime struct {
 	Env       map[string]string
 	Variables map[string]interface{}
 	Classes   map[string]*parser.ClassStatement
+	Functions map[string]*parser.MethodStatement
 	DB        *sql.DB
 }
 
@@ -51,6 +52,7 @@ func NewRuntime() *Runtime {
 		Env:       make(map[string]string),
 		Variables: make(map[string]interface{}),
 		Classes:   make(map[string]*parser.ClassStatement),
+		Functions: make(map[string]*parser.MethodStatement),
 	}
 	r.Variables["cout"] = &Cout{}
 	r.Variables["cin"] = &Cin{}
@@ -225,6 +227,8 @@ func (r *Runtime) executeStatement(stmt parser.Statement) interface{} {
 		return r.executeThrow(s)
 	case *parser.ReturnStatement:
 		return r.executeReturn(s)
+	case *parser.MethodStatement:
+		r.Functions[s.Name.Value] = s
 	}
 	return nil
 }
@@ -238,6 +242,23 @@ func (r *Runtime) executeReturn(rs *parser.ReturnStatement) interface{} {
 
 func (r *Runtime) executeImport(stmt *parser.ImportStatement) interface{} {
 	filename := stmt.Path
+
+	// Handle Global Import
+	if filename == "global" {
+		filename = "config/global.joss"
+		if _, err := os.Stat(filename); os.IsNotExist(err) {
+			// Try looking in parent directories if running from subfolder
+			if _, err := os.Stat("../config/global.joss"); err == nil {
+				filename = "../config/global.joss"
+			} else if _, err := os.Stat("../../config/global.joss"); err == nil {
+				filename = "../../config/global.joss"
+			} else {
+				fmt.Println("Error: @import \"global\" requiere 'config/global.joss'")
+				return nil
+			}
+		}
+	}
+
 	content, err := os.ReadFile(filename)
 	if err != nil {
 		fmt.Printf("Error: No se pudo importar '%s': %v\n", filename, err)
@@ -779,6 +800,11 @@ func (r *Runtime) executeCall(call *parser.CallExpression) interface{} {
 	}
 
 	if ident, ok := call.Function.(*parser.Identifier); ok {
+		// Check for Global Function
+		if method, ok := r.Functions[ident.Value]; ok {
+			return r.callMethod(method, nil, call.Arguments)
+		}
+
 		if ident.Value == "print" || ident.Value == "echo" {
 			for _, arg := range call.Arguments {
 				val := r.evaluateExpression(arg)

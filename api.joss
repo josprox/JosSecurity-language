@@ -1,0 +1,4 @@
+// API Routes
+class Api {
+    Init constructor() {}
+}
