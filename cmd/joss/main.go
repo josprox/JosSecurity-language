@@ -185,16 +185,54 @@ func createModel(name string) {
 
 func runMigrations() {
 	fmt.Println("Ejecutando migraciones...")
-	// In a real scenario, this would read migration files and execute SQL
-	// For now, we simulate checking the DB connection and running auto-migrations
+
+	// 1. Initialize Runtime
 	rt := core.NewRuntime()
 	rt.LoadEnv()
-	if rt.DB != nil {
-		fmt.Println("Conexión a DB exitosa.")
-		fmt.Println("Tablas base verificadas.")
-	} else {
-		fmt.Println("No se pudo conectar a la base de datos.")
+
+	if rt.DB == nil {
+		fmt.Println("Error: No se pudo conectar a la base de datos.")
+		return
 	}
+	fmt.Println("Conexión a DB exitosa.")
+
+	// 2. Find migration files
+	files, err := filepath.Glob("app/database/migrations/*.joss")
+	if err != nil {
+		fmt.Printf("Error buscando migraciones: %v\n", err)
+		return
+	}
+
+	if len(files) == 0 {
+		fmt.Println("No se encontraron migraciones en app/database/migrations/")
+		return
+	}
+
+	// 3. Execute each migration
+	for _, file := range files {
+		fmt.Printf("Migrando: %s...\n", filepath.Base(file))
+
+		data, err := os.ReadFile(file)
+		if err != nil {
+			fmt.Printf("Error leyendo %s: %v\n", file, err)
+			continue
+		}
+
+		l := parser.NewLexer(string(data))
+		p := parser.NewParser(l)
+		program := p.ParseProgram()
+
+		if len(p.Errors()) != 0 {
+			fmt.Printf("Error de parseo en %s:\n", file)
+			for _, msg := range p.Errors() {
+				fmt.Printf("\t%s\n", msg)
+			}
+			continue
+		}
+
+		rt.Execute(program)
+	}
+	fmt.Println("Migraciones completadas.")
 }
 
 func printHelp() {

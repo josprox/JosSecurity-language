@@ -176,6 +176,7 @@ func getTablePrefix() string {
 }
 
 // GranMySQL Implementation
+// GranMySQL Implementation
 func (r *Runtime) executeGranMySQLMethod(instance *Instance, method string, args []interface{}) interface{} {
 	// Initialize internal state if needed
 	if _, ok := instance.Fields["_wheres"]; !ok {
@@ -267,6 +268,48 @@ func (r *Runtime) executeGranMySQLMethod(instance *Instance, method string, args
 		instance.Fields["_bindings"] = bindings
 		return instance
 
+	case "innerJoin":
+		if len(args) >= 4 {
+			table := args[0].(string)
+			first := args[1].(string)
+			op := args[2].(string)
+			second := args[3].(string)
+			if _, ok := instance.Fields["_joins"]; !ok {
+				instance.Fields["_joins"] = []string{}
+			}
+			join := fmt.Sprintf("INNER JOIN %s ON %s %s %s", table, first, op, second)
+			instance.Fields["_joins"] = append(instance.Fields["_joins"].([]string), join)
+		}
+		return instance
+
+	case "leftJoin":
+		if len(args) >= 4 {
+			table := args[0].(string)
+			first := args[1].(string)
+			op := args[2].(string)
+			second := args[3].(string)
+			if _, ok := instance.Fields["_joins"]; !ok {
+				instance.Fields["_joins"] = []string{}
+			}
+			join := fmt.Sprintf("LEFT JOIN %s ON %s %s %s", table, first, op, second)
+			instance.Fields["_joins"] = append(instance.Fields["_joins"].([]string), join)
+		}
+		return instance
+
+	case "rightJoin":
+		if len(args) >= 4 {
+			table := args[0].(string)
+			first := args[1].(string)
+			op := args[2].(string)
+			second := args[3].(string)
+			if _, ok := instance.Fields["_joins"]; !ok {
+				instance.Fields["_joins"] = []string{}
+			}
+			join := fmt.Sprintf("RIGHT JOIN %s ON %s %s %s", table, first, op, second)
+			instance.Fields["_joins"] = append(instance.Fields["_joins"].([]string), join)
+		}
+		return instance
+
 	case "get":
 		if r.DB == nil {
 			fmt.Println("[GranMySQL] Error: No DB connection")
@@ -279,6 +322,13 @@ func (r *Runtime) executeGranMySQLMethod(instance *Instance, method string, args
 		bindings := instance.Fields["_bindings"].([]interface{})
 
 		query := fmt.Sprintf("SELECT %s FROM %s", sel, table)
+
+		if joins, ok := instance.Fields["_joins"]; ok {
+			for _, j := range joins.([]string) {
+				query += " " + j
+			}
+		}
+
 		if len(wheres) > 0 {
 			query += " WHERE " + strings.Join(wheres, " AND ")
 		}
@@ -287,7 +337,7 @@ func (r *Runtime) executeGranMySQLMethod(instance *Instance, method string, args
 		instance.Fields["_wheres"] = []string{}
 		instance.Fields["_bindings"] = []interface{}{}
 		instance.Fields["_select"] = "*"
-		// Keep table? Usually builder resets, but let's keep it simple.
+		instance.Fields["_joins"] = []string{}
 
 		rows, err := r.DB.Query(query, bindings...)
 		if err != nil {
@@ -299,8 +349,6 @@ func (r *Runtime) executeGranMySQLMethod(instance *Instance, method string, args
 		return rowsToJSON(rows)
 
 	case "first":
-		// Similar to get but returns single object or null
-		// Add LIMIT 1
 		if r.DB == nil {
 			return nil
 		}
@@ -311,6 +359,13 @@ func (r *Runtime) executeGranMySQLMethod(instance *Instance, method string, args
 		bindings := instance.Fields["_bindings"].([]interface{})
 
 		query := fmt.Sprintf("SELECT %s FROM %s", sel, table)
+
+		if joins, ok := instance.Fields["_joins"]; ok {
+			for _, j := range joins.([]string) {
+				query += " " + j
+			}
+		}
+
 		if len(wheres) > 0 {
 			query += " WHERE " + strings.Join(wheres, " AND ")
 		}
@@ -319,6 +374,7 @@ func (r *Runtime) executeGranMySQLMethod(instance *Instance, method string, args
 		// Reset state
 		instance.Fields["_wheres"] = []string{}
 		instance.Fields["_bindings"] = []interface{}{}
+		instance.Fields["_joins"] = []string{}
 
 		rows, err := r.DB.Query(query, bindings...)
 		if err != nil {
@@ -327,14 +383,9 @@ func (r *Runtime) executeGranMySQLMethod(instance *Instance, method string, args
 		defer rows.Close()
 
 		jsonStr := rowsToJSON(rows)
-		// If "[]", return nil/false? Or the first element?
-		// rowsToJSON returns string "[]" or "[{...}]"
 		if jsonStr == "[]" {
 			return nil
 		}
-		// Extract first object from JSON array string (hacky but consistent with current string returns)
-		// Better: return the raw map if possible? Joss uses strings mostly for now.
-		// Let's return the string of the object.
 		return strings.TrimSuffix(strings.TrimPrefix(jsonStr.(string), "["), "]")
 
 	case "insert":
@@ -377,7 +428,6 @@ func (r *Runtime) executeGranMySQLMethod(instance *Instance, method string, args
 		return false
 
 	case "query":
-		// Raw query support (still needed for migrations)
 		if len(args) > 0 {
 			if sqlStr, ok := args[0].(string); ok {
 				if r.DB == nil {
@@ -391,14 +441,55 @@ func (r *Runtime) executeGranMySQLMethod(instance *Instance, method string, args
 				return true
 			}
 		}
-
-	// Legacy support (tabla, comparar, comparable) -> Map to builder
-	case "legacy_where":
-		// ...
 	}
 	return nil
 }
 
+// System Implementation
+func (r *Runtime) executeSystemMethod(instance *Instance, method string, args []interface{}) interface{} {
+	switch method {
+	case "env":
+		if len(args) > 0 {
+			key := args[0].(string)
+			if val, ok := r.Env[key]; ok {
+				return val
+			}
+			if len(args) > 1 {
+				return args[1] // Default value
+			}
+			return ""
+		}
+	case "Run":
+		if len(args) > 0 {
+			cmdName := args[0].(string)
+			cmdArgs := []string{}
+			if len(args) > 1 {
+				if list, ok := args[1].([]interface{}); ok {
+					for _, arg := range list {
+						cmdArgs = append(cmdArgs, fmt.Sprintf("%v", arg))
+					}
+				}
+			}
+
+			cmd := exec.Command(cmdName, cmdArgs...)
+			output, err := cmd.CombinedOutput()
+			if err != nil {
+				fmt.Printf("[System] Error ejecutando '%s': %v\n", cmdName, err)
+				return ""
+			}
+			return string(output)
+		}
+	case "load_driver":
+		if len(args) > 0 {
+			path := args[0].(string)
+			fmt.Printf("[System] Cargando driver externo desde: %s (Simulación)\n", path)
+			return true
+		}
+	}
+	return nil
+}
+
+// SmtpClient Implementation
 func rowsToJSON(rows *sql.Rows) interface{} {
 	var results []string
 	cols, _ := rows.Columns()
@@ -608,44 +699,6 @@ func (r *Runtime) generateJWT(userId int, email string, userName string, isRefre
 	}
 
 	return tokenString
-}
-
-// System Implementation
-func (r *Runtime) executeSystemMethod(instance *Instance, method string, args []interface{}) interface{} {
-	switch method {
-	case "env":
-		if len(args) > 0 {
-			key := args[0].(string)
-			if val, ok := r.Env[key]; ok {
-				return val
-			}
-			if len(args) > 1 {
-				return args[1] // Default value
-			}
-			return ""
-		}
-	case "Run":
-		if len(args) > 0 {
-			cmdName := args[0].(string)
-			cmdArgs := []string{}
-			if len(args) > 1 {
-				if list, ok := args[1].([]interface{}); ok {
-					for _, arg := range list {
-						cmdArgs = append(cmdArgs, fmt.Sprintf("%v", arg))
-					}
-				}
-			}
-
-			cmd := exec.Command(cmdName, cmdArgs...)
-			output, err := cmd.CombinedOutput()
-			if err != nil {
-				fmt.Printf("[System] Error ejecutando '%s': %v\n", cmdName, err)
-				return ""
-			}
-			return string(output)
-		}
-	}
-	return nil
 }
 
 // SmtpClient Implementation

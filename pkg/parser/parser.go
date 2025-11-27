@@ -147,8 +147,8 @@ func (p *Parser) parseStatement() Statement {
 	if p.curToken.Type == ECHO || p.curToken.Type == PRINT {
 		return p.parseEchoStatement()
 	}
-	if p.curToken.Type == ECHO || p.curToken.Type == PRINT {
-		return p.parseEchoStatement()
+	if p.curToken.Type == IF {
+		return p.parseIfStatement()
 	}
 	if p.curToken.Type == WHILE {
 		return p.parseWhileStatement()
@@ -953,6 +953,58 @@ func (p *Parser) parseThrowStatement() *ThrowStatement {
 
 	if p.peekToken.Type == SEMICOLON {
 		p.nextToken()
+	}
+
+	return stmt
+}
+func (p *Parser) parseIfStatement() *IfStatement {
+	stmt := &IfStatement{Token: p.curToken}
+
+	if !p.expectPeek(LPAREN) {
+		return nil
+	}
+
+	p.nextToken()
+	stmt.Condition = p.parseExpression(LOWEST)
+
+	if !p.expectPeek(RPAREN) {
+		return nil
+	}
+
+	if !p.expectPeek(LBRACE) {
+		return nil
+	}
+
+	stmt.Consequence = p.parseBlockStatement()
+
+	if p.peekToken.Type == ELSE {
+		p.nextToken()
+
+		if p.peekToken.Type == IF {
+			// else if... treat as nested if in Alternative?
+			// Or just parseIfStatement again?
+			// Standard way: else { if ... } or specific ElseIf support.
+			// Let's support simple else block first.
+			// If we want else if, we can check if next token is IF.
+
+			// Actually, if peek is IF, we can just parse it as the Alternative (which is a Statement).
+			// But parseBlockStatement expects LBRACE.
+			// So "else if" is usually parsed recursively or as a block containing an if.
+
+			// Let's handle simple ELSE { BLOCK } first.
+			if !p.expectPeek(LBRACE) {
+				// Support "else if" by checking if next is IF?
+				// If p.peekToken.Type == IF { ... }
+				// For now, let's stick to strict ELSE { }
+				return nil
+			}
+			stmt.Alternative = p.parseBlockStatement()
+		} else {
+			if !p.expectPeek(LBRACE) {
+				return nil
+			}
+			stmt.Alternative = p.parseBlockStatement()
+		}
 	}
 
 	return stmt

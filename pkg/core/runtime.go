@@ -14,6 +14,7 @@ import (
 type Runtime struct {
 	Env       map[string]string
 	Variables map[string]interface{}
+	VarTypes  map[string]string // For strict typing
 	Classes   map[string]*parser.ClassStatement
 	Functions map[string]*parser.MethodStatement
 	DB        *sql.DB
@@ -51,6 +52,7 @@ func NewRuntime() *Runtime {
 	r := &Runtime{
 		Env:       make(map[string]string),
 		Variables: make(map[string]interface{}),
+		VarTypes:  make(map[string]string),
 		Classes:   make(map[string]*parser.ClassStatement),
 		Functions: make(map[string]*parser.MethodStatement),
 	}
@@ -207,6 +209,11 @@ func (r *Runtime) executeStatement(stmt parser.Statement) interface{} {
 	switch s := stmt.(type) {
 	case *parser.LetStatement:
 		val := r.evaluateExpression(s.Value)
+		// Strict Typing: Store type
+		r.VarTypes[s.Name.Value] = s.Token.Literal
+		if !r.checkType(val, s.Token.Literal) {
+			panic(fmt.Sprintf("Error de Tipado: Variable '%s' definida como '%s' pero asignada valor incompatible", s.Name.Value, s.Token.Literal))
+		}
 		r.Variables[s.Name.Value] = val
 	case *parser.ExpressionStatement:
 		return r.evaluateExpression(s.Expression)
@@ -229,6 +236,8 @@ func (r *Runtime) executeStatement(stmt parser.Statement) interface{} {
 		return r.executeReturn(s)
 	case *parser.MethodStatement:
 		r.Functions[s.Name.Value] = s
+	case *parser.IfStatement:
+		return r.executeIf(s)
 	}
 	return nil
 }
@@ -236,6 +245,16 @@ func (r *Runtime) executeStatement(stmt parser.Statement) interface{} {
 func (r *Runtime) executeReturn(rs *parser.ReturnStatement) interface{} {
 	if rs.ReturnValue != nil {
 		return r.evaluateExpression(rs.ReturnValue)
+	}
+	return nil
+}
+
+func (r *Runtime) executeIf(is *parser.IfStatement) interface{} {
+	cond := r.evaluateExpression(is.Condition)
+	if isTruthy(cond) {
+		return r.executeBlock(is.Consequence)
+	} else if is.Alternative != nil {
+		return r.executeBlock(is.Alternative)
 	}
 	return nil
 }
@@ -344,6 +363,12 @@ func (r *Runtime) evaluateAssign(ae *parser.AssignExpression) interface{} {
 	val := r.evaluateExpression(ae.Value)
 
 	if ident, ok := ae.Left.(*parser.Identifier); ok {
+		// Strict Typing Check
+		if expectedType, exists := r.VarTypes[ident.Value]; exists {
+			if !r.checkType(val, expectedType) {
+				panic(fmt.Sprintf("Error de Tipado: No se puede asignar valor a '%s' (se espera %s)", ident.Value, expectedType))
+			}
+		}
 		r.Variables[ident.Value] = val
 		return val
 	}
@@ -991,4 +1016,31 @@ func (r *Runtime) executeThrow(ts *parser.ThrowStatement) interface{} {
 
 func isTruthy(val interface{}) bool {
 	return !isFalsy(val)
+}
+
+func (r *Runtime) checkType(val interface{}, typeName string) bool {
+	if val == nil {
+		return true
+	} // Allow nil?
+	switch typeName {
+	case "int":
+		_, ok := val.(int64)
+		return ok
+	case "float":
+		_, ok := val.(float64)
+		return ok
+	case "string":
+		_, ok := val.(string)
+		return ok
+	case "bool":
+		_, ok := val.(bool)
+		return ok
+	case "array":
+		_, ok := val.([]interface{})
+		return ok
+	case "map":
+		_, ok := val.(map[string]interface{})
+		return ok
+	}
+	return true // Unknown types (classes) not strictly checked yet
 }
