@@ -161,5 +161,81 @@
       "}"
     ],
     "description": "Class with inheritance"
+  },
+  "System Run": {
+    "prefix": "sysrun",
+    "body": [
+      "System.Run(\"${1:command}\", [${2:args}])"
+    ],
+    "description": "Execute system command"
+  },
+  "System Env": {
+    "prefix": "sysenv",
+    "body": [
+      "\\$${1:var} = System.env(\"${2:KEY}\")"
+    ],
+    "description": "Get environment variable"
+  },
+  "SMTP Send": {
+    "prefix": "mailsend",
+    "body": [
+      "\\$smtp = new SmtpClient()",
+      "\\$smtp.auth(\"${1:user}\", \"${2:pass}\")",
+      "\\$smtp.send(\"${3:to}\", \"${4:subject}\", \"${5:body}\")"
+    ],
+    "description": "Send email via SMTP"
+  },
+  "Cron Schedule": {
+    "prefix": "cron",
+    "body": [
+      "Cron.schedule(\"${1:name}\", \"${2:00:00}\", {",
+      "\\t$0",
+      "})"
+    ],
+    "description": "Schedule a cron job"
+  },
+  "Task Hit": {
+    "prefix": "task",
+    "body": [
+      "Task.on_request(\"${1:name}\", \"${2:00:00}\", {",
+      "\\t$0",
+      "})"
+    ],
+    "description": "Schedule a hit-based task"
+  },
+  "View Render": {
+    "prefix": "view",
+    "body": [
+      "return View.render(\"${1:viewName}\", {${2:data}})"
+    ],
+    "description": "Render a view"
+  },
+  "TOON Encode": {
+    "prefix": "toonenc",
+    "body": [
+      "\\$toon = toon_encode(${1:data})"
+    ],
+    "description": "Encode to TOON"
+  },
+  "TOON Decode": {
+    "prefix": "toondeco",
+    "body": [
+      "\\$data = toon_decode(${1:string})"
+    ],
+    "description": "Decode TOON string"
+  },
+  "JSON Encode": {
+    "prefix": "jsonenc",
+    "body": [
+      "\\$json = json_encode(${1:data})"
+    ],
+    "description": "Encode to JSON"
+  },
+  "JSON Decode": {
+    "prefix": "jsondeco",
+    "body": [
+      "\\$data = json_decode(${1:string})"
+    ],
+    "description": "Decode JSON string"
   }
 }

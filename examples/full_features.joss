@@ -1,0 +1,45 @@
+class Main {
+    Init main() {
+        print("=== JOSSECURITY FULL FEATURES TEST ===")
+
+        // 1. System & Env
+        print("\n[1] Testing System & Env")
+        // Env is loaded in runtime, let's check a default one
+        print("DB_HOST: " + System.env("DB_HOST"))
+        print("Running echo command:")
+        // Windows echo might behave differently, let's try a simple string
+        // Note: System.Run uses exec.Command. On Windows "echo" is a shell builtin, might fail if not "cmd /c echo"
+        // Let's try "hostname" or something simple. Or "cmd", "/c", "echo hello"
+        print(System.Run("cmd", ["/c", "echo Hello from System.Run"]))
+
+        // 2. TOON
+        print("\n[2] Testing TOON")
+        $users = [{"id": 1, "name": "Alice"}, {"id": 2, "name": "Bob"}]
+        $toon = toon_encode($users)
+        print("Encoded TOON:\n" + $toon)
+        
+        $decoded = toon_decode($toon)
+        print("Decoded TOON (Count): " + count($decoded))
+        
+        // 3. View
+        print("\n[3] Testing View")
+        $html = View.render("emails.welcome", {"name": "Joss", "email": "joss@test.com"})
+        print("Rendered HTML:\n" + $html)
+        
+        // 4. Mail
+        print("\n[4] Testing Mail")
+        $smtp = new SmtpClient()
+        $smtp.auth("user", "pass")
+        // Mock send (it will fail to connect to gmail but should print error or success message from our mock logic if we mocked it? 
+        // Wait, I implemented real smtp.SendMail. It will fail without real creds.
+        // But the print output will show the attempt.
+        $smtp.send("test@example.com", "Welcome", $html)
+        
+        // 5. Cron & Task
+        print("\n[5] Testing Cron & Task")
+        Cron.schedule("backup_db", "00:00", {})
+        Task.on_request("health_check", "30m", {})
+        
+        print("\n=== TEST COMPLETE ===")
+    }
+}

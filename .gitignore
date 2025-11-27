@@ -1,0 +1,18 @@
+# Binaries
+*.exe
+*.dll
+*.so
+*.dylib
+
+# Joss
+env.joss
+env.enc
+*.lock
+
+# Go
+go.sum
+vendor/
+
+# IDE
+.vscode/
+.idea/

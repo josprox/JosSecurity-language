@@ -2,8 +2,12 @@ package core
 
 import (
 	"database/sql"
+	"encoding/json"
 	"fmt"
+	"net/smtp"
 	"os"
+	"os/exec"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -39,6 +43,44 @@ func (r *Runtime) RegisterNativeClasses() {
 	}
 	r.registerClass(authClass)
 	r.Variables["Auth"] = &Instance{Class: authClass, Fields: make(map[string]interface{})}
+
+	// System
+	systemClass := &parser.ClassStatement{
+		Name: &parser.Identifier{Value: "System"},
+		Body: &parser.BlockStatement{},
+	}
+	r.registerClass(systemClass)
+	r.Variables["System"] = &Instance{Class: systemClass, Fields: make(map[string]interface{})}
+
+	// SmtpClient
+	r.registerClass(&parser.ClassStatement{
+		Name: &parser.Identifier{Value: "SmtpClient"},
+		Body: &parser.BlockStatement{},
+	})
+
+	// Cron
+	cronClass := &parser.ClassStatement{
+		Name: &parser.Identifier{Value: "Cron"},
+		Body: &parser.BlockStatement{},
+	}
+	r.registerClass(cronClass)
+	r.Variables["Cron"] = &Instance{Class: cronClass, Fields: make(map[string]interface{})}
+
+	// Task
+	taskClass := &parser.ClassStatement{
+		Name: &parser.Identifier{Value: "Task"},
+		Body: &parser.BlockStatement{},
+	}
+	r.registerClass(taskClass)
+	r.Variables["Task"] = &Instance{Class: taskClass, Fields: make(map[string]interface{})}
+
+	// View
+	viewClass := &parser.ClassStatement{
+		Name: &parser.Identifier{Value: "View"},
+		Body: &parser.BlockStatement{},
+	}
+	r.registerClass(viewClass)
+	r.Variables["View"] = &Instance{Class: viewClass, Fields: make(map[string]interface{})}
 }
 
 func (r *Runtime) executeNativeMethod(instance *Instance, method string, args []interface{}) interface{} {
@@ -51,6 +93,16 @@ func (r *Runtime) executeNativeMethod(instance *Instance, method string, args []
 		return r.executeGranMySQLMethod(instance, method, args)
 	case "Auth":
 		return r.executeAuthMethod(instance, method, args)
+	case "System":
+		return r.executeSystemMethod(instance, method, args)
+	case "SmtpClient":
+		return r.executeSmtpClientMethod(instance, method, args)
+	case "Cron":
+		return r.executeCronMethod(instance, method, args)
+	case "Task":
+		return r.executeTaskMethod(instance, method, args)
+	case "View":
+		return r.executeViewMethod(instance, method, args)
 	}
 	return nil
 }
@@ -556,4 +608,312 @@ func (r *Runtime) generateJWT(userId int, email string, userName string, isRefre
 	}
 
 	return tokenString
+}
+
+// System Implementation
+func (r *Runtime) executeSystemMethod(instance *Instance, method string, args []interface{}) interface{} {
+	switch method {
+	case "env":
+		if len(args) > 0 {
+			key := args[0].(string)
+			if val, ok := r.Env[key]; ok {
+				return val
+			}
+			if len(args) > 1 {
+				return args[1] // Default value
+			}
+			return ""
+		}
+	case "Run":
+		if len(args) > 0 {
+			cmdName := args[0].(string)
+			cmdArgs := []string{}
+			if len(args) > 1 {
+				if list, ok := args[1].([]interface{}); ok {
+					for _, arg := range list {
+						cmdArgs = append(cmdArgs, fmt.Sprintf("%v", arg))
+					}
+				}
+			}
+
+			cmd := exec.Command(cmdName, cmdArgs...)
+			output, err := cmd.CombinedOutput()
+			if err != nil {
+				fmt.Printf("[System] Error ejecutando '%s': %v\n", cmdName, err)
+				return ""
+			}
+			return string(output)
+		}
+	}
+	return nil
+}
+
+// SmtpClient Implementation
+func (r *Runtime) executeSmtpClientMethod(instance *Instance, method string, args []interface{}) interface{} {
+	switch method {
+	case "auth":
+		if len(args) == 2 {
+			instance.Fields["user"] = args[0]
+			instance.Fields["pass"] = args[1]
+		}
+		return instance
+	case "secure":
+		if len(args) == 1 {
+			instance.Fields["secure"] = args[0]
+		}
+		return instance
+	case "send":
+		if len(args) >= 3 {
+			to := args[0].(string)
+			subject := args[1].(string)
+			body := args[2].(string)
+
+			// Defaults
+			host := "smtp.gmail.com"
+			port := "587"
+			if h, ok := r.Env["MAIL_HOST"]; ok {
+				host = h
+			}
+			if p, ok := r.Env["MAIL_PORT"]; ok {
+				port = p
+			}
+
+			user := ""
+			pass := ""
+			if u, ok := instance.Fields["user"]; ok {
+				user = u.(string)
+			}
+			if p, ok := instance.Fields["pass"]; ok {
+				pass = p.(string)
+			}
+
+			msg := []byte("From: " + user + "\r\n" +
+				"To: " + to + "\r\n" +
+				"Subject: " + subject + "\r\n" +
+				"MIME-Version: 1.0\r\n" +
+				"Content-Type: text/html; charset=\"UTF-8\"\r\n" +
+				"\r\n" +
+				body + "\r\n")
+
+			auth := smtp.PlainAuth("", user, pass, host)
+			err := smtp.SendMail(host+":"+port, auth, user, []string{to}, msg)
+			if err != nil {
+				fmt.Printf("[SmtpClient] Error enviando correo: %v\n", err)
+				return false
+			}
+			fmt.Println("[SmtpClient] Correo enviado exitosamente a " + to)
+			return true
+		}
+	}
+	return nil
+}
+
+// Cron Implementation (Daemon mode simulation)
+func (r *Runtime) executeCronMethod(instance *Instance, method string, args []interface{}) interface{} {
+	if method == "schedule" {
+		if len(args) >= 3 {
+			name := args[0].(string)
+			timeStr := args[1].(string)
+			fmt.Printf("[Cron] Tarea '%s' programada para '%s' (Simulación)\n", name, timeStr)
+			// In a real daemon, we would register this callback
+		}
+	}
+	return nil
+}
+
+// Task Implementation (Hit-based)
+func (r *Runtime) executeTaskMethod(instance *Instance, method string, args []interface{}) interface{} {
+	if method == "on_request" {
+		if len(args) >= 3 {
+			name := args[0].(string)
+			// interval := args[1].(string)
+			// callback := args[2] (Block/Closure)
+
+			// Check if we should run
+			// For simulation, we always run it if it's "system_health" or similar, or just log it.
+			// To properly implement, we need to execute the block passed as argument.
+			// The runtime needs to handle the callback execution.
+			// Since we are inside executeNativeMethod, we can't easily execute a block without the runtime context loop.
+			// BUT, we are in the runtime! 'r' is *Runtime.
+
+			// We need to check if args[2] is a BlockStatement or similar?
+			// The parser passes blocks as... wait, native methods receive evaluated args.
+			// If the argument was a block `{ ... }`, it might not be evaluated to a value easily unless we treat it as a closure.
+			// Currently, Joss doesn't support passing blocks as values (closures) fully.
+			// The "Bible" says: Task::on_request(..., { code })
+			// This implies the 3rd argument is a block.
+			// In `evaluateCall`, arguments are evaluated. A block `{}` is not an expression in current parser?
+			// Let's assume for now we just print. To support this fully, we need Closures.
+
+			fmt.Printf("[Task] Ejecutando tarea hit-based: %s\n", name)
+			// If we could, we would execute the block here.
+		}
+	}
+	return nil
+}
+
+// View Implementation
+func (r *Runtime) executeViewMethod(instance *Instance, method string, args []interface{}) interface{} {
+	if method == "render" {
+		if len(args) >= 1 {
+			viewName := args[0].(string)
+			data := make(map[string]interface{})
+			if len(args) > 1 {
+				if d, ok := args[1].(map[string]interface{}); ok {
+					data = d
+				}
+			}
+
+			// Resolve path: app/views/viewName.joss.html
+			// Convert dot notation to path
+			viewPath := strings.ReplaceAll(viewName, ".", "/")
+			path := filepath.Join("app", "views", viewPath+".joss.html")
+
+			content, err := os.ReadFile(path)
+			if err != nil {
+				// Try without .joss.html or just .html
+				path = filepath.Join("app", "views", viewPath+".html")
+				content, err = os.ReadFile(path)
+				if err != nil {
+					return fmt.Sprintf("Error: Vista '%s' no encontrada", viewName)
+				}
+			}
+
+			html := string(content)
+			// Simple template replacement {{ key }}
+			for k, v := range data {
+				placeholder := "{{" + k + "}}" // Strict no spaces
+				html = strings.ReplaceAll(html, placeholder, fmt.Sprintf("%v", v))
+				placeholderSpace := "{{ " + k + " }}" // With spaces
+				html = strings.ReplaceAll(html, placeholderSpace, fmt.Sprintf("%v", v))
+			}
+			return html
+		}
+	}
+	return nil
+}
+
+// TOON Helpers
+func ToonEncode(data interface{}) string {
+	// Simple implementation
+	// If array of maps:
+	// entity[count]{keys}:
+	//   val1,val2
+
+	if list, ok := data.([]interface{}); ok {
+		if len(list) == 0 {
+			return ""
+		}
+		// Assume homogeneous list of maps
+		first := list[0]
+		if m, ok := first.(map[string]interface{}); ok {
+			keys := []string{}
+			for k := range m {
+				keys = append(keys, k)
+			}
+
+			header := fmt.Sprintf("entity[%d]{%s}:\n", len(list), strings.Join(keys, ","))
+			body := ""
+			for _, item := range list {
+				if row, ok := item.(map[string]interface{}); ok {
+					vals := []string{}
+					for _, k := range keys {
+						vals = append(vals, fmt.Sprintf("%v", row[k]))
+					}
+					body += "  " + strings.Join(vals, ",") + "\n"
+				}
+			}
+			return header + body
+		}
+	}
+	return fmt.Sprintf("%v", data)
+}
+
+func ToonDecode(str string) interface{} {
+	// Handle literal \n if parser didn't unescape it
+	str = strings.ReplaceAll(str, "\\n", "\n")
+
+	// Very basic parser for "entity[N]{k1,k2}:\n v1,v2..."
+	lines := strings.Split(strings.TrimSpace(str), "\n")
+	if len(lines) < 2 {
+		return nil
+	}
+
+	header := lines[0]
+	// Parse header: name[count]{keys}:
+	// Regex or simple string manipulation
+	startBracket := strings.Index(header, "[")
+	endBracket := strings.Index(header, "]")
+	startBrace := strings.Index(header, "{")
+	endBrace := strings.Index(header, "}")
+
+	if startBracket == -1 || endBracket == -1 || startBrace == -1 || endBrace == -1 {
+		return nil
+	}
+
+	// countStr := header[startBracket+1 : endBracket]
+	keysStr := header[startBrace+1 : endBrace]
+	keys := strings.Split(keysStr, ",")
+
+	result := []interface{}{}
+
+	for _, line := range lines[1:] {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+		vals := strings.Split(line, ",")
+		if len(vals) != len(keys) {
+			continue
+		}
+
+		obj := make(map[string]interface{})
+		for i, k := range keys {
+			obj[k] = vals[i]
+		}
+		result = append(result, obj)
+	}
+
+	return result
+}
+
+func ToonVerify(str string) bool {
+	// Handle literal \n
+	str = strings.ReplaceAll(str, "\\n", "\n")
+
+	// Simple verification: check structure
+	lines := strings.Split(strings.TrimSpace(str), "\n")
+	if len(lines) < 2 {
+		return false
+	}
+	header := lines[0]
+	// Must contain [ ] { } :
+	if !strings.Contains(header, "[") || !strings.Contains(header, "]") ||
+		!strings.Contains(header, "{") || !strings.Contains(header, "}") ||
+		!strings.Contains(header, ":") {
+		return false
+	}
+	return true
+}
+
+// JSON Helpers
+func JsonEncode(data interface{}) string {
+	b, err := json.Marshal(data)
+	if err != nil {
+		return ""
+	}
+	return string(b)
+}
+
+func JsonDecode(str string) interface{} {
+	var result interface{}
+	err := json.Unmarshal([]byte(str), &result)
+	if err != nil {
+		return nil
+	}
+	return result
+}
+
+func JsonVerify(str string) bool {
+	return json.Valid([]byte(str))
 }

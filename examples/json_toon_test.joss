@@ -1,0 +1,28 @@
+class Main {
+    Init main() {
+        print("=== JSON & TOON TEST ===")
+        
+        // 1. JSON Encode
+        $data = {"name": "Joss", "role": "Admin", "active": true}
+        $json = json_encode($data)
+        print("JSON Encoded: " + $json)
+        
+        // 2. JSON Verify
+        $isValid = json_verify($json)
+        print("JSON Valid? " + $isValid)
+        
+        // 3. JSON Decode
+        $decoded = json_decode($json)
+        print("Decoded Name: " + $decoded["name"])
+        
+        // 4. TOON Verify
+        $toon = "entity[2]{id,name}:\n1,Alice\n2,Bob"
+        $isToonValid = toon_verify($toon)
+        print("TOON Valid? " + $isToonValid)
+        
+        $badToon = "Just some random text"
+        print("Bad TOON Valid? " + toon_verify($badToon))
+        
+        print("=== TEST COMPLETE ===")
+    }
+}

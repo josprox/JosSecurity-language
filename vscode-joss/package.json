@@ -7,6 +7,10 @@
   "engines": {
     "vscode": "^1.80.0"
   },
+  "main": "./extension.js",
+  "activationEvents": [
+    "onLanguage:joss"
+  ],
   "categories": [
     "Programming Languages",
     "Snippets",

@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"fmt"
 	"os"
+	"strings"
 
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/jossecurity/joss/pkg/parser"
@@ -59,30 +60,53 @@ func NewRuntime() *Runtime {
 	return r
 }
 
-// LoadEnv simulates loading and decrypting the environment
+// LoadEnv loads environment variables from env.joss
 func (r *Runtime) LoadEnv() {
-	fmt.Println("[Security] Cargando entorno encriptado en RAM...")
-	// Simulation of decryption
-	r.Env["APP_ENV"] = "dev"
-	r.Env["PORT"] = "8000"
-	r.Env["PORT"] = "8000"
-	r.Env["DB_HOST"] = "localhost"
-	r.Env["DB_USER"] = "root"
-	r.Env["DB_PASS"] = ""
-	r.Env["DB_NAME"] = "prueba_joss"
+	fmt.Println("[Security] Cargando entorno...")
 
-	// Connect to DB
-	dsn := fmt.Sprintf("%s:%s@tcp(%s:3306)/%s", r.Env["DB_USER"], r.Env["DB_PASS"], r.Env["DB_HOST"], r.Env["DB_NAME"])
-	db, err := sql.Open("mysql", dsn)
+	// Try reading env.joss
+	content, err := os.ReadFile("env.joss")
 	if err != nil {
-		fmt.Printf("[GranMySQL] Error conectando a DB: %v\n", err)
-	} else {
-		// Test connection
-		err = db.Ping()
+		// Try looking in parent directory (for examples/ scripts)
+		content, err = os.ReadFile("../env.joss")
 		if err != nil {
-			fmt.Printf("[GranMySQL] Error ping DB: %v\n", err)
-		} else {
-			fmt.Println("[GranMySQL] Conexión establecida con éxito")
+			// Try looking in project root if running from subfolder
+			content, err = os.ReadFile("../../env.joss")
+			if err != nil {
+				// Try looking in the specific test folder
+				content, err = os.ReadFile("pruebas 271125/env.joss")
+				if err != nil {
+					fmt.Println("[Security] Advertencia: No se encontró env.joss")
+					return
+				}
+			}
+		}
+	}
+
+	lines := strings.Split(string(content), "\n")
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+
+		parts := strings.SplitN(line, "=", 2)
+		if len(parts) == 2 {
+			key := strings.TrimSpace(parts[0])
+			val := strings.TrimSpace(parts[1])
+			// Remove quotes if present
+			val = strings.Trim(val, "\"")
+			val = strings.Trim(val, "'")
+			r.Env[key] = val
+		}
+	}
+
+	// Connect to DB if creds exist
+	if host, ok := r.Env["DB_HOST"]; ok {
+		dsn := fmt.Sprintf("%s:%s@tcp(%s:3306)/%s", r.Env["DB_USER"], r.Env["DB_PASS"], host, r.Env["DB_NAME"])
+		db, err := sql.Open("mysql", dsn)
+		if err == nil {
+			// db.Ping() // Optional: don't block if DB is down
 			r.DB = db
 		}
 	}
@@ -631,9 +655,10 @@ func (r *Runtime) evaluateMember(me *parser.MemberExpression) interface{} {
 		}
 	}
 
-	// Check for Native Class methods (Stack, Queue, GranMySQL, Auth)
+	// Check for Native Class methods (Stack, Queue, GranMySQL, Auth, System, SmtpClient, Cron, Task, View)
 	className := instance.Class.Name.Value
-	if className == "Stack" || className == "Queue" || className == "GranMySQL" || className == "Auth" {
+	if className == "Stack" || className == "Queue" || className == "GranMySQL" || className == "Auth" ||
+		className == "System" || className == "SmtpClient" || className == "Cron" || className == "Task" || className == "View" {
 		// Return a synthetic method with nil body to trigger native execution
 		return &BoundMethod{
 			Method: &parser.MethodStatement{
@@ -797,6 +822,57 @@ func (r *Runtime) executeCall(call *parser.CallExpression) interface{} {
 				}
 			}
 			return int64(0)
+		}
+		if ident.Value == "toon_encode" {
+			if len(call.Arguments) == 1 {
+				arg := r.evaluateExpression(call.Arguments[0])
+				return ToonEncode(arg)
+			}
+			return ""
+		}
+		if ident.Value == "toon_decode" {
+			if len(call.Arguments) == 1 {
+				arg := r.evaluateExpression(call.Arguments[0])
+				if str, ok := arg.(string); ok {
+					return ToonDecode(str)
+				}
+			}
+			return nil
+		}
+
+		if ident.Value == "toon_verify" {
+			if len(call.Arguments) == 1 {
+				arg := r.evaluateExpression(call.Arguments[0])
+				if str, ok := arg.(string); ok {
+					return ToonVerify(str)
+				}
+			}
+			return false
+		}
+		if ident.Value == "json_encode" {
+			if len(call.Arguments) == 1 {
+				arg := r.evaluateExpression(call.Arguments[0])
+				return JsonEncode(arg)
+			}
+			return ""
+		}
+		if ident.Value == "json_decode" {
+			if len(call.Arguments) == 1 {
+				arg := r.evaluateExpression(call.Arguments[0])
+				if str, ok := arg.(string); ok {
+					return JsonDecode(str)
+				}
+			}
+			return nil
+		}
+		if ident.Value == "json_verify" {
+			if len(call.Arguments) == 1 {
+				arg := r.evaluateExpression(call.Arguments[0])
+				if str, ok := arg.(string); ok {
+					return JsonVerify(str)
+				}
+			}
+			return false
 		}
 		// async function - executes code in goroutine
 		if ident.Value == "async" {
