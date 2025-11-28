@@ -29,7 +29,7 @@ var (
 // Start initializes and starts the Joss HTTP server with Hot Reload
 func Start() {
 	// Initial Load
-	reloadApp()
+	reloadApp("")
 
 	// Start File Watcher
 	go watchChanges()
@@ -189,74 +189,110 @@ func generateSessionID() string {
 	return hex.EncodeToString(b)
 }
 
-func reloadApp() {
+func reloadApp(changedFile string) {
 	mutex.Lock()
 	defer mutex.Unlock()
 
-	fmt.Println("Recargando aplicación...")
-	compileStyles()
-
-	// Get new runtime from pool
-	if currentRuntime != nil {
-		currentRuntime.Free()
-	}
-	currentRuntime = core.NewRuntime()
-	currentRuntime.LoadEnv()
-
-	// Load App Files (Controllers, Models, etc.)
-	err := filepath.Walk("app", func(path string, info os.FileInfo, err error) error {
-		if err != nil {
-			return err
-		}
-		if !info.IsDir() && strings.HasSuffix(path, ".joss") {
-			fmt.Printf("[DEBUG] Loading file: %s\n", path)
-			content, err := os.ReadFile(path)
-			if err == nil {
-				l := parser.NewLexer(string(content))
-				p := parser.NewParser(l)
-				program := p.ParseProgram()
-				if len(p.Errors()) > 0 {
-					fmt.Printf("[DEBUG] Parser errors in %s:\n", path)
-					for _, msg := range p.Errors() {
-						fmt.Printf("\t%s\n", msg)
-					}
-				}
-				// Execute to register classes, ignore Main not found
-				currentRuntime.Execute(program)
-			} else {
-				fmt.Printf("[DEBUG] Error reading %s: %v\n", path, err)
-			}
-		}
-		return nil
-	})
-	if err != nil {
-		fmt.Printf("[DEBUG] Error walking app directory: %v\n", err)
+	if changedFile == "" {
+		fmt.Println("Recargando aplicación completa...")
+	} else {
+		fmt.Printf("Recargando parcial: %s\n", changedFile)
 	}
 
-	// Load Routes
-	routesPath := "routes.joss"
-	if _, err := os.Stat(routesPath); err == nil {
-		fmt.Println("[DEBUG] Loading routes from routes.joss")
-		content, err := os.ReadFile(routesPath)
+	// 1. Styles
+	if changedFile == "" || strings.HasSuffix(changedFile, ".scss") || strings.HasSuffix(changedFile, ".css") {
+		compileStyles()
+		if strings.HasSuffix(changedFile, ".scss") || strings.HasSuffix(changedFile, ".css") {
+			notifyClients()
+			return
+		}
+	}
+
+	// 2. Views (HTML)
+	if strings.HasSuffix(changedFile, ".html") {
+		// Views are read from disk, so just notify
+		notifyClients()
+		return
+	}
+
+	// 3. Runtime Logic
+	if currentRuntime == nil {
+		currentRuntime = core.NewRuntime()
+		currentRuntime.LoadEnv()
+	}
+
+	// Helper to load a single file
+	loadFile := func(path string) {
+		fmt.Printf("[DEBUG] Loading file: %s\n", path)
+		content, err := os.ReadFile(path)
 		if err == nil {
 			l := parser.NewLexer(string(content))
 			p := parser.NewParser(l)
 			program := p.ParseProgram()
 			if len(p.Errors()) > 0 {
-				fmt.Printf("[DEBUG] Parser errors in routes.joss:\n")
+				fmt.Printf("[DEBUG] Parser errors in %s:\n", path)
 				for _, msg := range p.Errors() {
 					fmt.Printf("\t%s\n", msg)
 				}
 			}
 			currentRuntime.Execute(program)
 		} else {
-			fmt.Printf("[DEBUG] Error reading routes.joss: %v\n", err)
+			fmt.Printf("[DEBUG] Error reading %s: %v\n", path, err)
 		}
-	} else {
-		fmt.Println("[DEBUG] routes.joss not found")
 	}
 
-	notifyClients()
+	if changedFile != "" && strings.HasSuffix(changedFile, ".joss") {
+		if strings.HasSuffix(changedFile, "routes.joss") {
+			// Reload Routes
+			fmt.Println("[DEBUG] Reloading routes...")
+			// Clear existing routes? Router overwrites, so it's okay.
+			// Ideally we should clear, but Runtime doesn't expose a ClearRoutes method.
+			// We can manually clear if we want, but overwriting is fine for now.
+			if currentRuntime.Routes != nil {
+				// Optional: clear routes to remove deleted ones
+				currentRuntime.Routes = make(map[string]map[string]interface{})
+			}
+			loadFile(changedFile)
+		} else {
+			// Reload Controller/Model
+			loadFile(changedFile)
+		}
+		notifyClients()
+		return
+	}
+
+	// Full Reload (Initial or unknown change)
+	if changedFile == "" {
+		// Reset Runtime
+		if currentRuntime != nil {
+			currentRuntime.Free()
+		}
+		currentRuntime = core.NewRuntime()
+		currentRuntime.LoadEnv()
+
+		// Load App Files
+		err := filepath.Walk("app", func(path string, info os.FileInfo, err error) error {
+			if err != nil {
+				return err
+			}
+			if !info.IsDir() && strings.HasSuffix(path, ".joss") {
+				loadFile(path)
+			}
+			return nil
+		})
+		if err != nil {
+			fmt.Printf("[DEBUG] Error walking app directory: %v\n", err)
+		}
+
+		// Load Routes
+		routesPath := "routes.joss"
+		if _, err := os.Stat(routesPath); err == nil {
+			loadFile(routesPath)
+		} else {
+			fmt.Println("[DEBUG] routes.joss not found")
+		}
+		notifyClients()
+	}
 }
 
 func compileStyles() {
@@ -379,7 +415,7 @@ func watchChanges() {
 	for {
 		time.Sleep(500 * time.Millisecond)
 
-		changed := false
+		var changedPath string
 		err := filepath.Walk(".", func(path string, info os.FileInfo, err error) error {
 			if err != nil {
 				return nil
@@ -397,23 +433,23 @@ func watchChanges() {
 				if lastHash, ok := fileHashes[path]; ok {
 					if currentHash != lastHash {
 						fileHashes[path] = currentHash
-						changed = true
+						changedPath = path
 						fmt.Printf("[HotReload] Cambio detectado en: %s\n", path)
 					}
 				} else {
 					// New file
 					fileHashes[path] = currentHash
-					changed = true
+					changedPath = path
 					fmt.Printf("[HotReload] Nuevo archivo detectado: %s\n", path)
 				}
 			}
 			return nil
 		})
 
-		if err == nil && changed {
-			// Debounce: Wait a bit to see if more changes come (e.g. "Save All")
+		if err == nil && changedPath != "" {
+			// Debounce
 			time.Sleep(100 * time.Millisecond)
-			reloadApp()
+			reloadApp(changedPath)
 		}
 	}
 }
