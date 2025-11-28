@@ -35,14 +35,15 @@ const (
 	QUESTION  = "?"
 	NEWLINE   = "NEWLINE"
 
-	LPAREN   = "("
-	RPAREN   = ")"
-	LBRACE   = "{"
-	RBRACE   = "}"
-	LBRACKET = "["
-	RBRACKET = "]"
-	DOT      = "."
-	ARROW    = "->"
+	LPAREN       = "("
+	RPAREN       = ")"
+	LBRACE       = "{"
+	RBRACE       = "}"
+	LBRACKET     = "["
+	RBRACKET     = "]"
+	DOT          = "."
+	ARROW        = "->"
+	DOUBLE_COLON = "::"
 
 	// Keywords
 	FUNCTION  = "FUNCTION"
@@ -93,6 +94,7 @@ var keywords = map[string]TokenType{
 	"foreach":   FOREACH,
 	"as":        AS,
 	"function":  FUNCTION,
+	"func":      FUNCTION,
 	"this":      THIS,
 	"echo":      ECHO,
 	"print":     PRINT,

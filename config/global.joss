@@ -1,6 +1,0 @@
-$APP_NAME = "JosSecurity App"
-$GLOBAL_VERSION = "1.0.0"
-
-function getAppName() {
-    return $APP_NAME
-}

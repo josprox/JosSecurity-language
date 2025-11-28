@@ -42,11 +42,68 @@ go build -o joss.exe ./cmd/joss
 
 ### Comandos Disponibles
 ```bash
+# Crear nuevo proyecto (Estructura Biblia)
+./joss.exe new myproject
+
+# Crear nuevo proyecto web (Estructura legacy)
+./joss.exe new web mywebproject
+
 # Ver versión
 ./joss.exe version
 
 # Iniciar servidor
 ./joss.exe server start
+
+# Ejecutar migraciones
+./joss.exe migrate
+
+# Crear controlador
+./joss.exe make:controller UserController
+
+# Crear modelo
+./joss.exe make:model User
+```
+
+## Estructura de Proyecto
+
+### Estructura Biblia (Por Defecto)
+Siguiendo "La Gran Biblia de JosSecurity", el comando `joss new` crea:
+
+```
+myproject/
+├── main.joss           # Entry Point
+├── env.joss            # Variables de Entorno
+├── api.joss            # Rutas API (JSON/TOON)
+├── routes.joss         # Rutas Web (HTML)
+├── config/
+│   ├── reglas.joss     # Constantes Globales
+│   └── cron.joss       # Tareas Programadas
+├── app/
+│   ├── controllers/    # Lógica de Negocio
+│   ├── models/         # Acceso a Datos
+│   ├── views/          # Plantillas HTML
+│   └── libs/           # Extensiones
+└── assets/             # CSS, JS, Imágenes
+```
+
+### Estructura Web (Legacy)
+Para compatibilidad con proyectos anteriores, usa `joss new web`:
+
+```
+mywebproject/
+├── main.joss
+├── env.joss
+├── routes.joss
+├── api.joss
+├── config/
+│   └── global.joss
+├── app/
+│   ├── controllers/
+│   ├── models/
+│   ├── views/
+│   ├── assets/
+│   └── database/migrations/
+└── public/
 ```
 
 ## Ejemplos

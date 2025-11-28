@@ -14,6 +14,7 @@ import (
 	"github.com/jossecurity/joss/pkg/core"
 	"github.com/jossecurity/joss/pkg/parser"
 	"github.com/jossecurity/joss/pkg/server"
+	"github.com/jossecurity/joss/pkg/template"
 )
 
 func main() {
@@ -74,6 +75,12 @@ func main() {
 		createModel(os.Args[2])
 	case "migrate":
 		runMigrations()
+	case "new":
+		if len(os.Args) < 3 {
+			fmt.Println("Uso: joss new [ruta]")
+			return
+		}
+		template.CreateBibleProject(os.Args[2])
 	case "version":
 		fmt.Println("JosSecurity v3.0 (Gold Master)")
 	case "help":

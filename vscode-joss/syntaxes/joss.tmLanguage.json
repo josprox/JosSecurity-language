@@ -114,7 +114,7 @@
         },
         {
           "name": "keyword.operator.member.joss",
-          "match": "(-\\>|\\.)"
+          "match": "(-\\>|\\.|::)"
         }
       ]
     },
@@ -142,7 +142,7 @@
       "patterns": [
         {
           "name": "entity.name.type.class.joss",
-          "match": "\\b(Auth|GranMySQL|Stack|Queue|Main)\\b"
+          "match": "\\b(Auth|GranMySQL|Stack|Queue|Main|Security|Server|Log|Task|Router|SmtpClient|View|Request|Session|Redirect)\\b"
         },
         {
           "name": "support.class.joss",

@@ -21,24 +21,25 @@ const (
 )
 
 var precedences = map[TokenType]int{
-	ASSIGN:      ASSIGNMENT,
-	QUESTION:    TERNARY,
-	PLUS:        SUM,
-	MINUS:       SUM,
-	SLASH:       PRODUCT,
-	ASTERISK:    PRODUCT,
-	LT:          LESSGREATER,
-	GT:          LESSGREATER,
-	EQ:          EQUALS,
-	NOT_EQ:      EQUALS,
-	LTE:         LESSGREATER,
-	GTE:         LESSGREATER,
-	SHIFT_LEFT:  SHIFT,
-	SHIFT_RIGHT: SHIFT,
-	LPAREN:      CALL,
-	LBRACKET:    INDEX,
-	DOT:         INDEX,
-	ARROW:       INDEX,
+	ASSIGN:       ASSIGNMENT,
+	QUESTION:     TERNARY,
+	PLUS:         SUM,
+	MINUS:        SUM,
+	SLASH:        PRODUCT,
+	ASTERISK:     PRODUCT,
+	LT:           LESSGREATER,
+	GT:           LESSGREATER,
+	EQ:           EQUALS,
+	NOT_EQ:       EQUALS,
+	LTE:          LESSGREATER,
+	GTE:          LESSGREATER,
+	SHIFT_LEFT:   SHIFT,
+	SHIFT_RIGHT:  SHIFT,
+	LPAREN:       CALL,
+	LBRACKET:     INDEX,
+	DOT:          INDEX,
+	ARROW:        INDEX,
+	DOUBLE_COLON: INDEX,
 }
 
 type (
@@ -77,7 +78,10 @@ func NewParser(l *Lexer) *Parser {
 	p.registerPrefix(NEW, p.parseNewExpression)
 	p.registerPrefix(THIS, p.parseIdentifier)
 	p.registerPrefix(ISSET, p.parseIssetExpression)
+	p.registerPrefix(ISSET, p.parseIssetExpression)
 	p.registerPrefix(EMPTY, p.parseEmptyExpression)
+	p.registerPrefix(BANG, p.parsePrefixExpression)
+	p.registerPrefix(MINUS, p.parsePrefixExpression)
 
 	p.infixParseFns = make(map[TokenType]infixParseFn)
 	p.registerInfix(PLUS, p.parseInfixExpression)
@@ -97,6 +101,7 @@ func NewParser(l *Lexer) *Parser {
 	p.registerInfix(LBRACKET, p.parseIndexExpression)
 	p.registerInfix(DOT, p.parseMemberExpression)
 	p.registerInfix(ARROW, p.parseMemberExpression)
+	p.registerInfix(DOUBLE_COLON, p.parseMemberExpression)
 	p.registerInfix(ASSIGN, p.parseAssignExpression)
 
 	// Read two tokens, so curToken and peekToken are both set
@@ -578,6 +583,19 @@ func (p *Parser) parseEchoStatement() *EchoStatement {
 	}
 
 	return stmt
+}
+
+func (p *Parser) parsePrefixExpression() Expression {
+	expression := &PrefixExpression{
+		Token:    p.curToken,
+		Operator: p.curToken.Literal,
+	}
+
+	p.nextToken()
+
+	expression.Right = p.parseExpression(PREFIX)
+
+	return expression
 }
 
 func (p *Parser) parseInfixExpression(left Expression) Expression {

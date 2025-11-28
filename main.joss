@@ -1,5 +1,0 @@
-class Main {
-    Init main() {
-        print("Hello World")
-    }
-}

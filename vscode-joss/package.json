@@ -2,7 +2,7 @@
   "name": "joss-language",
   "displayName": "JosSecurity Language Support",
   "description": "Syntax highlighting, snippets, and language support for JosSecurity (.joss) - Now with async/await, Maps, and Smart Numerics",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "publisher": "jossecurity",
   "engines": {
     "vscode": "^1.80.0"

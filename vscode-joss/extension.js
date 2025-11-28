@@ -8,11 +8,52 @@ function activate(context) {
         provideCompletionItems(document, position, token, context) {
             const linePrefix = document.lineAt(position).text.substr(0, position.character);
             
-            // Class-based Autocomplete
+            // Class-based Autocomplete (Static methods with ::)
+            if (linePrefix.endsWith('Security::')) {
+                return [
+                    createMethod('loadEnv', 'loadEnv()', 'Loads and decrypts environment variables.')
+                ];
+            }
+            if (linePrefix.endsWith('Server::')) {
+                return [
+                    createMethod('config', 'config(options)', 'Configures the web server.'),
+                    createMethod('loadRoutes', 'loadRoutes(file)', 'Loads HTML routes from file.'),
+                    createMethod('loadApi', 'loadApi(file)', 'Loads API routes from file.'),
+                    createMethod('start', 'start()', 'Starts the web server.')
+                ];
+            }
+            if (linePrefix.endsWith('Log::')) {
+                return [
+                    createMethod('info', 'info(msg)', 'Logs an informational message.'),
+                    createMethod('error', 'error(msg)', 'Logs an error message.')
+                ];
+            }
+            if (linePrefix.endsWith('Router::')) {
+                return [
+                    createMethod('get', 'get(path, handler)', 'Defines a GET route.'),
+                    createMethod('post', 'post(path, handler)', 'Defines a POST route.'),
+                    createMethod('put', 'put(path, handler)', 'Defines a PUT route.'),
+                    createMethod('delete', 'delete(path, handler)', 'Defines a DELETE route.')
+                ];
+            }
+            if (linePrefix.endsWith('Task::')) {
+                return [
+                    createMethod('on_request', 'on_request(name, interval, callback)', 'Schedules a hit-based task.')
+                ];
+            }
+            if (linePrefix.endsWith('Auth::')) {
+                return [
+                    createMethod('create', 'create(data)', 'Creates a new user with hashed password.'),
+                    createMethod('attempt', 'attempt(email, password)', 'Attempts login and returns JWT token.'),
+                    createMethod('refresh', 'refresh(token)', 'Refreshes a JWT token.')
+                ];
+            }
+            
+            // Instance methods (with .)
             if (linePrefix.endsWith('System.')) {
                 return [
-                    createMethod('run', 'Run(command, args)', 'Executes a system command.'),
-                    createMethod('env', 'env(key)', 'Retrieves an environment variable securely.')
+                    createMethod('Run', 'Run(command, args)', 'Executes a system command.'),
+                    createMethod('env', 'env(key, default)', 'Retrieves an environment variable securely.')
                 ];
             }
             if (linePrefix.endsWith('SmtpClient.')) {
@@ -25,11 +66,6 @@ function activate(context) {
             if (linePrefix.endsWith('Cron.')) {
                 return [
                     createMethod('schedule', 'schedule(name, time, callback)', 'Schedules a daemon task.')
-                ];
-            }
-            if (linePrefix.endsWith('Task.')) {
-                return [
-                    createMethod('on_request', 'on_request(name, time, callback)', 'Schedules a hit-based task.')
                 ];
             }
             if (linePrefix.endsWith('View.')) {
@@ -48,7 +84,7 @@ function activate(context) {
                 createFunction('json_verify', 'json_verify(string)', 'Verifies JSON string validity.'),
                 createFunction('print', 'print(msg)', 'Prints to stdout.'),
                 createFunction('echo', 'echo(msg)', 'Alias for print.'),
-                createFunction('env', 'env(key)', 'Global alias for System.env.'),
+                createFunction('env', 'env(key, default)', 'Global alias for System.env.'),
                 createKeyword('class', 'Defines a new class.'),
                 createKeyword('function', 'Defines a new function.'),
                 createKeyword('Init', 'Defines an initializer/constructor.'),
@@ -56,7 +92,7 @@ function activate(context) {
                 createKeyword('await', 'Waits for an asynchronous operation.'),
             ];
         }
-    }, '.'); // Trigger on '.'
+    }, '.', ':'); // Trigger on '.' and ':'
 
     // 2. Hover Provider
     const hoverProvider = vscode.languages.registerHoverProvider('joss', {

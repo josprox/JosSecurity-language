@@ -1,5 +1,0 @@
-class User extends GranMySQL {
-    Init constructor() {
-        $this->tabla = "js_user"
-    }
-}

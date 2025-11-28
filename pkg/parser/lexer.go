@@ -62,7 +62,14 @@ func (l *Lexer) NextToken() Token {
 	case ',':
 		tok = l.newToken(COMMA, l.ch)
 	case ':':
-		tok = l.newToken(COLON, l.ch)
+		if l.peekChar() == ':' {
+			ch := l.ch
+			l.readChar()
+			literal := string(ch) + string(l.ch)
+			tok = Token{Type: DOUBLE_COLON, Literal: literal, Line: l.line}
+		} else {
+			tok = l.newToken(COLON, l.ch)
+		}
 	case '?':
 		tok = l.newToken(QUESTION, l.ch)
 	case '!':
