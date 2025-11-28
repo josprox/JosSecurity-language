@@ -10,6 +10,17 @@
     ],
     "description": "Create a new class with Init method"
   },
+  "Controller": {
+    "prefix": "controller",
+    "body": [
+      "class ${1:Name}Controller {",
+      "\tfunc index() {",
+      "\t\treturn View::render(\"${2:view}\", {\"title\": \"${3:Title}\"})",
+      "\t}",
+      "}"
+    ],
+    "description": "Create a new Controller class"
+  },
   "Init Method": {
     "prefix": "init",
     "body": [
@@ -18,6 +29,63 @@
       "}"
     ],
     "description": "Create an Init method"
+  },
+  "Router Get": {
+    "prefix": "route:get",
+    "body": [
+      "Router::get(\"/${1:path}\", \"${2:Controller}@${3:method}\")"
+    ],
+    "description": "Define a GET route"
+  },
+  "Router Post": {
+    "prefix": "route:post",
+    "body": [
+      "Router::post(\"/${1:path}\", \"${2:Controller}@${3:method}\")"
+    ],
+    "description": "Define a POST route"
+  },
+  "Router Match": {
+    "prefix": "route:match",
+    "body": [
+      "Router::match(\"${1:GET|POST}\", \"/${2:path}\", \"${3:Controller}@${4:method}\")"
+    ],
+    "description": "Define a multi-method route"
+  },
+  "Router Group": {
+    "prefix": "route:group",
+    "body": [
+      "Router::middleware(\"${1:auth}\")",
+      "$0",
+      "Router::end()"
+    ],
+    "description": "Define a middleware group"
+  },
+  "Auth Check": {
+    "prefix": "auth:check",
+    "body": [
+      "if (Auth::check()) {",
+      "\t$0",
+      "}"
+    ],
+    "description": "Check if user is authenticated"
+  },
+  "Auth Guest": {
+    "prefix": "auth:guest",
+    "body": [
+      "if (Auth::guest()) {",
+      "\t$0",
+      "}"
+    ],
+    "description": "Check if user is guest"
+  },
+  "Auth Attempt": {
+    "prefix": "auth:attempt",
+    "body": [
+      "if (Auth::attempt($email, $password)) {",
+      "\treturn Response::redirect(\"/dashboard\")",
+      "}"
+    ],
+    "description": "Attempt login"
   },
   "Ternary": {
     "prefix": "tern",
@@ -67,14 +135,6 @@
       "\\$auth.create([${1:email}, ${2:password}, ${3:name}])"
     ],
     "description": "Create user with Auth"
-  },
-  "Auth Login": {
-    "prefix": "authlogin",
-    "body": [
-      "\\$auth = new Auth()",
-      "\\$token = \\$auth.attempt(${1:email}, ${2:password})"
-    ],
-    "description": "Login with Auth"
   },
   "GranMySQL Query": {
     "prefix": "dbquery",
@@ -206,7 +266,7 @@
   "View Render": {
     "prefix": "view",
     "body": [
-      "return View.render(\"${1:viewName}\", {${2:data}})"
+      "return View::render(\"${1:viewName}\", {${2:data}})"
     ],
     "description": "Render a view"
   },

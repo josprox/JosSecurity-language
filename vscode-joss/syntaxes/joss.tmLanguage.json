@@ -48,7 +48,7 @@
       "patterns": [
         {
           "name": "storage.type.joss",
-          "match": "\\b(int|float|string|bool|array|var|pointer|mixed)\\b"
+          "match": "\\b(int|float|string|bool|array|var|pointer|mixed|const)\\b"
         }
       ]
     },
@@ -142,7 +142,7 @@
       "patterns": [
         {
           "name": "entity.name.type.class.joss",
-          "match": "\\b(Auth|GranMySQL|Stack|Queue|Main|Security|Server|Log|Task|Router|SmtpClient|View|Request|Session|Redirect)\\b"
+          "match": "\\b(Auth|GranMySQL|Stack|Queue|Main|Security|Server|Log|Task|Router|SmtpClient|View|Request|Response|Cron|Session|Redirect)\\b"
         },
         {
           "name": "support.class.joss",
