@@ -5,27 +5,58 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"sync"
 
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/jossecurity/joss/pkg/parser"
 )
 
-// NewRuntime creates a new Joss runtime
-func NewRuntime() *Runtime {
-	r := &Runtime{
-		Env:       make(map[string]string),
-		Variables: make(map[string]interface{}),
-		VarTypes:  make(map[string]string),
-		Classes:   make(map[string]*parser.ClassStatement),
-		Functions: make(map[string]*parser.MethodStatement),
-		Routes:    make(map[string]map[string]interface{}),
+var (
+	// BroadcastFunc is a hook for WebSocket broadcasting
+	BroadcastFunc func(msg interface{})
+
+	runtimePool = sync.Pool{
+		New: func() interface{} {
+			r := &Runtime{
+				Env:               make(map[string]string),
+				Variables:         make(map[string]interface{}),
+				VarTypes:          make(map[string]string),
+				Classes:           make(map[string]*parser.ClassStatement),
+				Functions:         make(map[string]*parser.MethodStatement),
+				Routes:            make(map[string]map[string]interface{}),
+				CurrentMiddleware: make([]string, 0),
+			}
+			r.Variables["cout"] = &Cout{}
+			r.Variables["cin"] = &Cin{}
+			r.RegisterNativeClasses()
+			return r
+		},
 	}
+)
+
+// NewRuntime gets a runtime from the pool
+func NewRuntime() *Runtime {
+	return runtimePool.Get().(*Runtime)
+}
+
+// FreeRuntime returns the runtime to the pool
+func (r *Runtime) Free() {
+	// Reset state
+	for k := range r.Variables {
+		delete(r.Variables, k)
+	}
+	// Restore standard variables
 	r.Variables["cout"] = &Cout{}
 	r.Variables["cin"] = &Cin{}
 
-	r.RegisterNativeClasses()
+	// Keep Env, Classes, Functions, Routes as they are likely static or re-loaded?
+	// If Routes are dynamic per request (e.g. defined in routes.joss which is parsed every time?), then we should clear them.
+	// But parsing every time is slow.
+	// For now, let's assume we clear Variables.
+	// We should also clear CurrentMiddleware
+	r.CurrentMiddleware = r.CurrentMiddleware[:0]
 
-	return r
+	runtimePool.Put(r)
 }
 
 // LoadEnv loads environment variables from env.joss

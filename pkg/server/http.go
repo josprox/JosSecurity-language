@@ -49,6 +49,13 @@ func Start() {
 	// SSE Endpoint for Hot Reload
 	http.HandleFunc("/__hot_reload", sseHandler)
 
+	// WebSocket Endpoint
+	InitWebSocket()
+	core.BroadcastFunc = Broadcast
+	http.HandleFunc("/ws", func(w http.ResponseWriter, r *http.Request) {
+		ServeWs(GlobalHub, w, r)
+	})
+
 	// Main Handler
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		mutex.RLock()
@@ -188,6 +195,11 @@ func reloadApp() {
 
 	fmt.Println("Recargando aplicación...")
 	compileStyles()
+
+	// Get new runtime from pool
+	if currentRuntime != nil {
+		currentRuntime.Free()
+	}
 	currentRuntime = core.NewRuntime()
 	currentRuntime.LoadEnv()
 

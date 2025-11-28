@@ -73,7 +73,7 @@ func NewParser(l *Lexer) *Parser {
 	p.registerPrefix(FALSE, p.parseBoolean)
 	p.registerPrefix(LPAREN, p.parseGroupedExpression)
 	p.registerPrefix(LBRACKET, p.parseArrayLiteral)
-	p.registerPrefix(LBRACE, p.parseMapLiteral) // Maps { key: val }
+	p.registerPrefix(LBRACE, p.parseBraceExpression) // Maps { key: val } or Blocks { stmt; }
 	p.registerPrefix(NEW, p.parseNewExpression)
 	p.registerPrefix(NEW, p.parseNewExpression)
 	p.registerPrefix(THIS, p.parseIdentifier)
@@ -426,50 +426,230 @@ func (p *Parser) parseArrayLiteral() Expression {
 	return array
 }
 
-func (p *Parser) parseMapLiteral() Expression {
-	mapLit := &MapLiteral{Token: p.curToken}
-	mapLit.Pairs = make(map[Expression]Expression)
+func (p *Parser) parseBraceExpression() Expression {
+	// This could be a MapLiteral { key: val } or a BlockExpression { stmt; }
+	// We need to look ahead.
+	// But parsing an expression might consume tokens.
+	// Strategy: Parse the first statement/expression.
+	// If it's an expression and followed by COLON, it's a Map.
+	// Otherwise, it's a Block.
 
-	for !p.peekTokenIs(RBRACE) {
-		if p.peekTokenIs(NEWLINE) {
+	// However, p.parseExpression() consumes tokens.
+	// If we parse an expression, we can't easily "unparse" it to treat it as a statement if it was a statement.
+	// But in Joss, ExpressionStatement is a Statement.
+	// So if we parse a Block, we expect Statements.
+	// If we parse a Map, we expect Expressions.
+
+	// Let's try a heuristic:
+	// If the first token is RBRACE, it's empty map or empty block. Let's say empty Map {} (or empty block, doesn't matter much for logic, but empty map is more common as value).
+	if p.peekToken.Type == RBRACE {
+		p.nextToken()
+		return &MapLiteral{Token: p.curToken, Pairs: make(map[Expression]Expression)}
+	}
+
+	// If we are in a block, we might see statements like 'return', 'if', 'for', 'var'.
+	// These are NOT valid starts for a Map key (expression).
+	// So if we see a keyword that starts a statement but not an expression, it MUST be a Block.
+	if isStatementStart(p.peekToken.Type) {
+		return p.parseBlockExpression()
+	}
+
+	// If it's an identifier or literal, it could be either.
+	// { "a": 1 } -> Map
+	// { "a" } -> Block (ExpressionStatement "a")
+	// { $a = 1 } -> Block (AssignExpression is Expression, so ExpressionStatement)
+	// { $a } -> Block
+
+	// We have to parse the first "thing".
+	// Since we are inside parseExpression (prefix position), we are expected to return an Expression.
+	// If we return a BlockExpression, that's fine.
+
+	// Let's rely on the fact that a Map key MUST be followed by a COLON.
+	// But we can't parse the expression to check for colon without consuming it.
+	// And if we consume it, we can't easily put it back into a BlockStatement.
+
+	// ALTERNATIVE:
+	// Use backtracking? No, expensive.
+	// Use the fact that `parseBlockStatement` exists.
+	// We can try to parse as a Block.
+	// But `parseBlockStatement` expects statements.
+	// `parseStatement` calls `parseExpressionStatement` which calls `parseExpression`.
+
+	// Let's try this:
+	// 1. Check if it looks like a Map.
+	//    Map keys are usually literals or identifiers.
+	//    If we see `IDENT :` or `STRING :` or `INT :`, it is definitely a Map.
+	//    If we see `IDENT` then `ASSIGN` ($a = 1), it is definitely a Block (assignment).
+	//    If we see `IDENT` then `SEMICOLON` or `NEWLINE`, it is a Block.
+
+	// Peek 2 tokens ahead?
+	// p.peekToken is next. p.l.PeekToken() ? We don't have double peek in this parser struct easily (only cur and peek).
+	// We can add `peekTwice`?
+
+	// Let's assume it's a BlockExpression by default, UNLESS we see `Key : Value`.
+	// But we can't verify `Key : Value` without parsing Key.
+
+	// Let's change the logic:
+	// We parse a BlockStatement.
+	// Inside the block parsing, if we find that the FIRST statement is an ExpressionStatement,
+	// AND the next token is COLON, then we realize "Oh, this was actually a Map!".
+	// Then we convert that ExpressionStatement's expression into the first Key of the map.
+	// This is tricky but possible.
+
+	block := &BlockStatement{Token: p.curToken, Statements: []Statement{}}
+	p.nextToken() // consume LBRACE
+
+	// Check for empty
+	if p.curToken.Type == RBRACE {
+		// Empty {} -> Map (standard convention in dynamic langs)
+		return &MapLiteral{Token: p.curToken, Pairs: make(map[Expression]Expression)}
+	}
+
+	// Parse first statement
+	// Handle NEWLINEs
+	for p.curToken.Type == NEWLINE {
+		p.nextToken()
+	}
+	if p.curToken.Type == RBRACE {
+		return &MapLiteral{Token: p.curToken, Pairs: make(map[Expression]Expression)}
+	}
+
+	firstStmt := p.parseStatement()
+
+	// If the first statement is NOT an ExpressionStatement, it's definitely a Block.
+	// e.g. { return 1; } or { if ... }
+	exprStmt, isExpr := firstStmt.(*ExpressionStatement)
+	if !isExpr {
+		// It's a block. Continue parsing statements.
+		if firstStmt != nil {
+			block.Statements = append(block.Statements, firstStmt)
+		}
+		p.nextToken()
+		for p.curToken.Type != RBRACE && p.curToken.Type != EOF {
+			if p.curToken.Type == NEWLINE {
+				p.nextToken()
+				continue
+			}
+			stmt := p.parseStatement()
+			if stmt != nil {
+				block.Statements = append(block.Statements, stmt)
+			}
+			p.nextToken()
+		}
+		return &BlockExpression{Token: block.Token, Block: block}
+	}
+
+	// It IS an expression statement. Check for COLON.
+	// p.parseStatement() usually consumes the semicolon/newline.
+	// But `parseExpressionStatement` consumes the expression, then optionally semicolon.
+	// If it was a Map key, it wouldn't have a semicolon.
+	// But `parseExpression` stops at LOWEST precedence.
+
+	// If the next token (current token after parseStatement finished?) is COLON?
+	// Wait, `parseStatement` advances tokens.
+	// If `parseExpression` stopped at COLON, then `parseExpressionStatement` would see COLON as next token?
+	// `parseExpression` loop: `for ... precedence < p.peekPrecedence()`.
+	// COLON is not an infix operator in the map above (precedences).
+	// So `parseExpression` stops before COLON.
+	// Then `parseExpressionStatement` checks for SEMICOLON/NEWLINE.
+	// If it sees COLON, it does nothing and returns.
+	// So `p.peekToken` (or `p.curToken`?) should be COLON.
+
+	// Let's verify `parseExpressionStatement`:
+	// stmt.Expression = p.parseExpression(LOWEST)
+	// if p.peekToken.Type == SEMICOLON || p.peekToken.Type == NEWLINE { p.nextToken() }
+
+	// If input is `{ "a": 1 }`
+	// LBRACE consumed.
+	// parseStatement called.
+	// parseExpressionStatement called.
+	// parseExpression("a") returns StringLiteral.
+	// peekToken is COLON.
+	// parseExpressionStatement sees COLON != SEMI/NEWLINE. It does NOT consume it.
+	// Returns ExpressionStatement.
+	// Now inside `parseBraceExpression`:
+	// p.peekToken should be COLON.
+
+	if p.peekToken.Type == COLON {
+		// It's a Map!
+		// Convert firstStmt to Key.
+		mapLit := &MapLiteral{Token: block.Token, Pairs: make(map[Expression]Expression)}
+		key := exprStmt.Expression
+
+		p.nextToken() // curToken is :
+		p.nextToken() // curToken is start of value
+
+		val := p.parseExpression(LOWEST)
+		mapLit.Pairs[key] = val
+
+		// Continue parsing map
+		for !p.peekTokenIs(RBRACE) {
+			if p.peekTokenIs(NEWLINE) {
+				p.nextToken()
+			}
+			if p.peekTokenIs(COMMA) {
+				p.nextToken()
+			}
+			if p.peekTokenIs(NEWLINE) {
+				p.nextToken()
+			}
+			if p.peekTokenIs(RBRACE) {
+				break
+			}
+
+			p.nextToken() // start of next key
+			key := p.parseExpression(LOWEST)
+
+			if p.peekTokenIs(NEWLINE) {
+				p.nextToken()
+			}
+
+			if !p.expectPeek(COLON) {
+				return nil
+			}
+			p.nextToken()
+			val := p.parseExpression(LOWEST)
+			mapLit.Pairs[key] = val
+		}
+
+		if !p.expectPeek(RBRACE) {
+			return nil
+		}
+		return mapLit
+	}
+
+	// Not a map. It's a Block.
+	if firstStmt != nil {
+		block.Statements = append(block.Statements, firstStmt)
+	}
+	p.nextToken() // Move past the last token of first statement
+
+	for p.curToken.Type != RBRACE && p.curToken.Type != EOF {
+		if p.curToken.Type == NEWLINE {
 			p.nextToken()
 			continue
 		}
-
+		stmt := p.parseStatement()
+		if stmt != nil {
+			block.Statements = append(block.Statements, stmt)
+		}
 		p.nextToken()
-		key := p.parseExpression(LOWEST)
-
-		if !p.expectPeek(COLON) {
-			return nil
-		}
-
-		p.nextToken()
-		value := p.parseExpression(LOWEST)
-
-		mapLit.Pairs[key] = value
-
-		if p.peekTokenIs(RBRACE) {
-			break
-		}
-
-		if p.peekTokenIs(NEWLINE) {
-			p.nextToken()
-		}
-
-		if p.peekTokenIs(COMMA) {
-			p.nextToken()
-		}
-
-		if p.peekTokenIs(NEWLINE) {
-			p.nextToken()
-		}
 	}
 
-	if !p.expectPeek(RBRACE) {
-		return nil
-	}
+	return &BlockExpression{Token: block.Token, Block: block}
+}
 
-	return mapLit
+func (p *Parser) parseBlockExpression() *BlockExpression {
+	block := p.parseBlockStatement()
+	return &BlockExpression{Token: block.Token, Block: block}
+}
+
+func isStatementStart(t TokenType) bool {
+	switch t {
+	case RETURN, IF, VAR, FOREACH, WHILE, DO, TRY, THROW, ECHO, PRINT:
+		return true
+	}
+	return false
 }
 
 func (p *Parser) parseExpressionList(end TokenType) []Expression {
@@ -676,10 +856,37 @@ func (p *Parser) parseCallArguments() []Expression {
 	p.nextToken()
 	args = append(args, p.parseExpression(LOWEST))
 
-	for p.peekToken.Type == COMMA {
-		p.nextToken()
-		p.nextToken()
-		args = append(args, p.parseExpression(LOWEST))
+	for p.peekToken.Type == COMMA || p.peekToken.Type == NEWLINE {
+		if p.peekToken.Type == NEWLINE {
+			p.nextToken()
+			// Check if we hit RPAREN after newline
+			if p.peekToken.Type == RPAREN {
+				break
+			}
+			// If no comma after newline, we assume comma insertion or just continue if next is expression
+			if p.peekToken.Type != COMMA {
+				// Optional: check if next token is start of expression?
+				// For now, let's assume if it's not comma, it might be next arg (if comma is optional)
+				// But standard Joss requires comma.
+				// However, let's be safe and check for comma.
+				if p.peekToken.Type != COMMA {
+					// If not comma, maybe we should continue loop to let parseExpression handle it?
+					// Or break?
+					// Let's just continue and let the loop condition handle it (it won't match COMMA).
+					// But we are inside the loop.
+				}
+			}
+		}
+
+		if p.peekToken.Type == COMMA {
+			p.nextToken()
+			// Allow newline after comma
+			for p.peekToken.Type == NEWLINE {
+				p.nextToken()
+			}
+			p.nextToken() // Advance to start of expression
+			args = append(args, p.parseExpression(LOWEST))
+		}
 	}
 
 	if !p.expectPeek(RPAREN) {

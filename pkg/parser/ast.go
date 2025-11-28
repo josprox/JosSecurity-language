@@ -587,3 +587,14 @@ func (is *IfStatement) String() string {
 	}
 	return out.String()
 }
+
+type BlockExpression struct {
+	Token Token // {
+	Block *BlockStatement
+}
+
+func (be *BlockExpression) expressionNode()      {}
+func (be *BlockExpression) TokenLiteral() string { return be.Token.Literal }
+func (be *BlockExpression) String() string {
+	return be.Block.String()
+}

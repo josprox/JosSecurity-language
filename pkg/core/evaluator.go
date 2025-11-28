@@ -43,6 +43,10 @@ func (r *Runtime) evaluateExpression(exp parser.Expression) interface{} {
 		return r.evaluateIsset(e)
 	case *parser.EmptyExpression:
 		return r.evaluateEmpty(e)
+	case *parser.BlockExpression:
+		// Return the block itself (or a closure wrapper if we had one)
+		// For now, just return the BlockStatement so Task can execute it.
+		return e.Block
 	}
 	return nil
 }
