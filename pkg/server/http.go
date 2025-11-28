@@ -300,11 +300,16 @@ func compileStyles() {
 	// Find .scss files
 	files, _ := filepath.Glob("assets/css/*.scss")
 	for _, file := range files {
-		data, err := os.ReadFile(file)
-		if err != nil {
+		// Only compile files that don't start with _
+		if strings.HasPrefix(filepath.Base(file), "_") {
 			continue
 		}
-		content := string(data)
+
+		content, err := resolveImports(file)
+		if err != nil {
+			fmt.Printf("Error compilando %s: %v\n", file, err)
+			continue
+		}
 
 		// 1. Extract Variables
 		vars := make(map[string]string)
@@ -320,9 +325,6 @@ func compileStyles() {
 			// Replace $var with value
 			content = strings.ReplaceAll(content, k, v)
 		}
-
-		// 3. Simple Nesting (Very basic: selector { & inner { } })
-		// Too complex for regex. Let's stick to variables for PoC.
 
 		// Save to public/css/
 		outFile := filepath.Join("public", "css", filepath.Base(file))
@@ -342,6 +344,39 @@ func compileStyles() {
 		os.MkdirAll(filepath.Dir(outFile), 0755)
 		os.WriteFile(outFile, data, 0644)
 	}
+}
+
+func resolveImports(path string) (string, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return "", err
+	}
+	content := string(data)
+
+	reImport := regexp.MustCompile(`@import\s+"([^"]+)";`)
+	content = reImport.ReplaceAllStringFunc(content, func(match string) string {
+		parts := reImport.FindStringSubmatch(match)
+		importName := parts[1]
+
+		// Try _name.scss first, then name.scss
+		dir := filepath.Dir(path)
+		candidates := []string{
+			filepath.Join(dir, "_"+importName+".scss"),
+			filepath.Join(dir, importName+".scss"),
+		}
+
+		for _, candidate := range candidates {
+			if _, err := os.Stat(candidate); err == nil {
+				importedContent, err := resolveImports(candidate)
+				if err == nil {
+					return importedContent
+				}
+			}
+		}
+		return match // Keep original if not found (or error)
+	})
+
+	return content, nil
 }
 
 func sseHandler(w http.ResponseWriter, r *http.Request) {
