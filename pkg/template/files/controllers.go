@@ -8,7 +8,7 @@ func GetControllerFiles(path string) map[string]string {
     func index() {
         return View::render("welcome", {
             "title": "Bienvenido a JosSecurity",
-            "version": "3.0"
+            "version": JOSS_VERSION
         })
     }
 }`,

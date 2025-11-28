@@ -7,14 +7,18 @@ func GetViewFiles(path string) map[string]string {
 		filepath.Join(path, "app", "views", "welcome.joss.html"): `@extends('layouts.master')
 
 @section('content')
-    <div class="text-center">
+    <div class="hero-section text-center">
         <h1 class="display-4 mb-4">{{ $title }}</h1>
         <p class="lead mb-5">La plataforma de seguridad empresarial más avanzada.</p>
+        
         <div class="d-flex justify-content-center gap-3">
             <a href="/login" class="btn btn-primary btn-lg">Iniciar Sesión</a>
             <a href="/register" class="btn btn-outline-light btn-lg">Registrarse</a>
         </div>
-        <p class="mt-5 text-muted">Versión {{ $version }}</p>
+
+        <div class="mt-5">
+            <span class="badge badge-info">Compilador v{{ $version }}</span>
+        </div>
     </div>
 @endsection`,
 		filepath.Join(path, "app", "views", "auth", "login.joss.html"): `@extends('layouts.master')

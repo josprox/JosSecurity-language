@@ -29,6 +29,7 @@ var (
 			}
 			r.Variables["cout"] = &Cout{}
 			r.Variables["cin"] = &Cin{}
+			r.Variables["JOSS_VERSION"] = "3.0.0"
 			r.RegisterNativeClasses()
 			return r
 		},
@@ -42,6 +43,7 @@ func NewRuntime() *Runtime {
 	if _, ok := r.Variables["View"]; !ok {
 		r.Variables["cout"] = &Cout{}
 		r.Variables["cin"] = &Cin{}
+		r.Variables["JOSS_VERSION"] = "3.0.0"
 		r.RegisterNativeClasses()
 	}
 	return r

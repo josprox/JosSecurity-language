@@ -38,6 +38,15 @@ func (r *Runtime) executeViewMethod(instance *Instance, method string, args []in
 							data["auth_role"] = role
 						}
 					}
+					// Inject Flash Messages
+					if errVal, ok := sessInst.Fields["error"]; ok {
+						data["error"] = errVal
+						delete(sessInst.Fields, "error")
+					}
+					if successVal, ok := sessInst.Fields["success"]; ok {
+						data["success"] = successVal
+						delete(sessInst.Fields, "success")
+					}
 				}
 			}
 
@@ -108,8 +117,9 @@ func (r *Runtime) executeViewMethod(instance *Instance, method string, args []in
 			// 4. Variable Replacement
 
 			// A. Handle Ternaries: {{ $var ? 'trueVal' : 'falseVal' }}
-			// Very basic regex for: {{ $var ? 'a' : 'b' }}
+			// Regex for: {{ $var ? 'a' : 'b' }} (supporting single quotes)
 			reTernary := regexp.MustCompile(`\{\{\s*\$([a-zA-Z0-9_]+)\s*\?\s*'([^']*)'\s*:\s*'([^']*)'\s*\}\}`)
+
 			finalHtml = reTernary.ReplaceAllStringFunc(finalHtml, func(match string) string {
 				parts := reTernary.FindStringSubmatch(match)
 				key := parts[1]
