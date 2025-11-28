@@ -19,6 +19,7 @@ func CreateBibleProject(path string) {
 		filepath.Join(path, "app", "views", "layouts"),
 		filepath.Join(path, "app", "views", "auth"),
 		filepath.Join(path, "app", "views", "dashboard"),
+		filepath.Join(path, "app", "database", "migrations"),
 		filepath.Join(path, "app", "libs"),
 		filepath.Join(path, "assets", "css"),
 		filepath.Join(path, "assets", "js"),
@@ -43,10 +44,17 @@ func CreateBibleProject(path string) {
 }`,
 		filepath.Join(path, "env.joss"): `APP_ENV="development"
 PORT="8000"
+
+# Database Configuration (sqlite or mysql)
+DB="sqlite"
+DB_PATH="database.sqlite"
+
+# MySQL Configuration (Only if DB="mysql")
 DB_HOST="localhost"
 DB_NAME="joss_db"
 DB_USER="root"
 DB_PASS=""
+
 JWT_SECRET="change_me_in_production"`,
 		filepath.Join(path, "routes.joss"): `// Web Routes
 // Rutas Públicas

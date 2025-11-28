@@ -9,6 +9,7 @@ import (
 
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/jossecurity/joss/pkg/parser"
+	_ "modernc.org/sqlite"
 )
 
 var (
@@ -36,7 +37,14 @@ var (
 
 // NewRuntime gets a runtime from the pool
 func NewRuntime() *Runtime {
-	return runtimePool.Get().(*Runtime)
+	r := runtimePool.Get().(*Runtime)
+	// Ensure native classes are registered (if recycled)
+	if _, ok := r.Variables["View"]; !ok {
+		r.Variables["cout"] = &Cout{}
+		r.Variables["cin"] = &Cin{}
+		r.RegisterNativeClasses()
+	}
+	return r
 }
 
 // FreeRuntime returns the runtime to the pool
@@ -100,14 +108,42 @@ func (r *Runtime) LoadEnv() {
 		}
 	}
 
-	// Connect to DB if creds exist
-	if host, ok := r.Env["DB_HOST"]; ok {
-		dsn := fmt.Sprintf("%s:%s@tcp(%s:3306)/%s", r.Env["DB_USER"], r.Env["DB_PASS"], host, r.Env["DB_NAME"])
-		db, err := sql.Open("mysql", dsn)
-		if err == nil {
-			// db.Ping() // Optional: don't block if DB is down
-			r.DB = db
+	// Connect to DB
+	dbDriver := "mysql"
+	if val, ok := r.Env["DB"]; ok {
+		dbDriver = val
+	}
+
+	var dsn string
+
+	if dbDriver == "sqlite" {
+		dbPath := "database.sqlite"
+		if val, ok := r.Env["DB_PATH"]; ok {
+			dbPath = val
 		}
+		dsn = dbPath
+		fmt.Printf("[Security] Conectando a SQLite: %s\n", dbPath)
+		// Ensure sqlite3 driver is imported
+	} else {
+		// Default to MySQL
+		if host, ok := r.Env["DB_HOST"]; ok {
+			dsn = fmt.Sprintf("%s:%s@tcp(%s:3306)/%s", r.Env["DB_USER"], r.Env["DB_PASS"], host, r.Env["DB_NAME"])
+			fmt.Printf("[Security] Conectando a MySQL: %s\n", host)
+		} else {
+			// No DB config found
+			return
+		}
+	}
+
+	db, err := sql.Open(dbDriver, dsn)
+	if err == nil {
+		// db.Ping() // Optional: don't block if DB is down
+		r.DB = db
+		r.EnsureCronTable()
+		r.EnsureMigrationTable()
+		r.EnsureAuthTables()
+	} else {
+		fmt.Printf("[Security] Error conectando a DB: %v\n", err)
 	}
 }
 

@@ -16,36 +16,9 @@ func (r *Runtime) executeAuthMethod(instance *Instance, method string, args []in
 	usersTable := prefix + "users"
 	rolesTable := prefix + "roles"
 
-	// Auto-migrate check (lazy)
-	if _, ok := instance.Fields["_migrated"]; !ok {
-		if r.DB != nil {
-			// 1. Create Roles Table
-			queryRoles := fmt.Sprintf(`CREATE TABLE IF NOT EXISTS %s (
-				id INT AUTO_INCREMENT PRIMARY KEY,
-				name VARCHAR(50) UNIQUE
-			)`, rolesTable)
-			r.DB.Exec(queryRoles)
-
-			// Seed Roles (1: admin, 2: client)
-			r.DB.Exec(fmt.Sprintf("INSERT IGNORE INTO %s (id, name) VALUES (1, 'admin')", rolesTable))
-			r.DB.Exec(fmt.Sprintf("INSERT IGNORE INTO %s (id, name) VALUES (2, 'client')", rolesTable))
-
-			// 2. Create Users Table (with role_id)
-			queryUsers := fmt.Sprintf(`CREATE TABLE IF NOT EXISTS %s (
-				id INT AUTO_INCREMENT PRIMARY KEY,
-				name VARCHAR(255),
-				email VARCHAR(255) UNIQUE,
-				password VARCHAR(255),
-				role_id INT DEFAULT 2,
-				created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-				updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-				FOREIGN KEY (role_id) REFERENCES %s(id)
-			)`, usersTable, rolesTable)
-			r.DB.Exec(queryUsers)
-
-			instance.Fields["_migrated"] = true
-		}
-	}
+	// Ensure tables exist (lazy check removed, moved to explicit init)
+	// But we can keep it here as a fallback or just rely on EnsureAuthTables being called.
+	// To be safe and follow the pattern, let's move the logic to EnsureAuthTables and call it from Runtime.
 
 	switch method {
 	case "create":
@@ -77,7 +50,12 @@ func (r *Runtime) executeAuthMethod(instance *Instance, method string, args []in
 					return false
 				}
 
-				query := fmt.Sprintf("INSERT INTO %s (name, email, password, role_id, created_at, updated_at) VALUES (?, ?, ?, ?, NOW(), NOW())", usersTable)
+				nowFunc := "NOW()"
+				if val, ok := r.Env["DB"]; ok && val == "sqlite" {
+					nowFunc = "CURRENT_TIMESTAMP"
+				}
+
+				query := fmt.Sprintf("INSERT INTO %s (name, email, password, role_id, created_at, updated_at) VALUES (?, ?, ?, ?, %s, %s)", usersTable, nowFunc, nowFunc)
 				_, err = r.DB.Exec(query, name, email, hashedPassword, roleId)
 				if err != nil {
 					fmt.Printf("[Security] Error creando usuario: %v\n", err)

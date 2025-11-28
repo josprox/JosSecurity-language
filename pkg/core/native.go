@@ -107,6 +107,14 @@ func (r *Runtime) RegisterNativeClasses() {
 	}
 	r.registerClass(wsClass)
 	r.Variables["WebSocket"] = &Instance{Class: wsClass, Fields: make(map[string]interface{})}
+
+	// Schema
+	schemaClass := &parser.ClassStatement{
+		Name: &parser.Identifier{Value: "Schema"},
+		Body: &parser.BlockStatement{},
+	}
+	r.registerClass(schemaClass)
+	r.Variables["Schema"] = &Instance{Class: schemaClass, Fields: make(map[string]interface{})}
 }
 
 func (r *Runtime) executeNativeMethod(instance *Instance, method string, args []interface{}) interface{} {
@@ -139,6 +147,8 @@ func (r *Runtime) executeNativeMethod(instance *Instance, method string, args []
 		return r.executeRedirectResponseMethod(instance, method, args)
 	case "WebSocket":
 		return r.executeWebSocketMethod(instance, method, args)
+	case "Schema":
+		return r.executeSchemaMethod(instance, method, args)
 	}
 	return nil
 }
