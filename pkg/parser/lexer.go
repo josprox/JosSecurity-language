@@ -148,6 +148,15 @@ func (l *Lexer) NextToken() Token {
 		tok.Literal = ""
 		tok.Type = EOF
 		tok.Line = l.line
+	case '|':
+		if l.peekChar() == '>' {
+			ch := l.ch
+			l.readChar()
+			literal := string(ch) + string(l.ch)
+			tok = Token{Type: PIPE, Literal: literal, Line: l.line}
+		} else {
+			tok = l.newToken(ILLEGAL, l.ch)
+		}
 	default:
 		if isLetter(l.ch) {
 			tok.Literal = l.readIdentifier()

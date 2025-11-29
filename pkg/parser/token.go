@@ -44,6 +44,7 @@ const (
 	DOT          = "."
 	ARROW        = "->"
 	DOUBLE_COLON = "::"
+	PIPE         = "|>"
 
 	// Keywords
 	FUNCTION  = "FUNCTION"

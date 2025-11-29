@@ -10,6 +10,7 @@ const (
 	ASSIGNMENT  // =
 	EQUALS      // ==
 	LESSGREATER // > or <
+	PIPE_OP     // |>
 	SUM         // +
 	SHIFT       // << or >>
 	PRODUCT     // *
@@ -22,6 +23,7 @@ const (
 var precedences = map[TokenType]int{
 	ASSIGN:       ASSIGNMENT,
 	QUESTION:     TERNARY,
+	PIPE:         PIPE_OP,
 	PLUS:         SUM,
 	MINUS:        SUM,
 	SLASH:        PRODUCT,
@@ -96,6 +98,7 @@ func NewParser(l *Lexer) *Parser {
 	p.registerInfix(GTE, p.parseInfixExpression)
 	p.registerInfix(SHIFT_LEFT, p.parseInfixExpression)
 	p.registerInfix(SHIFT_RIGHT, p.parseInfixExpression)
+	p.registerInfix(PIPE, p.parseInfixExpression)
 	p.registerInfix(LPAREN, p.parseCallExpression)
 	p.registerInfix(QUESTION, p.parseTernaryExpression)
 	p.registerInfix(LBRACKET, p.parseIndexExpression)

@@ -1,6 +1,15 @@
 import { connection, indexer } from '../server';
 
 export function setupCustomRequests() {
+    // Manual workspace indexing
+    connection.onRequest('workspace/executeCommand', async (params: any) => {
+        if (params.command === 'joss.indexWorkspace') {
+            await indexer.indexWorkspace();
+            return { success: true };
+        }
+        return { success: false };
+    });
+
     connection.onRequest('joss/getRoutes', async () => {
         return await indexer.getAllRoutes();
     });

@@ -2,15 +2,14 @@
   "name": "joss-language",
   "displayName": "JosSecurity Language Support",
   "description": "Advanced language support for JosSecurity with LSP, go-to-definition, hover, diagnostics, and security analysis",
-  "version": "2.0.0",
+  "version": "3.0.0",
+  "icon": "images/icon.png",
   "publisher": "jossecurity",
   "engines": {
     "vscode": "^1.75.0"
   },
   "main": "./out/extension.js",
-  "activationEvents": [
-    "onLanguage:joss"
-  ],
+  "activationEvents": ["*"],
   "categories": [
     "Programming Languages",
     "Snippets",
@@ -28,8 +27,13 @@
     "languages": [
       {
         "id": "joss",
-        "aliases": ["JosSecurity", "joss"],
-        "extensions": [".joss"],
+        "aliases": [
+          "JosSecurity",
+          "joss"
+        ],
+        "extensions": [
+          ".joss"
+        ],
         "configuration": "./language-configuration.json"
       }
     ],
@@ -95,7 +99,10 @@
         },
         "joss.controllerPaths": {
           "type": "array",
-          "default": ["app/controllers", "app/Controllers"],
+          "default": [
+            "app/controllers",
+            "app/Controllers"
+          ],
           "description": "Paths to search for controllers"
         }
       }
@@ -108,21 +115,22 @@
     "package": "vsce package"
   },
   "devDependencies": {
+    "@types/fast-levenshtein": "^0.0.4",
     "@types/node": "^18.0.0",
     "@types/vscode": "^1.75.0",
-    "@types/fast-levenshtein": "^0.0.4",
     "@typescript-eslint/eslint-plugin": "^6.0.0",
     "@typescript-eslint/parser": "^6.0.0",
+    "@vscode/vsce": "^2.15.0",
     "eslint": "^8.0.0",
     "typescript": "^5.0.0",
     "vsce": "^2.15.0"
   },
   "dependencies": {
+    "fast-levenshtein": "^3.0.0",
+    "level": "^8.0.0",
     "vscode-languageclient": "^9.0.1",
     "vscode-languageserver": "^9.0.1",
-    "vscode-languageserver-textdocument": "^1.0.11",
-    "level": "^8.0.0",
-    "fast-levenshtein": "^3.0.0"
+    "vscode-languageserver-textdocument": "^1.0.11"
   },
   "repository": {
     "type": "git",

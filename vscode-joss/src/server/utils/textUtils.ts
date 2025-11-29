@@ -8,11 +8,11 @@ export function getWordAtPosition(document: TextDocument, position: Position): s
     let start = offset;
     let end = offset;
 
-    while (start > 0 && /[a-zA-Z0-9_]/.test(text[start - 1])) {
+    while (start > 0 && /[a-zA-Z0-9_@:$]/.test(text[start - 1])) {
         start--;
     }
 
-    while (end < text.length && /[a-zA-Z0-9_]/.test(text[end])) {
+    while (end < text.length && /[a-zA-Z0-9_@:$]/.test(text[end])) {
         end++;
     }
 

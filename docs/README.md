@@ -177,5 +177,5 @@ Crear issue en el repositorio con:
 
 ---
 
-**Versión**: JosSecurity v3.0 (Gold Master)  
-**Última actualización**: 2025-11-28
+**Versión**: JosSecurity v3.0.1
+**Última actualización**: 2025-11-29

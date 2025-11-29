@@ -113,6 +113,10 @@
           "match": "(&&|\\|\\||!)"
         },
         {
+          "name": "keyword.operator.pipe.joss",
+          "match": "(\\|>)"
+        },
+        {
           "name": "keyword.operator.member.joss",
           "match": "(-\\>|\\.|::)"
         }

@@ -8,6 +8,7 @@
 - [Loops](#loops)
 - [Try-Catch](#try-catch)
 - [Arrays y Maps](#arrays-y-maps)
+- [Operador Pipe](#operador-pipe)
 - [Concurrencia](#concurrencia)
 
 ---
@@ -431,6 +432,44 @@ $x += 5
 $x -= 3
 $x *= 2
 $x /= 4
+```
+
+---
+
+## Operador Pipe
+
+El operador `|>` permite encadenar llamadas de funciones de manera fluida, pasando el resultado de la izquierda como el **primer argumento** de la función de la derecha.
+
+### Uso Básico
+
+```joss
+// Equivalente a: square(10 + 5)
+$resultado = 10 + 5 |> square
+print($resultado) // 225
+```
+
+### Encadenamiento
+
+```joss
+// Equivalente a: mul(add(10, 5), 2)
+$res = 10 |> add(5) |> mul(2)
+print($res) // 30
+```
+
+### Con Funciones Anónimas
+
+```joss
+$res = 20 |> func($x) {
+    return $x / 2
+}
+print($res) // 10
+```
+
+### Con Builtins
+
+```joss
+"hello" |> len |> print
+// Imprime: 5
 ```
 
 ---

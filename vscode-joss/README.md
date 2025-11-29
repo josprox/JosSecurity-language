@@ -139,4 +139,6 @@ MIT
 
 ## Version
 
+3.0.0 - Added support for Pipe Operator (`|>`) and JosSecurity v3.0.1.
 2.0.0 - Complete LSP rewrite with advanced features
+

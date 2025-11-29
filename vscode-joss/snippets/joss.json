@@ -297,5 +297,81 @@
       "\\$data = json_decode(${1:string})"
     ],
     "description": "Decode JSON string"
+  },
+  "Pipe Operator": {
+    "prefix": "pipe",
+    "body": [
+      "${1:value} |> ${2:function}"
+    ],
+    "description": "Pipe operator - pass value to function"
+  },
+  "Pipe Chain": {
+    "prefix": "pipechain",
+    "body": [
+      "${1:value} |> ${2:func1} |> ${3:func2} |> ${4:func3}"
+    ],
+    "description": "Chain multiple functions with pipe operator"
+  },
+  "Pipe with Args": {
+    "prefix": "pipeargs",
+    "body": [
+      "${1:value} |> ${2:function}(${3:arg})"
+    ],
+    "description": "Pipe with additional arguments"
+  },
+  "Lambda Function": {
+    "prefix": "lambda",
+    "body": [
+      "func(${1:$x}) { return ${2:$x * 2}; }"
+    ],
+    "description": "Anonymous lambda function"
+  },
+  "Pipe Lambda": {
+    "prefix": "pipelambda",
+    "body": [
+      "${1:value} |> func(${2:$x}) { return ${3:$x}; }"
+    ],
+    "description": "Pipe to lambda function"
+  },
+  "Channel Create": {
+    "prefix": "chan",
+    "body": [
+      "\\$${1:ch} = make_chan(${2:0})"
+    ],
+    "description": "Create a channel"
+  },
+  "Channel Send": {
+    "prefix": "chansend",
+    "body": [
+      "\\$${1:ch} << ${2:value}"
+    ],
+    "description": "Send value to channel"
+  },
+  "Channel Receive": {
+    "prefix": "chanrecv",
+    "body": [
+      "\\$${1:value} = recv(\\$${2:ch})"
+    ],
+    "description": "Receive value from channel"
+  },
+  "Channel Foreach": {
+    "prefix": "chanfor",
+    "body": [
+      "foreach (\\$${1:ch} as \\$${2:value}) {",
+      "\\t$0",
+      "}"
+    ],
+    "description": "Iterate over channel values"
+  },
+  "Async with Channel": {
+    "prefix": "asyncchan",
+    "body": [
+      "\\$${1:ch} = make_chan()",
+      "\\$${2:future} = async({",
+      "\\t\\$${1:ch} << ${3:value}",
+      "})",
+      "$0"
+    ],
+    "description": "Async task with channel communication"
   }
 }

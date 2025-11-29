@@ -77,6 +77,17 @@ connection.onInitialized(async () => {
     }
 
     connection.console.log('JosSecurity Language Server initialized');
+
+    // Index workspace on startup
+    const workspaceFolders = await connection.workspace.getWorkspaceFolders();
+    if (workspaceFolders && workspaceFolders.length > 0) {
+        const workspaceRoot = workspaceFolders[0].uri.replace('file:///', '').replace(/\//g, '\\');
+        indexer.setWorkspaceRoot(workspaceRoot);
+
+        connection.console.log(`Indexing workspace: ${workspaceRoot}`);
+        await indexer.indexWorkspace();
+        connection.console.log('Workspace indexed successfully');
+    }
 });
 
 // Setup all providers

@@ -140,6 +140,71 @@ func (r *Runtime) evaluateInfix(ie *parser.InfixExpression) interface{} {
 		}
 	}
 
+	// Handle Pipe Operator |>
+	if ie.Operator == "|>" {
+		// Right side can be:
+		// 1. Identifier (function name) -> call(left)
+		// 2. CallExpression (function call) -> call(left, args...)
+		// 3. FunctionLiteral (anonymous function) -> call(left)
+
+		switch rightNode := ie.Right.(type) {
+		case *parser.Identifier:
+			// Case 1: "hello" |> strtoupper
+			fnName := rightNode.Value
+			if fn, ok := r.Functions[fnName]; ok {
+				return r.applyFunction(fn, []interface{}{left})
+			}
+			if res, ok := r.callBuiltin(fnName, []interface{}{left}); ok {
+				return res
+			}
+			fmt.Printf("Error: Función '%s' no encontrada para pipe\n", fnName)
+			return nil
+
+		case *parser.CallExpression:
+			// Case 2: "hello" |> foo(1) -> foo("hello", 1)
+
+			// Evaluate function
+			var fn interface{}
+			if ident, ok := rightNode.Function.(*parser.Identifier); ok {
+				if f, ok := r.Functions[ident.Value]; ok {
+					fn = f
+				} else {
+					// Check builtin
+					// But we need to evaluate args first to call builtin
+					// Evaluate existing arguments
+					args := []interface{}{left} // Prepend left
+					for _, argExp := range rightNode.Arguments {
+						args = append(args, r.evaluateExpression(argExp))
+					}
+
+					if res, ok := r.callBuiltin(ident.Value, args); ok {
+						return res
+					}
+					fmt.Printf("Error: Función '%s' no encontrada en pipe call\n", ident.Value)
+					return nil
+				}
+			} else {
+				fn = r.evaluateExpression(rightNode.Function)
+			}
+
+			// Evaluate existing arguments
+			args := []interface{}{left} // Prepend left
+			for _, argExp := range rightNode.Arguments {
+				args = append(args, r.evaluateExpression(argExp))
+			}
+
+			return r.applyFunction(fn, args)
+
+		case *parser.FunctionLiteral:
+			// Case 3: "hello" |> func($x) { return $x; }
+			return r.applyFunction(rightNode, []interface{}{left})
+
+		default:
+			fmt.Printf("Error: El lado derecho del pipe debe ser una función o llamada, se obtuvo %T\n", ie.Right)
+			return nil
+		}
+	}
+
 	// Smart Numerics: Auto-promote to float if needed
 	toFloat := func(val interface{}) (float64, bool) {
 		if i, ok := val.(int64); ok {
