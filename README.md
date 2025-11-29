@@ -37,15 +37,56 @@ Lenguaje de programación moderno con enfoque en seguridad, inspirado en PHP, Py
 
 ## Instalación
 
-### Requisitos
-- Go 1.20 o superior
-- MySQL o SQLite (para características de base de datos)
-- Node.js (opcional, para compilación de assets)
+### 🚀 Instalación Rápida (One-Liner)
 
-### Compilar
-```bash
-go build -o joss.exe ./cmd/joss
+**Windows (PowerShell como Administrador)**:
+```powershell
+iwr -useb https://raw.githubusercontent.com/josprox/JosSecurity-language/main/install/remote-install.ps1 | iex
 ```
+
+**Linux/macOS**:
+```bash
+curl -fsSL https://raw.githubusercontent.com/josprox/JosSecurity-language/main/install/remote-install.sh | bash
+```
+
+### 📦 Instalación Manual
+
+```bash
+# Clonar repositorio
+git clone https://github.com/josprox/JosSecurity-language.git
+cd JosSecurity-language/install
+
+# Ejecutar instalador
+./install.sh  # Linux/macOS
+# o
+.\install.ps1  # Windows
+```
+
+### 🔄 Actualizar
+
+**Windows**:
+```powershell
+iwr -useb https://raw.githubusercontent.com/josprox/JosSecurity-language/main/install/update.ps1 | iex
+```
+
+**Linux/macOS**:
+```bash
+curl -fsSL https://raw.githubusercontent.com/josprox/JosSecurity-language/main/install/update.sh | bash
+```
+
+### 🗑️ Desinstalar
+
+**Windows**:
+```powershell
+iwr -useb https://raw.githubusercontent.com/josprox/JosSecurity-language/main/install/uninstall.ps1 | iex
+```
+
+**Linux/macOS**:
+```bash
+curl -fsSL https://raw.githubusercontent.com/josprox/JosSecurity-language/main/install/uninstall.sh | bash
+```
+
+**Ver más comandos**: [ONE_LINER_COMMANDS.md](ONE_LINER_COMMANDS.md)
 
 ## Inicio Rápido
 
