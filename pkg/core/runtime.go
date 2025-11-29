@@ -9,6 +9,7 @@ import (
 
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/jossecurity/joss/pkg/parser"
+	"github.com/jossecurity/joss/pkg/version"
 	_ "modernc.org/sqlite"
 )
 
@@ -29,7 +30,7 @@ var (
 			}
 			r.Variables["cout"] = &Cout{}
 			r.Variables["cin"] = &Cin{}
-			r.Variables["JOSS_VERSION"] = "3.0.0"
+			r.Variables["JOSS_VERSION"] = version.Version
 			r.RegisterNativeClasses()
 			return r
 		},
@@ -43,7 +44,7 @@ func NewRuntime() *Runtime {
 	if _, ok := r.Variables["View"]; !ok {
 		r.Variables["cout"] = &Cout{}
 		r.Variables["cin"] = &Cin{}
-		r.Variables["JOSS_VERSION"] = "3.0.0"
+		r.Variables["JOSS_VERSION"] = version.Version
 		r.RegisterNativeClasses()
 	}
 	return r

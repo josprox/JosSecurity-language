@@ -1,6 +1,11 @@
 package files
 
-import "path/filepath"
+import (
+	"fmt"
+	"path/filepath"
+
+	"github.com/jossecurity/joss/pkg/version"
+)
 
 func GetConfigFiles(path string) map[string]string {
 	return map[string]string{
@@ -29,8 +34,8 @@ DB_PASS=""
 # REDIS_PASSWORD=""
 
 JWT_SECRET="change_me_in_production"`,
-		filepath.Join(path, "config", "reglas.joss"): `// Constantes Globales
+		filepath.Join(path, "config", "reglas.joss"): fmt.Sprintf(`// Constantes Globales
 const string APP_NAME = "JosSecurity Enterprise"
-const string APP_VERSION = "3.0.0"`,
+const string APP_VERSION = "%s"`, version.Version),
 	}
 }

@@ -1,0 +1,513 @@
+package parser
+
+import (
+	"fmt"
+	"strconv"
+)
+
+func (p *Parser) parseExpression(precedence int) Expression {
+	prefix := p.prefixParseFns[p.curToken.Type]
+	if prefix == nil {
+		p.noPrefixParseFnError(p.curToken.Type)
+		return nil
+	}
+	leftExp := prefix()
+
+	for !p.peekTokenIs(SEMICOLON) && !p.peekTokenIs(NEWLINE) && precedence < p.peekPrecedence() {
+		infix := p.infixParseFns[p.peekToken.Type]
+		if infix == nil {
+			return leftExp
+		}
+
+		p.nextToken()
+
+		leftExp = infix(leftExp)
+	}
+
+	return leftExp
+}
+
+func (p *Parser) parseIdentifier() Expression {
+	return &Identifier{Token: p.curToken, Value: p.curToken.Literal}
+}
+
+func (p *Parser) parseFunctionLiteral() Expression {
+	lit := &FunctionLiteral{Token: p.curToken}
+
+	if !p.expectPeek(LPAREN) {
+		return nil
+	}
+
+	lit.Parameters = p.parseFunctionParameters()
+
+	if !p.expectPeek(LBRACE) {
+		return nil
+	}
+
+	lit.Body = p.parseBlockStatement()
+
+	return lit
+}
+
+func (p *Parser) parseVarExpression() Expression {
+	// Current token is VAR ($)
+	// We expect next to be IDENT or THIS
+	if p.peekToken.Type == THIS {
+		p.nextToken()
+		return &Identifier{Token: p.curToken, Value: "this"}
+	}
+	if !p.expectPeek(IDENT) {
+		return nil
+	}
+	// Now curToken is IDENT
+	return &Identifier{Token: p.curToken, Value: p.curToken.Literal}
+}
+
+func (p *Parser) parseIntegerLiteral() Expression {
+	lit := &IntegerLiteral{Token: p.curToken}
+
+	value, err := strconv.ParseInt(p.curToken.Literal, 0, 64)
+	if err != nil {
+		msg := fmt.Sprintf("could not parse %q as integer", p.curToken.Literal)
+		p.errors = append(p.errors, msg)
+		return nil
+	}
+
+	lit.Value = value
+	return lit
+}
+
+func (p *Parser) parseFloatLiteral() Expression {
+	lit := &FloatLiteral{Token: p.curToken}
+
+	value, err := strconv.ParseFloat(p.curToken.Literal, 64)
+	if err != nil {
+		msg := fmt.Sprintf("could not parse %q as float", p.curToken.Literal)
+		p.errors = append(p.errors, msg)
+		return nil
+	}
+
+	lit.Value = value
+	return lit
+}
+
+func (p *Parser) parseStringLiteral() Expression {
+	return &StringLiteral{Token: p.curToken, Value: p.curToken.Literal}
+}
+
+func (p *Parser) parseBoolean() Expression {
+	return &Boolean{Token: p.curToken, Value: p.curToken.Type == TRUE}
+}
+
+func (p *Parser) parseGroupedExpression() Expression {
+	p.nextToken()
+	exp := p.parseExpression(LOWEST)
+	if !p.expectPeek(RPAREN) {
+		return nil
+	}
+	return exp
+}
+
+func (p *Parser) parseArrayLiteral() Expression {
+	array := &ArrayLiteral{Token: p.curToken}
+	array.Elements = p.parseExpressionList(RBRACKET)
+	return array
+}
+
+func (p *Parser) parseBraceExpression() Expression {
+	block := &BlockStatement{Token: p.curToken, Statements: []Statement{}}
+	p.nextToken() // consume LBRACE
+
+	// Check for empty
+	if p.curToken.Type == RBRACE {
+		// Empty {} -> Map (standard convention in dynamic langs)
+		return &MapLiteral{Token: p.curToken, Pairs: make(map[Expression]Expression)}
+	}
+
+	// Parse first statement
+	// Handle NEWLINEs
+	for p.curToken.Type == NEWLINE {
+		p.nextToken()
+	}
+	if p.curToken.Type == RBRACE {
+		return &MapLiteral{Token: p.curToken, Pairs: make(map[Expression]Expression)}
+	}
+
+	firstStmt := p.parseStatement()
+
+	// If the first statement is NOT an ExpressionStatement, it's definitely a Block.
+	// e.g. { return 1; } or { if ... }
+	exprStmt, isExpr := firstStmt.(*ExpressionStatement)
+	if !isExpr {
+		// It's a block. Continue parsing statements.
+		if firstStmt != nil {
+			block.Statements = append(block.Statements, firstStmt)
+		}
+		p.nextToken()
+		for p.curToken.Type != RBRACE && p.curToken.Type != EOF {
+			if p.curToken.Type == NEWLINE {
+				p.nextToken()
+				continue
+			}
+			stmt := p.parseStatement()
+			if stmt != nil {
+				block.Statements = append(block.Statements, stmt)
+			}
+			p.nextToken()
+		}
+		return &BlockExpression{Token: block.Token, Block: block}
+	}
+
+	if p.peekToken.Type == COLON {
+		// It's a Map!
+		// Convert firstStmt to Key.
+		mapLit := &MapLiteral{Token: block.Token, Pairs: make(map[Expression]Expression)}
+		key := exprStmt.Expression
+
+		p.nextToken() // curToken is :
+		p.nextToken() // curToken is start of value
+
+		val := p.parseExpression(LOWEST)
+		mapLit.Pairs[key] = val
+
+		// Continue parsing map
+		for !p.peekTokenIs(RBRACE) {
+			if p.peekTokenIs(NEWLINE) {
+				p.nextToken()
+			}
+			if p.peekTokenIs(COMMA) {
+				p.nextToken()
+			}
+			if p.peekTokenIs(NEWLINE) {
+				p.nextToken()
+			}
+			if p.peekTokenIs(RBRACE) {
+				break
+			}
+
+			p.nextToken() // start of next key
+			key := p.parseExpression(LOWEST)
+
+			if p.peekTokenIs(NEWLINE) {
+				p.nextToken()
+			}
+
+			if !p.expectPeek(COLON) {
+				return nil
+			}
+			p.nextToken()
+			val := p.parseExpression(LOWEST)
+			mapLit.Pairs[key] = val
+		}
+
+		if !p.expectPeek(RBRACE) {
+			return nil
+		}
+		return mapLit
+	}
+
+	// Not a map. It's a Block.
+	if firstStmt != nil {
+		block.Statements = append(block.Statements, firstStmt)
+	}
+	p.nextToken() // Move past the last token of first statement
+
+	for p.curToken.Type != RBRACE && p.curToken.Type != EOF {
+		if p.curToken.Type == NEWLINE {
+			p.nextToken()
+			continue
+		}
+		stmt := p.parseStatement()
+		if stmt != nil {
+			block.Statements = append(block.Statements, stmt)
+		}
+		p.nextToken()
+	}
+
+	return &BlockExpression{Token: block.Token, Block: block}
+}
+
+func (p *Parser) parseBlockExpression() *BlockExpression {
+	block := p.parseBlockStatement()
+	return &BlockExpression{Token: block.Token, Block: block}
+}
+
+func isStatementStart(t TokenType) bool {
+	switch t {
+	case RETURN, IF, VAR, FOREACH, WHILE, DO, TRY, THROW, ECHO, PRINT:
+		return true
+	}
+	return false
+}
+
+func (p *Parser) parseExpressionList(end TokenType) []Expression {
+	list := []Expression{}
+
+	if p.peekToken.Type == end {
+		p.nextToken()
+		return list
+	}
+
+	p.nextToken()
+	list = append(list, p.parseExpression(LOWEST))
+
+	for p.peekToken.Type == COMMA {
+		p.nextToken()
+		p.nextToken()
+		list = append(list, p.parseExpression(LOWEST))
+	}
+
+	if !p.expectPeek(end) {
+		return nil
+	}
+
+	return list
+}
+
+func (p *Parser) parseIndexExpression(left Expression) Expression {
+	exp := &IndexExpression{Token: p.curToken, Left: left}
+
+	p.nextToken()
+	exp.Index = p.parseExpression(LOWEST)
+
+	if !p.expectPeek(RBRACKET) {
+		return nil
+	}
+
+	return exp
+}
+
+func (p *Parser) parsePrefixExpression() Expression {
+	expression := &PrefixExpression{
+		Token:    p.curToken,
+		Operator: p.curToken.Literal,
+	}
+
+	p.nextToken()
+
+	expression.Right = p.parseExpression(PREFIX)
+
+	return expression
+}
+
+func (p *Parser) parseInfixExpression(left Expression) Expression {
+	expression := &InfixExpression{
+		Token:    p.curToken,
+		Operator: p.curToken.Literal,
+		Left:     left,
+	}
+
+	precedence := p.curPrecedence()
+	p.nextToken()
+	expression.Right = p.parseExpression(precedence)
+
+	return expression
+}
+
+func (p *Parser) parseTernaryExpression(condition Expression) Expression {
+	expression := &TernaryExpression{
+		Token:     p.curToken,
+		Condition: condition,
+	}
+
+	// Check if it's a block ternary: ? {
+	if p.peekToken.Type == LBRACE {
+		p.nextToken()
+		expression.True = p.parseBlockStatement()
+	} else {
+		// Value ternary: ? "A"
+		p.nextToken()
+		exp := p.parseExpression(LOWEST)
+		expression.True = &BlockStatement{
+			Statements: []Statement{&ExpressionStatement{Expression: exp}},
+		}
+	}
+
+	// Allow newlines before colon
+	for p.peekToken.Type == NEWLINE {
+		p.nextToken()
+	}
+
+	if !p.expectPeek(COLON) {
+		return nil
+	}
+
+	// Allow newlines after colon
+	for p.peekToken.Type == NEWLINE {
+		p.nextToken()
+	}
+
+	if p.peekToken.Type == LBRACE {
+		p.nextToken()
+		expression.False = p.parseBlockStatement()
+	} else {
+		p.nextToken()
+		exp := p.parseExpression(LOWEST)
+		expression.False = &BlockStatement{
+			Statements: []Statement{&ExpressionStatement{Expression: exp}},
+		}
+	}
+
+	return expression
+}
+
+func (p *Parser) parseCallExpression(function Expression) Expression {
+	exp := &CallExpression{Token: p.curToken, Function: function}
+	exp.Arguments = p.parseCallArguments()
+	return exp
+}
+
+func (p *Parser) parseCallArguments() []Expression {
+	args := []Expression{}
+
+	if p.peekToken.Type == RPAREN {
+		p.nextToken()
+		return args
+	}
+
+	p.nextToken()
+	args = append(args, p.parseExpression(LOWEST))
+
+	for p.peekToken.Type == COMMA || p.peekToken.Type == NEWLINE {
+		if p.peekToken.Type == NEWLINE {
+			p.nextToken()
+			// Check if we hit RPAREN after newline
+			if p.peekToken.Type == RPAREN {
+				break
+			}
+			// If no comma after newline, we assume comma insertion or just continue if next is expression
+			if p.peekToken.Type != COMMA {
+				// Optional: check if next token is start of expression?
+				// For now, let's assume if it's not comma, it might be next arg (if comma is optional)
+				// But standard Joss requires comma.
+				// However, let's be safe and check for comma.
+				if p.peekToken.Type != COMMA {
+					// If not comma, maybe we should continue loop to let parseExpression handle it?
+					// Or break?
+					// Let's just continue and let the loop condition handle it (it won't match COMMA).
+					// But we are inside the loop.
+				}
+			}
+		}
+
+		if p.peekToken.Type == COMMA {
+			p.nextToken()
+			// Allow newline after comma
+			for p.peekToken.Type == NEWLINE {
+				p.nextToken()
+			}
+			p.nextToken() // Advance to start of expression
+			args = append(args, p.parseExpression(LOWEST))
+		}
+	}
+
+	if !p.expectPeek(RPAREN) {
+		return nil
+	}
+
+	return args
+}
+
+func (p *Parser) parseFunctionParameters() []*Identifier {
+	identifiers := []*Identifier{}
+
+	if p.peekToken.Type == RPAREN {
+		p.nextToken()
+		return identifiers
+	}
+
+	p.nextToken()
+
+	// Expect variable: $param
+	if p.curToken.Type == VAR {
+		if !p.expectPeek(IDENT) {
+			return nil
+		}
+		ident := &Identifier{Token: p.curToken, Value: p.curToken.Literal}
+		identifiers = append(identifiers, ident)
+	}
+
+	for p.peekToken.Type == COMMA {
+		p.nextToken()
+		p.nextToken()
+		if p.curToken.Type == VAR {
+			if !p.expectPeek(IDENT) {
+				return nil
+			}
+			ident := &Identifier{Token: p.curToken, Value: p.curToken.Literal}
+			identifiers = append(identifiers, ident)
+		}
+	}
+
+	if !p.expectPeek(RPAREN) {
+		return nil
+	}
+
+	return identifiers
+}
+
+func (p *Parser) parseNewExpression() Expression {
+	exp := &NewExpression{Token: p.curToken}
+
+	if !p.expectPeek(IDENT) {
+		return nil
+	}
+	exp.Class = &Identifier{Token: p.curToken, Value: p.curToken.Literal}
+
+	if !p.expectPeek(LPAREN) {
+		return nil
+	}
+
+	exp.Arguments = p.parseCallArguments()
+
+	return exp
+}
+
+func (p *Parser) parseMemberExpression(left Expression) Expression {
+	exp := &MemberExpression{Token: p.curToken, Left: left}
+
+	if !p.expectPeek(IDENT) {
+		return nil
+	}
+	exp.Property = &Identifier{Token: p.curToken, Value: p.curToken.Literal}
+
+	return exp
+}
+
+func (p *Parser) parseAssignExpression(left Expression) Expression {
+	exp := &AssignExpression{Token: p.curToken, Left: left}
+
+	p.nextToken()
+	exp.Value = p.parseExpression(LOWEST)
+
+	return exp
+}
+
+func (p *Parser) parseIssetExpression() Expression {
+	exp := &IssetExpression{Token: p.curToken}
+
+	if !p.expectPeek(LPAREN) {
+		return nil
+	}
+
+	exp.Arguments = p.parseCallArguments()
+
+	return exp
+}
+
+func (p *Parser) parseEmptyExpression() Expression {
+	exp := &EmptyExpression{Token: p.curToken}
+
+	if !p.expectPeek(LPAREN) {
+		return nil
+	}
+
+	p.nextToken()
+	exp.Argument = p.parseExpression(LOWEST)
+
+	if !p.expectPeek(RPAREN) {
+		return nil
+	}
+
+	return exp
+}
