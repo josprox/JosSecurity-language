@@ -25,13 +25,15 @@ try {
     # Download main installer
     Invoke-WebRequest -Uri "$RawUrl/install.ps1" -OutFile "$TempDir\install.ps1" -UseBasicParsing
     
-    # Download binaries
-    Write-Host "[2/4] Downloading JosSecurity binary..." -ForegroundColor Yellow
-    Invoke-WebRequest -Uri "$RawUrl/joss.exe" -OutFile "$TempDir\joss.exe" -UseBasicParsing
+    # Download binaries zip
+    Write-Host "[2/4] Downloading JosSecurity binaries..." -ForegroundColor Yellow
+    $ZipPath = "$TempDir\jossecurity-binaries.zip"
+    Invoke-WebRequest -Uri "$RepoUrl/releases/latest/download/jossecurity-binaries.zip" -OutFile $ZipPath -UseBasicParsing
     
-    # Download VS Code extension
-    Write-Host "[3/4] Downloading VS Code extension..." -ForegroundColor Yellow
-    Invoke-WebRequest -Uri "$RawUrl/joss-language-2.0.0.vsix" -OutFile "$TempDir\joss-language-2.0.0.vsix" -UseBasicParsing
+    # Extract binaries
+    Write-Host "[3/4] Extracting files..." -ForegroundColor Yellow
+    Expand-Archive -Path $ZipPath -DestinationPath $TempDir -Force
+    Remove-Item $ZipPath -Force
     
     Write-Host "[4/4] Starting installation..." -ForegroundColor Yellow
     Write-Host ""

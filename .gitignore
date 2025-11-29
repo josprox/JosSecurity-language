@@ -18,3 +18,8 @@ vendor/
 .idea/
 
 /ejemplos/*
+install/*.zip
+install/*.exe
+install/joss-linux
+install/joss-macos
+install/*.vsix

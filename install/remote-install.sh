@@ -40,11 +40,12 @@ case "$OS" in
         ;;
 esac
 
-echo "[2/5] Downloading JosSecurity binary for $OS..."
-curl -fsSL "$RAW_URL/$BINARY" -o "$BINARY"
+echo "[2/5] Downloading JosSecurity binaries..."
+curl -fsSL "$REPO_URL/releases/latest/download/jossecurity-binaries.zip" -o jossecurity-binaries.zip
 
-echo "[3/5] Downloading VS Code extension..."
-curl -fsSL "$RAW_URL/joss-language-2.0.0.vsix" -o joss-language-2.0.0.vsix
+echo "[3/5] Extracting files..."
+unzip -o jossecurity-binaries.zip
+rm jossecurity-binaries.zip
 
 echo "[4/5] Starting installation..."
 echo ""

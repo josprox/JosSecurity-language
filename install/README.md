@@ -19,14 +19,18 @@ curl -fsSL https://raw.githubusercontent.com/josprox/JosSecurity-language/main/i
 If you prefer to download and run locally:
 
 ### Windows
+1. Download `jossecurity-binaries.zip` from the latest GitHub Release.
+2. Extract the zip file to this `install` folder.
+3. Run:
 ```powershell
-cd install
 .\install.ps1
 ```
 
 ### Linux/macOS
+1. Download `jossecurity-binaries.zip` from the latest GitHub Release.
+2. Extract the zip file to this `install` folder.
+3. Run:
 ```bash
-cd install
 chmod +x install.sh
 ./install.sh
 ```

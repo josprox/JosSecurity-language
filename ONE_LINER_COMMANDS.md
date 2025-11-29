@@ -51,7 +51,10 @@ If you prefer to download and run locally:
 git clone https://github.com/josprox/JosSecurity-language.git
 cd JosSecurity-language/install
 
-# Run installer
+# 1. Download jossecurity-binaries.zip from GitHub Releases
+# 2. Extract to this folder
+# 3. Run installer:
+
 ./install.sh  # Linux/macOS
 # or
 .\install.ps1  # Windows
