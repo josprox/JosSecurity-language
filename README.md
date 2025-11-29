@@ -41,7 +41,7 @@ Lenguaje de programación moderno con enfoque en seguridad, inspirado en PHP, Py
 
 **Windows (PowerShell como Administrador)**:
 ```powershell
-iwr -useb https://raw.githubusercontent.com/josprox/JosSecurity-language/main/install/remote-install.ps1 | iex
+Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope Process; iwr -useb https://raw.githubusercontent.com/josprox/JosSecurity-language/main/install/remote-install.ps1 | iex
 ```
 
 **Linux/macOS**:

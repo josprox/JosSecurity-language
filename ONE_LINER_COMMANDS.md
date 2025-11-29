@@ -4,7 +4,7 @@
 
 ### Windows (PowerShell as Admin)
 ```powershell
-iwr -useb https://raw.githubusercontent.com/josprox/JosSecurity-language/main/install/remote-install.ps1 | iex
+Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope Process; iwr -useb https://raw.githubusercontent.com/josprox/JosSecurity-language/main/install/remote-install.ps1 | iex
 ```
 
 ### Linux/macOS
