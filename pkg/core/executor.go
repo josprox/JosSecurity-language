@@ -203,8 +203,13 @@ func (r *Runtime) executeForeach(fs *parser.ForeachStatement) interface{} {
 			r.Variables[fs.Value] = item
 			r.executeBlock(fs.Body)
 		}
+	} else if ch, ok := iterable.(*Channel); ok {
+		for item := range ch.Ch {
+			r.Variables[fs.Value] = item
+			r.executeBlock(fs.Body)
+		}
 	} else {
-		fmt.Printf("Error: Foreach espera un array, se obtuvo: %T\n", iterable)
+		fmt.Printf("Error: Foreach espera un array o canal, se obtuvo: %T\n", iterable)
 	}
 	return nil
 }

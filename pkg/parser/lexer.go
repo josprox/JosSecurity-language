@@ -188,7 +188,7 @@ func (l *Lexer) newToken(tokenType TokenType, ch byte) Token {
 
 func (l *Lexer) readIdentifier() string {
 	position := l.position
-	for isLetter(l.ch) {
+	for isLetter(l.ch) || isDigit(l.ch) {
 		l.readChar()
 	}
 	return l.input[position:l.position]
@@ -217,12 +217,33 @@ func isDigit(ch byte) bool {
 }
 
 func (l *Lexer) readString() string {
-	position := l.position + 1
+	var out []byte
 	for {
 		l.readChar()
 		if l.ch == '"' || l.ch == 0 {
 			break
 		}
+
+		if l.ch == '\\' {
+			l.readChar()
+			switch l.ch {
+			case 'n':
+				out = append(out, '\n')
+			case 't':
+				out = append(out, '\t')
+			case 'r':
+				out = append(out, '\r')
+			case '"':
+				out = append(out, '"')
+			case '\\':
+				out = append(out, '\\')
+			default:
+				out = append(out, '\\')
+				out = append(out, l.ch)
+			}
+		} else {
+			out = append(out, l.ch)
+		}
 	}
-	return l.input[position:l.position]
+	return string(out)
 }

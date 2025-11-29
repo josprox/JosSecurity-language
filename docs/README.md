@@ -13,6 +13,9 @@ Guía completa de JosSecurity v3.0 (Gold Master)
   - Loops (foreach)
   - Try-Catch
   - Arrays y Maps
+- [CONCURRENCIA.md](./CONCURRENCIA.md) - Programación concurrente
+  - Async/Await
+  - Canales (Channels)
 
 ### Herramientas
 - [CLI.md](./CLI.md) - Comandos de línea de comandos

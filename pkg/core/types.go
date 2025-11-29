@@ -37,6 +37,13 @@ type Future struct {
 	err    error
 }
 
+// Channel represents a Go channel
+type Channel struct {
+	Ch chan interface{}
+}
+
+func (c *Channel) String() string { return "channel" }
+
 // Wait blocks until the Future completes and returns the result
 func (f *Future) Wait() interface{} {
 	<-f.done

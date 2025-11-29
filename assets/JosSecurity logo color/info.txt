@@ -1,0 +1,14 @@
+
+Hope you enjoy your new logo, here are the people that
+made your beautiful logo happen :)
+font name: Neuton-Regular
+font link: https://fonts.google.com/specimen/Neuton
+font author: Brian Zick
+font author site: https://brianskywalker.deviantart.com/
+
+
+icon designer: romzicon
+icon designer link: /creator/romzicon/
+        
+{"bg-gradient-0":"#177775","bg-gradient-1":"#28D2BF","icon":"#ffffff","font":"#ffffff","slogan":"#ffffff"}
+      

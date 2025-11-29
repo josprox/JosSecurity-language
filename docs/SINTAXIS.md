@@ -8,6 +8,7 @@
 - [Loops](#loops)
 - [Try-Catch](#try-catch)
 - [Arrays y Maps](#arrays-y-maps)
+- [Concurrencia](#concurrencia)
 
 ---
 
@@ -546,3 +547,14 @@ $usuario = new Usuario("editor")
     print("No puede eliminar")
 }
 ```
+
+---
+
+## Concurrencia
+
+JosSecurity soporta concurrencia moderna estilo Go.
+
+- **Async/Await**: Ejecución asíncrona.
+- **Canales**: Comunicación entre procesos.
+
+Ver [CONCURRENCIA.md](./CONCURRENCIA.md) para la guía completa.

@@ -47,6 +47,8 @@ func (r *Runtime) evaluateExpression(exp parser.Expression) interface{} {
 		// Return the block itself (or a closure wrapper if we had one)
 		// For now, just return the BlockStatement so Task can execute it.
 		return e.Block
+	case *parser.FunctionLiteral:
+		return e
 	}
 	return nil
 }
@@ -173,11 +175,15 @@ func (r *Runtime) evaluateInfix(ie *parser.InfixExpression) interface{} {
 
 	right := r.evaluateExpression(ie.Right)
 
-	// Handle cout << val
+	// Handle cout << val or channel << val
 	if ie.Operator == "<<" {
 		if _, ok := left.(*Cout); ok {
 			fmt.Print(right)
 			return left // Return cout for chaining
+		}
+		if ch, ok := left.(*Channel); ok {
+			ch.Ch <- right
+			return ch // Return channel for chaining?
 		}
 	}
 
@@ -652,7 +658,13 @@ func (r *Runtime) executeCall(call *parser.CallExpression) interface{} {
 					}()
 
 					// Evaluate the argument
-					future.result = r.evaluateExpression(call.Arguments[0])
+					argVal := r.evaluateExpression(call.Arguments[0])
+					if fn, ok := argVal.(*parser.FunctionLiteral); ok {
+						// Execute function body
+						future.result = r.executeBlock(fn.Body)
+					} else {
+						future.result = argVal
+					}
 				}()
 
 				return future
@@ -667,6 +679,55 @@ func (r *Runtime) executeCall(call *parser.CallExpression) interface{} {
 					return future.Wait()
 				}
 				fmt.Println("Error: await expects a Future")
+			}
+			return nil
+		}
+
+		// Channel Functions
+		if ident.Value == "make_chan" {
+			size := 0
+			if len(call.Arguments) > 0 {
+				if s, ok := r.evaluateExpression(call.Arguments[0]).(int64); ok {
+					size = int(s)
+				}
+			}
+			return &Channel{Ch: make(chan interface{}, size)}
+		}
+
+		if ident.Value == "close" {
+			if len(call.Arguments) == 1 {
+				if ch, ok := r.evaluateExpression(call.Arguments[0]).(*Channel); ok {
+					close(ch.Ch)
+					return nil
+				}
+				fmt.Println("Error: close expects a channel")
+			}
+			return nil
+		}
+
+		if ident.Value == "send" {
+			if len(call.Arguments) == 2 {
+				chVal := r.evaluateExpression(call.Arguments[0])
+				val := r.evaluateExpression(call.Arguments[1])
+				if ch, ok := chVal.(*Channel); ok {
+					ch.Ch <- val
+					return nil
+				}
+				fmt.Println("Error: send expects (channel, value)")
+			}
+			return nil
+		}
+
+		if ident.Value == "recv" {
+			if len(call.Arguments) == 1 {
+				if ch, ok := r.evaluateExpression(call.Arguments[0]).(*Channel); ok {
+					val, ok := <-ch.Ch
+					if !ok {
+						return nil // Channel closed
+					}
+					return val
+				}
+				fmt.Println("Error: recv expects a channel")
 			}
 			return nil
 		}
@@ -696,6 +757,9 @@ func (r *Runtime) checkType(val interface{}, typeName string) bool {
 		return ok
 	case "map":
 		_, ok := val.(map[string]interface{})
+		return ok
+	case "channel":
+		_, ok := val.(*Channel)
 		return ok
 	}
 	return true // Unknown types (classes) not strictly checked yet

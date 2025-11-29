@@ -6,12 +6,18 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"os"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/jossecurity/joss/pkg/core"
+
+	_ "embed"
 )
+
+//go:embed default_logo.png
+var DefaultLogo []byte
 
 var (
 	sessionStore = make(map[string]map[string]interface{})
@@ -60,6 +66,25 @@ func MainHandler(w http.ResponseWriter, r *http.Request) {
 			fmt.Fprintf(w, "<h1>500 Internal Server Error</h1><p>Something went wrong.</p><pre>%v</pre>", r)
 		}
 	}()
+
+	// Handle Favicon
+	if r.URL.Path == "/favicon.ico" {
+		// 1. Check for assets/logo.png
+		if _, err := os.Stat("assets/logo.png"); err == nil {
+			http.ServeFile(w, r, "assets/logo.png")
+			return
+		}
+		// 2. Check for assets/logo.ico
+		if _, err := os.Stat("assets/logo.ico"); err == nil {
+			http.ServeFile(w, r, "assets/logo.ico")
+			return
+		}
+		// 3. Fallback to embedded default
+		w.Header().Set("Content-Type", "image/png")
+		w.Header().Set("Cache-Control", "public, max-age=86400")
+		w.Write(DefaultLogo)
+		return
+	}
 
 	// 1. Parse Request Data
 	r.ParseMultipartForm(10 << 20) // 10MB

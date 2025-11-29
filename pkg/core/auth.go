@@ -106,7 +106,7 @@ func (r *Runtime) executeAuthMethod(instance *Instance, method string, args []in
 
 			fmt.Println("[Security] Login exitoso.")
 
-			// Store in session
+			// Store in session (for stateful support)
 			if sessVal, ok := r.Variables["$__session"]; ok {
 				if sessInst, ok := sessVal.(*Instance); ok {
 					sessInst.Fields["user_id"] = userId
@@ -116,7 +116,8 @@ func (r *Runtime) executeAuthMethod(instance *Instance, method string, args []in
 				}
 			}
 
-			return true
+			// Return JWT Token (Compliance with Bible)
+			return r.generateJWT(userId, email, userName, false)
 		}
 	case "check":
 		if sessVal, ok := r.Variables["$__session"]; ok {

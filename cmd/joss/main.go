@@ -1,12 +1,8 @@
 package main
 
 import (
-	"crypto/aes"
-	"crypto/cipher"
-	"crypto/rand"
 	"database/sql"
 	"fmt"
-	"io"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -36,6 +32,12 @@ func main() {
 		} else {
 			fmt.Println("Uso: joss server start")
 		}
+	case "program":
+		if len(os.Args) >= 3 && os.Args[2] == "start" {
+			startProgram()
+		} else {
+			fmt.Println("Uso: joss program start")
+		}
 	case "run":
 		if len(os.Args) < 3 {
 			fmt.Println("Uso: joss run [archivo.joss]")
@@ -64,7 +66,15 @@ func main() {
 		rt.Execute(program)
 
 	case "build":
-		buildProject()
+		target := "web"
+		if len(os.Args) >= 3 {
+			target = os.Args[2]
+		}
+		if target == "program" {
+			buildProgram()
+		} else {
+			buildWeb()
+		}
 	case "make:controller":
 		if len(os.Args) < 3 {
 			fmt.Println("Uso: joss make:controller [Nombre]")
@@ -121,68 +131,6 @@ func main() {
 		printHelp()
 		os.Exit(1)
 	}
-}
-
-func buildProject() {
-	fmt.Println("Iniciando compilación de JosSecurity...")
-
-	// 1. Validate Structure (Strict Topology)
-	required := []string{
-		"main.joss",
-		"env.joss",
-		"app",
-		"config",
-		"api.joss",
-		"routes.joss",
-	}
-	for _, f := range required {
-		if _, err := os.Stat(f); os.IsNotExist(err) {
-			fmt.Printf("Error de Arquitectura: Falta archivo/directorio requerido '%s'\n", f)
-			fmt.Println("La Biblia de JosSecurity requiere una estructura estricta.")
-			return
-		}
-	}
-
-	// 2. Encrypt env.joss
-	fmt.Println("Encriptando entorno...")
-	encryptEnv()
-
-	fmt.Println("Build completado exitosamente.")
-}
-
-func encryptEnv() {
-	data, err := ioutil.ReadFile("env.joss")
-	if err != nil {
-		fmt.Println("Error leyendo env.joss")
-		return
-	}
-
-	key := []byte("12345678901234567890123456789012") // Should be random in real prod
-	block, err := aes.NewCipher(key)
-	if err != nil {
-		fmt.Println("Error cipher:", err)
-		return
-	}
-
-	gcm, err := cipher.NewGCM(block)
-	if err != nil {
-		fmt.Println("Error GCM:", err)
-		return
-	}
-
-	nonce := make([]byte, gcm.NonceSize())
-	if _, err = io.ReadFull(rand.Reader, nonce); err != nil {
-		fmt.Println("Error nonce:", err)
-		return
-	}
-
-	ciphertext := gcm.Seal(nonce, nonce, data, nil)
-	err = ioutil.WriteFile("env.enc", ciphertext, 0644)
-	if err != nil {
-		fmt.Println("Error escribiendo env.enc")
-		return
-	}
-	fmt.Println("Generado env.enc (AES-256)")
 }
 
 func createController(name string) {
@@ -322,10 +270,6 @@ func changeDatabaseEngine(target string) {
 	defer srcDB.Close()
 
 	// 3. Connect to Dest
-	// For dest, we need to construct config.
-	// If target is sqlite, we need DB_PATH.
-	// If target is mysql, we need DB_HOST etc.
-	// Assuming env has all configs or we prompt/use defaults.
 	destDB, err := connectToDB(target, envMap)
 	if err != nil {
 		fmt.Printf("Error conectando a destino (%s): %v\n", target, err)
@@ -366,11 +310,6 @@ func changeDatabaseEngine(target string) {
 	// 5. Migrate Data
 	for _, table := range tables {
 		if table == "sqlite_sequence" || table == "js_migration" || table == "js_cron" {
-			continue // Skip system tables? Or migrate them too?
-			// js_migration and js_cron should be migrated.
-			// sqlite_sequence is internal.
-		}
-		if table == "sqlite_sequence" {
 			continue
 		}
 
@@ -391,29 +330,6 @@ func changeDatabaseEngine(target string) {
 		}
 
 		// Prepare insert in dest
-		// We need to create table in dest first?
-		// The user requirement says "Inyectar los datos".
-		// It assumes schema exists? Or we create it?
-		// "Extraer todos los datos... Inyectar... asegurando la coherencia".
-		// Usually migrations create schema.
-		// If we switch DB, we assume the user will run migrations or we run them?
-		// If we run migrations on dest, schema exists.
-		// Let's assume schema exists (user ran migrations) or we should run them.
-		// But `joss change db` implies it does everything.
-		// Let's assume we just copy data. If table missing, error.
-
-		// Actually, if we switch to SQLite, it's empty.
-		// We should probably run migrations on Dest first.
-		// But `runMigrations` uses `core.Runtime` which uses `env.joss`.
-		// We haven't updated `env.joss` yet.
-		// So we can't easily run migrations using `runMigrations`.
-		// We might need to copy Schema too? That's hard (SQL dialect diffs).
-		// Best approach: Update env, run migrations, then copy data?
-		// But if we update env, we lose source connection info (if it was same env vars).
-		// But MySQL and SQLite use different vars (DB_HOST vs DB_PATH).
-		// So we can have both in env.
-
-		// Let's try to Insert. If fails, warn.
 		count := 0
 		placeholders := make([]string, len(cols))
 		for i := range placeholders {
@@ -437,9 +353,6 @@ func changeDatabaseEngine(target string) {
 
 		for rows.Next() {
 			rows.Scan(valPtrs...)
-			// Handle types?
-			// SQLite is flexible. MySQL is strict.
-			// Drivers handle most.
 			_, err = stmt.Exec(vals...)
 			if err != nil {
 				fmt.Printf("Error insertando fila: %v\n", err)
@@ -523,9 +436,11 @@ func getTables(db *sql.DB, driver string) ([]string, error) {
 	defer rows.Close()
 
 	for rows.Next() {
-		var name string
-		rows.Scan(&name)
-		tables = append(tables, name)
+		var table string
+		if err := rows.Scan(&table); err != nil {
+			return nil, err
+		}
+		tables = append(tables, table)
 	}
 	return tables, nil
 }
@@ -533,16 +448,15 @@ func getTables(db *sql.DB, driver string) ([]string, error) {
 func printHelp() {
 	fmt.Println("Uso: joss [comando] [argumentos]")
 	fmt.Println("Comandos disponibles:")
-	fmt.Println("  server start             Inicia el servidor HTTP de desarrollo")
-	fmt.Println("  new [ruta]               Crea un nuevo proyecto web")
-	fmt.Println("  new console [ruta]       Crea un nuevo proyecto de consola")
-	fmt.Println("  new web [ruta]           Crea un nuevo proyecto web (explícito)")
-	fmt.Println("  run [archivo]            Ejecuta un script .joss")
-	fmt.Println("  build                    Compila el proyecto para producción")
-	fmt.Println("  migrate                  Ejecuta las migraciones pendientes")
-	fmt.Println("  change db [db]           Cambia el motor de base de datos (mysql/sqlite)")
-	fmt.Println("  make:controller [Nombre] Crea un nuevo controlador")
-	fmt.Println("  make:model [Nombre]      Crea un nuevo modelo")
-	fmt.Println("  version                  Muestra la versión actual")
-	fmt.Println("  help                     Muestra esta ayuda")
+	fmt.Println("  server start            - Inicia el servidor web")
+	fmt.Println("  program start           - Inicia la aplicación en modo escritorio")
+	fmt.Println("  run [archivo]           - Ejecuta un script .joss")
+	fmt.Println("  build [web|program]     - Compila el proyecto para distribución")
+	fmt.Println("  make:controller [Name]  - Crea un nuevo controlador")
+	fmt.Println("  make:model [Name]       - Crea un nuevo modelo")
+	fmt.Println("  migrate                 - Ejecuta migraciones pendientes")
+	fmt.Println("  new [web|console] [path]- Crea un nuevo proyecto")
+	fmt.Println("  change db [motor]       - Cambia el motor de base de datos (mysql/sqlite)")
+	fmt.Println("  version                 - Muestra la versión actual")
+	fmt.Println("  help                    - Muestra esta ayuda")
 }
