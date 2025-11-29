@@ -1,146 +1,142 @@
-- `classext` - Clase con herencia (extends)
-- `init` - Método Init
-- `tern` - Operador ternario con bloques
-- `terni` - Ternario inline
-- `foreach` - Bucle foreach
-- `print` - Print statement
-- `var` - Declarar variable
-- `async` - Async task con await
-- `asyncfn` - Función async
-- `map` - Map literal `{ key: value }`
-- `try` - Try-catch block
-- `authcreate` - Crear usuario con Auth
-- `authlogin` - Login con Auth
-- `dbquery` - Query con GranMySQL
-- `dbinsert` - Insert con GranMySQL
-- `main` - Clase Main completa
+# JosSecurity VS Code Extension v2.0
 
-### ⚙️ Language Features
-- Auto-cierre de brackets `{}`, `[]`, `()`
-- Auto-cierre de strings `""`, `''`
-- Comentarios con `//` y `/* */`
-- Folding de bloques de código
-- Indentación automática
+Advanced language support for JosSecurity with Language Server Protocol (LSP).
 
-### 🎨 Tema Incluido
-- **JosSecurity Dark**: Tema oscuro optimizado para JosSecurity
+## Features
 
-## Instalación
+### 🚀 Language Server Protocol (LSP)
+- Full LSP implementation with TypeScript
+- Real-time indexing of workspace
+- Incremental updates on file changes
 
-### Desde VSIX (Recomendado)
-1. Descarga `joss-language-1.0.0.vsix`
-2. En VS Code: `Ctrl+Shift+P` → "Extensions: Install from VSIX"
-3. Selecciona el archivo `.vsix`
+### 🔍 Navigation
+- **Go-to-Definition** (Ctrl+Click / F12) for:
+  - Controllers (`AuthController`)
+  - Methods (`@showLogin`)
+  - Router calls (`Router::get(...)`)
+- **Find References**
+- **Peek Definition**
 
-### Desde Código Fuente
-1. Copia la carpeta `vscode-joss` a:
-   - Windows: `%USERPROFILE%\.vscode\extensions\`
-   - macOS/Linux: `~/.vscode/extensions/`
-2. Reinicia VS Code
+### 💡 Intelligent Hover
+- Method signatures and documentation
+- Route information with validation
+- Processed docstrings (no asterisks)
+- Fuzzy suggestions for typos
 
-## Uso
+### 🔧 Diagnostics & Code Actions
+- Real-time error detection
+- Controller/method not found
+- Security vulnerabilities
+- Quick fixes and code actions
 
-1. Abre cualquier archivo `.joss`
-2. El syntax highlighting se aplicará automáticamente
-3. Usa snippets escribiendo el prefijo y presionando `Tab`
+### ⚡ Commands (Ctrl+Shift+P)
+- `Joss: Index Workspace`
+- `Joss: Go to Route`
+- `Joss: Create Controller Stub`
+- `Joss: Run JosSecurity Check`
+- `Joss: Open Definition Under Cursor`
+- `Joss: Restart Language Server`
 
-### Ejemplos de Snippets
+### 🛡️ Security Analysis
+- 10+ security rules
+- SQL injection detection
+- Weak encryption detection
+- Unsafe eval() usage
+- Public route validation
 
-**Crear clase:**
-```joss
-class // Tab
+## Installation
+
+### From Source
+
+```bash
+cd vscode-joss
+npm install
+npm run compile
 ```
 
-**Ternario:**
-```joss
-tern // Tab
+### Package Extension
+
+```bash
+npm run package
+# Install joss-language-2.0.0.vsix in VS Code
 ```
 
-**Query DB:**
-```joss
-dbquery // Tab
-```
-
-## Características del Lenguaje
-
-### ✅ Soportado
-- ✅ **Concurrencia**: async/await con Goroutines
-- ✅ **Smart Numerics**: División automática a float
-- ✅ **Maps Nativos**: Sintaxis `{ key: value }`
-- ✅ **Autoloading**: Carga automática de clases
-- ✅ **Herencia**: extends para clases
-- ✅ **Try-Catch**: Manejo de errores
-- ✅ Ternarios (NO if/else/switch)
-- ✅ Foreach
-- ✅ OOP (Clases, Init, Métodos)
-- ✅ Variables con prefijo `$`
-- ✅ Tipos estáticos (int, float, string, bool, array)
-- ✅ Auth con JWT
-- ✅ GranMySQL con prefijos
-- ✅ Helpers (isset, empty, len, count)
-
-### ❌ NO Soportado (Por Diseño)
-- ❌ if/else/switch (Usar ternarios)
-- ❌ while/do-while (Usar foreach)
-
-## Configuración Recomendada
-
-Añade a tu `settings.json`:
+## Configuration
 
 ```json
 {
-  "[joss]": {
-    "editor.tabSize": 4,
-    "editor.insertSpaces": true,
-    "editor.formatOnSave": false,
-    "editor.wordWrap": "on"
-  }
+  "joss.indexOnOpen": true,
+  "joss.maxFilesToIndex": 10000,
+  "joss.enableJosSecurity": true,
+  "joss.securitySeverity": "warning",
+  "joss.controllerPaths": ["app/controllers"],
+  "joss.modelPaths": ["app/models"]
 }
 ```
 
-## Ejemplos
+## Usage
 
-### Clase Main
+### Go-to-Definition
+
 ```joss
-class Main {
-    Init main() {
-        print("Hello JosSecurity")
-    }
-}
+Router::get("/login", "AuthController@showLogin")
+                      ^^^^^^^^^^^^^^ Ctrl+Click here
 ```
 
-### Ternario
-```joss
-($edad >= 18) ? {
-    print("Mayor de edad")
-} : {
-    print("Menor de edad")
-}
+### Hover Information
+
+Hover over any method or controller to see:
+- Signature
+- Location
+- Documentation
+- Validation status
+
+### Security Check
+
+Run `Joss: Run JosSecurity Check` to analyze your entire workspace for security issues.
+
+## Development
+
+```bash
+# Install dependencies
+npm install
+
+# Compile TypeScript
+npm run compile
+
+# Watch mode
+npm run watch
+
+# Run tests
+npm test
+
+# Lint
+npm run lint
 ```
 
-### Auth
-```joss
-$auth = new Auth()
-$token = $auth.attempt("user@example.com", "password")
+## Architecture
+
+```
+vscode-joss/
+├── src/
+│   ├── extension.ts          # Client extension
+│   └── server/
+│       ├── server.ts          # Language server
+│       ├── parser/
+│       │   └── routeParser.ts # Route parsing
+│       ├── indexer/
+│       │   └── indexer.ts     # Symbol indexing
+│       └── analyzer/
+│           └── securityAnalyzer.ts # Security rules
+├── syntaxes/                  # TextMate grammar
+├── snippets/                  # Code snippets
+└── themes/                    # Color themes
 ```
 
-### GranMySQL
-```joss
-$db = new GranMySQL()
-$db.table("users")
-$db.where("email", "user@example.com")
-$result = $db.get()
-```
-
-## Soporte
-
-- GitHub: https://github.com/jossecurity/joss
-- Documentación: Ver `docs/` en el repositorio
-
-## Licencia
+## License
 
 MIT
 
----
+## Version
 
-**Desarrollado para JosSecurity** 🔒
+2.0.0 - Complete LSP rewrite with advanced features

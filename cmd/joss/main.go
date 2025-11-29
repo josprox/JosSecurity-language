@@ -81,10 +81,30 @@ func main() {
 		runMigrations()
 	case "new":
 		if len(os.Args) < 3 {
-			fmt.Println("Uso: joss new [ruta]")
+			fmt.Println("Uso: joss new [web|console] [ruta]")
+			fmt.Println("  joss new [ruta]          - Crea proyecto web (default)")
+			fmt.Println("  joss new console [ruta]  - Crea proyecto de consola")
+			fmt.Println("  joss new web [ruta]      - Crea proyecto web (explícito)")
 			return
 		}
-		template.CreateBibleProject(os.Args[2])
+
+		// Detectar tipo de proyecto
+		if os.Args[2] == "console" {
+			if len(os.Args) < 4 {
+				fmt.Println("Uso: joss new console [ruta]")
+				return
+			}
+			template.CreateConsoleProject(os.Args[3])
+		} else if os.Args[2] == "web" {
+			if len(os.Args) < 4 {
+				fmt.Println("Uso: joss new web [ruta]")
+				return
+			}
+			template.CreateBibleProject(os.Args[3])
+		} else {
+			// Default: web project
+			template.CreateBibleProject(os.Args[2])
+		}
 	case "version":
 		fmt.Println("JosSecurity v3.0 (Gold Master)")
 	case "change":
@@ -513,14 +533,16 @@ func getTables(db *sql.DB, driver string) ([]string, error) {
 func printHelp() {
 	fmt.Println("Uso: joss [comando] [argumentos]")
 	fmt.Println("Comandos disponibles:")
-	fmt.Println("  server start   Inicia el servidor HTTP de desarrollo")
-	fmt.Println("  new [ruta]     Crea un nuevo proyecto JosSecurity")
-	fmt.Println("  run [archivo]  Ejecuta un script .joss")
-	fmt.Println("  build          Compila el proyecto para producción")
-	fmt.Println("  migrate        Ejecuta las migraciones pendientes")
-	fmt.Println("  change db [db] Cambia el motor de base de datos (mysql/sqlite)")
+	fmt.Println("  server start             Inicia el servidor HTTP de desarrollo")
+	fmt.Println("  new [ruta]               Crea un nuevo proyecto web")
+	fmt.Println("  new console [ruta]       Crea un nuevo proyecto de consola")
+	fmt.Println("  new web [ruta]           Crea un nuevo proyecto web (explícito)")
+	fmt.Println("  run [archivo]            Ejecuta un script .joss")
+	fmt.Println("  build                    Compila el proyecto para producción")
+	fmt.Println("  migrate                  Ejecuta las migraciones pendientes")
+	fmt.Println("  change db [db]           Cambia el motor de base de datos (mysql/sqlite)")
 	fmt.Println("  make:controller [Nombre] Crea un nuevo controlador")
 	fmt.Println("  make:model [Nombre]      Crea un nuevo modelo")
-	fmt.Println("  version        Muestra la versión actual")
-	fmt.Println("  help           Muestra esta ayuda")
+	fmt.Println("  version                  Muestra la versión actual")
+	fmt.Println("  help                     Muestra esta ayuda")
 }

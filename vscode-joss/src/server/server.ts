@@ -1,0 +1,129 @@
+import {
+    createConnection,
+    TextDocuments,
+    ProposedFeatures,
+    InitializeParams,
+    DidChangeConfigurationNotification,
+    TextDocumentSyncKind,
+    InitializeResult
+} from 'vscode-languageserver/node';
+
+import { TextDocument } from 'vscode-languageserver-textdocument';
+import { Indexer } from './indexer/indexer';
+import { RouteParser } from './parser/routeParser';
+import { SecurityAnalyzer } from './analyzer/securityAnalyzer';
+import { setupHoverProvider } from './providers/hoverProvider';
+import { setupDefinitionProvider } from './providers/definitionProvider';
+import { setupCompletionProvider } from './providers/completionProvider';
+import { setupDiagnostics } from './providers/diagnosticsProvider';
+import { setupCustomRequests } from './providers/customRequests';
+import { setupDocumentSymbolProvider } from './providers/documentSymbolProvider';
+import { JossSettings, getDefaultSettings } from './config/settings';
+
+// Create connection
+export const connection = createConnection(ProposedFeatures.all);
+
+// Create document manager
+export const documents: TextDocuments<TextDocument> = new TextDocuments(TextDocument);
+
+// Create core services
+export const indexer = new Indexer();
+export const routeParser = new RouteParser();
+export const securityAnalyzer = new SecurityAnalyzer();
+
+// Capabilities
+let hasConfigurationCapability = false;
+let hasWorkspaceFolderCapability = false;
+
+connection.onInitialize((params: InitializeParams) => {
+    const capabilities = params.capabilities;
+
+    hasConfigurationCapability = !!(
+        capabilities.workspace && !!capabilities.workspace.configuration
+    );
+    hasWorkspaceFolderCapability = !!(
+        capabilities.workspace && !!capabilities.workspace.workspaceFolders
+    );
+
+    const result: InitializeResult = {
+        capabilities: {
+            textDocumentSync: TextDocumentSyncKind.Incremental,
+            completionProvider: {
+                resolveProvider: true,
+                triggerCharacters: [':', '@', '$', '.']
+            },
+            hoverProvider: true,
+            definitionProvider: true,
+            referencesProvider: true,
+            documentSymbolProvider: true,
+            workspaceSymbolProvider: true
+        }
+    };
+
+    if (hasWorkspaceFolderCapability) {
+        result.capabilities.workspace = {
+            workspaceFolders: {
+                supported: true
+            }
+        };
+    }
+
+    return result;
+});
+
+connection.onInitialized(async () => {
+    if (hasConfigurationCapability) {
+        connection.client.register(DidChangeConfigurationNotification.type, undefined);
+    }
+
+    connection.console.log('JosSecurity Language Server initialized');
+});
+
+// Setup all providers
+setupHoverProvider();
+setupDefinitionProvider();
+setupCompletionProvider();
+setupDiagnostics();
+setupCustomRequests();
+setupDocumentSymbolProvider();
+
+// Configuration management
+export let globalSettings: JossSettings = getDefaultSettings();
+const documentSettings: Map<string, Thenable<JossSettings>> = new Map();
+
+export function getDocumentSettings(resource: string): Thenable<JossSettings> {
+    if (!hasConfigurationCapability) {
+        return Promise.resolve(globalSettings);
+    }
+    let result = documentSettings.get(resource);
+    if (!result) {
+        result = connection.workspace.getConfiguration({
+            scopeUri: resource,
+            section: 'joss'
+        });
+        documentSettings.set(resource, result);
+    }
+    return result;
+}
+
+connection.onDidChangeConfiguration(change => {
+    if (hasConfigurationCapability) {
+        documentSettings.clear();
+    } else {
+        globalSettings = <JossSettings>(
+            (change.settings.joss || getDefaultSettings())
+        );
+    }
+    documents.all().forEach(doc => {
+        // Re-validate all documents
+        connection.sendDiagnostics({ uri: doc.uri, diagnostics: [] });
+    });
+});
+
+documents.onDidClose(e => {
+    documentSettings.delete(e.document.uri);
+});
+
+// Listen on the connection
+documents.listen(connection);
+connection.listen();

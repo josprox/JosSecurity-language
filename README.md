@@ -8,102 +8,348 @@ Lenguaje de programación moderno con enfoque en seguridad, inspirado en PHP, Py
 - **Smart Numerics**: Promoción automática de int a float (división siempre retorna float)
 - **Maps Nativos**: Sintaxis `{ key: value }` con soporte completo
 - **Tipos Dinámicos**: Sistema flexible con optimización automática
+- **Operadores Ternarios**: Reemplazo de if/else con sintaxis concisa
 
 ### ⚡ Concurrencia
 - **async/await**: Ejecución asíncrona aprovechando Goroutines de Go
 - **Futures**: Manejo de valores asíncronos con canales de Go
 
 ### 🔐 Seguridad Integrada
-- **Auth Module**: Autenticación con JWT
+- **Auth Module**: Autenticación con JWT y Bcrypt (12 rondas)
 - **GranMySQL**: ORM seguro con protección contra SQL injection
-- **Entorno Encriptado**: Variables de entorno en RAM
+- **Entorno Encriptado**: Variables de entorno con AES-256
+- **CSRF Protection**: Protección nativa contra ataques CSRF
+- **Rate Limiting**: Limitación de peticiones por IP
 
-### 📦 Autoloading
-- Carga automática de clases desde `./classes/`
-- Sin necesidad de imports manuales
+### 📦 Módulos Nativos
+- **Router**: Sistema de rutas con middleware
+- **View**: Motor de plantillas HTML
+- **SMTP**: Cliente de correo con SSL/TLS
+- **Cron**: Tareas programadas
+- **Redis**: Cache y sesiones
+- **WebSocket**: Comunicación en tiempo real
+
+### 🎨 Desarrollo Web
+- **Hot Reload**: Recarga automática en desarrollo
+- **SCSS Compilation**: Compilación automática de estilos
+- **Static Files**: Servidor de archivos estáticos
+- **Security Headers**: Cabeceras de seguridad automáticas
 
 ## Instalación
 
 ### Requisitos
 - Go 1.20 o superior
-- MySQL (para características de base de datos)
+- MySQL o SQLite (para características de base de datos)
+- Node.js (opcional, para compilación de assets)
 
 ### Compilar
 ```bash
 go build -o joss.exe ./cmd/joss
 ```
 
-## Uso
+## Inicio Rápido
 
-### Ejecutar un Script
+### Crear Proyecto Web
 ```bash
-./joss.exe run examples/final_test.joss
+# Proyecto web completo (default)
+joss new mi_proyecto
+cd mi_proyecto
+joss server start
 ```
 
-### Comandos Disponibles
+### Crear Proyecto de Consola
 ```bash
-# Crear nuevo proyecto (Estructura Biblia)
-./joss.exe new myproject
+# Proyecto backend-only (sin UI)
+joss new console mi_app_consola
+cd mi_app_consola
+joss run main.joss
+```
 
-# Crear nuevo proyecto web (Estructura legacy)
-./joss.exe new web mywebproject
+## Comandos CLI
 
-# Ver versión
-./joss.exe version
+```bash
+# Gestión de Proyectos
+joss new [ruta]               # Crea proyecto web
+joss new console [ruta]       # Crea proyecto de consola
+joss new web [ruta]           # Crea proyecto web (explícito)
 
-# Iniciar servidor
-./joss.exe server start
+# Desarrollo
+joss server start             # Inicia servidor HTTP (puerto 8000)
+joss run [archivo]            # Ejecuta un script .joss
+joss build                    # Compila para producción
 
-# Ejecutar migraciones
-./joss.exe migrate
+# Base de Datos
+joss migrate                  # Ejecuta migraciones pendientes
+joss change db [mysql|sqlite] # Cambia motor de base de datos
 
-# Crear controlador
-./joss.exe make:controller UserController
+# Generadores
+joss make:controller [Nombre] # Crea controlador
+joss make:model [Nombre]      # Crea modelo
 
-# Crear modelo
-./joss.exe make:model User
+# Utilidades
+joss version                  # Muestra versión
+joss help                     # Muestra ayuda
 ```
 
 ## Estructura de Proyecto
 
-### Estructura Biblia (Por Defecto)
-Siguiendo "La Gran Biblia de JosSecurity", el comando `joss new` crea:
-
+### Proyecto Web
 ```
-myproject/
-├── main.joss           # Entry Point
-├── env.joss            # Variables de Entorno
-├── api.joss            # Rutas API (JSON/TOON)
-├── routes.joss         # Rutas Web (HTML)
+mi_proyecto/
+├── main.joss              # Entry Point
+├── env.joss               # Variables de Entorno
+├── api.joss               # Rutas API (JSON)
+├── routes.joss            # Rutas Web (HTML)
 ├── config/
-│   ├── reglas.joss     # Constantes Globales
-│   └── cron.joss       # Tareas Programadas
+│   ├── reglas.joss        # Constantes Globales
+│   └── cron.joss          # Tareas Programadas
 ├── app/
-│   ├── controllers/    # Lógica de Negocio
-│   ├── models/         # Acceso a Datos
-│   ├── views/          # Plantillas HTML
-│   └── libs/           # Extensiones
-└── assets/             # CSS, JS, Imágenes
+│   ├── controllers/       # Lógica de Negocio
+│   ├── models/            # Acceso a Datos
+│   ├── views/             # Plantillas HTML
+│   ├── libs/              # Extensiones
+│   └── database/
+│       └── migrations/    # Migraciones
+├── assets/
+│   ├── css/               # Estilos (SCSS)
+│   ├── js/                # JavaScript
+│   └── images/            # Imágenes
+└── public/                # Archivos públicos compilados
 ```
 
-### Estructura Web (Legacy)
-Para compatibilidad con proyectos anteriores, usa `joss new web`:
-
+### Proyecto de Consola
 ```
-mywebproject/
-├── main.joss
-├── env.joss
-├── routes.joss
-├── api.joss
+mi_app_consola/
+├── main.joss              # Entry Point
+├── env.joss               # Variables de Entorno
 ├── config/
-│   └── global.joss
-├── app/
-│   ├── controllers/
-│   ├── models/
-│   ├── views/
-│   ├── assets/
-│   └── database/migrations/
-└── public/
+│   └── reglas.joss        # Constantes Globales
+└── app/
+    ├── controllers/       # Lógica de Negocio
+    ├── models/            # Acceso a Datos
+    ├── libs/              # Extensiones
+    └── database/
+        └── migrations/    # Migraciones
+```
+
+## Sintaxis Básica
+
+### Variables y Tipos
+```joss
+// Tipos primitivos
+int $edad = 25
+float $precio = 99.99
+string $nombre = "Jose"
+bool $activo = true
+
+// Arrays
+array $lista = ["A", "B", "C"]
+$mapa = {"key": "value"}
+```
+
+### Operadores Ternarios (No hay if/else)
+```joss
+// Ternario simple
+$estado = ($edad >= 18) ? "Mayor" : "Menor"
+
+// Ternario con bloques
+($usuario->esValido()) ? {
+    DB::save($usuario)
+    print("Usuario guardado")
+} : {
+    print("Usuario inválido")
+}
+
+// Escalera lógica
+$nivel = ($puntos > 1000) ? "Oro"
+         ($puntos > 500)  ? "Plata" :
+                            "Bronce"
+```
+
+### Clases y Herencia
+```joss
+class Animal {
+    string $nombre
+    
+    Init constructor($n) {
+        $this->nombre = $n
+    }
+    
+    function hablar() {
+        print("...")
+    }
+}
+
+class Perro extends Animal {
+    function hablar() {
+        print("Guau!")
+    }
+}
+
+$perro = new Perro("Rex")
+$perro->hablar()  // "Guau!"
+```
+
+### Loops
+```joss
+// Foreach (principal)
+foreach ($usuarios as $u) {
+    print($u->nombre)
+}
+
+// Foreach con índice
+foreach ($items as $i => $item) {
+    print("$i: $item")
+}
+```
+
+### Try-Catch
+```joss
+try {
+    $resultado = operacionRiesgosa()
+    print($resultado)
+} catch ($error) {
+    print("Error: " . $error)
+}
+```
+
+## Módulos Nativos
+
+### Auth (Autenticación)
+```joss
+// Registro con hash automático
+Auth::create(["user@example.com", "password123", "Juan Pérez"])
+
+// Login
+$success = Auth::attempt("user@example.com", "password123")
+
+// Verificar sesión
+($Auth::check()) ? {
+    $nombre = Auth::user()
+    print("Hola " . $nombre)
+} : {
+    print("No autenticado")
+}
+
+// Logout
+Auth::logout()
+```
+
+### GranMySQL (Base de Datos)
+```joss
+// API Fluida
+$db = new GranMySQL()
+$usuarios = $db->table("users")
+               ->where("edad", ">", 18)
+               ->get()
+
+// Inserción
+$db->table("users")
+   ->insert(["nombre", "email"], ["Juan", "juan@example.com"])
+
+// Primera coincidencia
+$usuario = $db->table("users")
+              ->where("email", "juan@example.com")
+              ->first()
+```
+
+### Router (Rutas)
+```joss
+// routes.joss
+Router::get("/", "HomeController@index")
+Router::post("/login", "AuthController@login")
+
+// Middleware
+Router::middleware("auth")
+Router::get("/dashboard", "DashboardController@index")
+Router::end()
+
+// Múltiples métodos
+Router::match("GET|POST", "/contact", "ContactController@show@submit")
+```
+
+### View (Plantillas)
+```joss
+// Renderizar vista
+return View::render("welcome", {"nombre": "Juan"})
+
+// En la vista (app/views/welcome.joss.html)
+<h1>Hola {{nombre}}</h1>
+```
+
+### SmtpClient (Correo)
+```joss
+$mail = new SmtpClient()
+$mail->auth(env("MAIL_USER"), env("MAIL_PASS"))
+$mail->send("destino@example.com", "Asunto", "Cuerpo del mensaje")
+```
+
+### Cron (Tareas Programadas)
+```joss
+// config/cron.joss
+Cron::schedule("backup", "00:00", {
+    System::backupDatabase()
+})
+```
+
+## Async/Await
+```joss
+// Crear Future
+$future = async(operacionLenta())
+
+// Esperar resultado
+$resultado = await($future)
+
+// Múltiples operaciones
+$f1 = async(consulta1())
+$f2 = async(consulta2())
+$r1 = await($f1)
+$r2 = await($f2)
+```
+
+## Configuración
+
+### env.joss
+```bash
+APP_ENV="development"
+PORT="8000"
+
+# Base de datos
+DB="sqlite"
+DB_PATH="database.sqlite"
+
+# MySQL (alternativa)
+# DB="mysql"
+# DB_HOST="localhost"
+# DB_NAME="mi_db"
+# DB_USER="root"
+# DB_PASS=""
+
+# Prefijo de tablas
+DB_PREFIX="js_"
+
+# JWT
+JWT_SECRET="tu_secreto_aqui"
+```
+
+## Migraciones
+
+### Crear Migración
+```joss
+// app/database/migrations/001_create_users.joss
+$schema = new Schema()
+$schema->create("users", {
+    "id": "INT AUTO_INCREMENT PRIMARY KEY",
+    "name": "VARCHAR(255)",
+    "email": "VARCHAR(255) UNIQUE",
+    "password": "VARCHAR(255)",
+    "created_at": "TIMESTAMP DEFAULT CURRENT_TIMESTAMP"
+})
+```
+
+### Ejecutar Migraciones
+```bash
+joss migrate
 ```
 
 ## Ejemplos
@@ -113,64 +359,27 @@ Ver el directorio `examples/` para ejemplos completos:
 - `jwt_test.joss`: Autenticación con JWT
 - `jwt_refresh_test.joss`: Refresh tokens
 
-## Estructura del Proyecto
+## Documentación Completa
 
-```
-JosSecurity/
-├── cmd/joss/          # CLI principal
-├── pkg/
-│   ├── core/          # Runtime y ejecución
-│   ├── parser/        # Lexer, Parser y AST
-│   └── server/        # Servidor HTTP
-├── examples/          # Ejemplos de código
-├── docs/              # Documentación
-└── vscode-joss/       # Extensión de VS Code
-```
+📚 Ver la carpeta [`docs/`](./docs/) para documentación detallada:
 
-## Sintaxis Básica
-
-```joss
-// Clases y Herencia
-class Animal {
-    string $type = "Animal"
-    
-    Init constructor($t) {
-        $this->type = $t
-    }
-}
-
-class Dog extends Animal {
-    function makeSound() {
-        print("Woof!")
-    }
-}
-
-// Smart Numerics
-$result = 10 / 3  // Retorna 3.333... (float)
-
-// Maps Nativos
-$config = {
-    "host": "localhost",
-    "port": 3306
-}
-print($config["host"])
-
-// Async/Await
-$future = async(10 + 20)
-$result = await($future)  // 30
-
-// Auth con JWT
-Auth.create(["user@example.com", "password", "Name"])
-$token = Auth.attempt("user@example.com", "password")
-```
+- [Sintaxis](./docs/SINTAXIS.md) - Operadores, variables, clases, loops
+- [CLI](./docs/CLI.md) - Todos los comandos disponibles
+- [Módulos Nativos](./docs/MODULOS_NATIVOS.md) - Auth, GranMySQL, Router, etc.
+- [Estructura de Proyecto](./docs/ESTRUCTURA_PROYECTO.md) - Web y consola
+- [Configuración](./docs/CONFIGURACION.md) - env.joss, reglas.joss
+- [Migraciones](./docs/MIGRACIONES.md) - Sistema de base de datos
+- [Servidor](./docs/SERVIDOR.md) - Hot reload, SCSS, WebSocket
+- [Ejemplos](./docs/EJEMPLOS.md) - CRUD, Auth, API REST
 
 ## Desarrollo
 
-El proyecto está en desarrollo activo. Las tres fases principales están completadas:
+El proyecto está en desarrollo activo:
 - ✅ Fase 1: Smart Numerics y Maps
 - ✅ Fase 2: Autoloading
 - ✅ Fase 3: Concurrencia (async/await)
+- ✅ Fase 4: Proyectos de Consola
 
 ## Licencia
 
-Software cerrado fuente, derechos reservados. 
+Software cerrado fuente, derechos reservados.

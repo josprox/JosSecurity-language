@@ -1,27 +1,28 @@
 {
   "name": "joss-language",
   "displayName": "JosSecurity Language Support",
-  "description": "Syntax highlighting, snippets, and language support for JosSecurity (.joss) - Now with Middleware, Router::match, and Auth",
-  "version": "1.3.0",
+  "description": "Advanced language support for JosSecurity with LSP, go-to-definition, hover, diagnostics, and security analysis",
+  "version": "2.0.0",
   "publisher": "jossecurity",
   "engines": {
-    "vscode": "^1.80.0"
+    "vscode": "^1.75.0"
   },
-  "main": "./extension.js",
+  "main": "./out/extension.js",
   "activationEvents": [
     "onLanguage:joss"
   ],
   "categories": [
     "Programming Languages",
     "Snippets",
-    "Themes"
+    "Linters"
   ],
   "keywords": [
     "joss",
     "jossecurity",
     "security",
     "web",
-    "backend"
+    "backend",
+    "lsp"
   ],
   "contributes": {
     "languages": [
@@ -51,7 +52,77 @@
         "uiTheme": "vs-dark",
         "path": "./themes/joss-dark.json"
       }
-    ]
+    ],
+    "commands": [
+      {
+        "command": "joss.indexWorkspace",
+        "title": "Joss: Index Workspace"
+      },
+      {
+        "command": "joss.goToRoute",
+        "title": "Joss: Go to Route"
+      },
+      {
+        "command": "joss.createController",
+        "title": "Joss: Create Controller Stub"
+      },
+      {
+        "command": "joss.runSecurityCheck",
+        "title": "Joss: Run Security Check"
+      },
+      {
+        "command": "joss.openDefinition",
+        "title": "Joss: Open Definition"
+      },
+      {
+        "command": "joss.restartServer",
+        "title": "Joss: Restart Language Server"
+      }
+    ],
+    "configuration": {
+      "type": "object",
+      "title": "JosSecurity",
+      "properties": {
+        "joss.indexOnOpen": {
+          "type": "boolean",
+          "default": true,
+          "description": "Automatically index workspace when opening a .joss file"
+        },
+        "joss.enableJosSecurity": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable security analysis"
+        },
+        "joss.controllerPaths": {
+          "type": "array",
+          "default": ["app/controllers", "app/Controllers"],
+          "description": "Paths to search for controllers"
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "package": "vsce package"
+  },
+  "devDependencies": {
+    "@types/node": "^18.0.0",
+    "@types/vscode": "^1.75.0",
+    "@types/fast-levenshtein": "^0.0.4",
+    "@typescript-eslint/eslint-plugin": "^6.0.0",
+    "@typescript-eslint/parser": "^6.0.0",
+    "eslint": "^8.0.0",
+    "typescript": "^5.0.0",
+    "vsce": "^2.15.0"
+  },
+  "dependencies": {
+    "vscode-languageclient": "^9.0.1",
+    "vscode-languageserver": "^9.0.1",
+    "vscode-languageserver-textdocument": "^1.0.11",
+    "level": "^8.0.0",
+    "fast-levenshtein": "^3.0.0"
   },
   "repository": {
     "type": "git",
