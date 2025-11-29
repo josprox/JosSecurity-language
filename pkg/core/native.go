@@ -115,6 +115,14 @@ func (r *Runtime) RegisterNativeClasses() {
 	}
 	r.registerClass(schemaClass)
 	r.Variables["Schema"] = &Instance{Class: schemaClass, Fields: make(map[string]interface{})}
+
+	// Redis
+	redisClass := &parser.ClassStatement{
+		Name: &parser.Identifier{Value: "Redis"},
+		Body: &parser.BlockStatement{},
+	}
+	r.registerClass(redisClass)
+	r.Variables["Redis"] = &Instance{Class: redisClass, Fields: make(map[string]interface{})}
 }
 
 func (r *Runtime) executeNativeMethod(instance *Instance, method string, args []interface{}) interface{} {
@@ -149,6 +157,8 @@ func (r *Runtime) executeNativeMethod(instance *Instance, method string, args []
 		return r.executeWebSocketMethod(instance, method, args)
 	case "Schema":
 		return r.executeSchemaMethod(instance, method, args)
+	case "Redis":
+		return r.executeRedisMethod(instance, method, args)
 	}
 	return nil
 }

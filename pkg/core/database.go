@@ -35,7 +35,7 @@ func (r *Runtime) executeGranMySQLMethod(instance *Instance, method string, args
 			if !strings.HasPrefix(tableName, prefix) {
 				tableName = prefix + tableName
 			}
-			instance.Fields["_table"] = tableName
+			instance.Fields["_table"] = quoteIdentifier(tableName)
 		}
 		return instance // Return this for chaining
 
@@ -92,12 +92,12 @@ func (r *Runtime) executeGranMySQLMethod(instance *Instance, method string, args
 		bindings := instance.Fields["_bindings"].([]interface{})
 
 		if len(args) == 2 {
-			col := args[0].(string)
+			col := quoteIdentifier(args[0].(string))
 			val := args[1]
 			wheres = append(wheres, fmt.Sprintf("%s = ?", col))
 			bindings = append(bindings, val)
 		} else if len(args) == 3 {
-			col := args[0].(string)
+			col := quoteIdentifier(args[0].(string))
 			op := args[1].(string)
 			val := args[2]
 			wheres = append(wheres, fmt.Sprintf("%s %s ?", col, op))
@@ -248,7 +248,7 @@ func (r *Runtime) executeGranMySQLMethod(instance *Instance, method string, args
 				bindings := []interface{}{}
 
 				for _, c := range cols {
-					colNames = append(colNames, fmt.Sprintf("%v", c))
+					colNames = append(colNames, quoteIdentifier(fmt.Sprintf("%v", c)))
 					placeholders = append(placeholders, "?")
 				}
 				for _, v := range vals {
@@ -311,4 +311,28 @@ func rowsToJSON(rows *sql.Rows) interface{} {
 		results = append(results, rowStr)
 	}
 	return "[" + strings.Join(results, ", ") + "]"
+}
+
+// Helper to quote identifiers (basic protection)
+func quoteIdentifier(name string) string {
+	name = strings.TrimSpace(name)
+	if name == "*" {
+		return "*"
+	}
+	// Don't quote if it contains spaces (likely a function or complex expression)
+	if strings.Contains(name, " ") || strings.Contains(name, "(") {
+		return name
+	}
+	// Handle table.column
+	if strings.Contains(name, ".") {
+		parts := strings.Split(name, ".")
+		for i, p := range parts {
+			parts[i] = quoteIdentifier(p)
+		}
+		return strings.Join(parts, ".")
+	}
+	if strings.HasPrefix(name, "`") && strings.HasSuffix(name, "`") {
+		return name
+	}
+	return "`" + name + "`"
 }

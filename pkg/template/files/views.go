@@ -37,6 +37,7 @@ func GetViewFiles(path string) map[string]string {
             </div>
 
             <form method="POST" action="/login">
+                {{ csrf_field() }}
                 <div class="form-group">
                     <label>Correo Electrónico</label>
                     <input type="email" name="email" class="form-control" required placeholder="ejemplo@correo.com">
@@ -66,6 +67,7 @@ func GetViewFiles(path string) map[string]string {
             </div>
 
             <form method="POST" action="/register">
+                {{ csrf_field() }}
                 <div class="form-group">
                     <label>Nombre Completo</label>
                     <input type="text" name="name" class="form-control" required placeholder="Juan Pérez">

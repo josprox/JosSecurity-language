@@ -2,6 +2,7 @@ package core
 
 import (
 	"fmt"
+	"html"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -46,6 +47,10 @@ func (r *Runtime) executeViewMethod(instance *Instance, method string, args []in
 					if successVal, ok := sessInst.Fields["success"]; ok {
 						data["success"] = successVal
 						delete(sessInst.Fields, "success")
+					}
+					// Inject CSRF Token
+					if csrfVal, ok := sessInst.Fields["csrf_token"]; ok {
+						data["csrf_token"] = csrfVal
 					}
 				}
 			}
@@ -145,16 +150,32 @@ func (r *Runtime) executeViewMethod(instance *Instance, method string, args []in
 			})
 
 			// C. Handle Standard Replacements
+
+			// 0. Handle Helpers
+			if token, ok := data["csrf_token"]; ok {
+				field := fmt.Sprintf(`<input type="hidden" name="_token" value="%v">`, token)
+				finalHtml = strings.ReplaceAll(finalHtml, "{{ csrf_field() }}", field)
+			}
+
+			// 1. Handle Raw Output: {{! var }} or {{!var}}
 			for k, v := range data {
+				valStr := fmt.Sprintf("%v", v)
+
+				// Raw: {{! key }}
+				finalHtml = strings.ReplaceAll(finalHtml, "{{! "+k+" }}", valStr)
+				finalHtml = strings.ReplaceAll(finalHtml, "{{!"+k+"}}", valStr)
+				finalHtml = strings.ReplaceAll(finalHtml, "{{!$"+k+"}}", valStr) // {{!$var}}
+				finalHtml = strings.ReplaceAll(finalHtml, "{{! $"+k+" }}", valStr)
+
+				// Escaped: {{ key }}
+				escapedVal := html.EscapeString(valStr)
+
 				// Strict {{key}}
-				placeholder := "{{" + k + "}}"
-				finalHtml = strings.ReplaceAll(finalHtml, placeholder, fmt.Sprintf("%v", v))
+				finalHtml = strings.ReplaceAll(finalHtml, "{{"+k+"}}", escapedVal)
 				// Spaced {{ key }}
-				placeholderSpace := "{{ " + k + " }}"
-				finalHtml = strings.ReplaceAll(finalHtml, placeholderSpace, fmt.Sprintf("%v", v))
+				finalHtml = strings.ReplaceAll(finalHtml, "{{ "+k+" }}", escapedVal)
 				// Dollar var {{ $key }}
-				placeholderVar := "{{ $" + k + " }}"
-				finalHtml = strings.ReplaceAll(finalHtml, placeholderVar, fmt.Sprintf("%v", v))
+				finalHtml = strings.ReplaceAll(finalHtml, "{{ $"+k+" }}", escapedVal)
 			}
 
 			// D. Cleanup remaining {{ $var }} tags (replace with empty string)

@@ -23,6 +23,11 @@ DB_NAME="joss_db"
 DB_USER="root"
 DB_PASS=""
 
+# Redis Configuration (Optional)
+# SESSION_DRIVER="redis"
+# REDIS_HOST="localhost:6379"
+# REDIS_PASSWORD=""
+
 JWT_SECRET="change_me_in_production"`,
 		filepath.Join(path, "config", "reglas.joss"): `// Constantes Globales
 const string APP_NAME = "JosSecurity Enterprise"
