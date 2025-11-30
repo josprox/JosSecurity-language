@@ -124,6 +124,7 @@ func (r *Runtime) Dispatch(method, path string, reqData, sessData map[string]int
 	}
 
 	// Execute Handler
+	// Execute Handler
 	if handlerName, ok := handler.(string); ok {
 		// Controller@Method
 		parts := strings.Split(handlerName, "@")
@@ -133,14 +134,36 @@ func (r *Runtime) Dispatch(method, path string, reqData, sessData map[string]int
 
 			// Find Controller Class
 			if classStmt, ok := r.Classes[controllerName]; ok {
-				// Create Instance (Optional, but good for $this)
-				// instance := &Instance{Class: classStmt, Fields: make(map[string]interface{})}
+				// Create Instance
+				instance := &Instance{Class: classStmt, Fields: make(map[string]interface{})}
 
 				// Find Method
 				for _, stmt := range classStmt.Body.Statements {
 					if m, ok := stmt.(*parser.MethodStatement); ok {
 						if m.Name.Value == methodName {
-							return r.executeBlock(m.Body), nil
+							// Extract parameters if dynamic route
+							args := []interface{}{}
+							if strings.Contains(path, "/") { // Simple check, better logic needed for exact vs dynamic
+								// Re-match to extract args if we haven't already
+								// Optimization: We should have saved the matches/params earlier.
+								// For now, let's re-match if it looks dynamic.
+								for routePath := range r.Routes[method] {
+									if strings.Contains(routePath, "{") {
+										regexPath := "^" + regexp.MustCompile(`\{[a-zA-Z0-9_]+\}`).ReplaceAllString(routePath, "([^/]+)") + "$"
+										re := regexp.MustCompile(regexPath)
+										matches := re.FindStringSubmatch(path)
+										if len(matches) > 1 {
+											// matches[1:] are the params
+											for _, param := range matches[1:] {
+												args = append(args, param)
+											}
+											break
+										}
+									}
+								}
+							}
+
+							return r.CallMethodEvaluated(m, instance, args), nil
 						}
 					}
 				}

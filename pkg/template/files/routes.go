@@ -16,8 +16,9 @@ Router::end()
 
 // Rutas Protegidas (Solo autenticados)
 Router::middleware("auth")
-Router::get("/dashboard", "DashboardController@index")
-Router::get("/logout", "AuthController@logout")
+    Router::get("/dashboard", "DashboardController@index")
+    Router::get("/profile", "ProfileController@index")
+    Router::get("/logout", "AuthController@logout")
 Router::end()
 `,
 	}

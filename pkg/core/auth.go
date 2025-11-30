@@ -140,8 +140,38 @@ func (r *Runtime) executeAuthMethod(instance *Instance, method string, args []in
 	case "user":
 		if sessVal, ok := r.Variables["$__session"]; ok {
 			if sessInst, ok := sessVal.(*Instance); ok {
-				if name, ok := sessInst.Fields["user_name"]; ok {
-					return name
+				if id, ok := sessInst.Fields["user_id"]; ok {
+					// Fetch full user from DB
+					if r.DB != nil {
+						var userId int
+						var name, email, password, createdAt, updatedAt string
+						var roleId int
+
+						// Handle sqlite vs mysql dates if needed, but for now scan as string
+						query := fmt.Sprintf("SELECT id, name, email, password, role_id, created_at, updated_at FROM %s WHERE id = ?", usersTable)
+						err := r.DB.QueryRow(query, id).Scan(&userId, &name, &email, &password, &roleId, &createdAt, &updatedAt)
+						if err == nil {
+							return map[string]interface{}{
+								"id":         userId,
+								"name":       name,
+								"email":      email,
+								"role_id":    roleId,
+								"created_at": createdAt,
+								"updated_at": updatedAt,
+							}
+						}
+					}
+
+					// Fallback to session data if DB fails or not available
+					userMap := make(map[string]interface{})
+					userMap["id"] = id
+					if name, ok := sessInst.Fields["user_name"]; ok {
+						userMap["name"] = name
+					}
+					if email, ok := sessInst.Fields["user_email"]; ok {
+						userMap["email"] = email
+					}
+					return userMap
 				}
 			}
 		}

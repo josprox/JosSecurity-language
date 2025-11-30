@@ -84,8 +84,34 @@ func main() {
 			return
 		}
 		createModel(os.Args[2])
+	case "make:view":
+		if len(os.Args) < 3 {
+			fmt.Println("Uso: joss make:view [Nombre]")
+			return
+		}
+		createView(os.Args[2])
+	case "make:mvc":
+		if len(os.Args) < 3 {
+			fmt.Println("Uso: joss make:mvc [Nombre]")
+			return
+		}
+		createMVC(os.Args[2])
+	case "make:crud":
+		if len(os.Args) < 3 {
+			fmt.Println("Uso: joss make:crud [Tabla]")
+			return
+		}
+		createCRUD(os.Args[2])
+	case "make:migration":
+		if len(os.Args) < 3 {
+			fmt.Println("Uso: joss make:migration [Nombre]")
+			return
+		}
+		createMigration(os.Args[2])
 	case "migrate":
 		runMigrations()
+	case "migrate:fresh":
+		runMigrateFresh()
 	case "new":
 		if len(os.Args) < 3 {
 			fmt.Println("Uso: joss new [web|console] [ruta]")

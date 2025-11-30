@@ -59,6 +59,13 @@ func CreateBibleProject(path string) {
 
 	// Write files
 	for file, content := range allFiles {
+		// Ensure directory exists
+		dir := filepath.Dir(file)
+		if err := os.MkdirAll(dir, 0755); err != nil {
+			fmt.Printf("Error creando directorio %s: %v\n", dir, err)
+			continue
+		}
+
 		err := ioutil.WriteFile(file, []byte(content), 0644)
 		if err != nil {
 			fmt.Printf("Error creando archivo %s: %v\n", file, err)

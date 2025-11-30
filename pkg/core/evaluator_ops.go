@@ -361,9 +361,18 @@ func (r *Runtime) evaluateNew(ne *parser.NewExpression) interface{} {
 
 func (r *Runtime) evaluateMember(me *parser.MemberExpression) interface{} {
 	left := r.evaluateExpression(me.Left)
+
+	// Support Map access via dot notation (e.g. $item.id where $item is a map)
+	if m, ok := left.(map[string]interface{}); ok {
+		if val, exists := m[me.Property.Value]; exists {
+			return val
+		}
+		return nil
+	}
+
 	instance, ok := left.(*Instance)
 	if !ok {
-		fmt.Printf("Error: %v no es una instancia\n", left)
+		fmt.Printf("Error: %v (tipo %T) no es una instancia. Intentando acceder a: '%s'\n", left, left, me.Property.Value)
 		return nil
 	}
 
@@ -416,9 +425,10 @@ func (r *Runtime) evaluateMember(me *parser.MemberExpression) interface{} {
 	isNative := false
 	for checkClass != nil {
 		className := checkClass.Name.Value
-		if className == "Stack" || className == "Queue" || className == "GranMySQL" || className == "Auth" ||
+		if className == "Stack" || className == "Queue" || className == "GranMySQL" || className == "GranDB" || className == "Auth" ||
 			className == "System" || className == "SmtpClient" || className == "Cron" || className == "Task" || className == "View" || className == "Router" ||
-			className == "Request" || className == "Response" || className == "RedirectResponse" || className == "Session" || className == "Redirect" || className == "Security" || className == "Server" || className == "Log" {
+			className == "Request" || className == "Response" || className == "RedirectResponse" || className == "Session" || className == "Redirect" || className == "Security" || className == "Server" || className == "Log" ||
+			className == "Schema" || className == "Blueprint" || className == "WebSocket" || className == "Redis" {
 			isNative = true
 			break
 		}

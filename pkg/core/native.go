@@ -18,9 +18,9 @@ func (r *Runtime) RegisterNativeClasses() {
 		Body: &parser.BlockStatement{},
 	})
 
-	// GranMySQL
+	// GranDB (Database Abstraction)
 	r.registerClass(&parser.ClassStatement{
-		Name: &parser.Identifier{Value: "GranMySQL"},
+		Name: &parser.Identifier{Value: "GranDB"},
 		Body: &parser.BlockStatement{},
 	})
 
@@ -116,6 +116,13 @@ func (r *Runtime) RegisterNativeClasses() {
 	r.registerClass(schemaClass)
 	r.Variables["Schema"] = &Instance{Class: schemaClass, Fields: make(map[string]interface{})}
 
+	// Blueprint (for Schema migrations)
+	blueprintClass := &parser.ClassStatement{
+		Name: &parser.Identifier{Value: "Blueprint"},
+		Body: &parser.BlockStatement{},
+	}
+	r.registerClass(blueprintClass)
+
 	// Redis
 	redisClass := &parser.ClassStatement{
 		Name: &parser.Identifier{Value: "Redis"},
@@ -126,39 +133,56 @@ func (r *Runtime) RegisterNativeClasses() {
 }
 
 func (r *Runtime) executeNativeMethod(instance *Instance, method string, args []interface{}) interface{} {
-	switch instance.Class.Name.Value {
-	case "Stack":
-		return r.executeStackMethod(instance, method, args)
-	case "Queue":
-		return r.executeQueueMethod(instance, method, args)
-	case "GranMySQL":
-		return r.executeGranMySQLMethod(instance, method, args)
-	case "Auth":
-		return r.executeAuthMethod(instance, method, args)
-	case "System":
-		return r.executeSystemMethod(instance, method, args)
-	case "SmtpClient":
-		return r.executeSmtpClientMethod(instance, method, args)
-	case "Cron":
-		return r.executeCronMethod(instance, method, args)
-	case "Task":
-		return r.executeTaskMethod(instance, method, args)
-	case "View":
-		return r.executeViewMethod(instance, method, args)
-	case "Router":
-		return r.executeRouterMethod(instance, method, args)
-	case "Request":
-		return r.executeRequestMethod(instance, method, args)
-	case "Response":
-		return r.executeResponseMethod(instance, method, args)
-	case "RedirectResponse":
-		return r.executeRedirectResponseMethod(instance, method, args)
-	case "WebSocket":
-		return r.executeWebSocketMethod(instance, method, args)
-	case "Schema":
-		return r.executeSchemaMethod(instance, method, args)
-	case "Redis":
-		return r.executeRedisMethod(instance, method, args)
+	// Check class and super classes for native handler
+	currentClass := instance.Class
+	for currentClass != nil {
+		switch currentClass.Name.Value {
+		case "Stack":
+			return r.executeStackMethod(instance, method, args)
+		case "Queue":
+			return r.executeQueueMethod(instance, method, args)
+		case "GranMySQL", "GranDB":
+			return r.executeGranMySQLMethod(instance, method, args)
+		case "Auth":
+			return r.executeAuthMethod(instance, method, args)
+		case "System":
+			return r.executeSystemMethod(instance, method, args)
+		case "SmtpClient":
+			return r.executeSmtpClientMethod(instance, method, args)
+		case "Cron":
+			return r.executeCronMethod(instance, method, args)
+		case "Task":
+			return r.executeTaskMethod(instance, method, args)
+		case "View":
+			return r.executeViewMethod(instance, method, args)
+		case "Router":
+			return r.executeRouterMethod(instance, method, args)
+		case "Request":
+			return r.executeRequestMethod(instance, method, args)
+		case "Response":
+			return r.executeResponseMethod(instance, method, args)
+		case "RedirectResponse":
+			return r.executeRedirectResponseMethod(instance, method, args)
+		case "WebSocket":
+			return r.executeWebSocketMethod(instance, method, args)
+		case "Schema":
+			return r.executeSchemaMethod(instance, method, args)
+		case "Blueprint":
+			return r.executeBlueprintMethod(instance, method, args)
+		case "Redis":
+			return r.executeRedisMethod(instance, method, args)
+		}
+
+		// Move to parent
+		if currentClass.SuperClass != nil {
+			if parent, ok := r.Classes[currentClass.SuperClass.Value]; ok {
+				currentClass = parent
+			} else {
+				break
+			}
+		} else {
+			break
+		}
 	}
 	return nil
 }

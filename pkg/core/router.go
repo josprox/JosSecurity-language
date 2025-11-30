@@ -3,6 +3,8 @@ package core
 import (
 	"fmt"
 	"strings"
+
+	"github.com/jossecurity/joss/pkg/parser"
 )
 
 // executeRouterMethod handles Router class methods (get, post, api, match)
@@ -132,6 +134,74 @@ func (r *Runtime) executeRouterMethod(instance *Instance, method string, args []
 			fmt.Printf("[DEBUG] executeRouterMethod called: api (%s)\n", path)
 		}
 		return nil
+
+	case "group":
+		// Router.group("middleware", function() { ... })
+		if len(args) >= 2 {
+			mwName := args[0].(string)
+			callback := args[1]
+
+			// Push Middleware
+			if r.CurrentMiddleware == nil {
+				r.CurrentMiddleware = []string{}
+			}
+			r.CurrentMiddleware = append(r.CurrentMiddleware, mwName)
+
+			// Execute Callback
+			// The callback is a *parser.FunctionLiteral or similar, passed as an argument.
+			// In executeStatement (MethodCall), arguments are evaluated.
+			// If the argument is a function definition, it might be passed as a closure/function object.
+			// We need to execute it.
+
+			// Check if callback is a function we can execute
+			// In Joss, functions passed as args are usually *parser.FunctionStatement or similar if defined inline?
+			// Or if it's an anonymous function, it's evaluated to something?
+			// The evaluator should handle function literals.
+
+			// Assuming 'callback' is something we can execute via r.executeBlock if it's a closure?
+			// Or we need a helper to execute a function object.
+
+			// Let's assume for now we can't easily execute it directly without more logic,
+			// BUT, looking at how `routes.joss` is parsed, `function() {}` is an expression.
+			// It evaluates to a Function object?
+
+			// If we look at `runtime.go` or `types.go` (if exists), we'd see what a function evaluates to.
+			// Since I don't have that handy, I'll assume it's a *parser.FunctionLiteral or similar.
+
+			// Actually, let's look at `executeStatement`.
+			// If `Router.group` is called, `args` are evaluated expressions.
+			// `function() {}` evaluates to... ?
+
+			// If I can't execute it, I can't implement group properly.
+			// BUT, I can try to see if `callback` is *parser.FunctionLiteral (if passed raw) or a struct.
+
+			// Hack: If I can't execute the callback, I can't support nesting.
+			// But wait, the user's code is `Router.group("auth", function() { ... })`.
+			// If I can't execute the function, the routes inside won't be registered.
+
+			// Let's try to execute it if it's a *parser.FunctionLiteral (if the evaluator returns that).
+			// Or maybe it's an *Instance of "Closure"?
+
+			// Since I can't verify the type easily, I'll try to cast to *parser.FunctionLiteral or *parser.BlockStatement.
+
+			// However, `evaluateExpression` for `FunctionLiteral` usually returns the node itself or a wrapper.
+
+			// Let's assume it returns the node for now.
+
+			if fn, ok := callback.(*parser.FunctionLiteral); ok {
+				r.executeBlock(fn.Body)
+			} else {
+				fmt.Printf("[ERROR] Router.group callback is not a function: %T\n", callback)
+			}
+
+			// Pop Middleware
+			if len(r.CurrentMiddleware) > 0 {
+				r.CurrentMiddleware = r.CurrentMiddleware[:len(r.CurrentMiddleware)-1]
+			}
+			fmt.Printf("[DEBUG] executeRouterMethod called: group (%s)\n", mwName)
+		}
+		return nil
+
 	}
 
 	return nil

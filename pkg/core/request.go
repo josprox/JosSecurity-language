@@ -1,5 +1,7 @@
 package core
 
+import "fmt"
+
 // executeRequestMethod handles Request methods
 func (r *Runtime) executeRequestMethod(instance *Instance, method string, args []interface{}) interface{} {
 	switch method {
@@ -24,6 +26,29 @@ func (r *Runtime) executeRequestMethod(instance *Instance, method string, args [
 		if reqVal, ok := r.Variables["$__request"]; ok {
 			if reqInstance, ok := reqVal.(*Instance); ok {
 				return reqInstance.Fields
+			}
+		}
+		return make(map[string]interface{})
+
+	case "except":
+		if len(args) > 0 {
+			excludeMap := make(map[string]bool)
+			if list, ok := args[0].([]interface{}); ok {
+				for _, item := range list {
+					excludeMap[fmt.Sprintf("%v", item)] = true
+				}
+			}
+
+			if reqVal, ok := r.Variables["$__request"]; ok {
+				if reqInstance, ok := reqVal.(*Instance); ok {
+					result := make(map[string]interface{})
+					for k, v := range reqInstance.Fields {
+						if !excludeMap[k] {
+							result[k] = v
+						}
+					}
+					return result
+				}
 			}
 		}
 		return make(map[string]interface{})

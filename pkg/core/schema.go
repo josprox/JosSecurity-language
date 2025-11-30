@@ -3,6 +3,8 @@ package core
 import (
 	"fmt"
 	"strings"
+
+	"github.com/jossecurity/joss/pkg/parser"
 )
 
 // Schema Implementation
@@ -20,43 +22,56 @@ func (r *Runtime) executeSchemaMethod(instance *Instance, method string, args []
 	case "create":
 		if len(args) >= 2 {
 			tableName := args[0].(string)
-			// colsMap := args[1].(map[string]interface{})
-			// The evaluator evaluates arguments before calling.
-			// So args[1] should be a map[string]interface{} or similar if we support map literals.
-			// But wait, `parseBraceExpression` creates `MapLiteral`.
-			// `Evaluate` converts `MapLiteral` to... what?
-			// I need to check `evaluator.go`.
-			// Assuming it evaluates to map[string]interface{} or similar.
-			// Let's assume args[1] is map[string]interface{}.
-
-			colsMap, ok := args[1].(map[string]interface{})
-			if !ok {
-				// It might be that map literal evaluation isn't fully supported to Go map yet?
-				// Or maybe it's passed as something else.
-				// Let's assume for now we can iterate it.
-				fmt.Println("[Schema] Error: El segundo argumento debe ser un mapa de columnas.")
-				return nil
-			}
 
 			var definitions []string
 
-			// We need order? Maps are unordered.
-			// If order matters (it usually does for readability, but not strictly for SQL), we might have issues.
-			// But for `create table`, order is preserved in the DB schema usually.
-			// If the user provides a map, they accept unordered unless we use an array of maps or ordered map.
-			// For now, map is fine.
+			// Check if second argument is a function (closure-based approach)
+			if fnLit, ok := args[1].(*parser.FunctionLiteral); ok {
+				// Get the registered Blueprint class
+				blueprintClass, ok := r.Classes["Blueprint"]
+				if !ok {
+					fmt.Println("[Schema] Error: Blueprint class not registered")
+					return nil
+				}
 
-			// Handle "id": "increments" specially to put it first if possible?
-			// Or just iterate.
+				// Create a Blueprint instance to collect column definitions
+				blueprint := &Instance{
+					Class:  blueprintClass,
+					Fields: make(map[string]interface{}),
+				}
+				blueprint.Fields["_columns"] = []map[string]string{}
 
-			for colName, colTypeRaw := range colsMap {
-				colType := colTypeRaw.(string)
-				def := r.buildColumnDefinition(colName, colType, dbDriver)
-				definitions = append(definitions, def)
+				fmt.Printf("[Schema] Created Blueprint instance, class: %s\n", blueprint.Class.Name.Value)
+
+				// Call the function with the blueprint
+				r.Variables["$table"] = blueprint
+				if len(fnLit.Parameters) > 0 {
+					r.Variables[fnLit.Parameters[0].Value] = blueprint
+					fmt.Printf("[Schema] Set parameter %s to Blueprint instance\n", fnLit.Parameters[0].Value)
+				}
+				r.executeBlock(fnLit.Body)
+
+				// Extract column definitions from blueprint
+				if cols, ok := blueprint.Fields["_columns"].([]map[string]string); ok {
+					for _, col := range cols {
+						def := r.buildColumnDefinition(col["name"], col["type"], dbDriver)
+						definitions = append(definitions, def)
+					}
+				}
+			} else {
+				// Map-based approach (legacy)
+				colsMap, ok := args[1].(map[string]interface{})
+				if !ok {
+					fmt.Println("[Schema] Error: El segundo argumento debe ser un mapa de columnas.")
+					return nil
+				}
+
+				for colName, colTypeRaw := range colsMap {
+					colType := colTypeRaw.(string)
+					def := r.buildColumnDefinition(colName, colType, dbDriver)
+					definitions = append(definitions, def)
+				}
 			}
-
-			// Simple primary key handling if not in definitions
-			// (buildColumnDefinition handles it)
 
 			query := fmt.Sprintf("CREATE TABLE IF NOT EXISTS %s (%s)", tableName, strings.Join(definitions, ", "))
 
@@ -94,16 +109,18 @@ func (r *Runtime) buildColumnDefinition(name, typeStr, driver string) string {
 		} else {
 			sqlDef = "INT AUTO_INCREMENT PRIMARY KEY"
 		}
-		return fmt.Sprintf("%s %s", name, sqlDef) // Name is included? Yes.
+		return fmt.Sprintf("%s %s", name, sqlDef)
 	case "string":
 		sqlDef = "VARCHAR(255)"
 	case "text":
 		sqlDef = "TEXT"
 	case "integer":
 		sqlDef = "INT"
+	case "decimal":
+		sqlDef = "DECIMAL(10,2)"
 	case "boolean":
 		if driver == "sqlite" {
-			sqlDef = "BOOLEAN" // SQLite uses 0/1 but accepts BOOLEAN
+			sqlDef = "BOOLEAN"
 		} else {
 			sqlDef = "TINYINT(1)"
 		}
@@ -121,8 +138,6 @@ func (r *Runtime) buildColumnDefinition(name, typeStr, driver string) string {
 		} else if mod == "nullable" {
 			def += " NULL"
 		} else if strings.HasPrefix(mod, "default") {
-			// Extract value default('value')
-			// Simple parsing
 			start := strings.Index(mod, "(")
 			end := strings.LastIndex(mod, ")")
 			if start != -1 && end != -1 {
@@ -132,8 +147,7 @@ func (r *Runtime) buildColumnDefinition(name, typeStr, driver string) string {
 		}
 	}
 
-	// If not nullable and not primary key, add NOT NULL?
-	// Usually yes, unless "nullable" is specified.
+	// Add NOT NULL if not nullable and not primary key
 	isNullable := false
 	for _, mod := range modifiers {
 		if mod == "nullable" {
@@ -145,4 +159,37 @@ func (r *Runtime) buildColumnDefinition(name, typeStr, driver string) string {
 	}
 
 	return def
+}
+
+// Blueprint method execution
+func (r *Runtime) executeBlueprintMethod(instance *Instance, method string, args []interface{}) interface{} {
+	fmt.Printf("[Blueprint] Method called: %s, args: %v\n", method, args)
+	cols, _ := instance.Fields["_columns"].([]map[string]string)
+
+	switch method {
+	case "id":
+		cols = append(cols, map[string]string{"name": "id", "type": "increments"})
+	case "string":
+		if len(args) > 0 {
+			cols = append(cols, map[string]string{"name": args[0].(string), "type": "string"})
+		}
+	case "text":
+		if len(args) > 0 {
+			cols = append(cols, map[string]string{"name": args[0].(string), "type": "text"})
+		}
+	case "integer":
+		if len(args) > 0 {
+			cols = append(cols, map[string]string{"name": args[0].(string), "type": "integer"})
+		}
+	case "decimal":
+		if len(args) > 0 {
+			cols = append(cols, map[string]string{"name": args[0].(string), "type": "decimal"})
+		}
+	case "timestamps":
+		cols = append(cols, map[string]string{"name": "created_at", "type": "datetime|default(CURRENT_TIMESTAMP)"})
+		cols = append(cols, map[string]string{"name": "updated_at", "type": "datetime|default(CURRENT_TIMESTAMP)"})
+	}
+
+	instance.Fields["_columns"] = cols
+	return nil
 }

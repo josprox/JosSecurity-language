@@ -110,7 +110,7 @@ func (r *Runtime) applyFunction(fn interface{}, args []interface{}) interface{} 
 		return r.CallMethodEvaluated(method, nil, args)
 	}
 
-	fmt.Printf("Error: '%v' no es una función invocable\n", fn)
+	fmt.Printf("Error: '%v' (tipo %T) no es una función invocable\n", fn, fn)
 	return nil
 }
 
@@ -265,6 +265,35 @@ func (r *Runtime) callBuiltin(name string, args []interface{}) (interface{}, boo
 					return nil, true
 				}
 				return val, true
+			}
+		}
+		return nil, true
+	case "keys":
+		if len(args) == 1 {
+			if m, ok := args[0].(map[string]interface{}); ok {
+				keys := []interface{}{}
+				for k := range m {
+					keys = append(keys, k)
+				}
+				return keys, true
+			}
+		}
+		return []interface{}{}, true
+	case "values":
+		if len(args) == 1 {
+			if m, ok := args[0].(map[string]interface{}); ok {
+				vals := []interface{}{}
+				for _, v := range m {
+					vals = append(vals, v)
+				}
+				return vals, true
+			}
+		}
+		return []interface{}{}, true
+	case "redirect":
+		if len(args) == 1 {
+			if url, ok := args[0].(string); ok {
+				return r.createRedirectResponse(url), true
 			}
 		}
 		return nil, true

@@ -4,6 +4,43 @@ import "path/filepath"
 
 func GetViewFiles(path string) map[string]string {
 	return map[string]string{
+		filepath.Join(path, "app", "views", "profile", "index.joss.html"): `@extends('layouts.master')
+
+@section('content')
+    <div class="card">
+        <div class="card-header">
+            <h2>Mi Perfil</h2>
+        </div>
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-4 text-center">
+                    <img src="https://ui-avatars.com/api/?name={{ $user.name }}&background=2563eb&color=fff&size=128" alt="Avatar" class="rounded-circle mb-3">
+                    <h4>{{ $user.name }}</h4>
+                    <p class="text-muted">{{ $user.email }}</p>
+                    <span class="badge badge-primary">{{ $user.role_id == 1 ? 'Administrador' : 'Usuario' }}</span>
+                </div>
+                <div class="col-md-8">
+                    <h3>Información de la Cuenta</h3>
+                    <hr>
+                    <form>
+                        <div class="form-group">
+                            <label>Nombre Completo</label>
+                            <input type="text" class="form-control" value="{{ $user.name }}" readonly>
+                        </div>
+                        <div class="form-group">
+                            <label>Correo Electrónico</label>
+                            <input type="email" class="form-control" value="{{ $user.email }}" readonly>
+                        </div>
+                        <div class="form-group">
+                            <label>Miembro desde</label>
+                            <input type="text" class="form-control" value="{{ $user.created_at }}" readonly>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+@endsection`,
 		filepath.Join(path, "app", "views", "welcome.joss.html"): `@extends('layouts.master')
 
 @section('content')
@@ -100,7 +137,7 @@ func GetViewFiles(path string) map[string]string {
             </div>
         </div>
         <div class="card-body">
-            <h3>Bienvenido, {{ $user }}</h3>
+            <h3>Bienvenido, {{ $user.name }}</h3>
             <p>Has iniciado sesión correctamente en el sistema JosSecurity Enterprise.</p>
             
             <div class="alert alert-info" style="display: {{ $isAdmin ? 'block' : 'none' }}">
@@ -137,26 +174,94 @@ func GetViewFiles(path string) map[string]string {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{{ $title ?? "JosSecurity" }}</title>
     <link rel="stylesheet" href="/public/css/app.css">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
 <body>
-    <nav class="navbar">
-        <div class="container-nav">
-            <a href="/" class="brand">JosSecurity</a>
-            <div class="nav-links">
-                {{ $auth_check ? '<a href="/dashboard">Dashboard</a>' : '' }}
-                {{ $auth_guest ? '<a href="/login">Login</a><a href="/register">Registro</a>' : '' }}
+    <div class="app-container">
+        <!-- Sidebar -->
+        <aside class="sidebar" id="sidebar">
+            <div class="sidebar-header">
+                <a href="/" class="brand">
+                    <i class="fas fa-shield-alt"></i> JosSecurity
+                </a>
+                <button class="close-sidebar d-md-none" id="closeSidebar">
+                    <i class="fas fa-times"></i>
+                </button>
             </div>
-        </div>
-    </nav>
+            
+            <nav class="sidebar-nav">
+                <ul>
+                    <li><a href="/" class="{{ $current_path == '/' ? 'active' : '' }}"><i class="fas fa-home"></i> Inicio</a></li>
+                    
+                    {{ ($auth_check) ? {
+                        <li class="nav-header">Aplicación</li>
+                        <li><a href="/dashboard" class="{{ $current_path == '/dashboard' ? 'active' : '' }}"><i class="fas fa-tachometer-alt"></i> Dashboard</a></li>
+                        <!-- Injected Links Here -->
+                    } : {} }}
 
-    <div class="container">
-        @yield('content')
+                    <li class="nav-header">Cuenta</li>
+                    {{ ($auth_check) ? {
+                        <li><a href="/profile"><i class="fas fa-user"></i> Perfil</a></li>
+                        <li><a href="/logout" class="text-danger"><i class="fas fa-sign-out-alt"></i> Cerrar Sesión</a></li>
+                    } : {
+                        <li><a href="/login"><i class="fas fa-sign-in-alt"></i> Iniciar Sesión</a></li>
+                        <li><a href="/register"><i class="fas fa-user-plus"></i> Registrarse</a></li>
+                    } }}
+                </ul>
+            </nav>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Top Navbar -->
+            <header class="top-navbar">
+                <button class="toggle-sidebar" id="toggleSidebar">
+                    <i class="fas fa-bars"></i>
+                </button>
+                
+                <div class="navbar-right">
+                    {{ ($auth_check) ? {
+                        <div class="user-menu">
+                            <span class="user-name">{{ $auth_user ?? 'Usuario' }}</span>
+                            <img src="https://ui-avatars.com/api/?name={{ $auth_user ?? 'U' }}&background=2563eb&color=fff" alt="Avatar" class="user-avatar">
+                        </div>
+                    } : {} }}
+                </div>
+            </header>
+
+            <!-- Page Content -->
+            <div class="content-wrapper">
+                @yield('content')
+            </div>
+
+            <footer class="footer">
+                <p>&copy; 2024 JosSecurity Enterprise. <span class="d-none d-sm-inline">Todos los derechos reservados.</span></p>
+            </footer>
+        </main>
+        
+        <!-- Overlay for mobile -->
+        <div class="sidebar-overlay" id="sidebarOverlay"></div>
     </div>
 
-    <footer class="footer">
-        <p>&copy; 2024 JosSecurity Enterprise. Todos los derechos reservados.</p>
-    </footer>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const sidebar = document.getElementById('sidebar');
+            const toggleBtn = document.getElementById('toggleSidebar');
+            const closeBtn = document.getElementById('closeSidebar');
+            const overlay = document.getElementById('sidebarOverlay');
+
+            function toggleMenu() {
+                sidebar.classList.toggle('active');
+                overlay.classList.toggle('active');
+            }
+
+            if(toggleBtn) toggleBtn.addEventListener('click', toggleMenu);
+            if(closeBtn) closeBtn.addEventListener('click', toggleMenu);
+            if(overlay) overlay.addEventListener('click', toggleMenu);
+        });
+    </script>
 </body>
 </html>`,
 	}

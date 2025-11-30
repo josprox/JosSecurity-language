@@ -97,7 +97,7 @@ func watchChanges() {
 	for {
 		time.Sleep(500 * time.Millisecond)
 
-		var changedPath string
+		var changedPaths []string
 		err := filepath.Walk(".", func(path string, info os.FileInfo, err error) error {
 			if err != nil {
 				return nil
@@ -115,23 +115,25 @@ func watchChanges() {
 				if lastHash, ok := fileHashes[path]; ok {
 					if currentHash != lastHash {
 						fileHashes[path] = currentHash
-						changedPath = path
+						changedPaths = append(changedPaths, path)
 						fmt.Printf("[HotReload] Cambio detectado en: %s\n", path)
 					}
 				} else {
 					// New file
 					fileHashes[path] = currentHash
-					changedPath = path
+					changedPaths = append(changedPaths, path)
 					fmt.Printf("[HotReload] Nuevo archivo detectado: %s\n", path)
 				}
 			}
 			return nil
 		})
 
-		if err == nil && changedPath != "" {
+		if err == nil && len(changedPaths) > 0 {
 			// Debounce
 			time.Sleep(100 * time.Millisecond)
-			reloadApp(changedPath)
+			for _, p := range changedPaths {
+				reloadApp(p)
+			}
 		}
 	}
 }

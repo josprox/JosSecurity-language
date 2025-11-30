@@ -4,6 +4,12 @@ import "path/filepath"
 
 func GetControllerFiles(path string) map[string]string {
 	return map[string]string{
+		filepath.Join(path, "app", "controllers", "ProfileController.joss"): `class ProfileController {
+    function index() {
+        $user = Auth.user()
+        return View.render("profile/index", {"user": $user, "title": "Mi Perfil"})
+    }
+}`,
 		filepath.Join(path, "app", "controllers", "HomeController.joss"): `class HomeController {
     func index() {
         return View::render("welcome", {

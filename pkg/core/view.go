@@ -21,6 +21,7 @@ func (r *Runtime) executeViewMethod(instance *Instance, method string, args []in
 					data = d
 				}
 			}
+			fmt.Printf("[View] Rendering %s with data: %v\n", viewName, data)
 
 			// Inject Global Auth Variables
 			data["auth_check"] = false
@@ -179,12 +180,129 @@ func (r *Runtime) executeViewMethod(instance *Instance, method string, args []in
 				finalHtml = reYield.ReplaceAllString(finalHtml, "")
 			}
 
+			// 3.5 Handle Control Structures
+
+			// A. Handle Block Ternaries: {{ ($var) ? { trueBlock } : { falseBlock } }}
+			reBlockTernary := regexp.MustCompile(`\{\{\s*\((.*?)\)\s*\?\s*\{([\s\S]*?)\}\s*:\s*\{([\s\S]*?)\}\s*\}\}`)
+			for {
+				match := reBlockTernary.FindStringSubmatch(finalHtml)
+				if match == nil {
+					break
+				}
+				fullMatch := match[0]
+				condStr := strings.TrimSpace(match[1])
+				trueBlock := match[2]
+				falseBlock := match[3]
+
+				condition := false
+
+				// Check for equality: $var == 'val'
+				if strings.Contains(condStr, "==") {
+					parts := strings.Split(condStr, "==")
+					if len(parts) == 2 {
+						key := strings.TrimSpace(strings.TrimPrefix(strings.TrimSpace(parts[0]), "$"))
+						val := strings.Trim(strings.TrimSpace(parts[1]), "'\"")
+
+						if v, ok := data[key]; ok {
+							if fmt.Sprintf("%v", v) == val {
+								condition = true
+							}
+						}
+					}
+				} else {
+					// Simple boolean check: $var
+					key := strings.TrimPrefix(condStr, "$")
+					if val, ok := data[key]; ok && val != nil && val != false && val != "" && val != 0 {
+						condition = true
+					}
+				}
+
+				if condition {
+					finalHtml = strings.Replace(finalHtml, fullMatch, trueBlock, 1)
+				} else {
+					finalHtml = strings.Replace(finalHtml, fullMatch, falseBlock, 1)
+				}
+			}
+
+			// B. Handle @foreach($list as $item) ... @endforeach
+			reForeach := regexp.MustCompile(`@foreach\(\$([a-zA-Z0-9_]+)\s+as\s+\$([a-zA-Z0-9_]+)\)([\s\S]*?)@endforeach`)
+			for {
+				match := reForeach.FindStringSubmatch(finalHtml)
+				if match == nil {
+					break
+				}
+				fullMatch := match[0]
+				listName := match[1]
+				itemName := match[2]
+				blockContent := match[3]
+
+				var result string
+				if listVal, ok := data[listName]; ok {
+					if list, ok := listVal.([]interface{}); ok {
+						for _, item := range list {
+							itemHtml := blockContent
+							if itemMap, ok := item.(map[string]interface{}); ok {
+								for k, v := range itemMap {
+									valStr := fmt.Sprintf("%v", v)
+									itemHtml = strings.ReplaceAll(itemHtml, fmt.Sprintf("{{ $%s.%s }}", itemName, k), valStr)
+								}
+							} else if itemInst, ok := item.(*Instance); ok {
+								for k, v := range itemInst.Fields {
+									valStr := fmt.Sprintf("%v", v)
+									itemHtml = strings.ReplaceAll(itemHtml, fmt.Sprintf("{{ $%s.%s }}", itemName, k), valStr)
+								}
+							}
+							result += itemHtml
+						}
+					}
+				}
+				finalHtml = strings.Replace(finalHtml, fullMatch, result, 1)
+			}
+
 			// 4. Variable Replacement
 
-			// A. Handle Ternaries: {{ $var ? 'trueVal' : 'falseVal' }}
-			// Regex for: {{ $var ? 'a' : 'b' }} (supporting single quotes)
-			reTernary := regexp.MustCompile(`\{\{\s*\$([a-zA-Z0-9_]+)\s*\?\s*'([^']*)'\s*:\s*'([^']*)'\s*\}\}`)
+			// A. Handle Ternaries with Equality: {{ $var == 'val' ? 'true' : 'false' }} or {{ $var.prop == 1 ... }}
+			reTernaryEq := regexp.MustCompile(`\{\{\s*\$([a-zA-Z0-9_]+(?:\.[a-zA-Z0-9_]+)?)\s*==\s*['"]?([^'"\s]+)['"]?\s*\?\s*'([^']*)'\s*:\s*'([^']*)'\s*\}\}`)
+			finalHtml = reTernaryEq.ReplaceAllStringFunc(finalHtml, func(match string) string {
+				parts := reTernaryEq.FindStringSubmatch(match)
+				key := parts[1]
+				targetVal := parts[2]
+				trueVal := parts[3]
+				falseVal := parts[4]
 
+				// Resolve value (handle dot notation)
+				var currentVal interface{}
+				if strings.Contains(key, ".") {
+					keyParts := strings.Split(key, ".")
+					varName := keyParts[0]
+					propName := keyParts[1]
+					if val, ok := data[varName]; ok {
+						if inst, ok := val.(*Instance); ok {
+							if fieldVal, ok := inst.Fields[propName]; ok {
+								currentVal = fieldVal
+							}
+						} else if m, ok := val.(map[string]interface{}); ok {
+							if fieldVal, ok := m[propName]; ok {
+								currentVal = fieldVal
+							}
+						}
+					}
+				} else {
+					if val, ok := data[key]; ok {
+						currentVal = val
+					}
+				}
+
+				if currentVal != nil {
+					if fmt.Sprintf("%v", currentVal) == targetVal {
+						return trueVal
+					}
+				}
+				return falseVal
+			})
+
+			// B. Handle Standard Ternaries: {{ $var ? 'trueVal' : 'falseVal' }}
+			reTernary := regexp.MustCompile(`\{\{\s*\$([a-zA-Z0-9_]+)\s*\?\s*'([^']*)'\s*:\s*'([^']*)'\s*\}\}`)
 			finalHtml = reTernary.ReplaceAllStringFunc(finalHtml, func(match string) string {
 				parts := reTernary.FindStringSubmatch(match)
 				key := parts[1]
@@ -197,19 +315,23 @@ func (r *Runtime) executeViewMethod(instance *Instance, method string, args []in
 				return falseVal
 			})
 
-			// B. Handle Null Coalescing: {{ $var ?? "default" }}
-			reCoalesce := regexp.MustCompile(`\{\{\s*\$([a-zA-Z0-9_]+)\s*\?\?\s*"([^"]*)"\s*\}\}`)
+			// C. Handle Null Coalescing: {{ $var ?? "default" }} or {{ $var ?? 'default' }}
+			// Go regexp doesn't support backreferences (\2), so we use alternatives.
+			reCoalesce := regexp.MustCompile(`\{\{\s*\$([a-zA-Z0-9_]+)\s*\?\?\s*(?:"([^"]*)"|'([^']*)')\s*\}\}`)
 			finalHtml = reCoalesce.ReplaceAllStringFunc(finalHtml, func(match string) string {
 				parts := reCoalesce.FindStringSubmatch(match)
 				key := parts[1]
-				defaultVal := parts[2]
-				if val, ok := data[key]; ok {
+				// parts[2] is double quoted value, parts[3] is single quoted value.
+				// Since they are mutually exclusive alternatives, we can just concatenate them.
+				defaultVal := parts[2] + parts[3]
+
+				if val, ok := data[key]; ok && val != nil && val != "" {
 					return fmt.Sprintf("%v", val)
 				}
 				return defaultVal
 			})
 
-			// C. Handle Standard Replacements
+			// D. Handle Standard Replacements
 
 			// 0. Handle Helpers
 			if token, ok := data["csrf_token"]; ok {
@@ -217,28 +339,42 @@ func (r *Runtime) executeViewMethod(instance *Instance, method string, args []in
 				finalHtml = strings.ReplaceAll(finalHtml, "{{ csrf_field() }}", field)
 			}
 
-			// 1. Handle Raw Output: {{! var }} or {{!var}}
+			// 1. Handle Dot Notation: {{ $var.prop }}
+			reDot := regexp.MustCompile(`\{\{\s*\$([a-zA-Z0-9_]+)\.([a-zA-Z0-9_]+)\s*\}\}`)
+			finalHtml = reDot.ReplaceAllStringFunc(finalHtml, func(match string) string {
+				parts := reDot.FindStringSubmatch(match)
+				varName := parts[1]
+				propName := parts[2]
+
+				if val, ok := data[varName]; ok {
+					if inst, ok := val.(*Instance); ok {
+						if fieldVal, ok := inst.Fields[propName]; ok {
+							return html.EscapeString(fmt.Sprintf("%v", fieldVal))
+						}
+					} else if m, ok := val.(map[string]interface{}); ok {
+						if fieldVal, ok := m[propName]; ok {
+							return html.EscapeString(fmt.Sprintf("%v", fieldVal))
+						}
+					}
+				}
+				return "" // Return empty if not found
+			})
+
+			// 2. Handle Raw Output: {{! var }} or {{!var}}
 			for k, v := range data {
 				valStr := fmt.Sprintf("%v", v)
-
-				// Raw: {{! key }}
 				finalHtml = strings.ReplaceAll(finalHtml, "{{! "+k+" }}", valStr)
 				finalHtml = strings.ReplaceAll(finalHtml, "{{!"+k+"}}", valStr)
-				finalHtml = strings.ReplaceAll(finalHtml, "{{!$"+k+"}}", valStr) // {{!$var}}
+				finalHtml = strings.ReplaceAll(finalHtml, "{{!$"+k+"}}", valStr)
 				finalHtml = strings.ReplaceAll(finalHtml, "{{! $"+k+" }}", valStr)
 
-				// Escaped: {{ key }}
 				escapedVal := html.EscapeString(valStr)
-
-				// Strict {{key}}
 				finalHtml = strings.ReplaceAll(finalHtml, "{{"+k+"}}", escapedVal)
-				// Spaced {{ key }}
 				finalHtml = strings.ReplaceAll(finalHtml, "{{ "+k+" }}", escapedVal)
-				// Dollar var {{ $key }}
 				finalHtml = strings.ReplaceAll(finalHtml, "{{ $"+k+" }}", escapedVal)
 			}
 
-			// D. Cleanup remaining {{ $var }} tags (replace with empty string)
+			// E. Cleanup remaining {{ $var }} tags
 			reRemaining := regexp.MustCompile(`\{\{\s*\$[a-zA-Z0-9_]+\s*\}\}`)
 			finalHtml = reRemaining.ReplaceAllString(finalHtml, "")
 

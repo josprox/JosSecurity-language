@@ -90,3 +90,81 @@ func (r *Runtime) LogMigration(migration string, batch int) {
 		fmt.Printf("[Migration] Error registrando migración %s: %v\n", migration, err)
 	}
 }
+
+// DropAllTables drops all user tables from the database
+func (r *Runtime) DropAllTables() {
+	if r.DB == nil {
+		return
+	}
+
+	dbDriver := "mysql"
+	if val, ok := r.Env["DB"]; ok {
+		dbDriver = val
+	}
+
+	var tables []string
+
+	if dbDriver == "sqlite" {
+		// SQLite: Get all tables except sqlite_* system tables
+		rows, err := r.DB.Query("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'")
+		if err != nil {
+			fmt.Printf("[Migration] Error obteniendo tablas: %v\n", err)
+			return
+		}
+		defer rows.Close()
+
+		for rows.Next() {
+			var tableName string
+			if err := rows.Scan(&tableName); err == nil {
+				tables = append(tables, tableName)
+			}
+		}
+
+		// Drop each table
+		for _, table := range tables {
+			_, err := r.DB.Exec(fmt.Sprintf("DROP TABLE IF EXISTS %s", table))
+			if err != nil {
+				fmt.Printf("[Migration] Error eliminando tabla %s: %v\n", table, err)
+			} else {
+				fmt.Printf("[Migration] Tabla %s eliminada\n", table)
+			}
+		}
+	} else {
+		// MySQL: Get all tables from current database
+		dbName := r.Env["DB_NAME"]
+		if dbName == "" {
+			fmt.Println("[Migration] Error: DB_NAME no está configurado")
+			return
+		}
+
+		rows, err := r.DB.Query("SELECT table_name FROM information_schema.tables WHERE table_schema = ?", dbName)
+		if err != nil {
+			fmt.Printf("[Migration] Error obteniendo tablas: %v\n", err)
+			return
+		}
+		defer rows.Close()
+
+		for rows.Next() {
+			var tableName string
+			if err := rows.Scan(&tableName); err == nil {
+				tables = append(tables, tableName)
+			}
+		}
+
+		// Disable foreign key checks for MySQL
+		r.DB.Exec("SET FOREIGN_KEY_CHECKS = 0")
+
+		// Drop each table
+		for _, table := range tables {
+			_, err := r.DB.Exec(fmt.Sprintf("DROP TABLE IF EXISTS `%s`", table))
+			if err != nil {
+				fmt.Printf("[Migration] Error eliminando tabla %s: %v\n", table, err)
+			} else {
+				fmt.Printf("[Migration] Tabla %s eliminada\n", table)
+			}
+		}
+
+		// Re-enable foreign key checks
+		r.DB.Exec("SET FOREIGN_KEY_CHECKS = 1")
+	}
+}
