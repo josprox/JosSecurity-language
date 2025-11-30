@@ -53,6 +53,7 @@ func printHelp() {
 	fmt.Println("  make:view [Name]        - Crea una nueva vista (solo web)")
 	fmt.Println("  make:mvc [Name]         - Crea Modelo, Vista y Controlador")
 	fmt.Println("  make:crud [Tabla]       - Crea CRUD completo basado en tabla")
+	fmt.Println("  remove:crud [Tabla]     - Elimina el CRUD generado para una tabla")
 	fmt.Println("  make:migration [Name]   - Crea una nueva migración")
 	fmt.Println("  migrate                 - Ejecuta migraciones pendientes")
 	fmt.Println("  migrate:fresh           - Elimina todas las tablas y re-ejecuta migraciones")

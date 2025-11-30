@@ -211,6 +211,14 @@ class User extends GranMySQL {
 }
 ```
 
+### `joss remove:crud [Tabla]`
+
+Elimina todos los archivos generados por `make:crud` para una tabla específica (Controlador, Modelo, Vistas, Rutas y Navbar).
+
+```bash
+joss remove:crud js_products
+```
+
 ---
 
 ## Utilidades
@@ -368,6 +376,8 @@ Comandos:
   change db [motor]        - Cambiar base de datos
   make:controller [Nombre] - Crear controlador
   make:model [Nombre]      - Crear modelo
+  make:crud [Tabla]        - Crear CRUD completo
+  remove:crud [Tabla]      - Eliminar CRUD generado
   version                  - Mostrar versión
   help                     - Mostrar ayuda
 ```
