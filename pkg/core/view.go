@@ -107,7 +107,8 @@ func (r *Runtime) executeViewMethod(instance *Instance, method string, args []in
 
 			if strings.HasPrefix(strings.TrimSpace(viewContent), "@extends") {
 				// Extract layout name
-				reExtends := regexp.MustCompile(`@extends\('([^']+)'\)`)
+				// Allow spaces: @extends ( 'layout' )
+				reExtends := regexp.MustCompile(`@extends\s*\(\s*'([^']+)'\s*\)`)
 				match := reExtends.FindStringSubmatch(viewContent)
 				if len(match) > 1 {
 					layoutName := match[1]
@@ -159,7 +160,10 @@ func (r *Runtime) executeViewMethod(instance *Instance, method string, args []in
 				// Extract Sections
 				// @section('name') ... @endsection
 				// We need a loop to find all sections
-				reSection := regexp.MustCompile(`@section\('([^']+)'\)([\s\S]*?)@endsection`)
+				// Extract Sections
+				// @section('name') ... @endsection
+				// Allow spaces: @section ( 'name' )
+				reSection := regexp.MustCompile(`@section\s*\(\s*'([^']+)'\s*\)([\s\S]*?)@endsection`)
 				sectionMatches := reSection.FindAllStringSubmatch(viewContent, -1)
 				for _, sm := range sectionMatches {
 					sections[sm[1]] = sm[2]
@@ -176,7 +180,7 @@ func (r *Runtime) executeViewMethod(instance *Instance, method string, args []in
 					finalHtml = strings.ReplaceAll(finalHtml, placeholder, content)
 				}
 				// Remove any remaining @yields
-				reYield := regexp.MustCompile(`@yield\('[^']+'\)`)
+				reYield := regexp.MustCompile(`@yield\s*\(\s*'[^']+'\s*\)`)
 				finalHtml = reYield.ReplaceAllString(finalHtml, "")
 			}
 
@@ -225,7 +229,8 @@ func (r *Runtime) executeViewMethod(instance *Instance, method string, args []in
 			}
 
 			// B. Handle @foreach($list as $item) ... @endforeach
-			reForeach := regexp.MustCompile(`@foreach\(\$([a-zA-Z0-9_]+)\s+as\s+\$([a-zA-Z0-9_]+)\)([\s\S]*?)@endforeach`)
+			// Allow spaces: @foreach ( $list as $item )
+			reForeach := regexp.MustCompile(`@foreach\s*\(\s*\$([a-zA-Z0-9_]+)\s+as\s+\$([a-zA-Z0-9_]+)\s*\)([\s\S]*?)@endforeach`)
 			for {
 				match := reForeach.FindStringSubmatch(finalHtml)
 				if match == nil {
@@ -238,19 +243,37 @@ func (r *Runtime) executeViewMethod(instance *Instance, method string, args []in
 
 				var result string
 				if listVal, ok := data[listName]; ok {
+					// Handle []interface{} (from script)
 					if list, ok := listVal.([]interface{}); ok {
 						for _, item := range list {
 							itemHtml := blockContent
 							if itemMap, ok := item.(map[string]interface{}); ok {
 								for k, v := range itemMap {
 									valStr := fmt.Sprintf("%v", v)
-									itemHtml = strings.ReplaceAll(itemHtml, fmt.Sprintf("{{ $%s.%s }}", itemName, k), valStr)
+									// Use regex to replace {{ $item.key }} with flexibility for spaces
+									// Pattern: {{ \s* $itemName \. key \s* }}
+									reItem := regexp.MustCompile(fmt.Sprintf(`\{\{\s*\$%s\.%s\s*\}\}`, regexp.QuoteMeta(itemName), regexp.QuoteMeta(k)))
+									itemHtml = reItem.ReplaceAllString(itemHtml, valStr)
 								}
 							} else if itemInst, ok := item.(*Instance); ok {
 								for k, v := range itemInst.Fields {
 									valStr := fmt.Sprintf("%v", v)
-									itemHtml = strings.ReplaceAll(itemHtml, fmt.Sprintf("{{ $%s.%s }}", itemName, k), valStr)
+									// Use regex to replace {{ $item.key }} with flexibility for spaces
+									reItem := regexp.MustCompile(fmt.Sprintf(`\{\{\s*\$%s\.%s\s*\}\}`, regexp.QuoteMeta(itemName), regexp.QuoteMeta(k)))
+									itemHtml = reItem.ReplaceAllString(itemHtml, valStr)
 								}
+							}
+							result += itemHtml
+						}
+					} else if listMap, ok := listVal.([]map[string]interface{}); ok {
+						// Handle []map[string]interface{} (from GranDB)
+						for _, itemMap := range listMap {
+							itemHtml := blockContent
+							for k, v := range itemMap {
+								valStr := fmt.Sprintf("%v", v)
+								// Use regex to replace {{ $item.key }} with flexibility for spaces
+								reItem := regexp.MustCompile(fmt.Sprintf(`\{\{\s*\$%s\.%s\s*\}\}`, regexp.QuoteMeta(itemName), regexp.QuoteMeta(k)))
+								itemHtml = reItem.ReplaceAllString(itemHtml, valStr)
 							}
 							result += itemHtml
 						}

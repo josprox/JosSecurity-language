@@ -51,7 +51,7 @@ func createModel(name string) {
 	tableName := "js_" + strings.ToLower(name) + "s" // Plural convention
 
 	content := fmt.Sprintf(`class %s extends GranDB {
-    Init constructor() {
+    function constructor() {
         $this.tabla = "%s"
     }
 }`, name, tableName)

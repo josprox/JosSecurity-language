@@ -64,7 +64,8 @@ func (r *Runtime) executeGranMySQLMethod(instance *Instance, method string, args
 			format := args[0].(string)
 
 			// Use legacy properties
-			table := instance.Fields["tabla"]
+			// Use getTable helper
+			table := r.getTable(instance)
 			col := instance.Fields["comparar"]
 			val := instance.Fields["comparable"]
 
@@ -84,7 +85,7 @@ func (r *Runtime) executeGranMySQLMethod(instance *Instance, method string, args
 			if format == "json" {
 				return rowsToJSON(rows)
 			}
-			return rowsToJSON(rows) // Default to JSON
+			return rowsToJSON(rows) // Default to JSON for legacy where()
 		}
 
 		// New fluent builder API
@@ -153,10 +154,10 @@ func (r *Runtime) executeGranMySQLMethod(instance *Instance, method string, args
 	case "get":
 		if r.DB == nil {
 			fmt.Println("[GranMySQL] Error: No DB connection")
-			return "[]"
+			return []map[string]interface{}{}
 		}
 
-		table := instance.Fields["_table"].(string)
+		table := r.getTable(instance)
 		sel := instance.Fields["_select"].(string)
 		wheres := instance.Fields["_wheres"].([]string)
 		bindings := instance.Fields["_bindings"].([]interface{})
@@ -182,18 +183,18 @@ func (r *Runtime) executeGranMySQLMethod(instance *Instance, method string, args
 		rows, err := r.DB.Query(query, bindings...)
 		if err != nil {
 			fmt.Printf("[GranMySQL] Error en get: %v\n", err)
-			return "[]"
+			return []map[string]interface{}{}
 		}
 		defer rows.Close()
 
-		return rowsToJSON(rows)
+		return rowsToMap(rows)
 
 	case "first":
 		if r.DB == nil {
 			return nil
 		}
 
-		table := instance.Fields["_table"].(string)
+		table := r.getTable(instance)
 		sel := instance.Fields["_select"].(string)
 		wheres := instance.Fields["_wheres"].([]string)
 		bindings := instance.Fields["_bindings"].([]interface{})
@@ -222,50 +223,26 @@ func (r *Runtime) executeGranMySQLMethod(instance *Instance, method string, args
 		}
 		defer rows.Close()
 
-		jsonStr := rowsToJSON(rows)
-		if jsonStr == "[]" {
-			return nil
+		results := rowsToMap(rows)
+		if len(results) > 0 {
+			return results[0]
 		}
-		return strings.TrimSuffix(strings.TrimPrefix(jsonStr.(string), "["), "]")
+		return nil
 
 	case "insert":
-		if r.DB == nil {
-			return false
-		}
-		if len(args) > 0 {
-			// Support insert(["col1", "col2"], ["val1", "val2"])
-			if len(args) == 2 {
-				cols := args[0].([]interface{})
-				vals := args[1].([]interface{})
+		return r.executeInsertMethod(instance, args)
 
-				if len(cols) != len(vals) {
-					return false
-				}
+	case "update":
+		return r.executeUpdateMethod(instance, args)
 
-				table := instance.Fields["_table"].(string)
-				colNames := []string{}
-				placeholders := []string{}
-				bindings := []interface{}{}
+	case "delete":
+		return r.executeDeleteMethod(instance)
 
-				for _, c := range cols {
-					colNames = append(colNames, quoteIdentifier(fmt.Sprintf("%v", c)))
-					placeholders = append(placeholders, "?")
-				}
-				for _, v := range vals {
-					bindings = append(bindings, v)
-				}
+	case "deleteAll":
+		return r.executeDeleteAllMethod(instance)
 
-				query := fmt.Sprintf("INSERT INTO %s (%s) VALUES (%s)", table, strings.Join(colNames, ", "), strings.Join(placeholders, ", "))
-
-				_, err := r.DB.Exec(query, bindings...)
-				if err != nil {
-					fmt.Printf("[GranMySQL] Error insert: %v\n", err)
-					return false
-				}
-				return true
-			}
-		}
-		return false
+	case "truncate":
+		return r.executeTruncateMethod(instance)
 
 	case "query":
 		if len(args) > 0 {
@@ -285,7 +262,32 @@ func (r *Runtime) executeGranMySQLMethod(instance *Instance, method string, args
 	return nil
 }
 
-func rowsToJSON(rows *sql.Rows) interface{} {
+func rowsToMap(rows *sql.Rows) []map[string]interface{} {
+	var results []map[string]interface{}
+	cols, _ := rows.Columns()
+	vals := make([]interface{}, len(cols))
+	valPtrs := make([]interface{}, len(cols))
+	for i := range cols {
+		valPtrs[i] = &vals[i]
+	}
+
+	for rows.Next() {
+		rows.Scan(valPtrs...)
+		row := make(map[string]interface{})
+		for i, colName := range cols {
+			valVal := vals[i]
+			if b, ok := valVal.([]byte); ok {
+				row[colName] = string(b)
+			} else {
+				row[colName] = valVal
+			}
+		}
+		results = append(results, row)
+	}
+	return results
+}
+
+func rowsToJSON(rows *sql.Rows) string {
 	var results []string
 	cols, _ := rows.Columns()
 	vals := make([]interface{}, len(cols))
@@ -335,4 +337,38 @@ func quoteIdentifier(name string) string {
 		return name
 	}
 	return "`" + name + "`"
+}
+
+// Helper to get table name from instance
+// Checks _table (internal), tabla (legacy property), or infers from class name
+func (r *Runtime) getTable(instance *Instance) string {
+	// 1. Check internal _table field (set via table() method)
+	if val, ok := instance.Fields["_table"]; ok {
+		if str, ok := val.(string); ok && str != "" {
+			return str
+		}
+	}
+
+	// 2. Check public tabla property (set in constructor)
+	if val, ok := instance.Fields["tabla"]; ok {
+		if str, ok := val.(string); ok && str != "" {
+			// Sync to _table for future use
+			instance.Fields["_table"] = str
+			return str
+		}
+	}
+
+	// 3. Infer from Class Name (e.g. User -> js_users)
+	className := instance.Class.Name.Value
+	if className == "GranDB" || className == "Model" {
+		return ""
+	}
+
+	// Simple pluralization and snake_case
+	tableName := "js_" + strings.ToLower(className) + "s"
+
+	// Sync to _table
+	instance.Fields["_table"] = tableName
+
+	return tableName
 }
