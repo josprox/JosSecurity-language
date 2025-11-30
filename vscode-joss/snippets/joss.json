@@ -60,6 +60,34 @@
     ],
     "description": "Define a middleware group"
   },
+  "Router Put": {
+    "prefix": "route:put",
+    "body": [
+      "Router::put(\"/${1:path}\", \"${2:Controller}@${3:method}\")"
+    ],
+    "description": "Define a PUT route"
+  },
+  "Router Delete": {
+    "prefix": "route:delete",
+    "body": [
+      "Router::delete(\"/${1:path}\", \"${2:Controller}@${3:method}\")"
+    ],
+    "description": "Define a DELETE route"
+  },
+  "Router API": {
+    "prefix": "route:api",
+    "body": [
+      "Router::api(\"/${1:path}\", \"${2:Controller}@${3:method}\")"
+    ],
+    "description": "Define an API route (GET & POST)"
+  },
+  "Redirect": {
+    "prefix": "redirect",
+    "body": [
+      "return redirect(\"${1:url}\")"
+    ],
+    "description": "Redirect to URL"
+  },
   "Auth Check": {
     "prefix": "auth:check",
     "body": [
@@ -97,6 +125,48 @@
       "}"
     ],
     "description": "Ternary operator with blocks"
+  },
+  "If (Ternary)": {
+    "prefix": "if",
+    "body": [
+      "(${1:condition}) ? {",
+      "\t$0",
+      "}"
+    ],
+    "description": "If statement (Ternary)"
+  },
+  "If Else (Ternary)": {
+    "prefix": "ifelse",
+    "body": [
+      "(${1:condition}) ? {",
+      "\t${2:// true}",
+      "} : {",
+      "\t$0",
+      "}"
+    ],
+    "description": "If-Else statement (Ternary)"
+  },
+  "Else (Ternary)": {
+    "prefix": "else",
+    "body": [
+      "} : {",
+      "\t$0",
+      "}"
+    ],
+    "description": "Else block (Ternary)"
+  },
+  "Switch (Ternary Ladder)": {
+    "prefix": "switch",
+    "body": [
+      "(${1:var} == ${2:value1}) ? {",
+      "\t${3:// case 1}",
+      "} : (${1:var} == ${4:value2}) ? {",
+      "\t${5:// case 2}",
+      "} : {",
+      "\t${6:// default}",
+      "}"
+    ],
+    "description": "Switch statement (Ternary Ladder)"
   },
   "Ternary Inline": {
     "prefix": "terni",
@@ -373,5 +443,44 @@
       "$0"
     ],
     "description": "Async task with channel communication"
+  },
+  "Schema Create": {
+    "prefix": "schema:create",
+    "body": [
+      "Schema::create(\"${1:tableName}\", func(\\$table) {",
+      "\t\\$table.id()",
+      "\t\\$table.string(\"${2:name}\")",
+      "\t\\$table.timestamps()",
+      "})"
+    ],
+    "description": "Create a new table schema"
+  },
+  "Schema Drop": {
+    "prefix": "schema:drop",
+    "body": [
+      "Schema::drop(\"${1:tableName}\")"
+    ],
+    "description": "Drop a table"
+  },
+  "Keys": {
+    "prefix": "keys",
+    "body": [
+      "keys(${1:map})"
+    ],
+    "description": "Get map keys"
+  },
+  "Values": {
+    "prefix": "values",
+    "body": [
+      "values(${1:map})"
+    ],
+    "description": "Get map values"
+  },
+  "Env": {
+    "prefix": "env",
+    "body": [
+      "env(\"${1:KEY}\")"
+    ],
+    "description": "Get environment variable"
   }
 }

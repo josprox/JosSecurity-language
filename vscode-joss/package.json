@@ -2,7 +2,7 @@
   "name": "joss-language",
   "displayName": "JosSecurity Language Support",
   "description": "Advanced language support for JosSecurity with LSP, go-to-definition, hover, diagnostics, and security analysis",
-  "version": "3.0.0",
+  "version": "3.0.1",
   "icon": "images/icon.png",
   "publisher": "jossecurity",
   "engines": {
@@ -21,7 +21,8 @@
     "security",
     "web",
     "backend",
-    "lsp"
+    "lsp",
+    "remove:crud"
   ],
   "contributes": {
     "languages": [
@@ -68,7 +69,7 @@
       },
       {
         "command": "joss.createController",
-        "title": "Joss: Create Controller Stub"
+        "title": "Joss: Make Controller"
       },
       {
         "command": "joss.runSecurityCheck",
@@ -81,6 +82,34 @@
       {
         "command": "joss.restartServer",
         "title": "Joss: Restart Language Server"
+      },
+      {
+        "command": "joss.newProject",
+        "title": "Joss: New Project"
+      },
+      {
+        "command": "joss.makeModel",
+        "title": "Joss: Make Model"
+      },
+      {
+        "command": "joss.makeCRUD",
+        "title": "Joss: Make CRUD"
+      },
+      {
+        "command": "joss.removeCRUD",
+        "title": "Joss: Remove CRUD"
+      },
+      {
+        "command": "joss.makeMigration",
+        "title": "Joss: Make Migration"
+      },
+      {
+        "command": "joss.migrate",
+        "title": "Joss: Run Migrations"
+      },
+      {
+        "command": "joss.serverStart",
+        "title": "Joss: Start Server"
       }
     ],
     "configuration": {

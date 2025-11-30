@@ -32,7 +32,14 @@ Advanced language support for JosSecurity with Language Server Protocol (LSP).
 ### ⚡ Commands (Ctrl+Shift+P)
 - `Joss: Index Workspace`
 - `Joss: Go to Route`
-- `Joss: Create Controller Stub`
+- `Joss: Make Controller`
+- `Joss: Make Model`
+- `Joss: Make CRUD`
+- `Joss: Remove CRUD`
+- `Joss: Make Migration`
+- `Joss: Run Migrations`
+- `Joss: Start Server`
+- `Joss: New Project`
 - `Joss: Run JosSecurity Check`
 - `Joss: Open Definition Under Cursor`
 - `Joss: Restart Language Server`
@@ -139,6 +146,7 @@ MIT
 
 ## Version
 
+3.0.1 - Added comprehensive commands, intelligent snippets (if/else/switch -> ternaries), and `remove:crud` support.
 3.0.0 - Added support for Pipe Operator (`|>`) and JosSecurity v3.0.1.
 2.0.0 - Complete LSP rewrite with advanced features
 
