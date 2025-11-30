@@ -102,6 +102,12 @@ func main() {
 			return
 		}
 		createCRUD(os.Args[2])
+	case "remove:crud":
+		if len(os.Args) < 3 {
+			fmt.Println("Uso: joss remove:crud [Tabla]")
+			return
+		}
+		removeCRUD(os.Args[2])
 	case "make:migration":
 		if len(os.Args) < 3 {
 			fmt.Println("Uso: joss make:migration [Nombre]")

@@ -48,7 +48,7 @@ func createModel(name string) {
 	path := filepath.Join("app", "models", name+".joss")
 	os.MkdirAll(filepath.Dir(path), 0755)
 
-	tableName := "js_" + strings.ToLower(name) + "s" // Plural convention
+	tableName := "js_" + strings.ToLower(pluralize(name)) // Plural convention
 
 	content := fmt.Sprintf(`class %s extends GranDB {
     function constructor() {
@@ -142,15 +142,16 @@ func createCRUD(tableName string) {
 			fmt.Printf("  -> Found relation for %s\n", c.Name)
 			// Infer relation
 			baseName := strings.TrimSuffix(c.Name, "_id")
-			relatedTable := "js_" + baseName + "s" // Convention: js_users
+			relatedTable := "js_" + strings.ToLower(pluralize(baseName)) // Convention: js_users
 
-			// Try to guess display column (name, title, email, username)
-			displayCol := "name" // Default
+			// Smartly detect display column
+			displayCol := getDisplayColumn(db, dbType, relatedTable)
+			fmt.Printf("  -> Detected display column for %s: %s\n", relatedTable, displayCol)
 
 			relations = append(relations, Relation{
 				ForeignKey: c.Name,
 				Table:      relatedTable,
-				Alias:      baseName + "_name",
+				Alias:      baseName + "_" + displayCol, // e.g. user_username
 				DisplayCol: displayCol,
 			})
 		}
@@ -158,13 +159,13 @@ func createCRUD(tableName string) {
 	fmt.Printf("Total relations found: %d\n", len(relations))
 
 	// 4. Generate Artifacts
+	// Model
 	modelName := snakeToCamel(tableName)
 	if strings.HasPrefix(modelName, "Js") {
 		modelName = modelName[2:]
 	}
-	if strings.HasSuffix(modelName, "s") {
-		modelName = modelName[:len(modelName)-1]
-	}
+	// Use singularize helper
+	modelName = singularize(modelName)
 
 	// Model
 	createModel(modelName)
@@ -175,9 +176,7 @@ func createCRUD(tableName string) {
 		if strings.HasPrefix(relModelName, "Js") {
 			relModelName = relModelName[2:]
 		}
-		if strings.HasSuffix(relModelName, "s") {
-			relModelName = relModelName[:len(relModelName)-1]
-		}
+		relModelName = singularize(relModelName)
 
 		path := filepath.Join("app", "models", relModelName+".joss")
 		if _, err := os.Stat(path); os.IsNotExist(err) {
@@ -241,10 +240,8 @@ func createCRUDController(modelName, tableName string, cols []ColumnSchema, rela
 			if strings.HasPrefix(relModel, "Js") {
 				relModel = relModel[2:]
 			}
-			if strings.HasSuffix(relModel, "s") {
-				relModel = relModel[:len(relModel)-1]
-			}
-			varName := strings.ToLower(relModel) + "s" // roles
+			relModel = singularize(relModel)
+			varName := strings.ToLower(pluralize(relModel)) // roles
 			createLogic += fmt.Sprintf("\n        $%sModel = new %s()", strings.ToLower(relModel), relModel)
 			createLogic += fmt.Sprintf("\n        $%s = $%sModel.get()", varName, strings.ToLower(relModel))
 			createVars += fmt.Sprintf(", \"%s\": $%s", varName, varName)
@@ -400,10 +397,8 @@ func createCRUDViews(modelName string, cols []ColumnSchema, relations []Relation
 			if strings.HasPrefix(relModel, "Js") {
 				relModel = relModel[2:]
 			}
-			if strings.HasSuffix(relModel, "s") {
-				relModel = relModel[:len(relModel)-1]
-			}
-			varName := strings.ToLower(relModel) + "s"
+			relModel = singularize(relModel)
+			varName := strings.ToLower(pluralize(relModel))
 
 			createHtml += fmt.Sprintf(`                    <div class="form-group">
                         <label>%s</label>
@@ -473,10 +468,8 @@ func createCRUDViews(modelName string, cols []ColumnSchema, relations []Relation
 			if strings.HasPrefix(relModel, "Js") {
 				relModel = relModel[2:]
 			}
-			if strings.HasSuffix(relModel, "s") {
-				relModel = relModel[:len(relModel)-1]
-			}
-			varName := strings.ToLower(relModel) + "s"
+			relModel = singularize(relModel)
+			varName := strings.ToLower(pluralize(relModel))
 
 			editHtml += fmt.Sprintf(`                    <div class="form-group">
                         <label>%s</label>
@@ -670,4 +663,105 @@ Schema.create("%s", function($table) {
 `, name, time.Now().Format("2006-01-02 15:04:05"), name)
 
 	writeGenFile(path, content)
+}
+
+func getDisplayColumn(db *sql.DB, dbType, tableName string) string {
+	cols, err := getColumns(db, dbType, tableName)
+	if err != nil {
+		return "id"
+	}
+
+	candidates := []string{"name", "title", "username", "email", "first_name", "last_name", "description", "slug", "code"}
+
+	for _, candidate := range candidates {
+		for _, col := range cols {
+			if col.Name == candidate {
+				return candidate
+			}
+		}
+	}
+
+	// If no candidate found, look for any string column
+	for _, col := range cols {
+		lowerType := strings.ToLower(col.Type)
+		if strings.Contains(lowerType, "char") || strings.Contains(lowerType, "text") {
+			return col.Name
+		}
+	}
+
+	return "id"
+}
+
+func removeCRUD(tableName string) {
+	fmt.Printf("Removing CRUD for table '%s'...\n", tableName)
+
+	// 1. Infer Model Name
+	modelName := snakeToCamel(tableName)
+	if strings.HasPrefix(modelName, "Js") {
+		modelName = modelName[2:]
+	}
+	modelName = singularize(modelName)
+
+	fmt.Printf("Inferred Model Name: %s\n", modelName)
+
+	// 2. Delete Controller
+	controllerPath := filepath.Join("app", "controllers", modelName+"Controller.joss")
+	if _, err := os.Stat(controllerPath); err == nil {
+		os.Remove(controllerPath)
+		fmt.Printf("Deleted: %s\n", controllerPath)
+	}
+
+	// 3. Delete Model
+	modelPath := filepath.Join("app", "models", modelName+".joss")
+	if _, err := os.Stat(modelPath); err == nil {
+		os.Remove(modelPath)
+		fmt.Printf("Deleted: %s\n", modelPath)
+	}
+
+	// 4. Delete Views
+	viewsPath := filepath.Join("app", "views", strings.ToLower(modelName))
+	if _, err := os.Stat(viewsPath); err == nil {
+		os.RemoveAll(viewsPath)
+		fmt.Printf("Deleted: %s\n", viewsPath)
+	}
+
+	// 5. Remove Routes
+	routesPath := "routes.joss"
+	content, err := ioutil.ReadFile(routesPath)
+	if err == nil {
+		lines := strings.Split(string(content), "\n")
+		var newLines []string
+		for _, line := range lines {
+			// Check for CRUD Routes comment
+			if strings.Contains(line, fmt.Sprintf("// CRUD Routes for %s", modelName)) {
+				continue
+			}
+			// Filter out lines that contain the controller name
+			if strings.Contains(line, modelName+"Controller") {
+				continue
+			}
+			newLines = append(newLines, line)
+		}
+		ioutil.WriteFile(routesPath, []byte(strings.Join(newLines, "\n")), 0644)
+		fmt.Println("Cleaned routes.")
+	}
+
+	// 6. Remove Navbar Link
+	masterPath := filepath.Join("app", "views", "layouts", "master.joss.html")
+	content, err = ioutil.ReadFile(masterPath)
+	if err == nil {
+		lines := strings.Split(string(content), "\n")
+		var newLines []string
+		linkTarget := fmt.Sprintf(`href="/%s"`, strings.ToLower(modelName))
+		for _, line := range lines {
+			if strings.Contains(line, linkTarget) {
+				continue
+			}
+			newLines = append(newLines, line)
+		}
+		ioutil.WriteFile(masterPath, []byte(strings.Join(newLines, "\n")), 0644)
+		fmt.Println("Cleaned navbar.")
+	}
+
+	fmt.Println("CRUD removal complete.")
 }
