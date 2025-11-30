@@ -25,7 +25,7 @@ func main() {
 	switch command {
 	case "server":
 		if len(os.Args) >= 3 && os.Args[2] == "start" {
-			server.Start()
+			server.Start(nil)
 		} else {
 			fmt.Println("Uso: joss server start")
 		}

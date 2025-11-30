@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"path"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -63,6 +64,11 @@ func notifyClients() {
 }
 
 func watchChanges() {
+	// If using VFS (Production), disable hot reload
+	if GlobalFileSystem != nil {
+		return
+	}
+
 	// Store file hashes: path -> hash
 	fileHashes := make(map[string]string)
 
@@ -159,7 +165,7 @@ func reloadApp(changedFile string) {
 	// 3. Runtime Logic
 	if currentRuntime == nil {
 		currentRuntime = core.NewRuntime()
-		currentRuntime.LoadEnv()
+		currentRuntime.LoadEnv(GlobalFileSystem)
 
 		// Init Redis if configured
 		if currentRuntime.Env["SESSION_DRIVER"] == "redis" {
@@ -179,7 +185,7 @@ func reloadApp(changedFile string) {
 	// Helper to load a single file
 	loadFile := func(path string) {
 		fmt.Printf("[DEBUG] Loading file: %s\n", path)
-		content, err := os.ReadFile(path)
+		content, err := vfsReadFile(path)
 		if err == nil {
 			l := parser.NewLexer(string(content))
 			p := parser.NewParser(l)
@@ -223,7 +229,7 @@ func reloadApp(changedFile string) {
 			currentRuntime.Free()
 		}
 		currentRuntime = core.NewRuntime()
-		currentRuntime.LoadEnv()
+		currentRuntime.LoadEnv(GlobalFileSystem)
 
 		// Init Redis if configured
 		if currentRuntime.Env["SESSION_DRIVER"] == "redis" {
@@ -240,7 +246,7 @@ func reloadApp(changedFile string) {
 		}
 
 		// Load App Files
-		err := filepath.Walk("app", func(path string, info os.FileInfo, err error) error {
+		walkFn := func(path string, info os.FileInfo, err error) error {
 			if err != nil {
 				return err
 			}
@@ -248,18 +254,107 @@ func reloadApp(changedFile string) {
 				loadFile(path)
 			}
 			return nil
-		})
+		}
+
+		var err error
+		if GlobalFileSystem != nil {
+			err = vfsWalk(GlobalFileSystem, "app", walkFn)
+		} else {
+			err = filepath.Walk("app", walkFn)
+		}
+
 		if err != nil {
 			fmt.Printf("[DEBUG] Error walking app directory: %v\n", err)
 		}
 
 		// Load Routes
 		routesPath := "routes.joss"
-		if _, err := os.Stat(routesPath); err == nil {
+		// Check existence
+		exists := false
+		if GlobalFileSystem != nil {
+			f, err := GlobalFileSystem.Open(routesPath)
+			if err == nil {
+				f.Close()
+				exists = true
+			}
+		} else {
+			if _, err := os.Stat(routesPath); err == nil {
+				exists = true
+			}
+		}
+
+		if exists {
 			loadFile(routesPath)
 		} else {
 			fmt.Println("[DEBUG] routes.joss not found")
 		}
 		notifyClients()
 	}
+}
+
+// Helpers for VFS support
+
+func vfsReadFile(pathStr string) ([]byte, error) {
+	if GlobalFileSystem != nil {
+		// Ensure path is slash-separated
+		pathStr = filepath.ToSlash(pathStr)
+		f, err := GlobalFileSystem.Open(pathStr)
+		if err != nil {
+			return nil, err
+		}
+		defer f.Close()
+
+		// Get size
+		stat, err := f.Stat()
+		if err != nil {
+			return nil, err
+		}
+
+		data := make([]byte, stat.Size())
+		_, err = f.Read(data)
+		return data, err
+	}
+	return os.ReadFile(pathStr)
+}
+
+func vfsWalk(fs http.FileSystem, root string, walkFn filepath.WalkFunc) error {
+	f, err := fs.Open(root)
+	if err != nil {
+		return walkFn(root, nil, err)
+	}
+	defer f.Close()
+
+	info, err := f.Stat()
+	if err != nil {
+		return walkFn(root, nil, err)
+	}
+
+	if err := walkFn(root, info, nil); err != nil {
+		return err
+	}
+
+	if !info.IsDir() {
+		return nil
+	}
+
+	// It's a directory, read children
+	// http.File doesn't strictly support Readdir unless it's an os.File or similar.
+	// But our MemFS implements Readdir.
+	// We need to type assert or assume it supports Readdir if it's a directory.
+	// Standard http.File interface includes Readdir.
+
+	// However, http.File.Readdir returns []os.FileInfo
+	dirs, err := f.Readdir(-1)
+	if err != nil {
+		return walkFn(root, info, err)
+	}
+
+	for _, d := range dirs {
+		// Use path.Join for VFS paths (always forward slashes)
+		childPath := path.Join(root, d.Name())
+		if err := vfsWalk(fs, childPath, walkFn); err != nil {
+			return err
+		}
+	}
+	return nil
 }

@@ -66,12 +66,22 @@ Guía completa de JosSecurity v3.0 (Gold Master)
 
 ### 1. Instalación
 
-```bash
-# Clonar repositorio
-git clone https://github.com/tu-usuario/JosSecurity
+### 1. Instalación
 
-# Compilar
-cd JosSecurity
+**Windows (PowerShell)**:
+```powershell
+Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope Process; iwr -useb https://raw.githubusercontent.com/josprox/JosSecurity-language/main/install/remote-install.ps1 | iex
+```
+
+**Linux/macOS**:
+```bash
+curl -fsSL https://raw.githubusercontent.com/josprox/JosSecurity-language/main/install/remote-install.sh | bash
+```
+
+**Manual (Desarrollo)**:
+```bash
+git clone https://github.com/josprox/JosSecurity-language.git
+cd JosSecurity-language
 go build -o joss.exe ./cmd/joss
 ```
 

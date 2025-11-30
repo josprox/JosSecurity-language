@@ -3,6 +3,7 @@ package core
 import (
 	"database/sql"
 	"fmt"
+	"net/http"
 	"os"
 	"strings"
 	"sync"
@@ -16,6 +17,9 @@ import (
 var (
 	// BroadcastFunc is a hook for WebSocket broadcasting
 	BroadcastFunc func(msg interface{})
+
+	// GlobalFileSystem is the VFS for the application
+	GlobalFileSystem http.FileSystem
 
 	runtimePool = sync.Pool{
 		New: func() interface{} {
@@ -36,6 +40,11 @@ var (
 		},
 	}
 )
+
+// SetFileSystem sets the global file system
+func SetFileSystem(fs http.FileSystem) {
+	GlobalFileSystem = fs
+}
 
 // NewRuntime gets a runtime from the pool
 func NewRuntime() *Runtime {
@@ -71,26 +80,41 @@ func (r *Runtime) Free() {
 }
 
 // LoadEnv loads environment variables from env.joss
-func (r *Runtime) LoadEnv() {
+func (r *Runtime) LoadEnv(fs http.FileSystem) {
 	fmt.Println("[Security] Cargando entorno...")
 
-	// Try reading env.joss
-	content, err := os.ReadFile("env.joss")
-	if err != nil {
-		// Try looking in parent directory (for examples/ scripts)
-		content, err = os.ReadFile("../env.joss")
+	var content []byte
+	var err error
+
+	if fs != nil {
+		f, err := fs.Open("env.joss")
+		if err == nil {
+			defer f.Close()
+			// Get size
+			stat, _ := f.Stat()
+			content = make([]byte, stat.Size())
+			f.Read(content)
+		}
+	} else {
+		// Try reading env.joss from disk
+		content, err = os.ReadFile("env.joss")
 		if err != nil {
-			// Try looking in project root if running from subfolder
-			content, err = os.ReadFile("../../env.joss")
+			// Try looking in parent directory (for examples/ scripts)
+			content, err = os.ReadFile("../env.joss")
 			if err != nil {
-				// Try looking in the specific test folder
-				content, err = os.ReadFile("pruebas 271125/env.joss")
+				// Try looking in project root if running from subfolder
+				content, err = os.ReadFile("../../env.joss")
 				if err != nil {
-					fmt.Println("[Security] Advertencia: No se encontró env.joss")
-					return
+					// Try looking in the specific test folder
+					content, err = os.ReadFile("pruebas 271125/env.joss")
 				}
 			}
 		}
+	}
+
+	if len(content) == 0 {
+		fmt.Println("[Security] Advertencia: No se encontró env.joss")
+		return
 	}
 
 	lines := strings.Split(string(content), "\n")

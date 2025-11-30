@@ -14,7 +14,7 @@ func runMigrations() {
 
 	// 1. Initialize Runtime
 	rt := core.NewRuntime()
-	rt.LoadEnv()
+	rt.LoadEnv(nil)
 
 	if rt.DB == nil {
 		fmt.Println("Error: No se pudo conectar a la base de datos.")

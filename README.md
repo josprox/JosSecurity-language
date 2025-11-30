@@ -421,6 +421,23 @@ El proyecto está en desarrollo activo:
 - ✅ Fase 3: Concurrencia (async/await)
 - ✅ Fase 4: Proyectos de Consola
 
+
+## Distribución y Lanzamiento
+
+Para preparar una nueva versión de JosSecurity para su distribución (GitHub Releases), utiliza el script de construcción automática. Este script compilará los binarios para todas las plataformas soportadas (Windows, Linux, macOS) y empaquetará la extensión de VS Code en un archivo `jossecurity-binaries.zip` listo para el instalador remoto.
+
+### Windows
+```powershell
+.\build_all.bat
+```
+
+### Linux / macOS
+```bash
+./build_all.sh
+```
+
+El archivo resultante se generará en la carpeta `installer/jossecurity-binaries.zip`.
+
 ## Licencia
 
 Software cerrado fuente, derechos reservados.

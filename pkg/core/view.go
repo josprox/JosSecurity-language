@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"html"
 	"os"
+	"path"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -57,15 +58,46 @@ func (r *Runtime) executeViewMethod(instance *Instance, method string, args []in
 
 			// 1. Read View Content
 			viewPath := strings.ReplaceAll(viewName, ".", "/")
-			path := filepath.Join("app", "views", viewPath+".joss.html")
-			content, err := os.ReadFile(path)
-			if err != nil {
-				path = filepath.Join("app", "views", viewPath+".html")
+
+			var content []byte
+			var err error
+
+			if GlobalFileSystem != nil {
+				// VFS Mode
+				// Use path.Join for forward slashes
+				pathStr := path.Join("app", "views", viewPath+".joss.html")
+				f, errOpen := GlobalFileSystem.Open(pathStr)
+				if errOpen == nil {
+					stat, _ := f.Stat()
+					content = make([]byte, stat.Size())
+					f.Read(content)
+					f.Close()
+				} else {
+					// Try .html
+					pathStr = path.Join("app", "views", viewPath+".html")
+					f, errOpen = GlobalFileSystem.Open(pathStr)
+					if errOpen == nil {
+						stat, _ := f.Stat()
+						content = make([]byte, stat.Size())
+						f.Read(content)
+						f.Close()
+					} else {
+						return fmt.Sprintf("Error: Vista '%s' no encontrada (VFS)", viewName)
+					}
+				}
+			} else {
+				// Disk Mode
+				path := filepath.Join("app", "views", viewPath+".joss.html")
 				content, err = os.ReadFile(path)
 				if err != nil {
-					return fmt.Sprintf("Error: Vista '%s' no encontrada", viewName)
+					path = filepath.Join("app", "views", viewPath+".html")
+					content, err = os.ReadFile(path)
+					if err != nil {
+						return fmt.Sprintf("Error: Vista '%s' no encontrada", viewName)
+					}
 				}
 			}
+
 			viewContent := string(content)
 
 			// 2. Handle Inheritance (@extends)
@@ -79,18 +111,46 @@ func (r *Runtime) executeViewMethod(instance *Instance, method string, args []in
 				if len(match) > 1 {
 					layoutName := match[1]
 					layoutPath := strings.ReplaceAll(layoutName, ".", "/")
-					lPath := filepath.Join("app", "views", layoutPath+".joss.html")
-					lContent, err := os.ReadFile(lPath)
-					if err == nil {
-						layoutContent = string(lContent)
+
+					if GlobalFileSystem != nil {
+						// VFS Layout
+						lPath := path.Join("app", "views", layoutPath+".joss.html")
+						f, err := GlobalFileSystem.Open(lPath)
+						if err == nil {
+							stat, _ := f.Stat()
+							lContent := make([]byte, stat.Size())
+							f.Read(lContent)
+							f.Close()
+							layoutContent = string(lContent)
+						} else {
+							// Try .html
+							lPath = path.Join("app", "views", layoutPath+".html")
+							f, err = GlobalFileSystem.Open(lPath)
+							if err == nil {
+								stat, _ := f.Stat()
+								lContent := make([]byte, stat.Size())
+								f.Read(lContent)
+								f.Close()
+								layoutContent = string(lContent)
+							} else {
+								return fmt.Sprintf("Error: Layout '%s' no encontrado (VFS)", layoutName)
+							}
+						}
 					} else {
-						// Try .html
-						lPath = filepath.Join("app", "views", layoutPath+".html")
-						lContent, err = os.ReadFile(lPath)
+						// Disk Layout
+						lPath := filepath.Join("app", "views", layoutPath+".joss.html")
+						lContent, err := os.ReadFile(lPath)
 						if err == nil {
 							layoutContent = string(lContent)
 						} else {
-							return fmt.Sprintf("Error: Layout '%s' no encontrado", layoutName)
+							// Try .html
+							lPath = filepath.Join("app", "views", layoutPath+".html")
+							lContent, err = os.ReadFile(lPath)
+							if err == nil {
+								layoutContent = string(lContent)
+							} else {
+								return fmt.Sprintf("Error: Layout '%s' no encontrado", layoutName)
+							}
 						}
 					}
 				}

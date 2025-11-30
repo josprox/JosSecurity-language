@@ -1,61 +1,249 @@
 #!/bin/bash
-# JosSecurity Remote Installer - Linux/macOS
-# Usage: curl -fsSL https://raw.githubusercontent.com/USER/REPO/main/install/remote-install.sh | bash
+# -----------------------------------------------------------
+# JosSecurity Remote Installer, Updater, and Uninstaller (Linux/macOS)
+# Usos:
+#   Instalación: curl -fsSL <URL_DE_ESTE_SCRIPT> | bash
+#   Ejecución manual: ./remote-install.sh
+# -----------------------------------------------------------
 
 set -e
 
-echo "======================================="
-echo "   JosSecurity Remote Installer"
-echo "======================================="
-echo ""
+# --- COLORS & CONFIGURACIÓN ---
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+NC='\033[0m'
 
-# Configuration
-REPO_URL="https://github.com/josprox/JosSecurity-language"
-RAW_URL="https://raw.githubusercontent.com/josprox/JosSecurity-language/main/install"
-TEMP_DIR="/tmp/jossecurity-install"
+# Configuración que DEBE ser actualizada manualmente en el script
+JOSS_VERSION="3.0.0" 
+REPO_OWNER="josprox"
+REPO_NAME="JosSecurity-language"
 
-# Create temp directory
-rm -rf "$TEMP_DIR"
-mkdir -p "$TEMP_DIR"
-cd "$TEMP_DIR"
+# Rutas
+INSTALL_DIR="/usr/local/bin"
+LOG_FILE="/tmp/jossecurity-action.log"
+TEMP_DIR="/tmp/jossecurity-temp-action"
+REPO_URL="https://api.github.com/repos/$REPO_OWNER/$REPO_NAME/releases/latest"
+ZIP_URL="https://github.com/$REPO_OWNER/$REPO_NAME/releases/latest/download/jossecurity-binaries.zip"
+# --------------------
 
-echo "[1/5] Downloading installer..."
+# --- FUNCIONES DE LOGGING/UTILIDADES ---
+log() {
+    local level=$1
+    shift
+    local message="$@"
+    local timestamp=$(date '+%Y-%m-%d %H:%M:%S')
+    echo "[$timestamp] [$level] $message" >> "$LOG_FILE"
+    case $level in
+        ERROR) echo -e "${RED}$message${NC}";;
+        SUCCESS) echo -e "${GREEN}$message${NC}";;
+        WARNING) echo -e "${YELLOW}$message${NC}";;
+        *) echo -e "$message";;
+    esac
+}
 
-# Download main installer
-curl -fsSL "$RAW_URL/install.sh" -o install.sh
-chmod +x install.sh
+detect_vscode() {
+    command -v code &> /dev/null
+}
 
-# Detect OS
-OS=$(uname -s)
-case "$OS" in
-    Linux*)
-        BINARY="joss-linux"
-        ;;
-    Darwin*)
-        BINARY="joss-macos"
-        ;;
-    *)
-        echo "Error: Unsupported OS: $OS"
-        exit 1
-        ;;
-esac
+# Detecta el nombre del binario a buscar en el ZIP
+get_binary_name() {
+    OS=$(uname -s)
+    ARCH=$(uname -m)
 
-echo "[2/5] Downloading JosSecurity binaries..."
-curl -fsSL "$REPO_URL/releases/latest/download/jossecurity-binaries.zip" -o jossecurity-binaries.zip
+    case "$OS" in
+        Linux*)
+            case "$ARCH" in
+                x86_64) echo "joss-linux-amd64";;
+                aarch64) echo "joss-linux-arm64";;
+                armv7l) echo "joss-linux-armv7";;
+                *) log ERROR "Linux Architecture $ARCH not supported."; exit 1;;
+            esac
+            ;;
+        Darwin*)
+            case "$ARCH" in
+                x86_64) echo "joss-macos-amd64";;
+                arm64) echo "joss-macos-arm64";;
+                *) log ERROR "macOS Architecture $ARCH not supported."; exit 1;;
+            esac
+            ;;
+        *)
+            log ERROR "Unsupported OS: $OS"
+            exit 1
+            ;;
+    esac
+}
+# --------------------
 
-echo "[3/5] Extracting files..."
-unzip -o jossecurity-binaries.zip
-rm jossecurity-binaries.zip
+# --- FUNCIONES DE ACCIÓN ---
 
-echo "[4/5] Starting installation..."
-echo ""
+# 1. Instalación
+install_jossecurity() {
+    log INFO "[1/3] Installing JosSecurity..."
+    
+    BINARY_FILE=$(get_binary_name)
+    BINARY_PATH=$(find "$TEMP_DIR" -name "$BINARY_FILE" -type f | head -n 1)
 
-# Run installer
-./install.sh
+    if [ -z "$BINARY_PATH" ]; then
+        log ERROR "[X] Binary $BINARY_FILE not found in ZIP."
+        return 1
+    fi
+    
+    log INFO "Found binary: $BINARY_FILE. Installing to $INSTALL_DIR..."
+    
+    if sudo cp "$BINARY_PATH" "$INSTALL_DIR/joss"; then
+        sudo chmod +x "$INSTALL_DIR/joss"
+        log SUCCESS "[OK] Binary installed and executable."
+        log WARNING "Please restart your terminal (e.g., 'source ~/.bashrc') to update PATH."
+        return 0
+    else
+        log ERROR "[X] Failed to copy binary. Requires sudo."
+        return 1
+    fi
+}
 
-echo ""
-echo "[5/5] Cleaning up..."
-cd ~
-rm -rf "$TEMP_DIR"
+install_extension() {
+    log INFO "[3/3] Installing VS Code extension..."
+    
+    if ! detect_vscode; then
+        log WARNING "[X] VS Code not detected. Skipping extension install."
+        return 1
+    fi
 
-echo "Done!"
+    # Buscar CUALQUIER archivo VSIX
+    VSIX_FILE=$(find "$TEMP_DIR" -name "*.vsix" -type f | head -n 1)
+    
+    if [ -z "$VSIX_FILE" ]; then
+        log ERROR "[X] VSIX file not found in ZIP."
+        return 1
+    fi
+    
+    log INFO "Found VSIX: $(basename "$VSIX_FILE"). Installing..."
+    
+    # El comando --install-extension --force maneja la actualización/instalación
+    if code --install-extension "$VSIX_FILE" --force &> /dev/null; then
+        log SUCCESS "[OK] Extension installed successfully."
+        return 0
+    else
+        log ERROR "[X] Extension installation failed. Is VS Code in your PATH?"
+        return 1
+    fi
+}
+
+# 2. Desinstalación
+uninstall_jossecurity() {
+    log INFO "Uninstalling JosSecurity..."
+    if command -v joss &> /dev/null; then
+        sudo rm -f "$INSTALL_DIR/joss"
+        log SUCCESS "[OK] Binary removed from $INSTALL_DIR"
+    else
+        log INFO "[OK] Binary not found."
+    fi
+}
+
+uninstall_extension() {
+    log INFO "Uninstalling VS Code extension..."
+    if detect_vscode && code --list-extensions | grep -q "joss-language"; then
+        code --uninstall-extension jossecurity.joss-language &> /dev/null
+        log SUCCESS "[OK] Extension uninstalled."
+    else
+        log INFO "[OK] Extension not found or already removed."
+    fi
+}
+
+# 3. Actualización
+check_update() {
+    log INFO "Checking for updates..."
+    RELEASE_INFO=$(curl -s "$REPO_URL")
+    LATEST_VERSION=$(echo "$RELEASE_INFO" | grep '"tag_name"' | sed -E 's/.*"v?([^"]+)".*/\1/' || echo "0.0.0")
+    
+    if [ "$LATEST_VERSION" != "0.0.0" ] && [ "$(printf '%s\n' "$LATEST_VERSION" "$JOSS_VERSION" | sort -V | head -n1)" != "$LATEST_VERSION" ]; then
+        log WARNING "[!] Update available: $LATEST_VERSION"
+        echo "$LATEST_VERSION" # Devuelve la versión para el menú
+        return 0 # Update available
+    fi
+    log SUCCESS "[OK] You have the latest version ($JOSS_VERSION)."
+    return 1 # No update
+}
+
+run_update() {
+    log INFO "Running update: Download and reinstalling."
+    if install_jossecurity && install_extension; then
+        log SUCCESS "Update completed successfully."
+        return 0
+    fi
+    log ERROR "Update failed."
+    return 1
+}
+
+# --- FLUJO DE TRABAJO PRINCIPAL ---
+
+# 1. Descarga y Extracción
+download_and_extract() {
+    log INFO "[INIT] Preparing temp directory..."
+    rm -rf "$TEMP_DIR"
+    mkdir -p "$TEMP_DIR"
+    
+    log INFO "[INIT] Downloading binaries and VSIX from $ZIP_URL..."
+    curl -fsSL "$ZIP_URL" -o "$TEMP_DIR/binaries.zip"
+    
+    log INFO "[INIT] Extracting files..."
+    unzip -o "$TEMP_DIR/binaries.zip" -d "$TEMP_DIR"
+    
+    if [ $? -ne 0 ]; then
+        log ERROR "[X] Failed to extract zip. Do you have 'unzip' installed?"
+        return 1
+    fi
+    return 0
+}
+
+# 2. Menú de Acción
+main_menu() {
+    echo -e "${BLUE}"
+    echo "======================================="
+    echo "  JosSecurity Action Menu"
+    echo "======================================="
+    echo -e "${NC}"
+    
+    echo ""
+    echo "Select an action:"
+    echo ""
+    echo "  [1] Install (JosSecurity Binary + Extension)"
+    echo "  [2] Update (Check and Reinstall)"
+    echo "  [3] Uninstall (Remove Binary + Extension)"
+    echo "  [0] Exit"
+    echo ""
+    read -p "Option: " option
+    
+    case $option in
+        1) # INSTALAR
+            if download_and_extract; then
+                install_jossecurity
+                install_extension
+            fi
+            ;;
+        2) # ACTUALIZAR
+            LATEST_VER=$(check_update)
+            if [ $? -eq 0 ]; then
+                log SUCCESS "Updating to v$LATEST_VER"
+                if download_and_extract; then run_update; fi
+            else
+                log WARNING "No update required."
+            fi
+            ;;
+        3) # DESINSTALAR
+            uninstall_jossecurity
+            uninstall_extension
+            ;;
+        0) log INFO "Operation cancelled."; exit 0;;
+        *) log ERROR "Invalid option"; main_menu;;
+    esac
+    
+    log INFO "Cleaning up temp directory..."
+    rm -rf "$TEMP_DIR"
+    log SUCCESS "Operation finished. Log: $LOG_FILE"
+}
+
+# Execute main logic
+main_menu

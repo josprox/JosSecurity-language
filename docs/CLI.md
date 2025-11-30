@@ -104,6 +104,10 @@ joss build
 3. Optimiza assets
 4. Genera bytecode (futuro)
 
+**Variantes**:
+- `joss build web` (default): Compila para servidor web tradicional.
+- `joss build program`: Compila un ejecutable autocontenido (Windows/Linux/Mac) con base de datos y assets encriptados.
+
 **Archivos requeridos**:
 - `main.joss`
 - `env.joss`

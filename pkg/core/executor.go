@@ -11,7 +11,7 @@ import (
 func (r *Runtime) Execute(program *parser.Program) {
 	// Ensure env is loaded
 	if len(r.Env) == 0 {
-		r.LoadEnv()
+		r.LoadEnv(nil)
 	}
 
 	// First pass: Register classes and functions
