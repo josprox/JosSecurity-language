@@ -33,11 +33,38 @@ type rateLimitEntry struct {
 }
 
 func MainHandler(w http.ResponseWriter, r *http.Request) {
+	// Request Watchdog: Log progress every second to find hangs
+	requestID := fmt.Sprintf("%s %s", r.Method, r.URL.Path)
+	requestStartTime := time.Now()
+	done := make(chan struct{})
+	go func() {
+		ticker := time.NewTicker(2 * time.Second)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ticker.C:
+				fmt.Printf("[WATCHDOG] Request %s still processing (%.0fs)...\n", requestID, time.Since(requestStartTime).Seconds())
+			case <-done:
+				return
+			}
+		}
+	}()
+	defer close(done)
+
+	// 1. Runtime Fork (Isolation)
+	// fmt.Printf("[HANDLER] %s: Forking runtime...\n", requestID)
 	mutex.RLock()
-	rt := currentRuntime
+	if currentRuntime == nil {
+		mutex.RUnlock()
+		http.Error(w, "Server starting up...", http.StatusServiceUnavailable)
+		return
+	}
+	rt := currentRuntime.Fork()
 	mutex.RUnlock()
 
-	// 0. Rate Limiting (60 req/min)
+	// rt.LoadEnv(core.GlobalFileSystem) // Fork already has Env copied
+
+	// 2. Rate Limiting (60 req/min)
 	ip := strings.Split(r.RemoteAddr, ":")[0]
 	rateLimitMu.Lock()
 	entry, exists := rateLimitStore[ip]
@@ -65,48 +92,42 @@ func MainHandler(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusInternalServerError)
 			fmt.Fprintf(w, "<h1>500 Internal Server Error</h1><p>Something went wrong.</p><pre>%v</pre>", r)
 		}
+		rt.Free() // Return to pool
 	}()
 
 	// Handle Favicon
 	if r.URL.Path == "/favicon.ico" {
-		// 1. Check for assets/logo.png
 		if _, err := os.Stat("assets/logo.png"); err == nil {
 			http.ServeFile(w, r, "assets/logo.png")
 			return
 		}
-		// 2. Check for assets/logo.ico
 		if _, err := os.Stat("assets/logo.ico"); err == nil {
 			http.ServeFile(w, r, "assets/logo.ico")
 			return
 		}
-		// 3. Fallback to embedded default
 		w.Header().Set("Content-Type", "image/png")
 		w.Header().Set("Cache-Control", "public, max-age=86400")
 		w.Write(DefaultLogo)
 		return
 	}
 
-	// 1. Parse Request Data
+	// 3. Parse Request Data
 	r.ParseMultipartForm(10 << 20) // 10MB
 	reqData := make(map[string]interface{})
-
-	// Query Params
 	for k, v := range r.URL.Query() {
 		if len(v) > 0 {
 			reqData[k] = v[0]
 		}
 	}
-	// Form Data
 	for k, v := range r.PostForm {
 		if len(v) > 0 {
 			reqData[k] = v[0]
 		}
 	}
-	// Method
 	reqData["_method"] = r.Method
 	reqData["_referer"] = r.Referer()
 
-	// 2. Session Management
+	// 4. Session Management
 	sessionID := ""
 	cookie, err := r.Cookie("joss_session")
 	if err != nil {
@@ -116,7 +137,10 @@ func MainHandler(w http.ResponseWriter, r *http.Request) {
 		sessionID = cookie.Value
 	}
 
+	// fmt.Printf("[HANDLER] %s: Acquiring session lock...\n", requestID)
 	sessionMu.Lock()
+	// fmt.Printf("[HANDLER] %s: Session lock acquired.\n", requestID)
+
 	var sessData map[string]interface{}
 	if rt.Env["SESSION_DRIVER"] == "redis" {
 		// Load from Redis
@@ -133,11 +157,17 @@ func MainHandler(w http.ResponseWriter, r *http.Request) {
 		if _, ok := sessionStore[sessionID]; !ok {
 			sessionStore[sessionID] = make(map[string]interface{})
 		}
-		sessData = sessionStore[sessionID]
+		// DEEP COPY Session Data
+		sourceMap := sessionStore[sessionID]
+		sessData = make(map[string]interface{})
+		for k, v := range sourceMap {
+			sessData[k] = v
+		}
 		sessionMu.Unlock()
 	}
+	// fmt.Printf("[HANDLER] %s: Session lock released (Load).\n", requestID)
 
-	// 3. Security Headers
+	// 5. Security Headers
 	w.Header().Set("X-Content-Type-Options", "nosniff")
 	w.Header().Set("X-Frame-Options", "DENY")
 	w.Header().Set("X-XSS-Protection", "1; mode=block")
@@ -145,18 +175,16 @@ func MainHandler(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
 	}
 
-	// 4. CSRF Protection
+	// 6. CSRF Protection
 	csrfToken := ""
 	if val, ok := sessData["csrf_token"]; ok {
 		csrfToken = val.(string)
 	} else {
-		// Generate new token
 		b := make([]byte, 32)
 		rand.Read(b)
 		csrfToken = hex.EncodeToString(b)
 		sessionMu.Lock()
 		if rt.Env["SESSION_DRIVER"] == "redis" {
-			// Update local map for this request, save later
 			sessData["csrf_token"] = csrfToken
 		} else {
 			sessionStore[sessionID]["csrf_token"] = csrfToken
@@ -165,7 +193,6 @@ func MainHandler(w http.ResponseWriter, r *http.Request) {
 		sessData["csrf_token"] = csrfToken
 	}
 
-	// Validate CSRF on state-changing methods
 	if r.Method == "POST" || r.Method == "PUT" || r.Method == "DELETE" || r.Method == "PATCH" {
 		reqToken := ""
 		if val, ok := reqData["_token"]; ok {
@@ -173,7 +200,6 @@ func MainHandler(w http.ResponseWriter, r *http.Request) {
 		} else {
 			reqToken = r.Header.Get("X-CSRF-TOKEN")
 		}
-
 		if reqToken == "" || reqToken != csrfToken {
 			w.WriteHeader(http.StatusForbidden)
 			fmt.Fprintf(w, "<h1>419 Page Expired</h1><p>CSRF token mismatch.</p>")
@@ -181,17 +207,29 @@ func MainHandler(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Dispatch
-	fmt.Printf("[DEBUG] Dispatching %s %s\n", r.Method, r.URL.Path)
+	// 7. Dispatch
+	// fmt.Printf("[DEBUG] Dispatching %s %s\n", r.Method, r.URL.Path)
 	result, err := rt.Dispatch(r.Method, r.URL.Path, reqData, sessData)
 
-	// Save Session (if Redis)
+	// 8. Save Session
 	if rt.Env["SESSION_DRIVER"] == "redis" {
 		data, _ := json.Marshal(sessData)
 		core.GlobalRedis.Set(core.Ctx, "session:"+sessionID, data, 24*time.Hour)
+	} else {
+		// Save In-Memory (Write-Back)
+		// fmt.Printf("[HANDLER] %s: Acquiring session lock for write-back...\n", requestID)
+		sessionMu.Lock()
+		if sessionStore[sessionID] == nil {
+			sessionStore[sessionID] = make(map[string]interface{})
+		}
+		for k, v := range sessData {
+			sessionStore[sessionID][k] = v
+		}
+		sessionMu.Unlock()
+		// fmt.Printf("[HANDLER] %s: Session lock released (Write-back).\n", requestID)
 	}
+
 	if err == nil {
-		fmt.Printf("[DEBUG] Dispatch success. Result type: %T\n", result)
 		// Handle Redirect (Map)
 		if resMap, ok := result.(map[string]interface{}); ok {
 			if val, ok := resMap["_type"]; ok && val == "REDIRECT" {
@@ -199,14 +237,12 @@ func MainHandler(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 		}
-		// Handle Redirect (Instance - e.g. RedirectResponse)
+		// Handle Redirect (Instance)
 		if resInst, ok := result.(*core.Instance); ok {
 			if val, ok := resInst.Fields["_type"]; ok && val == "REDIRECT" {
-				// Handle Flash Data
 				if flash, ok := resInst.Fields["flash"].(map[string]interface{}); ok {
 					sessionMu.Lock()
 					if rt.Env["SESSION_DRIVER"] == "redis" {
-						// Merge flash into sessData and save
 						for k, v := range flash {
 							sessData[k] = v
 						}
@@ -216,14 +252,12 @@ func MainHandler(w http.ResponseWriter, r *http.Request) {
 						if _, ok := sessionStore[sessionID]; !ok {
 							sessionStore[sessionID] = make(map[string]interface{})
 						}
-						// Merge flash into session
 						for k, v := range flash {
 							sessionStore[sessionID][k] = v
 						}
 					}
 					sessionMu.Unlock()
 				}
-
 				http.Redirect(w, r, resInst.Fields["url"].(string), http.StatusFound)
 				return
 			}
@@ -233,19 +267,19 @@ func MainHandler(w http.ResponseWriter, r *http.Request) {
 		if str, ok := result.(string); ok {
 			w.Header().Set("Content-Type", "text/html; charset=utf-8")
 			w.Write([]byte(str))
-			// ... hot reload script ...
-			fmt.Fprintf(w, `<script>
-				const evtSource = new EventSource("/__hot_reload");
-				evtSource.onmessage = function(event) {
-					if (event.data === "reload") {
-						console.log("Reloading...");
-						location.reload();
-					}
-				};
-			</script>`)
+			// Hot Reload Script (Disabled for debugging hangs)
+			/*
+				fmt.Fprintf(w, `<script>
+					const evtSource = new EventSource("/__hot_reload");
+					evtSource.onmessage = function(event) {
+						if (event.data === "reload") {
+							console.log("Reloading...");
+							location.reload();
+						}
+					};
+				</script>`)
+			*/
 			return
-		} else {
-			fmt.Println("[DEBUG] Result is not a string or redirect map")
 		}
 	} else {
 		fmt.Printf("[DEBUG] Dispatch error: %v\n", err)
@@ -257,17 +291,18 @@ func MainHandler(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprintf(w, "<h1>JosSecurity Server Running</h1>")
 		fmt.Fprintf(w, "<p>Environment: %s</p>", rt.Env["APP_ENV"])
 		fmt.Fprintf(w, `<link rel="stylesheet" href="/public/css/app.css">`)
-
-		// Hot Reload Script
-		fmt.Fprintf(w, `<script>
-			const evtSource = new EventSource("/__hot_reload");
-			evtSource.onmessage = function(event) {
-				if (event.data === "reload") {
-					console.log("Reloading...");
-					location.reload();
-				}
-			};
-		</script>`)
+		// Hot Reload Script (Disabled)
+		/*
+			fmt.Fprintf(w, `<script>
+				const evtSource = new EventSource("/__hot_reload");
+				evtSource.onmessage = function(event) {
+					if (event.data === "reload") {
+						console.log("Reloading...");
+						location.reload();
+					}
+				};
+			</script>`)
+		*/
 		return
 	}
 

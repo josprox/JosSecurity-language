@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/jossecurity/joss/pkg/core"
 )
@@ -31,8 +32,6 @@ func Start(fileSystem http.FileSystem) {
 	if val, ok := currentRuntime.Env["PORT"]; ok && val != "" {
 		port = val
 	}
-
-	fmt.Printf("Iniciando servidor JosSecurity en http://localhost:%s\n", port)
 
 	// Static Files
 	if GlobalFileSystem != nil {
@@ -70,8 +69,17 @@ func Start(fileSystem http.FileSystem) {
 	// Main Handler
 	http.HandleFunc("/", MainHandler)
 
-	err := http.ListenAndServe(":"+port, nil)
-	if err != nil {
+	// Start Server with Timeouts
+	srv := &http.Server{
+		Addr:         ":" + port,
+		Handler:      nil, // Use DefaultServeMux
+		ReadTimeout:  15 * time.Second,
+		WriteTimeout: 15 * time.Second,
+		IdleTimeout:  60 * time.Second,
+	}
+
+	fmt.Printf("Iniciando servidor JosSecurity en http://localhost:%s\n", port)
+	if err := srv.ListenAndServe(); err != nil {
 		fmt.Printf("Error iniciando servidor: %v\n", err)
 	}
 }

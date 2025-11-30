@@ -7,6 +7,7 @@ import (
 	"os"
 	"strings"
 	"sync"
+	"time"
 
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/jossecurity/joss/pkg/parser"
@@ -72,11 +73,53 @@ func (r *Runtime) Free() {
 	// Keep Env, Classes, Functions, Routes as they are likely static or re-loaded?
 	// If Routes are dynamic per request (e.g. defined in routes.joss which is parsed every time?), then we should clear them.
 	// But parsing every time is slow.
-	// For now, let's assume we clear Variables.
 	// We should also clear CurrentMiddleware
 	r.CurrentMiddleware = r.CurrentMiddleware[:0]
 
 	runtimePool.Put(r)
+}
+
+// Fork creates a lightweight copy of the runtime for request isolation
+func (r *Runtime) Fork() *Runtime {
+	// fmt.Println("[RUNTIME] Forking...")
+	newR := &Runtime{
+		Env:       make(map[string]string),
+		Classes:   r.Classes,   // Share Classes (Read-Only)
+		Functions: r.Functions, // Share Functions (Read-Only)
+		Routes:    make(map[string]map[string]interface{}),
+		DB:        r.DB, // Share DB Connection (Thread-Safe)
+		Variables: make(map[string]interface{}),
+		VarTypes:  make(map[string]string),
+	}
+
+	// Copy Env
+	for k, v := range r.Env {
+		newR.Env[k] = v
+	}
+
+	// Copy Routes (Deep Copy to allow dynamic route modification per request without race)
+	for method, routes := range r.Routes {
+		newR.Routes[method] = make(map[string]interface{})
+		for path, handler := range routes {
+			newR.Routes[method][path] = handler
+		}
+	}
+
+	// Initialize standard variables
+	newR.Variables["cout"] = &Cout{}
+	newR.Variables["cin"] = &Cin{}
+	newR.Variables["JOSS_VERSION"] = version.Version
+
+	// Deep Copy Global Variables (Native Instances)
+	for k, v := range r.Variables {
+		if inst, ok := v.(*Instance); ok {
+			newR.Variables[k] = inst.Clone()
+		} else {
+			newR.Variables[k] = v
+		}
+	}
+
+	return newR
 }
 
 // LoadEnv loads environment variables from env.joss
@@ -166,9 +209,32 @@ func (r *Runtime) LoadEnv(fs http.FileSystem) {
 	if err == nil {
 		// db.Ping() // Optional: don't block if DB is down
 		r.DB = db
+
+		// Optimize SQLite for Concurrency
+		if dbDriver == "sqlite" {
+			_, err := db.Exec("PRAGMA journal_mode=WAL;")
+			if err != nil {
+				fmt.Printf("[Security] Error activando WAL: %v\n", err)
+			} else {
+				fmt.Println("[Security] SQLite WAL mode activado")
+			}
+			// Set busy timeout to avoid "database is locked" errors
+			_, err = db.Exec("PRAGMA busy_timeout = 5000;")
+			if err != nil {
+				fmt.Printf("[Security] Error setting busy_timeout: %v\n", err)
+			}
+		}
+
+		r.EnsureCronTable()
+		r.EnsureMigrationTable()
 		r.EnsureCronTable()
 		r.EnsureMigrationTable()
 		r.EnsureAuthTables()
+
+		// Connection Pooling Settings
+		db.SetMaxOpenConns(25)
+		db.SetMaxIdleConns(25)
+		db.SetConnMaxLifetime(5 * time.Minute)
 	} else {
 		fmt.Printf("[Security] Error conectando a DB: %v\n", err)
 	}
@@ -180,4 +246,16 @@ func NewInstance(class *parser.ClassStatement) *Instance {
 		Class:  class,
 		Fields: make(map[string]interface{}),
 	}
+}
+
+// Clone creates a deep copy of the instance (for runtime forking)
+func (i *Instance) Clone() *Instance {
+	newI := &Instance{
+		Class:  i.Class,
+		Fields: make(map[string]interface{}),
+	}
+	for k, v := range i.Fields {
+		newI.Fields[k] = v
+	}
+	return newI
 }
