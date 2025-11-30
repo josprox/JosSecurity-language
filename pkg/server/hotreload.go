@@ -12,53 +12,51 @@ import (
 	"sync"
 	"time"
 
+	"github.com/gorilla/websocket"
 	"github.com/jossecurity/joss/pkg/core"
 	"github.com/jossecurity/joss/pkg/parser"
 )
 
 var (
-	sseClients   = make(map[chan string]bool)
-	sseClientsMu sync.Mutex
+	hotReloadUpgrader = websocket.Upgrader{
+		CheckOrigin: func(r *http.Request) bool { return true },
+	}
+	hotReloadClients   = make(map[*websocket.Conn]bool)
+	hotReloadClientsMu sync.Mutex
 )
 
-func sseHandler(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "text/event-stream")
-	w.Header().Set("Cache-Control", "no-cache")
-	w.Header().Set("Connection", "keep-alive")
-	w.Header().Set("Access-Control-Allow-Origin", "*")
+func hotReloadHandler(w http.ResponseWriter, r *http.Request) {
+	conn, err := hotReloadUpgrader.Upgrade(w, r, nil)
+	if err != nil {
+		return
+	}
 
-	clientChan := make(chan string)
-	sseClientsMu.Lock()
-	sseClients[clientChan] = true
-	sseClientsMu.Unlock()
+	hotReloadClientsMu.Lock()
+	hotReloadClients[conn] = true
+	hotReloadClientsMu.Unlock()
 
-	defer func() {
-		sseClientsMu.Lock()
-		delete(sseClients, clientChan)
-		sseClientsMu.Unlock()
-		close(clientChan)
-	}()
-
-	notify := r.Context().Done()
-
+	// Keep connection alive and handle close
 	for {
-		select {
-		case <-notify:
-			return
-		case msg := <-clientChan:
-			fmt.Fprintf(w, "data: %s\n\n", msg)
-			w.(http.Flusher).Flush()
+		_, _, err := conn.ReadMessage()
+		if err != nil {
+			hotReloadClientsMu.Lock()
+			delete(hotReloadClients, conn)
+			hotReloadClientsMu.Unlock()
+			conn.Close()
+			break
 		}
 	}
 }
 
 func notifyClients() {
-	sseClientsMu.Lock()
-	defer sseClientsMu.Unlock()
-	for client := range sseClients {
-		select {
-		case client <- "reload":
-		default:
+	hotReloadClientsMu.Lock()
+	defer hotReloadClientsMu.Unlock()
+
+	for conn := range hotReloadClients {
+		err := conn.WriteMessage(websocket.TextMessage, []byte("reload"))
+		if err != nil {
+			conn.Close()
+			delete(hotReloadClients, conn)
 		}
 	}
 }

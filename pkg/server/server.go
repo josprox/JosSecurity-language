@@ -56,8 +56,8 @@ func Start(fileSystem http.FileSystem) {
 		http.Handle("/assets/", http.StripPrefix("/assets/", fsHandler))
 	}
 
-	// SSE Endpoint for Hot Reload
-	http.HandleFunc("/__hot_reload", sseHandler)
+	// WebSocket Endpoint for Hot Reload
+	http.HandleFunc("/__hot_reload", hotReloadHandler)
 
 	// WebSocket Endpoint
 	InitWebSocket()

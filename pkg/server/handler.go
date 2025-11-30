@@ -267,18 +267,22 @@ func MainHandler(w http.ResponseWriter, r *http.Request) {
 		if str, ok := result.(string); ok {
 			w.Header().Set("Content-Type", "text/html; charset=utf-8")
 			w.Write([]byte(str))
-			// Hot Reload Script (Disabled for debugging hangs)
-			/*
-				fmt.Fprintf(w, `<script>
-					const evtSource = new EventSource("/__hot_reload");
-					evtSource.onmessage = function(event) {
-						if (event.data === "reload") {
+			// Hot Reload Script (WebSocket)
+			fmt.Fprintf(w, `<script>
+				(function() {
+					var conn = new WebSocket("ws://" + location.host + "/__hot_reload");
+					conn.onmessage = function(evt) {
+						if (evt.data === "reload") {
 							console.log("Reloading...");
 							location.reload();
 						}
 					};
-				</script>`)
-			*/
+					conn.onclose = function() {
+						console.log("Hot reload connection closed. Reconnecting in 2s...");
+						setTimeout(function() { location.reload(); }, 2000);
+					};
+				})();
+			</script>`)
 			return
 		}
 	} else {
@@ -291,18 +295,22 @@ func MainHandler(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprintf(w, "<h1>JosSecurity Server Running</h1>")
 		fmt.Fprintf(w, "<p>Environment: %s</p>", rt.Env["APP_ENV"])
 		fmt.Fprintf(w, `<link rel="stylesheet" href="/public/css/app.css">`)
-		// Hot Reload Script (Disabled)
-		/*
-			fmt.Fprintf(w, `<script>
-				const evtSource = new EventSource("/__hot_reload");
-				evtSource.onmessage = function(event) {
-					if (event.data === "reload") {
+		// Hot Reload Script (WebSocket)
+		fmt.Fprintf(w, `<script>
+			(function() {
+				var conn = new WebSocket("ws://" + location.host + "/__hot_reload");
+				conn.onmessage = function(evt) {
+					if (evt.data === "reload") {
 						console.log("Reloading...");
 						location.reload();
 					}
 				};
-			</script>`)
-		*/
+				conn.onclose = function() {
+					console.log("Hot reload connection closed. Reconnecting in 2s...");
+					setTimeout(function() { location.reload(); }, 2000);
+				};
+			})();
+		</script>`)
 		return
 	}
 
