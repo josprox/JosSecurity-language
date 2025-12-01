@@ -171,6 +171,19 @@ joss change db mysql
 - `mysql` - MySQL/MariaDB
 - `sqlite` - SQLite (archivo local)
 
+### `joss change db prefix [nuevo_prefijo]`
+
+Cambia el prefijo de todas las tablas en la base de datos y actualiza `env.joss`.
+
+```bash
+joss change db prefix app_
+```
+
+**Proceso**:
+1. Actualiza `PREFIX` en `env.joss`.
+2. Renombra todas las tablas existentes que usaban el prefijo anterior.
+3. Las futuras migraciones y operaciones usarán el nuevo prefijo.
+
 ---
 
 ## Generadores

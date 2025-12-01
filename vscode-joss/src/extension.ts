@@ -6,6 +6,7 @@ import {
     ServerOptions,
     TransportKind
 } from 'vscode-languageclient/node';
+import * as cp from 'child_process';
 
 let client: LanguageClient;
 
@@ -185,6 +186,47 @@ function registerCommands(context: vscode.ExtensionContext) {
             await client.stop();
             client.start();
             vscode.window.showInformationMessage('Language server restarted');
+        })
+    );
+
+    // Change DB Prefix
+    context.subscriptions.push(
+        vscode.commands.registerCommand('joss.changeDbPrefix', async () => {
+            const prefix = await vscode.window.showInputBox({
+                prompt: 'Enter new database prefix (e.g., app_)',
+                placeHolder: 'app_',
+                validateInput: (value) => {
+                    if (!value) return 'Prefix is required';
+                    return null;
+                }
+            });
+
+            if (prefix) {
+                const workspaceFolders = vscode.workspace.workspaceFolders;
+                if (!workspaceFolders) {
+                    vscode.window.showErrorMessage('No workspace open');
+                    return;
+                }
+                const rootPath = workspaceFolders[0].uri.fsPath;
+
+                vscode.window.withProgress({
+                    location: vscode.ProgressLocation.Notification,
+                    title: `Changing DB prefix to '${prefix}'...`,
+                    cancellable: false
+                }, async (progress) => {
+                    return new Promise<void>((resolve, reject) => {
+                        cp.exec(`joss change db prefix ${prefix}`, { cwd: rootPath }, (err, stdout, stderr) => {
+                            if (err) {
+                                vscode.window.showErrorMessage(`Failed to change prefix: ${stderr || err.message}`);
+                                resolve();
+                            } else {
+                                vscode.window.showInformationMessage(`Database prefix changed to '${prefix}' successfully!`);
+                                resolve();
+                            }
+                        });
+                    });
+                });
+            }
         })
     );
 }

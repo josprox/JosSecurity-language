@@ -48,7 +48,7 @@ DB_PATH="database.sqlite"
 # DB_PASS=""
 
 # Database Table Prefix
-DB_PREFIX="js_"
+PREFIX="js_"
 
 # Application Settings
 APP_NAME="JosSecurity Console App"

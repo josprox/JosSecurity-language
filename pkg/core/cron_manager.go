@@ -4,14 +4,20 @@ import (
 	"fmt"
 )
 
-// EnsureCronTable creates the js_cron table if it doesn't exist
+// EnsureCronTable creates the cron table if it doesn't exist
 func (r *Runtime) EnsureCronTable() {
 	if r.DB == nil {
 		return
 	}
 
-	query := `
-	CREATE TABLE IF NOT EXISTS js_cron (
+	prefix := "js_"
+	if val, ok := r.Env["PREFIX"]; ok {
+		prefix = val
+	}
+	tableName := prefix + "cron"
+
+	query := fmt.Sprintf(`
+	CREATE TABLE IF NOT EXISTS %s (
 		id INTEGER PRIMARY KEY AUTOINCREMENT,
 		name VARCHAR(255) NOT NULL UNIQUE,
 		schedule VARCHAR(255) NOT NULL,
@@ -19,7 +25,7 @@ func (r *Runtime) EnsureCronTable() {
 		is_running BOOLEAN DEFAULT 0,
 		status VARCHAR(50)
 	);
-	`
+	`, tableName)
 	// Adjust for MySQL if needed (AUTOINCREMENT vs AUTO_INCREMENT)
 	// But since we want to support both, we need to check driver or use compatible SQL.
 	// SQLite uses AUTOINCREMENT (with INTEGER PRIMARY KEY), MySQL uses AUTO_INCREMENT.
@@ -36,8 +42,8 @@ func (r *Runtime) EnsureCronTable() {
 	}
 
 	if dbDriver == "mysql" {
-		query = `
-		CREATE TABLE IF NOT EXISTS js_cron (
+		query = fmt.Sprintf(`
+		CREATE TABLE IF NOT EXISTS %s (
 			id INT AUTO_INCREMENT PRIMARY KEY,
 			name VARCHAR(255) NOT NULL UNIQUE,
 			schedule VARCHAR(255) NOT NULL,
@@ -45,11 +51,11 @@ func (r *Runtime) EnsureCronTable() {
 			is_running BOOLEAN DEFAULT 0,
 			status VARCHAR(50)
 		);
-		`
+		`, tableName)
 	}
 
 	_, err := r.DB.Exec(query)
 	if err != nil {
-		fmt.Printf("[Cron] Error creando tabla js_cron: %v\n", err)
+		fmt.Printf("[Cron] Error creando tabla %s: %v\n", tableName, err)
 	}
 }

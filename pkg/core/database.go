@@ -9,7 +9,10 @@ import (
 
 // Helper to get table prefix
 func getTablePrefix() string {
-	prefix := os.Getenv("DB_PREFIX")
+	prefix := os.Getenv("PREFIX")
+	if prefix == "" {
+		prefix = os.Getenv("DB_PREFIX")
+	}
 	if prefix == "" {
 		return "js_"
 	}
@@ -31,7 +34,10 @@ func (r *Runtime) executeGranMySQLMethod(instance *Instance, method string, args
 		if len(args) > 0 {
 			tableName := args[0].(string)
 			// Apply prefix if not already present (and not a raw query)
-			prefix := getTablePrefix()
+			prefix := "js_"
+			if val, ok := r.Env["PREFIX"]; ok {
+				prefix = val
+			}
 			if !strings.HasPrefix(tableName, prefix) {
 				tableName = prefix + tableName
 			}
@@ -365,7 +371,11 @@ func (r *Runtime) getTable(instance *Instance) string {
 	}
 
 	// Simple pluralization and snake_case
-	tableName := "js_" + strings.ToLower(className) + "s"
+	prefix := "js_"
+	if val, ok := r.Env["PREFIX"]; ok {
+		prefix = val
+	}
+	tableName := prefix + strings.ToLower(className) + "s"
 
 	// Sync to _table
 	instance.Fields["_table"] = tableName

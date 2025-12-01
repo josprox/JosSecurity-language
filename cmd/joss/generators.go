@@ -48,7 +48,8 @@ func createModel(name string) {
 	path := filepath.Join("app", "models", name+".joss")
 	os.MkdirAll(filepath.Dir(path), 0755)
 
-	tableName := "js_" + strings.ToLower(pluralize(name)) // Plural convention
+	_, _, _, _, _, _, prefix := loadEnvConfig()
+	tableName := prefix + strings.ToLower(pluralize(name)) // Plural convention
 
 	content := fmt.Sprintf(`class %s extends GranDB {
     function constructor() {
@@ -106,7 +107,7 @@ func createCRUD(tableName string) {
 	fmt.Printf("Generating CRUD for table '%s'...\n", tableName)
 
 	// 1. Connect to DB
-	dbType, dbPath, dbHost, dbUser, dbPass, dbName := loadEnvConfig()
+	dbType, dbPath, dbHost, dbUser, dbPass, dbName, prefix := loadEnvConfig()
 
 	var db *sql.DB
 	var err error
@@ -131,9 +132,9 @@ func createCRUD(tableName string) {
 		return
 	}
 
-	// If table not found and doesn't start with js_, try adding prefix
-	if len(cols) == 0 && !strings.HasPrefix(tableName, "js_") {
-		prefixedName := "js_" + tableName
+	// If table not found and doesn't start with prefix, try adding prefix
+	if len(cols) == 0 && !strings.HasPrefix(tableName, prefix) {
+		prefixedName := prefix + tableName
 		fmt.Printf("Table '%s' not found. Trying '%s'...\n", tableName, prefixedName)
 		cols, err = getColumns(db, dbType, prefixedName)
 		if err != nil {
@@ -158,7 +159,8 @@ func createCRUD(tableName string) {
 			fmt.Printf("  -> Found relation for %s\n", c.Name)
 			// Infer relation
 			baseName := strings.TrimSuffix(c.Name, "_id")
-			relatedTable := "js_" + strings.ToLower(pluralize(baseName)) // Convention: js_users
+			_, _, _, _, _, _, prefix := loadEnvConfig()
+			relatedTable := prefix + strings.ToLower(pluralize(baseName)) // Convention: js_users
 
 			// Smartly detect display column
 			displayCol := getDisplayColumn(db, dbType, relatedTable)
@@ -177,9 +179,7 @@ func createCRUD(tableName string) {
 	// 4. Generate Artifacts
 	// Model
 	modelName := snakeToCamel(tableName)
-	if strings.HasPrefix(modelName, "Js") {
-		modelName = modelName[2:]
-	}
+	modelName = strings.TrimPrefix(modelName, "Js")
 	// Use singularize helper
 	modelName = singularize(modelName)
 
@@ -189,9 +189,7 @@ func createCRUD(tableName string) {
 	// Auto-create related models
 	for _, rel := range relations {
 		relModelName := snakeToCamel(rel.Table)
-		if strings.HasPrefix(relModelName, "Js") {
-			relModelName = relModelName[2:]
-		}
+		relModelName = strings.TrimPrefix(relModelName, "Js")
 		relModelName = singularize(relModelName)
 
 		path := filepath.Join("app", "models", relModelName+".joss")
@@ -253,9 +251,7 @@ func createCRUDController(modelName, tableName string, cols []ColumnSchema, rela
 		for _, rel := range relations {
 			// Derive model name from table: js_roles -> Role
 			relModel := snakeToCamel(rel.Table)
-			if strings.HasPrefix(relModel, "Js") {
-				relModel = relModel[2:]
-			}
+			relModel = strings.TrimPrefix(relModel, "Js")
 			relModel = singularize(relModel)
 			varName := strings.ToLower(pluralize(relModel)) // roles
 			createLogic += fmt.Sprintf("\n        $%sModel = new %s()", strings.ToLower(relModel), relModel)
@@ -410,9 +406,7 @@ func createCRUDViews(modelName string, cols []ColumnSchema, relations []Relation
 		if isRelation {
 			// Derive variable name: js_roles -> roles
 			relModel := snakeToCamel(relData.Table)
-			if strings.HasPrefix(relModel, "Js") {
-				relModel = relModel[2:]
-			}
+			relModel = strings.TrimPrefix(relModel, "Js")
 			relModel = singularize(relModel)
 			varName := strings.ToLower(pluralize(relModel))
 
@@ -481,9 +475,7 @@ func createCRUDViews(modelName string, cols []ColumnSchema, relations []Relation
 		if isRelation {
 			// Derive variable name: js_roles -> roles
 			relModel := snakeToCamel(relData.Table)
-			if strings.HasPrefix(relModel, "Js") {
-				relModel = relModel[2:]
-			}
+			relModel = strings.TrimPrefix(relModel, "Js")
 			relModel = singularize(relModel)
 			varName := strings.ToLower(pluralize(relModel))
 
@@ -555,7 +547,7 @@ func getColumns(db *sql.DB, dbType, tableName string) ([]ColumnSchema, error) {
 	return cols, nil
 }
 
-func loadEnvConfig() (string, string, string, string, string, string) {
+func loadEnvConfig() (string, string, string, string, string, string, string) {
 	// Simple parser for env.joss
 	content, _ := ioutil.ReadFile("env.joss")
 	lines := strings.Split(string(content), "\n")
@@ -569,7 +561,13 @@ func loadEnvConfig() (string, string, string, string, string, string) {
 			config[key] = val
 		}
 	}
-	return config["DB"], config["DB_PATH"], config["DB_HOST"], config["DB_USER"], config["DB_PASS"], config["DB_NAME"]
+
+	prefix := config["PREFIX"]
+	if prefix == "" {
+		prefix = "js_" // Default
+	}
+
+	return config["DB"], config["DB_PATH"], config["DB_HOST"], config["DB_USER"], config["DB_PASS"], config["DB_NAME"], prefix
 }
 
 func updateNavbar(modelName string) {
@@ -668,9 +666,11 @@ func createMigration(name string) {
 	path := filepath.Join("app", "database", "migrations", filename)
 	os.MkdirAll(filepath.Dir(path), 0755)
 
+	_, _, _, _, _, _, prefix := loadEnvConfig()
+
 	tableName := name
-	if !strings.HasPrefix(tableName, "js_") {
-		tableName = "js_" + tableName
+	if !strings.HasPrefix(tableName, prefix) {
+		tableName = prefix + tableName
 	}
 
 	content := fmt.Sprintf(`// Migration: %s
@@ -726,9 +726,7 @@ func removeCRUD(tableName string) {
 
 	// 1. Infer Model Name
 	modelName := snakeToCamel(tableName)
-	if strings.HasPrefix(modelName, "Js") {
-		modelName = modelName[2:]
-	}
+	modelName = strings.TrimPrefix(modelName, "Js")
 	modelName = singularize(modelName)
 
 	fmt.Printf("Inferred Model Name: %s\n", modelName)

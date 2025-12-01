@@ -134,7 +134,7 @@
       "patterns": [
         {
           "name": "entity.name.function.joss",
-          "match": "\\b(print|echo|printf|env|isset|empty|len|count|async|await)\\b"
+          "match": "\\b(print|echo|printf|env|isset|empty|len|count|async|await|toon_encode|toon_decode|toon_verify|json_encode|json_decode|json_verify|make_chan|close|send|recv|keys|values|redirect)\\b"
         },
         {
           "name": "support.function.joss",
@@ -146,7 +146,7 @@
       "patterns": [
         {
           "name": "entity.name.type.class.joss",
-          "match": "\\b(Auth|GranMySQL|Stack|Queue|Main|Security|Server|Log|Task|Router|SmtpClient|View|Request|Response|Cron|Session|Redirect)\\b"
+          "match": "\\b(Auth|GranMySQL|GranDB|Stack|Queue|Main|Security|Server|Log|Task|Router|SmtpClient|View|Request|Response|Cron|Session|Redirect|RedirectResponse|WebSocket|Schema|Blueprint|Redis)\\b"
         },
         {
           "name": "support.class.joss",

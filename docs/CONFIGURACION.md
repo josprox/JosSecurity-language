@@ -324,6 +324,8 @@ miapp_roles
 miapp_posts
 ```
 
+**Nota**: Se recomienda usar el comando `joss change db prefix [nuevo_prefijo]` para realizar este cambio, ya que también renombrará las tablas existentes en la base de datos.
+
 ---
 
 ## Entornos

@@ -16,13 +16,19 @@ func (r *Runtime) executeCronMethod(instance *Instance, method string, args []in
 
 			// 1. Register/Update Task in DB
 			if r.DB != nil {
+				prefix := "js_"
+				if val, ok := r.Env["PREFIX"]; ok {
+					prefix = val
+				}
+				tableName := prefix + "cron"
+
 				// Check if exists
 				var id int
-				err := r.DB.QueryRow("SELECT id FROM js_cron WHERE name = ?", name).Scan(&id)
+				err := r.DB.QueryRow(fmt.Sprintf("SELECT id FROM %s WHERE name = ?", tableName), name).Scan(&id)
 				if err == sql.ErrNoRows {
-					_, err = r.DB.Exec("INSERT INTO js_cron (name, schedule, status) VALUES (?, ?, 'idle')", name, schedule)
+					_, err = r.DB.Exec(fmt.Sprintf("INSERT INTO %s (name, schedule, status) VALUES (?, ?, 'idle')", tableName), name, schedule)
 				} else if err == nil {
-					_, err = r.DB.Exec("UPDATE js_cron SET schedule = ? WHERE id = ?", schedule, id)
+					_, err = r.DB.Exec(fmt.Sprintf("UPDATE %s SET schedule = ? WHERE id = ?", tableName), schedule, id)
 				}
 				if err != nil {
 					fmt.Printf("[Cron] Error registrando tarea %s: %v\n", name, err)
@@ -32,15 +38,21 @@ func (r *Runtime) executeCronMethod(instance *Instance, method string, args []in
 			if block, ok := args[2].(*parser.BlockStatement); ok {
 				// 2. Check if we should run (Locking)
 				if r.DB != nil {
+					prefix := "js_"
+					if val, ok := r.Env["PREFIX"]; ok {
+						prefix = val
+					}
+					tableName := prefix + "cron"
+
 					var isRunning bool
-					err := r.DB.QueryRow("SELECT is_running FROM js_cron WHERE name = ?", name).Scan(&isRunning)
+					err := r.DB.QueryRow(fmt.Sprintf("SELECT is_running FROM %s WHERE name = ?", tableName), name).Scan(&isRunning)
 					if err == nil && isRunning {
 						fmt.Printf("[Cron] Tarea '%s' ya está en ejecución. Saltando.\n", name)
 						return nil
 					}
 
 					// Lock
-					_, err = r.DB.Exec("UPDATE js_cron SET is_running = 1, status = 'running' WHERE name = ?", name)
+					_, err = r.DB.Exec(fmt.Sprintf("UPDATE %s SET is_running = 1, status = 'running' WHERE name = ?", tableName), name)
 					if err != nil {
 						fmt.Printf("[Cron] Error bloqueando tarea %s: %v\n", name, err)
 						return nil
@@ -52,14 +64,20 @@ func (r *Runtime) executeCronMethod(instance *Instance, method string, args []in
 				// Execute in goroutine
 				go func() {
 					defer func() {
+						prefix := "js_"
+						if val, ok := r.Env["PREFIX"]; ok {
+							prefix = val
+						}
+						tableName := prefix + "cron"
+
 						if rec := recover(); rec != nil {
 							fmt.Printf("[Cron] Error en tarea %s: %v\n", name, rec)
 							if r.DB != nil {
-								r.DB.Exec("UPDATE js_cron SET is_running = 0, status = 'error', last_run_at = CURRENT_TIMESTAMP WHERE name = ?", name)
+								r.DB.Exec(fmt.Sprintf("UPDATE %s SET is_running = 0, status = 'error', last_run_at = CURRENT_TIMESTAMP WHERE name = ?", tableName), name)
 							}
 						} else {
 							if r.DB != nil {
-								r.DB.Exec("UPDATE js_cron SET is_running = 0, status = 'completed', last_run_at = CURRENT_TIMESTAMP WHERE name = ?", name)
+								r.DB.Exec(fmt.Sprintf("UPDATE %s SET is_running = 0, status = 'completed', last_run_at = CURRENT_TIMESTAMP WHERE name = ?", tableName), name)
 							}
 						}
 					}()

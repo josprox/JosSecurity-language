@@ -148,11 +148,21 @@ func main() {
 		fmt.Printf("JosSecurity v%s (Gold Master)\n", version.Version)
 	case "change":
 		if len(os.Args) < 4 || os.Args[2] != "db" {
-			fmt.Println("Uso: joss change db [motor]")
+			fmt.Println("Uso: joss change db [motor] o joss change db prefix [nuevo_prefijo]")
 			return
 		}
-		targetEngine := os.Args[3]
-		changeDatabaseEngine(targetEngine)
+
+		if os.Args[3] == "prefix" {
+			if len(os.Args) < 5 {
+				fmt.Println("Uso: joss change db prefix [nuevo_prefijo]")
+				return
+			}
+			newPrefix := os.Args[4]
+			changeDatabasePrefix(newPrefix)
+		} else {
+			targetEngine := os.Args[3]
+			changeDatabaseEngine(targetEngine)
+		}
 	case "help":
 		printHelp()
 	default:

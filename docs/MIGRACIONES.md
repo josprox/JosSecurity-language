@@ -200,7 +200,7 @@ joss make:crud js_products
 2. **Siempre usa `timestamps()`** - Facilita auditoría
 3. **Nombra las migraciones descriptivamente** - `create_products`, no `migration1`
 4. **Usa `migrate:fresh` solo en desarrollo** - Elimina todos los datos
-5. **Prefija tablas con `js_`** - Evita conflictos (automático)
+5. **Prefija tablas con `js_`** - O usa `joss change db prefix` para personalizarlo.
 
 ---
 

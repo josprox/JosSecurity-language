@@ -10,7 +10,10 @@ func (r *Runtime) EnsureAuthTables() {
 		return
 	}
 
-	prefix := getTablePrefix()
+	prefix := "js_"
+	if val, ok := r.Env["PREFIX"]; ok {
+		prefix = val
+	}
 	rolesTable := prefix + "roles"
 	usersTable := prefix + "users"
 

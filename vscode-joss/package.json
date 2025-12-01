@@ -2,7 +2,7 @@
   "name": "joss-language",
   "displayName": "JosSecurity Language Support",
   "description": "Advanced language support for JosSecurity with LSP, go-to-definition, hover, diagnostics, and security analysis",
-  "version": "3.0.1",
+  "version": "3.0.2",
   "icon": "images/icon.png",
   "publisher": "jossecurity",
   "engines": {
@@ -110,6 +110,10 @@
       {
         "command": "joss.serverStart",
         "title": "Joss: Start Server"
+      },
+      {
+        "command": "joss.changeDbPrefix",
+        "title": "Joss: Change DB Prefix"
       }
     ],
     "configuration": {

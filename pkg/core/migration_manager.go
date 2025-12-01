@@ -5,20 +5,26 @@ import (
 	"fmt"
 )
 
-// EnsureMigrationTable creates the js_migration table if it doesn't exist
+// EnsureMigrationTable creates the migration table if it doesn't exist
 func (r *Runtime) EnsureMigrationTable() {
 	if r.DB == nil {
 		return
 	}
 
-	query := `
-	CREATE TABLE IF NOT EXISTS js_migration (
+	prefix := "js_"
+	if val, ok := r.Env["PREFIX"]; ok {
+		prefix = val
+	}
+	tableName := prefix + "migration"
+
+	query := fmt.Sprintf(`
+	CREATE TABLE IF NOT EXISTS %s (
 		id INTEGER PRIMARY KEY AUTOINCREMENT,
 		migration VARCHAR(255) NOT NULL,
 		batch INTEGER NOT NULL,
 		executed_at DATETIME DEFAULT CURRENT_TIMESTAMP
 	);
-	`
+	`, tableName)
 
 	dbDriver := "mysql"
 	if val, ok := r.Env["DB"]; ok {
@@ -26,19 +32,19 @@ func (r *Runtime) EnsureMigrationTable() {
 	}
 
 	if dbDriver == "mysql" {
-		query = `
-		CREATE TABLE IF NOT EXISTS js_migration (
+		query = fmt.Sprintf(`
+		CREATE TABLE IF NOT EXISTS %s (
 			id INT AUTO_INCREMENT PRIMARY KEY,
 			migration VARCHAR(255) NOT NULL,
 			batch INT NOT NULL,
 			executed_at DATETIME DEFAULT CURRENT_TIMESTAMP
 		);
-		`
+		`, tableName)
 	}
 
 	_, err := r.DB.Exec(query)
 	if err != nil {
-		fmt.Printf("[Migration] Error creando tabla js_migration: %v\n", err)
+		fmt.Printf("[Migration] Error creando tabla %s: %v\n", tableName, err)
 	}
 }
 
@@ -49,7 +55,13 @@ func (r *Runtime) GetExecutedMigrations() map[string]bool {
 		return executed
 	}
 
-	rows, err := r.DB.Query("SELECT migration FROM js_migration")
+	prefix := "js_"
+	if val, ok := r.Env["PREFIX"]; ok {
+		prefix = val
+	}
+	tableName := prefix + "migration"
+
+	rows, err := r.DB.Query(fmt.Sprintf("SELECT migration FROM %s", tableName))
 	if err != nil {
 		return executed
 	}
@@ -69,8 +81,15 @@ func (r *Runtime) GetNextBatch() int {
 	if r.DB == nil {
 		return 1
 	}
+
+	prefix := "js_"
+	if val, ok := r.Env["PREFIX"]; ok {
+		prefix = val
+	}
+	tableName := prefix + "migration"
+
 	var maxBatch sql.NullInt64
-	err := r.DB.QueryRow("SELECT MAX(batch) FROM js_migration").Scan(&maxBatch)
+	err := r.DB.QueryRow(fmt.Sprintf("SELECT MAX(batch) FROM %s", tableName)).Scan(&maxBatch)
 	if err != nil {
 		return 1
 	}
@@ -85,7 +104,14 @@ func (r *Runtime) LogMigration(migration string, batch int) {
 	if r.DB == nil {
 		return
 	}
-	_, err := r.DB.Exec("INSERT INTO js_migration (migration, batch) VALUES (?, ?)", migration, batch)
+
+	prefix := "js_"
+	if val, ok := r.Env["PREFIX"]; ok {
+		prefix = val
+	}
+	tableName := prefix + "migration"
+
+	_, err := r.DB.Exec(fmt.Sprintf("INSERT INTO %s (migration, batch) VALUES (?, ?)", tableName), migration, batch)
 	if err != nil {
 		fmt.Printf("[Migration] Error registrando migración %s: %v\n", migration, err)
 	}

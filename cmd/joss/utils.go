@@ -59,6 +59,7 @@ func printHelp() {
 	fmt.Println("  migrate:fresh           - Elimina todas las tablas y re-ejecuta migraciones")
 	fmt.Println("  new [web|console] [path]- Crea un nuevo proyecto")
 	fmt.Println("  change db [motor]       - Cambia el motor de base de datos (mysql/sqlite)")
+	fmt.Println("  change db prefix [pref] - Cambia el prefijo de las tablas")
 	fmt.Println("  version                 - Muestra la versión actual")
 	fmt.Println("  help                    - Muestra esta ayuda")
 }

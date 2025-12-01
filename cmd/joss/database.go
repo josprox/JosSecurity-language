@@ -73,7 +73,12 @@ func changeDatabaseEngine(target string) {
 
 	// 5. Migrate Data
 	for _, table := range tables {
-		if table == "sqlite_sequence" || table == "js_migration" || table == "js_cron" {
+		prefix := "js_"
+		if val, ok := envMap["PREFIX"]; ok {
+			prefix = val
+		}
+
+		if table == "sqlite_sequence" || table == prefix+"migration" || table == prefix+"cron" {
 			continue
 		}
 
@@ -172,4 +177,68 @@ func getTables(db *sql.DB, driver string) ([]string, error) {
 		tables = append(tables, table)
 	}
 	return tables, nil
+}
+
+func changeDatabasePrefix(newPrefix string) {
+	fmt.Printf("Cambiando prefijo de base de datos a: %s\n", newPrefix)
+
+	// 1. Read current env
+	envMap := readEnvFile("env.joss")
+	currentPrefix := envMap["PREFIX"]
+	if currentPrefix == "" {
+		currentPrefix = "js_" // Default
+	}
+
+	if currentPrefix == newPrefix {
+		fmt.Println("El prefijo ya es " + newPrefix)
+		return
+	}
+
+	// 2. Connect to DB
+	dbDriver := envMap["DB"]
+	if dbDriver == "" {
+		dbDriver = "mysql" // Default
+	}
+
+	db, err := connectToDB(dbDriver, envMap)
+	if err != nil {
+		fmt.Printf("Error conectando a DB: %v\n", err)
+		return
+	}
+	defer db.Close()
+
+	// 3. Get Tables
+	tables, err := getTables(db, dbDriver)
+	if err != nil {
+		fmt.Printf("Error obteniendo tablas: %v\n", err)
+		return
+	}
+
+	// 4. Rename Tables
+	count := 0
+	for _, table := range tables {
+		if strings.HasPrefix(table, currentPrefix) {
+			newTableName := strings.Replace(table, currentPrefix, newPrefix, 1)
+			fmt.Printf("Renombrando %s a %s... ", table, newTableName)
+
+			var query string
+			if dbDriver == "sqlite" {
+				query = fmt.Sprintf("ALTER TABLE %s RENAME TO %s", table, newTableName)
+			} else {
+				query = fmt.Sprintf("RENAME TABLE %s TO %s", table, newTableName)
+			}
+
+			_, err := db.Exec(query)
+			if err != nil {
+				fmt.Printf("Error: %v\n", err)
+			} else {
+				fmt.Println("OK")
+				count++
+			}
+		}
+	}
+
+	// 5. Update env.joss
+	updateEnvFile("env.joss", "PREFIX", newPrefix)
+	fmt.Printf("Prefijo actualizado. %d tablas renombradas.\n", count)
 }

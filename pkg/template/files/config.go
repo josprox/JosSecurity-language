@@ -33,6 +33,9 @@ DB_PASS=""
 # REDIS_HOST="localhost:6379"
 # REDIS_PASSWORD=""
 
+# Database Table Prefix
+PREFIX="js_"
+
 JWT_SECRET="change_me_in_production"`,
 		filepath.Join(path, "config", "reglas.joss"): fmt.Sprintf(`// Constantes Globales
 const string APP_NAME = "JosSecurity Enterprise"
