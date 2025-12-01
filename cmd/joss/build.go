@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"crypto/rand"
+	"encoding/binary"
 	"encoding/gob"
 	"fmt"
 	"io"
@@ -11,110 +12,13 @@ import (
 	"os/exec"
 	"path/filepath"
 
-	"github.com/jossecurity/joss/pkg/crypto"
-)
-
-const runnerSource = `package main
-
-import (
-	"bytes"
-	"encoding/gob"
-	"encoding/hex"
-	"log"
-	"net"
-	"os"
-	"path/filepath"
-	"time"
-
-	"github.com/jchv/go-webview2"
-	"github.com/jossecurity/joss/pkg/crypto"
-	"github.com/jossecurity/joss/pkg/server"
-	"github.com/jossecurity/joss/pkg/vfs"
-
 	_ "embed"
+
+	"github.com/jossecurity/joss/pkg/crypto"
 )
 
-//go:embed assets.bin
-var encryptedAssets []byte
-
-// This variable is injected at build time via string replacement
-const BuildKey = "BUILD_KEY_PLACEHOLDER"
-
-func main() {
-	// 1. Setup Logging to error.log
-	setupLogging()
-
-	// 2. Decrypt Assets
-	if BuildKey == "BUILD_KEY_PLACEHOLDER" {
-		log.Fatal("BuildKey not injected")
-	}
-
-	obfuscatedKey, err := hex.DecodeString(BuildKey)
-	if err != nil {
-		log.Fatalf("Error decoding BuildKey: %v", err)
-	}
-
-	key := crypto.DeobfuscateKey(obfuscatedKey) 
-
-	decryptedData, err := crypto.DecryptAES(encryptedAssets, key)
-	if err != nil {
-		log.Fatalf("Error decrypting assets: %v", err)
-	}
-
-	// 3. Hydrate VFS
-	var files map[string][]byte
-	decDecoder := gob.NewDecoder(bytes.NewReader(decryptedData))
-	if err := decDecoder.Decode(&files); err != nil {
-		log.Fatalf("Error decoding assets: %v", err)
-	}
-
-	memFS := vfs.NewMemFS()
-	memFS.Files = files
-
-	// 4. Start Server with VFS
-	go func() {
-		server.Start(memFS)
-	}()
-
-	// 5. Wait for Server
-	waitForServer("localhost:8000")
-
-	// 6. Launch WebView
-	w := webview2.New(true)
-	if w == nil {
-		log.Fatal("Failed to load WebView2.")
-	}
-	defer w.Destroy()
-
-	w.SetTitle("JosSecurity App")
-	w.SetSize(1024, 768, webview2.HintNone)
-	w.Navigate("http://localhost:8000")
-	w.Run()
-}
-
-func setupLogging() {
-	exePath, err := os.Executable()
-	if err != nil {
-		exePath = "."
-	}
-	dir := filepath.Dir(exePath)
-	logFile, err := os.OpenFile(filepath.Join(dir, "error.log"), os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
-	if err == nil {
-		log.SetOutput(logFile)
-	}
-}
-
-func waitForServer(address string) {
-	for i := 0; i < 30; i++ {
-		conn, err := net.DialTimeout("tcp", address, 1*time.Second)
-		if err == nil {
-			conn.Close()
-			return
-		}
-		time.Sleep(200 * time.Millisecond)
-	}
-}
-`
+//go:embed runner_windows.exe
+var runnerWindows []byte
 
 func buildWeb() {
 	fmt.Println("Iniciando compilación WEB de JosSecurity...")
@@ -149,39 +53,23 @@ func buildProgram() {
 	// 1. Ask for Target OS
 	fmt.Println("Seleccione el sistema operativo destino:")
 	fmt.Println("1. Windows")
-	fmt.Println("2. Linux")
-	fmt.Println("3. MacOS")
 	fmt.Print("Opción: ")
 
 	var option string
 	fmt.Scanln(&option)
 
-	goos := "windows"
-	ext := ".exe"
-
-	switch option {
-	case "1", "windows":
-		goos = "windows"
-		ext = ".exe"
-	case "2", "linux":
-		goos = "linux"
-		ext = ""
-	case "3", "macos", "darwin":
-		goos = "darwin"
-		ext = ""
-	default:
-		fmt.Println("Opción inválida. Usando Windows por defecto.")
+	if option != "1" && option != "windows" {
+		fmt.Println("Solo Windows es soportado en esta versión pre-compilada.")
+		return
 	}
 
-	fmt.Printf("Compilando para %s...\n", goos)
+	fmt.Println("Compilando para Windows...")
 
 	// 2. Prepare Build Directory
 	buildDir := "build"
-	tempDir := filepath.Join(buildDir, "temp")
 	os.RemoveAll(buildDir)
 	os.MkdirAll(filepath.Join(buildDir, "data"), 0755)
 	os.MkdirAll(filepath.Join(buildDir, "Storage"), 0755)
-	os.MkdirAll(tempDir, 0755)
 
 	// 3. Encrypt Assets
 	fmt.Println("Encriptando y empaquetando assets...")
@@ -211,12 +99,8 @@ func buildProgram() {
 	rootFiles := []string{"main.joss", "api.joss", "routes.joss", "env.joss"}
 	for _, f := range rootFiles {
 		if data, err := ioutil.ReadFile(f); err == nil {
-			// If it's env.joss and we are building a program with a database,
-			// we need to update the DB_PATH to point to the Storage folder.
 			if f == "env.joss" {
 				if _, err := os.Stat("database.sqlite"); err == nil {
-					// Append the override
-					// We use a newline to ensure it's on a new line
 					override := "\nDB_PATH=\"Storage/database.sqlite\""
 					data = append(data, []byte(override)...)
 					fmt.Println("Inyectando configuración DB_PATH=\"Storage/database.sqlite\" en env.joss embebido...")
@@ -239,81 +123,62 @@ func buildProgram() {
 		return
 	}
 
-	// Write assets.bin to temp dir
-	if err := ioutil.WriteFile(filepath.Join(tempDir, "assets.bin"), encryptedAssets, 0644); err != nil {
-		fmt.Printf("Error escribiendo assets.bin: %v\n", err)
-		return
-	}
+	// 4. Create Final Executable
+	// Layout: [Runner] [Encrypted Assets] [Key 32] [Len 8] [Magic 16]
 
-	// Prepare Runner Source with Injected Key
-	obfuscatedKey := crypto.ObfuscateKey(buildKey)
-	hexKey := fmt.Sprintf("%x", obfuscatedKey)
-
-	// Inject Key via String Replacement
-	finalRunnerSource := bytes.Replace([]byte(runnerSource), []byte("BUILD_KEY_PLACEHOLDER"), []byte(hexKey), 1)
-
-	// Write main.go (runner) to temp dir
-	if err := ioutil.WriteFile(filepath.Join(tempDir, "main.go"), finalRunnerSource, 0644); err != nil {
-		fmt.Printf("Error escribiendo main.go: %v\n", err)
-		return
-	}
-
-	// 4. Initialize Go Module in temp dir
-	fmt.Println("Inicializando entorno de compilación...")
-	runCmd(tempDir, "go", "mod", "init", "runner")
-
-	// If we are in the JosSecurity repo (dev mode), replace the dependency
-	if _, err := os.Stat("../../go.mod"); err == nil {
-		absPath, _ := filepath.Abs("../..")
-		fmt.Printf("Detectado entorno de desarrollo, usando reemplazo local: %s\n", absPath)
-		runCmd(tempDir, "go", "mod", "edit", "-replace", "github.com/jossecurity/joss="+absPath)
-	}
-
-	runCmd(tempDir, "go", "mod", "tidy")
-
-	// 5. Compile Runner
-	fmt.Println("Compilando runner...")
-
-	ldflags := "-s -w -H=windowsgui"
-	if goos != "windows" {
-		ldflags = "-s -w"
-	}
-
-	outPath := filepath.Join("..", "main"+ext) // ../main.exe -> build/main.exe
-
-	cmd := exec.Command("go", "build", "-ldflags", ldflags, "-o", outPath, ".")
-	cmd.Dir = tempDir
-	cmd.Env = append(os.Environ(), "GOOS="+goos, "CGO_ENABLED=1")
-
-	output, err := cmd.CombinedOutput()
+	outPath := filepath.Join(buildDir, "program.exe")
+	f, err := os.Create(outPath)
 	if err != nil {
-		fmt.Printf("Error compilando runner: %v\n%s\n", err, output)
-		fmt.Println("Intentando sin CGO...")
-		cmd = exec.Command("go", "build", "-ldflags", ldflags, "-o", outPath, ".")
-		cmd.Dir = tempDir
-		cmd.Env = append(os.Environ(), "GOOS="+goos, "CGO_ENABLED=0")
-		output, err = cmd.CombinedOutput()
-		if err != nil {
-			fmt.Printf("Error fatal compilando runner: %v\n%s\n", err, output)
-			return
-		}
+		fmt.Printf("Error creando ejecutable: %v\n", err)
+		return
+	}
+	defer f.Close()
+
+	// Write Runner
+	if _, err := f.Write(runnerWindows); err != nil {
+		fmt.Printf("Error escribiendo runner: %v\n", err)
+		return
 	}
 
-	// Cleanup Temp
-	os.RemoveAll(tempDir)
+	// Write Encrypted Assets
+	if _, err := f.Write(encryptedAssets); err != nil {
+		fmt.Printf("Error escribiendo assets: %v\n", err)
+		return
+	}
 
-	// 6. Copy Database
+	// Write Key (32 bytes)
+	if _, err := f.Write(buildKey); err != nil {
+		fmt.Printf("Error escribiendo key: %v\n", err)
+		return
+	}
+
+	// Write Assets Length (8 bytes)
+	lenBuf := make([]byte, 8)
+	binary.LittleEndian.PutUint64(lenBuf, uint64(len(encryptedAssets)))
+	if _, err := f.Write(lenBuf); err != nil {
+		fmt.Printf("Error escribiendo longitud: %v\n", err)
+		return
+	}
+
+	// Write Magic Marker (16 bytes)
+	magic := []byte("JOSS_RUNNER_DATA") // Must match runner
+	if _, err := f.Write(magic); err != nil {
+		fmt.Printf("Error escribiendo magic marker: %v\n", err)
+		return
+	}
+
+	// 5. Copy Database
 	if _, err := os.Stat("database.sqlite"); err == nil {
 		copyFile("database.sqlite", filepath.Join(buildDir, "Storage", "database.sqlite"))
 		fmt.Println("Base de datos copiada a build/Storage/")
 	}
 
-	// 7. Create error.log
+	// 6. Create error.log
 	ioutil.WriteFile(filepath.Join(buildDir, "error.log"), []byte(""), 0666)
 
 	fmt.Println("Build PROGRAM completado exitosamente en carpeta 'build/'.")
 	fmt.Println("Estructura:")
-	fmt.Printf("  %s\n", filepath.Join(buildDir, "main"+ext))
+	fmt.Printf("  %s\n", outPath)
 	fmt.Println("  build/error.log")
 	fmt.Println("  build/Storage/database.sqlite")
 	fmt.Println("  build/data/ (vacío por ahora)")

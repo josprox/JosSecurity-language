@@ -229,4 +229,111 @@ function registerCommands(context: vscode.ExtensionContext) {
             }
         })
     );
+
+    // Start Server
+    context.subscriptions.push(
+        vscode.commands.registerCommand('joss.serverStart', async () => {
+            const terminal = vscode.window.createTerminal('Joss Server');
+            terminal.show();
+            terminal.sendText('joss server start');
+        })
+    );
+
+    // New Project
+    context.subscriptions.push(
+        vscode.commands.registerCommand('joss.newProject', async () => {
+            const type = await vscode.window.showQuickPick(['web', 'console'], {
+                placeHolder: 'Select project type'
+            });
+
+            if (!type) return;
+
+            const folderUri = await vscode.window.showOpenDialog({
+                canSelectFiles: false,
+                canSelectFolders: true,
+                canSelectMany: false,
+                openLabel: 'Select Project Location'
+            });
+
+            if (folderUri && folderUri[0]) {
+                const projectPath = folderUri[0].fsPath;
+                const terminal = vscode.window.createTerminal('Joss New Project');
+                terminal.show();
+                terminal.sendText(`joss new ${type} "${projectPath}"`);
+            }
+        })
+    );
+
+    // Make Model
+    context.subscriptions.push(
+        vscode.commands.registerCommand('joss.makeModel', async () => {
+            const name = await vscode.window.showInputBox({
+                prompt: 'Model name (e.g., User)',
+                placeHolder: 'User'
+            });
+
+            if (name) {
+                const terminal = vscode.window.createTerminal('Joss Make Model');
+                terminal.show();
+                terminal.sendText(`joss make:model ${name}`);
+            }
+        })
+    );
+
+    // Make CRUD
+    context.subscriptions.push(
+        vscode.commands.registerCommand('joss.makeCRUD', async () => {
+            const table = await vscode.window.showInputBox({
+                prompt: 'Table name (e.g., users)',
+                placeHolder: 'users'
+            });
+
+            if (table) {
+                const terminal = vscode.window.createTerminal('Joss Make CRUD');
+                terminal.show();
+                terminal.sendText(`joss make:crud ${table}`);
+            }
+        })
+    );
+
+    // Remove CRUD
+    context.subscriptions.push(
+        vscode.commands.registerCommand('joss.removeCRUD', async () => {
+            const table = await vscode.window.showInputBox({
+                prompt: 'Table name (e.g., users)',
+                placeHolder: 'users'
+            });
+
+            if (table) {
+                const terminal = vscode.window.createTerminal('Joss Remove CRUD');
+                terminal.show();
+                terminal.sendText(`joss remove:crud ${table}`);
+            }
+        })
+    );
+
+    // Make Migration
+    context.subscriptions.push(
+        vscode.commands.registerCommand('joss.makeMigration', async () => {
+            const name = await vscode.window.showInputBox({
+                prompt: 'Migration name (e.g., create_users_table)',
+                placeHolder: 'create_users_table'
+            });
+
+            if (name) {
+                const terminal = vscode.window.createTerminal('Joss Make Migration');
+                terminal.show();
+                terminal.sendText(`joss make:migration ${name}`);
+            }
+        })
+    );
+
+    // Run Migrations
+    context.subscriptions.push(
+        vscode.commands.registerCommand('joss.migrate', async () => {
+            const terminal = vscode.window.createTerminal('Joss Migrate');
+            terminal.show();
+            terminal.sendText('joss migrate');
+        })
+    );
 }

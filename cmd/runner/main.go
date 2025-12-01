@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"encoding/binary"
 	"encoding/gob"
 	"log"
 	"net"
@@ -13,34 +14,58 @@ import (
 	"github.com/jossecurity/joss/pkg/crypto"
 	"github.com/jossecurity/joss/pkg/server"
 	"github.com/jossecurity/joss/pkg/vfs"
-
-	_ "embed"
 )
 
-var encryptedAssets []byte
-
-// These variables are injected at build time via -ldflags
-var (
-	BuildSalt string // Hex encoded salt
-	BuildKey  string // Hex encoded obfuscated key
-)
+const MagicMarker = "JOSS_RUNNER_DATA"
 
 func main() {
-	// 1. Setup Logging to error.log
 	setupLogging()
 
+	// 1. Read Assets from Tail
+	exePath, err := os.Executable()
+	if err != nil {
+		log.Fatalf("Error getting executable path: %v", err)
+	}
+
+	f, err := os.Open(exePath)
+	if err != nil {
+		log.Fatalf("Error opening executable: %v", err)
+	}
+	defer f.Close()
+
+	stat, err := f.Stat()
+	if err != nil {
+		log.Fatalf("Error getting file stat: %v", err)
+	}
+	fileSize := stat.Size()
+
+	// Read Magic Marker (16 bytes)
+	if fileSize < 16 {
+		log.Fatal("Invalid executable size")
+	}
+	marker := make([]byte, 16)
+	f.ReadAt(marker, fileSize-16)
+
+	if string(marker) != MagicMarker {
+		log.Fatal("Error: Corrupted or invalid runner binary (Magic Marker not found)")
+	}
+
+	// Read Assets Length (8 bytes)
+	// Layout: [Data] [Key 32] [Len 8] [Magic 16]
+	lenBuf := make([]byte, 8)
+	f.ReadAt(lenBuf, fileSize-16-8)
+	var assetsLen int64
+	binary.Read(bytes.NewReader(lenBuf), binary.LittleEndian, &assetsLen)
+
+	// Read Key (32 bytes)
+	key := make([]byte, 32)
+	f.ReadAt(key, fileSize-16-8-32)
+
+	// Read Encrypted Assets
+	encryptedAssets := make([]byte, assetsLen)
+	f.ReadAt(encryptedAssets, fileSize-16-8-32-assetsLen)
+
 	// 2. Decrypt Assets
-	// In a real scenario, we would deobfuscate BuildKey and use BuildSalt
-	// For this prototype, we assume the key is passed or hardcoded for now if injection fails
-	// But the goal is to use the injected values.
-
-	// TODO: Implement proper key deobfuscation and salt usage from ldflags
-	// For now, we will assume a fixed key for the prototype to ensure it works first
-	// key := crypto.DeobfuscateKey([]byte(BuildKey))
-
-	// Placeholder key for development (must match build.go)
-	key := []byte("12345678901234567890123456789012")
-
 	decryptedData, err := crypto.DecryptAES(encryptedAssets, key)
 	if err != nil {
 		log.Fatalf("Error decrypting assets: %v", err)
