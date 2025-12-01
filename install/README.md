@@ -21,9 +21,9 @@ If you prefer to download and run locally:
 ### Windows
 1. Download `jossecurity-binaries.zip` from the latest GitHub Release.
 2. Extract the zip file to this `install` folder.
-3. Run:
+3. Run the remote installer script locally (it handles everything):
 ```powershell
-.\install.ps1
+.\remote-install.ps1
 ```
 
 ### Linux/macOS
@@ -31,8 +31,8 @@ If you prefer to download and run locally:
 2. Extract the zip file to this `install` folder.
 3. Run:
 ```bash
-chmod +x install.sh
-./install.sh
+chmod +x remote-install.sh
+./remote-install.sh
 ```
 
 ## ✨ What Gets Installed
@@ -55,11 +55,9 @@ chmod +x install.sh
 - `joss.exe` - Windows binary
 - `joss-linux` - Linux binary  
 - `joss-macos` - macOS binary
-- `joss-language-2.0.0.vsix` - VS Code extension
-- `install.ps1` - Windows installer (enhanced)
-- `install.sh` - Linux/macOS installer (enhanced)
-- `remote-install.ps1` - Windows remote installer
-- `remote-install.sh` - Linux/macOS remote installer
+- `joss-language-3.0.1.vsix` - VS Code extension
+- `remote-install.ps1` - Windows installer/updater/uninstaller
+- `remote-install.sh` - Linux/macOS installer/updater/uninstaller
 
 ## 🔒 Enhanced Features
 
@@ -81,6 +79,11 @@ chmod +x install.sh
 - Linux/macOS: `/tmp/jossecurity-install.log`
 
 ## 📝 Installation Options
+```bash
+# Check version
+joss version
+
+# Check extension
 code --list-extensions | grep joss
 
 # Create first project
@@ -124,15 +127,13 @@ The remote installers:
 - Linux binary: ~15 MB
 - macOS binary: ~15 MB
 - VS Code extension: 29 KB
-- Installers: 4 scripts
-- Updater: 2 scripts
-- Uninstaller: 2 scripts
+- Installers: 2 scripts (Unified Install/Update/Uninstall)
 - **Total**: ~45 MB
 
 ## 🆘 Support
 
 - Documentation: `../docs/`
-- Version: 3.0.0
+- Version: 3.0.1
 - License: MIT
 
 ---
