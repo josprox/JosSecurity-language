@@ -75,6 +75,39 @@ func performMigrations(rt *core.Runtime) {
 		}
 
 		rt.Execute(program)
+
+		// Find the migration class and execute 'up'
+		var migrationClass *parser.ClassStatement
+		for _, stmt := range program.Statements {
+			if classStmt, ok := stmt.(*parser.ClassStatement); ok {
+				migrationClass = classStmt
+				break
+			}
+		}
+
+		if migrationClass != nil {
+			// Instantiate
+			instance := core.NewInstance(migrationClass)
+
+			// Find 'up' method
+			var upMethod *parser.MethodStatement
+			for _, stmt := range migrationClass.Body.Statements {
+				if method, ok := stmt.(*parser.MethodStatement); ok {
+					if method.Name.Value == "up" {
+						upMethod = method
+						break
+					}
+				}
+			}
+
+			if upMethod != nil {
+				fmt.Printf("Ejecutando up() de %s...\n", migrationClass.Name.Value)
+				rt.CallMethodEvaluated(upMethod, instance, []interface{}{})
+			} else {
+				fmt.Printf("Advertencia: No se encontró el método 'up' en %s\n", migrationClass.Name.Value)
+			}
+		}
+
 		rt.LogMigration(filename, batch)
 		count++
 	}
