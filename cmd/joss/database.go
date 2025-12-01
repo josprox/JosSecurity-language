@@ -3,6 +3,9 @@ package main
 import (
 	"database/sql"
 	"fmt"
+	"io/ioutil"
+	"os"
+	"path/filepath"
 	"strings"
 
 	_ "github.com/go-sql-driver/mysql"
@@ -238,7 +241,49 @@ func changeDatabasePrefix(newPrefix string) {
 		}
 	}
 
-	// 5. Update env.joss
+	// 5. Update Source Code (Models and Migrations)
+	fmt.Println("Actualizando código fuente (Modelos y Migraciones)...")
+	updateSourceCodePrefix(currentPrefix, newPrefix)
+
+	// 6. Update env.joss
 	updateEnvFile("env.joss", "PREFIX", newPrefix)
 	fmt.Printf("Prefijo actualizado. %d tablas renombradas.\n", count)
+}
+
+func updateSourceCodePrefix(oldPrefix, newPrefix string) {
+	dirs := []string{"app/models", "app/database/migrations"}
+	for _, dir := range dirs {
+		filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
+			if err != nil {
+				return nil
+			}
+			if !info.IsDir() && strings.HasSuffix(path, ".joss") {
+				content, err := ioutil.ReadFile(path)
+				if err == nil {
+					strContent := string(content)
+					// Replace "oldPrefix" with "newPrefix"
+					// We look for the prefix followed by a letter, inside quotes ideally, but simple replacement is safer for now given the context
+					// To be safer, we can look for specific patterns like:
+					// "js_users" -> "comion_users"
+					// We should simply replace all occurrences of the old prefix if it looks like a table name start
+					// But simple string replacement of oldPrefix -> newPrefix might be too aggressive if oldPrefix is common (e.g. "a_")
+					// However, usually prefixes are unique enough (js_, comion_db).
+					// Let's replace occurrences of `"` + oldPrefix and `'` + oldPrefix
+
+					newContent := strings.ReplaceAll(strContent, "\""+oldPrefix, "\""+newPrefix)
+					newContent = strings.ReplaceAll(newContent, "'"+oldPrefix, "'"+newPrefix)
+
+					if strContent != newContent {
+						err = ioutil.WriteFile(path, []byte(newContent), 0644)
+						if err == nil {
+							fmt.Printf("Actualizado: %s\n", path)
+						} else {
+							fmt.Printf("Error actualizando %s: %v\n", path, err)
+						}
+					}
+				}
+			}
+			return nil
+		})
+	}
 }

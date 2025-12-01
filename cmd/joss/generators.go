@@ -53,7 +53,7 @@ func createModel(name string) {
 
 	content := fmt.Sprintf(`class %s extends GranDB {
     function constructor() {
-        $this.tabla = "%s"
+        // Table inferred from class name: %s
     }
 }`, name, tableName)
 
@@ -178,10 +178,13 @@ func createCRUD(tableName string) {
 
 	// 4. Generate Artifacts
 	// Model
+	// Model
 	modelName := snakeToCamel(tableName)
-	modelName = strings.TrimPrefix(modelName, "Js")
+	// Strip prefix
+	camelPrefix := snakeToCamel(prefix)
+	modelName = strings.TrimPrefix(modelName, camelPrefix)
 	// Use singularize helper
-	modelName = singularize(modelName)
+	modelName = strings.Title(singularize(modelName))
 
 	// Model
 	createModel(modelName)
@@ -189,8 +192,8 @@ func createCRUD(tableName string) {
 	// Auto-create related models
 	for _, rel := range relations {
 		relModelName := snakeToCamel(rel.Table)
-		relModelName = strings.TrimPrefix(relModelName, "Js")
-		relModelName = singularize(relModelName)
+		relModelName = strings.TrimPrefix(relModelName, camelPrefix)
+		relModelName = strings.Title(singularize(relModelName))
 
 		path := filepath.Join("app", "models", relModelName+".joss")
 		if _, err := os.Stat(path); os.IsNotExist(err) {
@@ -223,21 +226,30 @@ func createCRUDController(modelName, tableName string, cols []ColumnSchema, rela
 
 	viewPrefix := strings.ToLower(modelName)
 
-	// Build Index Query with Joins - Use single line to avoid parser issues
-	indexLogic := fmt.Sprintf("$%s = new %s()", strings.ToLower(modelName), modelName)
+	// Build Index Query with Joins
+	// Note: GranDB now handles prefixes automatically for select() and joins()
+	indexLogic := fmt.Sprintf(`$%s = new %s()`, strings.ToLower(modelName), modelName)
 
 	if len(relations) > 0 {
 		indexLogic += fmt.Sprintf("\n        $data = $%s", strings.ToLower(modelName))
+
 		// Selects
-		selects := []string{fmt.Sprintf("%s.*", tableName)}
+		// Use base table names, ORM will prefix them
+		_, _, _, _, _, _, currentPrefix := loadEnvConfig()
+		baseTableName := strings.TrimPrefix(tableName, currentPrefix)
+
+		selects := []string{fmt.Sprintf("\"%s.*\"", baseTableName)}
+
 		for _, rel := range relations {
-			selects = append(selects, fmt.Sprintf("%s.%s as %s", rel.Table, rel.DisplayCol, rel.Alias))
+			baseRelTable := strings.TrimPrefix(rel.Table, currentPrefix)
+			selects = append(selects, fmt.Sprintf("\"%s.%s as %s\"", baseRelTable, rel.DisplayCol, rel.Alias))
 		}
-		indexLogic += fmt.Sprintf(".select([\"%s\"])", strings.Join(selects, "\", \""))
+		indexLogic += fmt.Sprintf(".select([%s])", strings.Join(selects, ", "))
 
 		// Joins
 		for _, rel := range relations {
-			indexLogic += fmt.Sprintf(".leftJoin(\"%s\", \"%s.%s\", \"=\", \"%s.id\")", rel.Table, tableName, rel.ForeignKey, rel.Table)
+			baseRelTable := strings.TrimPrefix(rel.Table, currentPrefix)
+			indexLogic += fmt.Sprintf(".leftJoin(\"%s\", \"%s.%s\", \"=\", \"%s.id\")", baseRelTable, baseTableName, rel.ForeignKey, baseRelTable)
 		}
 		indexLogic += ".get()"
 	} else {
@@ -251,8 +263,11 @@ func createCRUDController(modelName, tableName string, cols []ColumnSchema, rela
 		for _, rel := range relations {
 			// Derive model name from table: js_roles -> Role
 			relModel := snakeToCamel(rel.Table)
-			relModel = strings.TrimPrefix(relModel, "Js")
-			relModel = singularize(relModel)
+			// Get current prefix to strip
+			_, _, _, _, _, _, prefix := loadEnvConfig()
+			camelPrefix := snakeToCamel(prefix)
+			relModel = strings.TrimPrefix(relModel, camelPrefix)
+			relModel = strings.Title(singularize(relModel))
 			varName := strings.ToLower(pluralize(relModel)) // roles
 			createLogic += fmt.Sprintf("\n        $%sModel = new %s()", strings.ToLower(relModel), relModel)
 			createLogic += fmt.Sprintf("\n        $%s = $%sModel.get()", varName, strings.ToLower(relModel))
@@ -406,8 +421,10 @@ func createCRUDViews(modelName string, cols []ColumnSchema, relations []Relation
 		if isRelation {
 			// Derive variable name: js_roles -> roles
 			relModel := snakeToCamel(relData.Table)
-			relModel = strings.TrimPrefix(relModel, "Js")
-			relModel = singularize(relModel)
+			_, _, _, _, _, _, prefix := loadEnvConfig()
+			camelPrefix := snakeToCamel(prefix)
+			relModel = strings.TrimPrefix(relModel, camelPrefix)
+			relModel = strings.Title(singularize(relModel))
 			varName := strings.ToLower(pluralize(relModel))
 
 			createHtml += fmt.Sprintf(`                    <div class="form-group">
@@ -475,7 +492,9 @@ func createCRUDViews(modelName string, cols []ColumnSchema, relations []Relation
 		if isRelation {
 			// Derive variable name: js_roles -> roles
 			relModel := snakeToCamel(relData.Table)
-			relModel = strings.TrimPrefix(relModel, "Js")
+			_, _, _, _, _, _, prefix := loadEnvConfig()
+			camelPrefix := snakeToCamel(prefix)
+			relModel = strings.TrimPrefix(relModel, camelPrefix)
 			relModel = singularize(relModel)
 			varName := strings.ToLower(pluralize(relModel))
 
@@ -678,7 +697,10 @@ func createMigration(name string) {
 
 class Create%sTable extends Migration {
     func up() {
-        Schema::create("%s", func($table) {
+        $prefix = System::env("PREFIX")
+        if ($prefix == "") { $prefix = "js_" }
+        
+        Schema::create($prefix + "%s", func($table) {
             $table.id()
             $table.string("name")
             $table.timestamps()
@@ -686,10 +708,13 @@ class Create%sTable extends Migration {
     }
 
     func down() {
-        Schema::drop("%s")
+        $prefix = System::env("PREFIX")
+        if ($prefix == "") { $prefix = "js_" }
+        
+        Schema::drop($prefix + "%s")
     }
 }
-`, name, time.Now().Format("2006-01-02 15:04:05"), snakeToCamel(name), tableName, tableName)
+`, name, time.Now().Format("2006-01-02 15:04:05"), snakeToCamel(name), strings.ToLower(pluralize(name)), strings.ToLower(pluralize(name)))
 
 	writeGenFile(path, content)
 }
@@ -725,9 +750,13 @@ func removeCRUD(tableName string) {
 	fmt.Printf("Removing CRUD for table '%s'...\n", tableName)
 
 	// 1. Infer Model Name
+	// Infer Model Name
 	modelName := snakeToCamel(tableName)
-	modelName = strings.TrimPrefix(modelName, "Js")
-	modelName = singularize(modelName)
+	// Strip prefix (CamelCased)
+	_, _, _, _, _, _, prefix := loadEnvConfig()
+	camelPrefix := snakeToCamel(prefix)
+	modelName = strings.TrimPrefix(modelName, camelPrefix)
+	modelName = strings.Title(singularize(modelName))
 
 	fmt.Printf("Inferred Model Name: %s\n", modelName)
 
@@ -763,8 +792,10 @@ func removeCRUD(tableName string) {
 			if strings.Contains(line, fmt.Sprintf("// CRUD Routes for %s", modelName)) {
 				continue
 			}
-			// Filter out lines that contain the controller name
-			if strings.Contains(line, modelName+"Controller") {
+			// Filter out lines that contain the controller name (case insensitive check)
+			lowerLine := strings.ToLower(line)
+			lowerController := strings.ToLower(modelName + "Controller")
+			if strings.Contains(lowerLine, lowerController) {
 				continue
 			}
 			newLines = append(newLines, line)

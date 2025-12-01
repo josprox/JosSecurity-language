@@ -3,21 +3,8 @@ package core
 import (
 	"database/sql"
 	"fmt"
-	"os"
 	"strings"
 )
-
-// Helper to get table prefix
-func getTablePrefix() string {
-	prefix := os.Getenv("PREFIX")
-	if prefix == "" {
-		prefix = os.Getenv("DB_PREFIX")
-	}
-	if prefix == "" {
-		return "js_"
-	}
-	return prefix
-}
 
 // GranMySQL Implementation
 func (r *Runtime) executeGranMySQLMethod(instance *Instance, method string, args []interface{}) interface{} {
@@ -33,27 +20,33 @@ func (r *Runtime) executeGranMySQLMethod(instance *Instance, method string, args
 	case "table":
 		if len(args) > 0 {
 			tableName := args[0].(string)
-			// Apply prefix if not already present (and not a raw query)
-			prefix := "js_"
-			if val, ok := r.Env["PREFIX"]; ok {
-				prefix = val
-			}
-			if !strings.HasPrefix(tableName, prefix) {
-				tableName = prefix + tableName
-			}
-			instance.Fields["_table"] = quoteIdentifier(tableName)
+			instance.Fields["_table"] = quoteIdentifier(r.applyTablePrefix(tableName))
 		}
 		return instance // Return this for chaining
 
 	case "select":
 		if len(args) > 0 {
 			if cols, ok := args[0].(string); ok {
+				// Handle single string "table.col" or "col"
 				instance.Fields["_select"] = cols
 			} else if cols, ok := args[0].([]interface{}); ok {
 				// Handle array of columns
 				strCols := []string{}
 				for _, c := range cols {
-					strCols = append(strCols, fmt.Sprintf("%v", c))
+					colStr := fmt.Sprintf("%v", c)
+					// Handle "table.col as alias"
+					if strings.Contains(strings.ToLower(colStr), " as ") {
+						parts := strings.Split(colStr, " ") // simplistic split
+						// Try to find the part with "."
+						for i, p := range parts {
+							if strings.Contains(p, ".") {
+								parts[i] = r.applyColumnPrefix(p)
+							}
+						}
+						strCols = append(strCols, strings.Join(parts, " "))
+					} else {
+						strCols = append(strCols, r.applyColumnPrefix(colStr))
+					}
 				}
 				instance.Fields["_select"] = strings.Join(strCols, ", ")
 			}
@@ -99,12 +92,12 @@ func (r *Runtime) executeGranMySQLMethod(instance *Instance, method string, args
 		bindings := instance.Fields["_bindings"].([]interface{})
 
 		if len(args) == 2 {
-			col := quoteIdentifier(args[0].(string))
+			col := quoteIdentifier(r.applyColumnPrefix(args[0].(string)))
 			val := args[1]
 			wheres = append(wheres, fmt.Sprintf("%s = ?", col))
 			bindings = append(bindings, val)
 		} else if len(args) == 3 {
-			col := quoteIdentifier(args[0].(string))
+			col := quoteIdentifier(r.applyColumnPrefix(args[0].(string)))
 			op := args[1].(string)
 			val := args[2]
 			wheres = append(wheres, fmt.Sprintf("%s %s ?", col, op))
@@ -117,10 +110,10 @@ func (r *Runtime) executeGranMySQLMethod(instance *Instance, method string, args
 
 	case "innerJoin":
 		if len(args) >= 4 {
-			table := args[0].(string)
-			first := args[1].(string)
+			table := r.applyTablePrefix(args[0].(string))
+			first := r.applyColumnPrefix(args[1].(string))
 			op := args[2].(string)
-			second := args[3].(string)
+			second := r.applyColumnPrefix(args[3].(string))
 			if _, ok := instance.Fields["_joins"]; !ok {
 				instance.Fields["_joins"] = []string{}
 			}
@@ -131,10 +124,10 @@ func (r *Runtime) executeGranMySQLMethod(instance *Instance, method string, args
 
 	case "leftJoin":
 		if len(args) >= 4 {
-			table := args[0].(string)
-			first := args[1].(string)
+			table := r.applyTablePrefix(args[0].(string))
+			first := r.applyColumnPrefix(args[1].(string))
 			op := args[2].(string)
-			second := args[3].(string)
+			second := r.applyColumnPrefix(args[3].(string))
 			if _, ok := instance.Fields["_joins"]; !ok {
 				instance.Fields["_joins"] = []string{}
 			}
@@ -145,10 +138,10 @@ func (r *Runtime) executeGranMySQLMethod(instance *Instance, method string, args
 
 	case "rightJoin":
 		if len(args) >= 4 {
-			table := args[0].(string)
-			first := args[1].(string)
+			table := r.applyTablePrefix(args[0].(string))
+			first := r.applyColumnPrefix(args[1].(string))
 			op := args[2].(string)
-			second := args[3].(string)
+			second := r.applyColumnPrefix(args[3].(string))
 			if _, ok := instance.Fields["_joins"]; !ok {
 				instance.Fields["_joins"] = []string{}
 			}
@@ -343,6 +336,48 @@ func quoteIdentifier(name string) string {
 		return name
 	}
 	return "`" + name + "`"
+}
+
+// Helper to apply prefix to table names
+func (r *Runtime) applyTablePrefix(name string) string {
+	prefix := "js_"
+	if val, ok := r.Env["PREFIX"]; ok {
+		prefix = val
+	}
+	if prefix == "" {
+		return name
+	}
+	if !strings.HasPrefix(name, prefix) {
+		return prefix + name
+	}
+	return name
+}
+
+// Helper to apply prefix to column names (only if qualified with table)
+func (r *Runtime) applyColumnPrefix(name string) string {
+	prefix := "js_"
+	if val, ok := r.Env["PREFIX"]; ok {
+		prefix = val
+	}
+	if prefix == "" {
+		return name
+	}
+
+	// Handle "table.column"
+	if strings.Contains(name, ".") {
+		parts := strings.SplitN(name, ".", 2)
+		tablePart := parts[0]
+		colPart := parts[1]
+
+		// Don't prefix if already prefixed
+		if !strings.HasPrefix(tablePart, prefix) {
+			tablePart = prefix + tablePart
+		}
+		return tablePart + "." + colPart
+	}
+
+	// If no dot, return as is (it's a column name)
+	return name
 }
 
 // Helper to get table name from instance

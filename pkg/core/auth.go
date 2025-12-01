@@ -12,7 +12,10 @@ import (
 
 // Auth Implementation
 func (r *Runtime) executeAuthMethod(instance *Instance, method string, args []interface{}) interface{} {
-	prefix := getTablePrefix()
+	prefix := "js_"
+	if val, ok := r.Env["PREFIX"]; ok {
+		prefix = val
+	}
 	usersTable := prefix + "users"
 	rolesTable := prefix + "roles"
 
