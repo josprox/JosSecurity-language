@@ -131,8 +131,24 @@ func createCRUD(tableName string) {
 		return
 	}
 
+	// If table not found and doesn't start with js_, try adding prefix
+	if len(cols) == 0 && !strings.HasPrefix(tableName, "js_") {
+		prefixedName := "js_" + tableName
+		fmt.Printf("Table '%s' not found. Trying '%s'...\n", tableName, prefixedName)
+		cols, err = getColumns(db, dbType, prefixedName)
+		if err != nil {
+			fmt.Printf("Error inspecting table: %v\n", err)
+			return
+		}
+		if len(cols) > 0 {
+			tableName = prefixedName
+			fmt.Printf("Found table '%s'. Using it.\n", tableName)
+		}
+	}
+
 	if len(cols) == 0 {
 		fmt.Printf("Table '%s' not found or empty.\n", tableName)
+		return
 	}
 	// 3. Analyze Relations
 	var relations []Relation

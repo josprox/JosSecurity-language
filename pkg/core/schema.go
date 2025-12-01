@@ -22,6 +22,9 @@ func (r *Runtime) executeSchemaMethod(instance *Instance, method string, args []
 	case "create":
 		if len(args) >= 2 {
 			tableName := args[0].(string)
+			if !strings.HasPrefix(tableName, "js_") {
+				tableName = "js_" + tableName
+			}
 
 			var definitions []string
 
@@ -85,6 +88,9 @@ func (r *Runtime) executeSchemaMethod(instance *Instance, method string, args []
 	case "drop":
 		if len(args) >= 1 {
 			tableName := args[0].(string)
+			if !strings.HasPrefix(tableName, "js_") {
+				tableName = "js_" + tableName
+			}
 			query := fmt.Sprintf("DROP TABLE IF EXISTS %s", tableName)
 			_, err := r.DB.Exec(query)
 			if err != nil {
