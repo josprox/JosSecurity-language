@@ -211,6 +211,17 @@ func buildProgram() {
 	rootFiles := []string{"main.joss", "api.joss", "routes.joss", "env.joss"}
 	for _, f := range rootFiles {
 		if data, err := ioutil.ReadFile(f); err == nil {
+			// If it's env.joss and we are building a program with a database,
+			// we need to update the DB_PATH to point to the Storage folder.
+			if f == "env.joss" {
+				if _, err := os.Stat("database.sqlite"); err == nil {
+					// Append the override
+					// We use a newline to ensure it's on a new line
+					override := "\nDB_PATH=\"Storage/database.sqlite\""
+					data = append(data, []byte(override)...)
+					fmt.Println("Inyectando configuración DB_PATH=\"Storage/database.sqlite\" en env.joss embebido...")
+				}
+			}
 			files[f] = data
 		}
 	}
