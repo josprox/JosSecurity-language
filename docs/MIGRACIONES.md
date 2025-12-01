@@ -42,76 +42,64 @@ joss migrate:fresh
 
 ## Blueprint Pattern (Recomendado)
 
-Sintaxis moderna para definir esquemas de tablas.
+Sintaxis moderna para definir esquemas de tablas. Para una referencia completa de todos los métodos disponibles, consulta [Schema Builder](SCHEMA_BUILDER.md).
 
 ### Ejemplo Básico
 
 ```joss
 // app/database/migrations/20251129234208_create_products.joss
-Schema.create("js_products", function($table) {
-    $table.id()
-    $table.string("name")
-    $table.text("description")
-    $table.decimal("price", 10, 2)
-    $table.integer("stock")
-    $table.timestamps()
-})
+Schema::create("js_products", func($table) {
+    $table.id();
+    $table.string("name");
+    $table.text("description").nullable();
+    $table.decimal("price", 10, 2);
+    $table.integer("stock").unsigned().default(0);
+    $table.timestamps();
+});
 ```
 
-### Métodos Disponibles
+### Métodos Comunes
 
-| Método | SQL Generado | Descripción |
-|--------|--------------|-------------|
-| `$table.id()` | `INTEGER PRIMARY KEY AUTOINCREMENT` | ID auto-incremental |
-| `$table.string(name)` | `VARCHAR(255) NOT NULL` | Cadena de texto |
-| `$table.text(name)` | `TEXT NOT NULL` | Texto largo |
-| `$table.integer(name)` | `INT NOT NULL` | Número entero |
-| `$table.decimal(name, p, s)` | `DECIMAL(p,s) NOT NULL` | Decimal con precisión |
-| `$table.timestamps()` | `created_at`, `updated_at` con DEFAULT | Timestamps automáticos |
-
-### Timestamps Automáticos
-
-El método `timestamps()` crea dos campos con valores por defecto:
-
-```sql
-created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
-updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
-```
-
-**Ventajas**:
-- ✅ No necesitas agregar timestamps manualmente en inserts
-- ✅ Compatible con SQLite y MySQL
-- ✅ Se llenan automáticamente con la fecha actual
+| Método | Descripción |
+|--------|-------------|
+| `$table.id()` | ID auto-incremental (Primary Key) |
+| `$table.string(name)` | Cadena de texto |
+| `$table.text(name)` | Texto largo |
+| `$table.integer(name)` | Número entero |
+| `$table.decimal(name, p, s)` | Decimal con precisión |
+| `$table.boolean(name)` | Booleano |
+| `$table.date(name)` | Fecha |
+| `$table.timestamps()` | `created_at` y `updated_at` |
 
 ### Ejemplo Completo con Relaciones
 
 ```joss
 // Tabla de categorías
-Schema.create("js_categories", function($table) {
-    $table.id()
-    $table.string("name")
-    $table.string("description")
-    $table.timestamps()
-})
+Schema::create("js_categories", func($table) {
+    $table.id();
+    $table.string("name");
+    $table.string("description").nullable();
+    $table.timestamps();
+});
 
 // Tabla de proveedores
-Schema.create("js_suppliers", function($table) {
-    $table.id()
-    $table.string("name")
-    $table.string("contact_email")
-    $table.timestamps()
-})
+Schema::create("js_suppliers", func($table) {
+    $table.id();
+    $table.string("name");
+    $table.string("contact_email").unique();
+    $table.timestamps();
+});
 
 // Tabla de productos con relaciones
-Schema.create("js_products", function($table) {
-    $table.id()
-    $table.string("name")
-    $table.decimal("price", 10, 2)
-    $table.integer("stock")
-    $table.integer("category_id")   // Foreign key a js_categories
-    $table.integer("supplier_id")   // Foreign key a js_suppliers
-    $table.timestamps()
-})
+Schema::create("js_products", func($table) {
+    $table.id();
+    $table.string("name");
+    $table.decimal("price", 10, 2);
+    $table.integer("stock").default(0);
+    $table.integer("category_id").unsigned();   // Foreign key a js_categories
+    $table.integer("supplier_id").unsigned();   // Foreign key a js_suppliers
+    $table.timestamps();
+});
 ```
 
 ---

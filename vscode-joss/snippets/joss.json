@@ -462,6 +462,49 @@
     ],
     "description": "Drop a table"
   },
+  "Schema Drop If Exists": {
+    "prefix": "schema:dropIfExists",
+    "body": [
+      "Schema::dropIfExists(\"${1:tableName}\")"
+    ],
+    "description": "Drop a table if it exists"
+  },
+  "Schema Table": {
+    "prefix": "schema:table",
+    "body": [
+      "Schema::table(\"${1:tableName}\", func(\\$table) {",
+      "\t\\$table.string(\"${2:column}\")",
+      "\t$0",
+      "})"
+    ],
+    "description": "Modify an existing table"
+  },
+  "Schema Rename": {
+    "prefix": "schema:rename",
+    "body": [
+      "Schema::rename(\"${1:from}\", \"${2:to}\")"
+    ],
+    "description": "Rename a table"
+  },
+  "Migration Class": {
+    "prefix": "migration",
+    "body": [
+      "class ${1:CreateUsersTable} extends Migration {",
+      "\tfunc up() {",
+      "\t\tSchema::create(\"${2:users}\", func(\\$table) {",
+      "\t\t\t\\$table.id()",
+      "\t\t\t\\$table.string(\"name\")",
+      "\t\t\t\\$table.timestamps()",
+      "\t\t})",
+      "\t}",
+      "",
+      "\tfunc down() {",
+      "\t\tSchema::dropIfExists(\"${2:users}\")",
+      "\t}",
+      "}"
+    ],
+    "description": "Create a full migration class"
+  },
   "Keys": {
     "prefix": "keys",
     "body": [

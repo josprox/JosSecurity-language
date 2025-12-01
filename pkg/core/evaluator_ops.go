@@ -425,10 +425,14 @@ func (r *Runtime) evaluateMember(me *parser.MemberExpression) interface{} {
 	isNative := false
 	for checkClass != nil {
 		className := checkClass.Name.Value
+		if className == "Schema" || className == "Blueprint" || className == "Migration" {
+			isNative = true
+			break
+		}
 		if className == "Stack" || className == "Queue" || className == "GranMySQL" || className == "GranDB" || className == "Auth" ||
 			className == "System" || className == "SmtpClient" || className == "Cron" || className == "Task" || className == "View" || className == "Router" ||
 			className == "Request" || className == "Response" || className == "RedirectResponse" || className == "Session" || className == "Redirect" || className == "Security" || className == "Server" || className == "Log" ||
-			className == "Schema" || className == "Blueprint" || className == "WebSocket" || className == "Redis" {
+			className == "WebSocket" || className == "Redis" {
 			isNative = true
 			break
 		}
@@ -454,7 +458,7 @@ func (r *Runtime) evaluateMember(me *parser.MemberExpression) interface{} {
 		}
 	}
 
-	fmt.Printf("Error: Propiedad o método '%s' no encontrado\n", propName)
+	fmt.Printf("Error: Propiedad o método '%s' no encontrado en clase '%s'\n", propName, instance.Class.Name.Value)
 	return nil
 }
 

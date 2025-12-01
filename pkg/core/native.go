@@ -130,6 +130,12 @@ func (r *Runtime) RegisterNativeClasses() {
 	}
 	r.registerClass(redisClass)
 	r.Variables["Redis"] = &Instance{Class: redisClass, Fields: make(map[string]interface{})}
+	// Migration
+	migrationClass := &parser.ClassStatement{
+		Name: &parser.Identifier{Value: "Migration"},
+		Body: &parser.BlockStatement{},
+	}
+	r.registerClass(migrationClass)
 }
 
 func (r *Runtime) executeNativeMethod(instance *Instance, method string, args []interface{}) interface{} {

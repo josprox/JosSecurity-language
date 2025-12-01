@@ -146,7 +146,7 @@
       "patterns": [
         {
           "name": "entity.name.type.class.joss",
-          "match": "\\b(Auth|GranMySQL|GranDB|Stack|Queue|Main|Security|Server|Log|Task|Router|SmtpClient|View|Request|Response|Cron|Session|Redirect|RedirectResponse|WebSocket|Schema|Blueprint|Redis)\\b"
+          "match": "\\b(Auth|GranMySQL|GranDB|Stack|Queue|Main|Security|Server|Log|Task|Router|SmtpClient|View|Request|Response|Cron|Session|Redirect|RedirectResponse|WebSocket|Schema|Blueprint|Redis|Migration)\\b"
         },
         {
           "name": "support.class.joss",
