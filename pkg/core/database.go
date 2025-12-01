@@ -405,15 +405,60 @@ func (r *Runtime) getTable(instance *Instance) string {
 		return ""
 	}
 
-	// Simple pluralization and snake_case
+	// Smart pluralization
 	prefix := "js_"
 	if val, ok := r.Env["PREFIX"]; ok {
 		prefix = val
 	}
-	tableName := prefix + strings.ToLower(className) + "s"
+
+	tableName := prefix + strings.ToLower(r.pluralize(className))
 
 	// Sync to _table
 	instance.Fields["_table"] = tableName
 
 	return tableName
+}
+
+// Helper for pluralization (simple English rules)
+func (r *Runtime) pluralize(s string) string {
+	s = strings.TrimSpace(s)
+	if s == "" {
+		return ""
+	}
+
+	lower := strings.ToLower(s)
+
+	// Irregular words
+	irregular := map[string]string{
+		"person": "people",
+		"man":    "men",
+		"child":  "children",
+		"foot":   "feet",
+		"tooth":  "teeth",
+		"mouse":  "mice",
+	}
+
+	if val, ok := irregular[lower]; ok {
+		return val
+	}
+
+	// Ends in 'y' preceded by consonant -> 'ies'
+	if strings.HasSuffix(lower, "y") && len(lower) > 1 {
+		lastChar := lower[len(lower)-1]
+		secondLast := lower[len(lower)-2]
+		if lastChar == 'y' && !isVowel(secondLast) {
+			return s[:len(s)-1] + "ies"
+		}
+	}
+
+	// Ends in s, x, z, ch, sh -> 'es'
+	if strings.HasSuffix(lower, "s") || strings.HasSuffix(lower, "x") || strings.HasSuffix(lower, "z") || strings.HasSuffix(lower, "ch") || strings.HasSuffix(lower, "sh") {
+		return s + "es"
+	}
+
+	return s + "s"
+}
+
+func isVowel(c byte) bool {
+	return c == 'a' || c == 'e' || c == 'i' || c == 'o' || c == 'u'
 }

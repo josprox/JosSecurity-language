@@ -49,7 +49,8 @@ func createModel(name string) {
 	os.MkdirAll(filepath.Dir(path), 0755)
 
 	_, _, _, _, _, _, prefix := loadEnvConfig()
-	tableName := prefix + strings.ToLower(pluralize(name)) // Plural convention
+	// Fix: singularize first to avoid double pluralization
+	tableName := prefix + strings.ToLower(pluralize(singularize(name)))
 
 	content := fmt.Sprintf(`class %s extends GranDB {
     function constructor() {
@@ -177,7 +178,6 @@ func createCRUD(tableName string) {
 	fmt.Printf("Total relations found: %d\n", len(relations))
 
 	// 4. Generate Artifacts
-	// Model
 	// Model
 	modelName := snakeToCamel(tableName)
 	// Strip prefix
@@ -685,22 +685,16 @@ func createMigration(name string) {
 	path := filepath.Join("app", "database", "migrations", filename)
 	os.MkdirAll(filepath.Dir(path), 0755)
 
-	_, _, _, _, _, _, prefix := loadEnvConfig()
-
-	tableName := name
-	if !strings.HasPrefix(tableName, prefix) {
-		tableName = prefix + tableName
-	}
+	// Fix: singularize first to avoid double pluralization
+	tableName := strings.ToLower(pluralize(singularize(name)))
 
 	content := fmt.Sprintf(`// Migration: %s
 // Created at: %s
 
 class Create%sTable extends Migration {
     func up() {
-        $prefix = System::env("PREFIX")
-        if ($prefix == "") { $prefix = "js_" }
-        
-        Schema::create($prefix + "%s", func($table) {
+        // Schema::create automatically handles the prefix defined in env.joss
+        Schema::create("%s", func($table) {
             $table.id()
             $table.string("name")
             $table.timestamps()
@@ -708,13 +702,10 @@ class Create%sTable extends Migration {
     }
 
     func down() {
-        $prefix = System::env("PREFIX")
-        if ($prefix == "") { $prefix = "js_" }
-        
-        Schema::drop($prefix + "%s")
+        Schema::drop("%s")
     }
 }
-`, name, time.Now().Format("2006-01-02 15:04:05"), snakeToCamel(name), strings.ToLower(pluralize(name)), strings.ToLower(pluralize(name)))
+`, name, time.Now().Format("2006-01-02 15:04:05"), snakeToCamel(name), tableName, tableName)
 
 	writeGenFile(path, content)
 }
