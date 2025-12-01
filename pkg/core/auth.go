@@ -83,7 +83,7 @@ func (r *Runtime) executeAuthMethod(instance *Instance, method string, args []in
 			var storedHash string
 			var userId int
 			var userName string
-			var roleName string
+			var roleName sql.NullString
 			// Join with roles table to get role name
 			query := fmt.Sprintf(`
 				SELECT u.id, u.name, u.password, r.name 
@@ -115,7 +115,7 @@ func (r *Runtime) executeAuthMethod(instance *Instance, method string, args []in
 					sessInst.Fields["user_id"] = userId
 					sessInst.Fields["user_name"] = userName
 					sessInst.Fields["user_email"] = email
-					sessInst.Fields["user_role"] = roleName
+					sessInst.Fields["user_role"] = roleName.String
 				}
 			}
 
