@@ -652,15 +652,28 @@ func createMigration(name string) {
 	path := filepath.Join("app", "database", "migrations", filename)
 	os.MkdirAll(filepath.Dir(path), 0755)
 
+	tableName := name
+	if !strings.HasPrefix(tableName, "js_") {
+		tableName = "js_" + tableName
+	}
+
 	content := fmt.Sprintf(`// Migration: %s
 // Created at: %s
 
-Schema.create("%s", function($table) {
-    $table.id()
-    $table.string("name")
-    $table.timestamps()
-})
-`, name, time.Now().Format("2006-01-02 15:04:05"), name)
+class Create%sTable extends Migration {
+    func up() {
+        Schema::create("%s", func($table) {
+            $table.id()
+            $table.string("name")
+            $table.timestamps()
+        })
+    }
+
+    func down() {
+        Schema::drop("%s")
+    }
+}
+`, name, time.Now().Format("2006-01-02 15:04:05"), snakeToCamel(name), tableName, tableName)
 
 	writeGenFile(path, content)
 }
