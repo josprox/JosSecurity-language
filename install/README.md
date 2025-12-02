@@ -55,7 +55,7 @@ chmod +x remote-install.sh
 - `joss.exe` - Windows binary
 - `joss-linux` - Linux binary  
 - `joss-macos` - macOS binary
-- `joss-language-3.0.1.vsix` - VS Code extension
+- `joss-language-3.0.2.vsix` - VS Code extension
 - `remote-install.ps1` - Windows installer/updater/uninstaller
 - `remote-install.sh` - Linux/macOS installer/updater/uninstaller
 
@@ -133,7 +133,7 @@ The remote installers:
 ## 🆘 Support
 
 - Documentation: `../docs/`
-- Version: 3.0.1
+- Version: 3.0.2
 - License: MIT
 
 ---

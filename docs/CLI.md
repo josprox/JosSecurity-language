@@ -106,7 +106,17 @@ joss build
 
 **Variantes**:
 - `joss build web` (default): Compila para servidor web tradicional.
-- `joss build program`: Compila un ejecutable autocontenido (Windows/Linux/Mac) con base de datos y assets encriptados.
+  - Crea una carpeta `build/` lista para despliegue.
+  - Copia todo el código fuente (`app`, `config`, `public`, `main.joss`, etc.).
+  - Genera `env.enc` con las variables de entorno encriptadas.
+  - Copia `database.sqlite` y sus archivos WAL (`.shm`, `.wal`) si existen, preservando los datos.
+  - **Despliegue**: Subir carpeta `build/` al servidor y ejecutar `joss run main.joss`.
+
+- `joss build program`: Compila un ejecutable autocontenido (Windows/Linux/Mac).
+  - Genera un ejecutable único (ej. `program.exe`) con todo embebido (assets, código, entorno).
+  - **Windows**: Compilado como aplicación GUI (sin ventana de terminal).
+  - **Base de Datos**: Usa `Storage/database.sqlite` junto al ejecutable.
+  - **Seguridad**: Todo el contenido es encriptado dentro del ejecutable.
 
 **Archivos requeridos**:
 - `main.joss`
