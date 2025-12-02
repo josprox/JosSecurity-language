@@ -14,8 +14,10 @@ const (
 	SUM         // +
 	SHIFT       // << or >>
 	PRODUCT     // *
+	MODULO      // %
 	PREFIX      // -X or !X
 	TERNARY     // ? :
+	LOGICAL     // && or ||
 	CALL        // myFunction(X)
 	INDEX       // array[index]
 )
@@ -28,6 +30,9 @@ var precedences = map[TokenType]int{
 	MINUS:        SUM,
 	SLASH:        PRODUCT,
 	ASTERISK:     PRODUCT,
+	PERCENT:      MODULO,
+	AND:          LOGICAL,
+	OR:           LOGICAL,
 	LT:           LESSGREATER,
 	GT:           LESSGREATER,
 	EQ:           EQUALS,
@@ -41,6 +46,7 @@ var precedences = map[TokenType]int{
 	DOT:          INDEX,
 	ARROW:        INDEX,
 	DOUBLE_COLON: INDEX,
+	INCREMENT:    INDEX,
 }
 
 type (
@@ -76,9 +82,7 @@ func NewParser(l *Lexer) *Parser {
 	p.registerPrefix(LBRACKET, p.parseArrayLiteral)
 	p.registerPrefix(LBRACE, p.parseBraceExpression) // Maps { key: val } or Blocks { stmt; }
 	p.registerPrefix(NEW, p.parseNewExpression)
-	p.registerPrefix(NEW, p.parseNewExpression)
 	p.registerPrefix(THIS, p.parseIdentifier)
-	p.registerPrefix(ISSET, p.parseIssetExpression)
 	p.registerPrefix(ISSET, p.parseIssetExpression)
 	p.registerPrefix(EMPTY, p.parseEmptyExpression)
 	p.registerPrefix(BANG, p.parsePrefixExpression)
@@ -90,6 +94,9 @@ func NewParser(l *Lexer) *Parser {
 	p.registerInfix(MINUS, p.parseInfixExpression)
 	p.registerInfix(SLASH, p.parseInfixExpression)
 	p.registerInfix(ASTERISK, p.parseInfixExpression)
+	p.registerInfix(PERCENT, p.parseInfixExpression)
+	p.registerInfix(AND, p.parseInfixExpression)
+	p.registerInfix(OR, p.parseInfixExpression)
 	p.registerInfix(LT, p.parseInfixExpression)
 	p.registerInfix(GT, p.parseInfixExpression)
 	p.registerInfix(EQ, p.parseInfixExpression)
@@ -106,6 +113,7 @@ func NewParser(l *Lexer) *Parser {
 	p.registerInfix(ARROW, p.parseMemberExpression)
 	p.registerInfix(DOUBLE_COLON, p.parseMemberExpression)
 	p.registerInfix(ASSIGN, p.parseAssignExpression)
+	p.registerInfix(INCREMENT, p.parsePostfixExpression)
 
 	// Read two tokens, so curToken and peekToken are both set
 	p.nextToken()

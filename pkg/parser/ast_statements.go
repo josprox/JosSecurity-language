@@ -275,6 +275,51 @@ type IfStatement struct {
 
 func (is *IfStatement) statementNode()       {}
 func (is *IfStatement) TokenLiteral() string { return is.Token.Literal }
+
+type SwitchStatement struct {
+	Token   Token
+	Value   Expression
+	Choices []*CaseStatement
+	Default *BlockStatement
+}
+
+func (ss *SwitchStatement) statementNode()       {}
+func (ss *SwitchStatement) TokenLiteral() string { return ss.Token.Literal }
+
+type CaseStatement struct {
+	Token Token
+	Value Expression // nil for default, but we use Default field in SwitchStatement
+	Body  *BlockStatement
+}
+
+func (cs *CaseStatement) statementNode()       {}
+func (cs *CaseStatement) TokenLiteral() string { return cs.Token.Literal }
+
+func (ss *SwitchStatement) String() string {
+	var out bytes.Buffer
+	out.WriteString("switch (")
+	out.WriteString(ss.Value.String())
+	out.WriteString(") {")
+	for _, c := range ss.Choices {
+		out.WriteString(c.String())
+	}
+	if ss.Default != nil {
+		out.WriteString(" default: ")
+		out.WriteString(ss.Default.String())
+	}
+	out.WriteString("}")
+	return out.String()
+}
+
+func (cs *CaseStatement) String() string {
+	var out bytes.Buffer
+	out.WriteString(" case ")
+	out.WriteString(cs.Value.String())
+	out.WriteString(": ")
+	out.WriteString(cs.Body.String())
+	return out.String()
+}
+
 func (is *IfStatement) String() string {
 	var out bytes.Buffer
 	out.WriteString("if")

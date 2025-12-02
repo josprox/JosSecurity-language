@@ -30,6 +30,50 @@ func (r *Runtime) evaluateAssign(ae *parser.AssignExpression) interface{} {
 		return nil
 	}
 
+	if indexExp, ok := ae.Left.(*parser.IndexExpression); ok {
+		left := r.evaluateExpression(indexExp.Left)
+
+		// Array Append: $arr[] = val (Index is nil)
+		if indexExp.Index == nil {
+			if list, ok := left.([]interface{}); ok {
+				// We need to update the variable that holds the list.
+				// But `left` is a copy of the slice header (value).
+				// We cannot modify the original variable unless we re-assign it.
+				// BUT, `evaluateExpression` returns the value.
+				// If we append, we get a new slice.
+				// We need to find the variable name to update it in `r.Variables`.
+
+				// This requires `ae.Left` to be resolvable to a variable name.
+				// `indexExp.Left` must be an Identifier or MemberExpression.
+
+				newList := append(list, val)
+				return r.updateVariable(indexExp.Left, newList)
+			}
+			fmt.Println("Error: Append [] solo permitido en arrays")
+			return nil
+		}
+
+		index := r.evaluateExpression(indexExp.Index)
+
+		// Map Assignment: $map["key"] = val
+		if m, ok := left.(map[string]interface{}); ok {
+			if key, ok := index.(string); ok {
+				m[key] = val
+				return val // Maps are reference types, so modification sticks
+			}
+		}
+
+		// Array Assignment: $arr[0] = val
+		if list, ok := left.([]interface{}); ok {
+			if idx, ok := index.(int64); ok {
+				if idx >= 0 && idx < int64(len(list)) {
+					list[idx] = val
+					return val // Slices are reference-like for elements
+				}
+			}
+		}
+	}
+
 	fmt.Printf("Error: Asignación inválida a %T\n", ae.Left)
 	return nil
 }
@@ -81,6 +125,16 @@ func (r *Runtime) evaluateIndex(ie *parser.IndexExpression) interface{} {
 		}
 		fmt.Println("Error: El índice de un mapa debe ser string")
 		return nil
+	}
+
+	if str, ok := left.(string); ok {
+		if idx, ok := index.(int64); ok {
+			if idx >= 0 && idx < int64(len(str)) {
+				return string(str[idx])
+			}
+			fmt.Println("Error: Índice de string fuera de rango")
+			return nil
+		}
 	}
 
 	fmt.Println("Error: No se puede indexar algo que no es un array o mapa")
@@ -224,6 +278,12 @@ func (r *Runtime) evaluateInfix(ie *parser.InfixExpression) interface{} {
 		if ie.Operator == "/" {
 			return lFloat / rFloat
 		}
+		if ie.Operator == "%" {
+			// Modulo for floats usually uses math.Mod, but for simplicity let's cast to int if possible or use math.Mod
+			// Go's % is only for ints.
+			// Let's cast to int for now as Joss is simple.
+			return int64(lFloat) % int64(rFloat)
+		}
 
 		// If any operand is float, result is float
 		isFloatOp := false
@@ -254,6 +314,11 @@ func (r *Runtime) evaluateInfix(ie *parser.InfixExpression) interface{} {
 				return lFloat == rFloat
 			case "!=":
 				return lFloat != rFloat
+			case "&&":
+				// Logical AND for numbers (C-style: non-zero is true)
+				return (lFloat != 0) && (rFloat != 0)
+			case "||":
+				return (lFloat != 0) || (rFloat != 0)
 			}
 		} else {
 			// Integer operations
@@ -278,6 +343,12 @@ func (r *Runtime) evaluateInfix(ie *parser.InfixExpression) interface{} {
 				return lInt == rInt
 			case "!=":
 				return lInt != rInt
+			case "%":
+				return lInt % rInt
+			case "&&":
+				return (lInt != 0) && (rInt != 0)
+			case "||":
+				return (lInt != 0) || (rInt != 0)
 			}
 		}
 	}
@@ -292,6 +363,18 @@ func (r *Runtime) evaluateInfix(ie *parser.InfixExpression) interface{} {
 	}
 	if ie.Operator == "!=" {
 		return lStr != rStr
+	}
+
+	// Boolean Logic
+	if bLeft, ok := left.(bool); ok {
+		if bRight, ok := right.(bool); ok {
+			if ie.Operator == "&&" {
+				return bLeft && bRight
+			}
+			if ie.Operator == "||" {
+				return bLeft || bRight
+			}
+		}
 	}
 
 	return nil
@@ -372,6 +455,27 @@ func (r *Runtime) evaluateMember(me *parser.MemberExpression) interface{} {
 
 	instance, ok := left.(*Instance)
 	if !ok {
+		// Check if it's a Static Class Access (e.g. Session::get)
+		// In this case, 'left' might be nil if the identifier wasn't found as a variable.
+		// We need to check if the original expression was an Identifier matching a known class.
+
+		if ident, ok := me.Left.(*parser.Identifier); ok {
+			className := ident.Value
+			// Check if it's a known native class or user class
+			if _, ok := r.Classes[className]; ok || isNativeClass(className) {
+				// It is a static access.
+				// Return a synthetic BoundMethod with nil Instance.
+				return &BoundMethod{
+					Method: &parser.MethodStatement{
+						Name: &parser.Identifier{Value: me.Property.Value},
+						Body: nil, // Native methods have no body here
+					},
+					Instance:    nil, // Static call
+					StaticClass: className,
+				}
+			}
+		}
+
 		fmt.Printf("Error: %v (tipo %T) no es una instancia. Intentando acceder a: '%s'\n", left, left, me.Property.Value)
 		return nil
 	}
@@ -432,7 +536,7 @@ func (r *Runtime) evaluateMember(me *parser.MemberExpression) interface{} {
 		if className == "Stack" || className == "Queue" || className == "GranMySQL" || className == "GranDB" || className == "Auth" ||
 			className == "System" || className == "SmtpClient" || className == "Cron" || className == "Task" || className == "View" || className == "Router" ||
 			className == "Request" || className == "Response" || className == "RedirectResponse" || className == "Session" || className == "Redirect" || className == "Security" || className == "Server" || className == "Log" ||
-			className == "WebSocket" || className == "Redis" {
+			className == "WebSocket" || className == "Redis" || className == "Math" {
 			isNative = true
 			break
 		}
@@ -479,4 +583,59 @@ func (r *Runtime) evaluateEmpty(ee *parser.EmptyExpression) bool {
 
 	val := r.evaluateExpression(ee.Argument)
 	return isFalsy(val)
+}
+
+func (r *Runtime) updateVariable(exp parser.Expression, newVal interface{}) interface{} {
+	if ident, ok := exp.(*parser.Identifier); ok {
+		r.Variables[ident.Value] = newVal
+		return newVal
+	}
+	if member, ok := exp.(*parser.MemberExpression); ok {
+		left := r.evaluateExpression(member.Left)
+		if instance, ok := left.(*Instance); ok {
+			instance.Fields[member.Property.Value] = newVal
+			return newVal
+		}
+	}
+	fmt.Println("Error: No se puede actualizar la variable (expresión no soportada)")
+	return nil
+}
+
+func (r *Runtime) evaluatePostfix(pe *parser.PostfixExpression) interface{} {
+	// Only supports ++ for now
+	if pe.Operator == "++" {
+		// Get current value
+		// We need to evaluate the Left expression to get value AND be able to update it.
+		// Similar to assignment.
+
+		// 1. Get current value
+		val := r.evaluateExpression(pe.Left)
+
+		// 2. Check type (int or float)
+		var newVal interface{}
+
+		if i, ok := val.(int64); ok {
+			newVal = i + 1
+		} else if f, ok := val.(float64); ok {
+			newVal = f + 1.0
+		} else {
+			fmt.Println("Error: Operador ++ solo aplicable a números")
+			return nil
+		}
+
+		// 3. Update variable
+		r.updateVariable(pe.Left, newVal)
+
+		// Postfix returns OLD value
+		return val
+	}
+	return nil
+}
+
+func isNativeClass(name string) bool {
+	switch name {
+	case "Session", "Math", "Auth", "View", "Request", "Response", "Redirect", "Log", "System", "Router", "Security", "Server", "GranDB", "GranMySQL", "Stack", "Queue", "SmtpClient", "Cron", "Task", "WebSocket", "Redis":
+		return true
+	}
+	return false
 }

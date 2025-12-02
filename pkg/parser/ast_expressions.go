@@ -100,6 +100,23 @@ func (pe *PrefixExpression) String() string {
 	return out.String()
 }
 
+type PostfixExpression struct {
+	Token    Token // The postfix token, e.g. ++
+	Operator string
+	Left     Expression
+}
+
+func (pe *PostfixExpression) expressionNode()      {}
+func (pe *PostfixExpression) TokenLiteral() string { return pe.Token.Literal }
+func (pe *PostfixExpression) String() string {
+	var out bytes.Buffer
+	out.WriteString("(")
+	out.WriteString(pe.Left.String())
+	out.WriteString(pe.Operator)
+	out.WriteString(")")
+	return out.String()
+}
+
 type Boolean struct {
 	Token Token
 	Value bool

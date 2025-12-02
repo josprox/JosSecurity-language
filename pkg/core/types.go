@@ -26,8 +26,9 @@ type Instance struct {
 
 // BoundMethod represents a method bound to an instance
 type BoundMethod struct {
-	Method   *parser.MethodStatement
-	Instance *Instance
+	Method      *parser.MethodStatement
+	Instance    *Instance
+	StaticClass string // For static calls
 }
 
 // Future represents an asynchronous computation

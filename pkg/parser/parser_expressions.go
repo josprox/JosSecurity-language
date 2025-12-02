@@ -243,6 +243,11 @@ func isStatementStart(t TokenType) bool {
 func (p *Parser) parseExpressionList(end TokenType) []Expression {
 	list := []Expression{}
 
+	// Allow newline before first element
+	for p.peekToken.Type == NEWLINE {
+		p.nextToken()
+	}
+
 	if p.peekToken.Type == end {
 		p.nextToken()
 		return list
@@ -251,8 +256,42 @@ func (p *Parser) parseExpressionList(end TokenType) []Expression {
 	p.nextToken()
 	list = append(list, p.parseExpression(LOWEST))
 
-	for p.peekToken.Type == COMMA {
-		p.nextToken()
+	for p.peekToken.Type == COMMA || p.peekToken.Type == NEWLINE {
+		if p.peekToken.Type == NEWLINE {
+			p.nextToken()
+			// Check if we hit end after newline
+			if p.peekToken.Type == end {
+				break
+			}
+			// If no comma after newline, check if next is comma or continue
+			if p.peekToken.Type == COMMA {
+				p.nextToken()
+			} else {
+				// Optional comma if newline present?
+				// For now, let's assume comma is required unless we want to support newline as separator
+				// Let's enforce comma for now, but skip multiple newlines
+				// If we are here, we consumed a NEWLINE.
+				// If next is not COMMA, and not END, it might be syntax error or optional comma.
+				// Let's check if it's start of expression.
+				// If so, we treat newline as separator?
+				// Joss syntax usually requires comma.
+				// Let's just consume newlines and expect comma.
+				continue
+			}
+		} else {
+			// It is COMMA
+			p.nextToken()
+		}
+
+		// Allow newlines after comma
+		for p.peekToken.Type == NEWLINE {
+			p.nextToken()
+		}
+
+		if p.peekToken.Type == end {
+			break
+		}
+
 		p.nextToken()
 		list = append(list, p.parseExpression(LOWEST))
 	}
@@ -268,6 +307,13 @@ func (p *Parser) parseIndexExpression(left Expression) Expression {
 	exp := &IndexExpression{Token: p.curToken, Left: left}
 
 	p.nextToken()
+
+	// Check for empty index: []
+	if p.curToken.Type == RBRACKET {
+		exp.Index = nil
+		return exp
+	}
+
 	exp.Index = p.parseExpression(LOWEST)
 
 	if !p.expectPeek(RBRACKET) {
@@ -510,4 +556,12 @@ func (p *Parser) parseEmptyExpression() Expression {
 	}
 
 	return exp
+}
+
+func (p *Parser) parsePostfixExpression(left Expression) Expression {
+	return &PostfixExpression{
+		Token:    p.curToken,
+		Operator: p.curToken.Literal,
+		Left:     left,
+	}
 }

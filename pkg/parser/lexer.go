@@ -110,7 +110,14 @@ func (l *Lexer) NextToken() Token {
 			tok = l.newToken(GT, l.ch)
 		}
 	case '+':
-		tok = l.newToken(PLUS, l.ch)
+		if l.peekChar() == '+' {
+			ch := l.ch
+			l.readChar()
+			literal := string(ch) + string(l.ch)
+			tok = Token{Type: INCREMENT, Literal: literal, Line: l.line}
+		} else {
+			tok = l.newToken(PLUS, l.ch)
+		}
 	case '-':
 		if l.peekChar() == '>' {
 			ch := l.ch
@@ -128,6 +135,8 @@ func (l *Lexer) NextToken() Token {
 			return l.NextToken()
 		}
 		tok = l.newToken(SLASH, l.ch)
+	case '%':
+		tok = l.newToken(PERCENT, l.ch)
 	case '{':
 		tok = l.newToken(LBRACE, l.ch)
 	case '}':
@@ -148,12 +157,26 @@ func (l *Lexer) NextToken() Token {
 		tok.Literal = ""
 		tok.Type = EOF
 		tok.Line = l.line
+	case '&':
+		if l.peekChar() == '&' {
+			ch := l.ch
+			l.readChar()
+			literal := string(ch) + string(l.ch)
+			tok = Token{Type: AND, Literal: literal, Line: l.line}
+		} else {
+			tok = l.newToken(ILLEGAL, l.ch)
+		}
 	case '|':
 		if l.peekChar() == '>' {
 			ch := l.ch
 			l.readChar()
 			literal := string(ch) + string(l.ch)
 			tok = Token{Type: PIPE, Literal: literal, Line: l.line}
+		} else if l.peekChar() == '|' {
+			ch := l.ch
+			l.readChar()
+			literal := string(ch) + string(l.ch)
+			tok = Token{Type: OR, Literal: literal, Line: l.line}
 		} else {
 			tok = l.newToken(ILLEGAL, l.ch)
 		}

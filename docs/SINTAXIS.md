@@ -4,6 +4,7 @@
 - [Variables y Tipos](#variables-y-tipos)
 - [Operadores Ternarios](#operadores-ternarios)
 - [Clases y Herencia](#clases-y-herencia)
+- [Estructuras de Control](#estructuras-de-control)
 - [Funciones](#funciones)
 - [Loops](#loops)
 - [Try-Catch](#try-catch)
@@ -46,6 +47,14 @@ $config = {
 
 // Acceso a maps
 print($config["host"])  // "localhost"
+
+// Asignación en Maps
+$config["port"] = 3307
+
+// Indexación de Strings
+string $texto = "Hola"
+print($texto[0]) // "H"
+
 ```
 
 ### Constantes
@@ -66,9 +75,38 @@ __FILE__  // Archivo actual
 
 ---
 
+## Estructuras de Control
+
+JosSecurity soporta tanto estructuras de control tradicionales (`if/else`, `switch`) como operadores ternarios avanzados.
+
+### If / Else
+
+```joss
+if ($edad >= 18) {
+    print("Mayor de edad")
+} else if ($edad >= 13) {
+    print("Adolescente")
+} else {
+    print("Menor de edad")
+}
+```
+
+### Switch
+
+```joss
+switch ($opcion) {
+    case 1:
+        print("Opción 1 seleccionada")
+    case 2:
+        print("Opción 2 seleccionada")
+    default:
+        print("Opción inválida")
+}
+```
+
 ## Operadores Ternarios
 
-**JosSecurity NO tiene `if/else` tradicionales**. Se usan operadores ternarios exclusivamente.
+También puedes usar operadores ternarios para lógica concisa.
 
 ### Ternario Simple
 
@@ -123,6 +161,8 @@ $nivel = ($puntos > 1000) ? "Oro"
 <   // Menor que
 >=  // Mayor o igual
 <=  // Menor o igual
+%   // Módulo (Resto de la división)
+
 ```
 
 ### Operadores Lógicos
@@ -373,8 +413,15 @@ $segundo = $lista[1]
 // Modificación
 $lista[0] = "Nuevo valor"
 
-// Agregar elemento
+// Agregar elemento (Append)
 $lista[] = "Elemento nuevo"
+
+// Arrays Multilínea
+$matriz = [
+    [1, 2, 3],
+    [4, 5, 6]
+]
+
 ```
 
 ### Maps (Diccionarios)

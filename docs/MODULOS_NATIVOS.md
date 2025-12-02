@@ -17,6 +17,9 @@ Documentación completa de todos los módulos nativos disponibles en JosSecurity
 - [Redis](#redis) - Cache y sesiones
 - [Queue](#queue) - Colas de trabajo
 - [WebSocket](#websocket) - Comunicación en tiempo real
+- [Math](#math) - Funciones matemáticas
+- [Session](#session) - Gestión de sesiones
+
 
 ---
 
@@ -548,6 +551,85 @@ Queue::push("enviar_email", {"to": "user@example.com"})
 
 Comunicación en tiempo real.
 
-```joss
 WebSocket::broadcast("mensaje", {"texto": "Hola a todos"})
 ```
+
+---
+
+## Math
+
+Funciones matemáticas de utilidad.
+
+### Métodos
+
+#### `Math::random(int $min, int $max)`
+Genera un número entero aleatorio entre min y max.
+
+```joss
+$dado = Math::random(1, 6)
+```
+
+#### `Math::floor(float $val)`
+Redondea hacia abajo.
+
+```joss
+$entero = Math::floor(4.9) // 4
+```
+
+#### `Math::ceil(float $val)`
+Redondea hacia arriba.
+
+```joss
+$entero = Math::ceil(4.1) // 5
+```
+
+#### `Math::abs(number $val)`
+Valor absoluto.
+
+```joss
+$positivo = Math::abs(-10) // 10
+```
+
+---
+
+## Session
+
+Gestión directa de la sesión del usuario.
+
+### Métodos
+
+#### `Session::put(string $key, mixed $value)`
+Guarda un valor en la sesión.
+
+```joss
+Session::put("carrito_id", 123)
+```
+
+#### `Session::get(string $key)`
+Obtiene un valor de la sesión.
+
+```joss
+$id = Session::get("carrito_id")
+```
+
+#### `Session::has(string $key)`
+Verifica si existe una clave.
+
+```joss
+if (Session::has("user_id")) { ... }
+```
+
+#### `Session::forget(string $key)`
+Elimina una clave de la sesión.
+
+```joss
+Session::forget("temp_data")
+```
+
+#### `Session::all()`
+Obtiene todos los datos de la sesión.
+
+```joss
+$datos = Session::all()
+```
+

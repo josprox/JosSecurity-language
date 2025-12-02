@@ -13,6 +13,28 @@ func (r *Runtime) CallMethod(method *parser.MethodStatement, instance *Instance,
 		for _, arg := range args {
 			evalArgs = append(evalArgs, r.evaluateExpression(arg))
 		}
+
+		// Check for Static Class Call
+		if instance == nil {
+			// We need to pass the class name somehow.
+			// But executeNativeMethod expects *Instance.
+			// Let's modify executeNativeMethod or handle it here.
+			// For now, let's pass a dummy instance with the class name if possible,
+			// OR check if we can access the static class name from somewhere.
+			// Wait, CallMethod doesn't know the static class name unless we pass it.
+			// But we are calling this from applyFunction which has the BoundMethod.
+			// BoundMethod has StaticClass!
+			// But CallMethod signature is (method, instance, args).
+			// We should update CallMethod signature or handle nil instance in executeNativeMethod.
+			// But executeNativeMethod needs the class name.
+			// If instance is nil, we can't get class name.
+
+			// Alternative: Pass a synthetic instance for static calls.
+			// In evaluateMember, we returned instance=nil.
+			// Let's change evaluateMember to return a synthetic instance.
+			return nil
+		}
+
 		return r.executeNativeMethod(instance, method.Name.Value, evalArgs)
 	}
 
@@ -92,6 +114,26 @@ func (r *Runtime) executeCall(call *parser.CallExpression) interface{} {
 
 func (r *Runtime) applyFunction(fn interface{}, args []interface{}) interface{} {
 	if bound, ok := fn.(*BoundMethod); ok {
+		if bound.Instance == nil && bound.StaticClass != "" {
+			// Static Call
+			// Evaluate arguments
+			evalArgs := []interface{}{}
+			for _, arg := range args {
+				evalArgs = append(evalArgs, arg) // args are already evaluated in executeCall
+			}
+			// We need to call executeNativeMethod with a way to identify the class.
+			// executeNativeMethod expects *Instance.
+			// Let's create a temporary instance for the static call.
+			// Or better, update executeNativeMethod to accept className string.
+			// But that requires changing signature in native.go and all calls.
+			// Easier: Create a dummy instance.
+			dummyInstance := &Instance{
+				Class: &parser.ClassStatement{
+					Name: &parser.Identifier{Value: bound.StaticClass},
+				},
+			}
+			return r.executeNativeMethod(dummyInstance, bound.Method.Name.Value, evalArgs)
+		}
 		return r.CallMethodEvaluated(bound.Method, bound.Instance, args)
 	}
 

@@ -27,7 +27,16 @@ func (r *Runtime) RegisterNativeClasses() {
 	// Auth
 	authClass := &parser.ClassStatement{
 		Name: &parser.Identifier{Value: "Auth"},
-		Body: &parser.BlockStatement{},
+		Body: &parser.BlockStatement{
+			Statements: []parser.Statement{
+				&parser.MethodStatement{Name: &parser.Identifier{Value: "user"}},
+				&parser.MethodStatement{Name: &parser.Identifier{Value: "check"}},
+				&parser.MethodStatement{Name: &parser.Identifier{Value: "guest"}},
+				&parser.MethodStatement{Name: &parser.Identifier{Value: "id"}},
+				&parser.MethodStatement{Name: &parser.Identifier{Value: "logout"}},
+				&parser.MethodStatement{Name: &parser.Identifier{Value: "attempt"}},
+			},
+		},
 	}
 	r.registerClass(authClass)
 	r.Variables["Auth"] = &Instance{Class: authClass, Fields: make(map[string]interface{})}
@@ -65,7 +74,11 @@ func (r *Runtime) RegisterNativeClasses() {
 	// View
 	viewClass := &parser.ClassStatement{
 		Name: &parser.Identifier{Value: "View"},
-		Body: &parser.BlockStatement{},
+		Body: &parser.BlockStatement{
+			Statements: []parser.Statement{
+				&parser.MethodStatement{Name: &parser.Identifier{Value: "render"}},
+			},
+		},
 	}
 	r.registerClass(viewClass)
 	r.Variables["View"] = &Instance{Class: viewClass, Fields: make(map[string]interface{})}
@@ -73,7 +86,19 @@ func (r *Runtime) RegisterNativeClasses() {
 	// Router
 	routerClass := &parser.ClassStatement{
 		Name: &parser.Identifier{Value: "Router"},
-		Body: &parser.BlockStatement{},
+		Body: &parser.BlockStatement{
+			Statements: []parser.Statement{
+				&parser.MethodStatement{Name: &parser.Identifier{Value: "get"}},
+				&parser.MethodStatement{Name: &parser.Identifier{Value: "post"}},
+				&parser.MethodStatement{Name: &parser.Identifier{Value: "put"}},
+				&parser.MethodStatement{Name: &parser.Identifier{Value: "delete"}},
+				&parser.MethodStatement{Name: &parser.Identifier{Value: "match"}},
+				&parser.MethodStatement{Name: &parser.Identifier{Value: "api"}},
+				&parser.MethodStatement{Name: &parser.Identifier{Value: "group"}},
+				&parser.MethodStatement{Name: &parser.Identifier{Value: "middleware"}},
+				&parser.MethodStatement{Name: &parser.Identifier{Value: "end"}},
+			},
+		},
 	}
 	r.registerClass(routerClass)
 	r.Variables["Router"] = &Instance{Class: routerClass, Fields: make(map[string]interface{})}
@@ -136,6 +161,38 @@ func (r *Runtime) RegisterNativeClasses() {
 		Body: &parser.BlockStatement{},
 	}
 	r.registerClass(migrationClass)
+	r.registerClass(migrationClass)
+
+	// Math
+	mathClass := &parser.ClassStatement{
+		Name: &parser.Identifier{Value: "Math"},
+		Body: &parser.BlockStatement{
+			Statements: []parser.Statement{
+				&parser.MethodStatement{Name: &parser.Identifier{Value: "random"}},
+				&parser.MethodStatement{Name: &parser.Identifier{Value: "floor"}},
+				&parser.MethodStatement{Name: &parser.Identifier{Value: "ceil"}},
+				&parser.MethodStatement{Name: &parser.Identifier{Value: "abs"}},
+			},
+		},
+	}
+	r.registerClass(mathClass)
+	r.Variables["Math"] = &Instance{Class: mathClass, Fields: make(map[string]interface{})}
+
+	// Session
+	sessionClass := &parser.ClassStatement{
+		Name: &parser.Identifier{Value: "Session"},
+		Body: &parser.BlockStatement{
+			Statements: []parser.Statement{
+				&parser.MethodStatement{Name: &parser.Identifier{Value: "get"}},
+				&parser.MethodStatement{Name: &parser.Identifier{Value: "put"}},
+				&parser.MethodStatement{Name: &parser.Identifier{Value: "has"}},
+				&parser.MethodStatement{Name: &parser.Identifier{Value: "forget"}},
+				&parser.MethodStatement{Name: &parser.Identifier{Value: "all"}},
+			},
+		},
+	}
+	r.registerClass(sessionClass)
+	// Session is instantiated per request, but we register the class here.
 }
 
 func (r *Runtime) executeNativeMethod(instance *Instance, method string, args []interface{}) interface{} {
@@ -177,6 +234,10 @@ func (r *Runtime) executeNativeMethod(instance *Instance, method string, args []
 			return r.executeBlueprintMethod(instance, method, args)
 		case "Redis":
 			return r.executeRedisMethod(instance, method, args)
+		case "Math":
+			return r.executeMathMethod(instance, method, args)
+		case "Session":
+			return r.executeSessionMethod(instance, method, args)
 		}
 
 		// Move to parent

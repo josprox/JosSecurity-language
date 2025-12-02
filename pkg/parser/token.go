@@ -19,6 +19,7 @@ const (
 	BANG     = "!"
 	ASTERISK = "*"
 	SLASH    = "/"
+	PERCENT  = "%"
 
 	LT          = "<"
 	GT          = ">"
@@ -28,6 +29,9 @@ const (
 	GTE         = ">="
 	SHIFT_LEFT  = "<<"
 	SHIFT_RIGHT = ">>"
+	AND         = "&&"
+	OR          = "||"
+	INCREMENT   = "++"
 
 	COMMA     = ","
 	SEMICOLON = ";"
@@ -73,6 +77,9 @@ const (
 	CATCH   = "CATCH"
 	THROW   = "THROW"
 	EXTENDS = "EXTENDS"
+	SWITCH  = "SWITCH"
+	CASE    = "CASE"
+	DEFAULT = "DEFAULT"
 )
 
 type Token struct {
@@ -109,6 +116,9 @@ var keywords = map[string]TokenType{
 	"extends":   EXTENDS,
 	"@import":   IMPORT,
 	"import":    IMPORT,
+	"switch":    SWITCH,
+	"case":      CASE,
+	"default":   DEFAULT,
 }
 
 func LookupIdent(ident string) TokenType {
