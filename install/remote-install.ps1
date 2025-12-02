@@ -10,7 +10,7 @@ $Host.UI.RawUI.ForegroundColor = "White"
 
 # --- CONFIGURACIÓN ---
 # Configuración que DEBE ser actualizada manualmente en el script
-$JossVersion = "3.0.1" 
+$JossVersion = "3.0.2" 
 $RepoOwner = "josprox"
 $RepoName = "JosSecurity-language"
 

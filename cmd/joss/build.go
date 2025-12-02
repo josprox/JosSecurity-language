@@ -40,11 +40,52 @@ func buildWeb() {
 		}
 	}
 
-	// 2. Encrypt env.joss
-	fmt.Println("Encriptando entorno...")
-	encryptEnvTo("env.enc")
+	// 2. Prepare Build Directory
+	buildDir := "build"
+	fmt.Printf("Creando directorio de salida '%s'...\n", buildDir)
+	os.RemoveAll(buildDir)
+	if err := os.MkdirAll(buildDir, 0755); err != nil {
+		fmt.Printf("Error creando directorio build: %v\n", err)
+		return
+	}
 
-	fmt.Println("Build WEB completado exitosamente.")
+	// 3. Copy Project Files
+	fmt.Println("Copiando archivos del proyecto...")
+	dirsToCopy := []string{"app", "config", "public", "assets"}
+	for _, dir := range dirsToCopy {
+		if _, err := os.Stat(dir); err == nil {
+			copyDir(dir, filepath.Join(buildDir, dir))
+		}
+	}
+
+	filesToCopy := []string{"main.joss", "api.joss", "routes.joss", "package.json"}
+	for _, f := range filesToCopy {
+		if _, err := os.Stat(f); err == nil {
+			copyFile(f, filepath.Join(buildDir, f))
+		}
+	}
+
+	// 4. Copy Database and WAL files
+	if _, err := os.Stat("database.sqlite"); err == nil {
+		copyFile("database.sqlite", filepath.Join(buildDir, "database.sqlite"))
+		fmt.Println("Base de datos copiada a build/")
+
+		// Copy WAL files if they exist
+		if _, err := os.Stat("database.sqlite-shm"); err == nil {
+			copyFile("database.sqlite-shm", filepath.Join(buildDir, "database.sqlite-shm"))
+		}
+		if _, err := os.Stat("database.sqlite-wal"); err == nil {
+			copyFile("database.sqlite-wal", filepath.Join(buildDir, "database.sqlite-wal"))
+		}
+	}
+
+	// 4. Encrypt env.joss to build/env.enc
+	fmt.Println("Encriptando entorno para producción...")
+	encryptEnvTo(filepath.Join(buildDir, "env.enc"))
+
+	fmt.Println("Build WEB completado exitosamente en carpeta 'build/'.")
+	fmt.Println("Para desplegar, sube el contenido de la carpeta 'build/' a tu servidor.")
+	fmt.Println("Solo necesitas ejecutar joss run main.joss dentro de ella en el servidor.")
 }
 
 func buildProgram() {

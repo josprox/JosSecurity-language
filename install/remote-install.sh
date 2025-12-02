@@ -16,7 +16,7 @@ BLUE='\033[0;34m'
 NC='\033[0m'
 
 # Configuración que DEBE ser actualizada manualmente en el script
-JOSS_VERSION="3.0.1" 
+JOSS_VERSION="3.0.2" 
 REPO_OWNER="josprox"
 REPO_NAME="JosSecurity-language"
 
