@@ -96,17 +96,33 @@ func buildProgram() {
 		})
 	}
 
-	rootFiles := []string{"main.joss", "api.joss", "routes.joss", "env.joss"}
+	rootFiles := []string{"main.joss", "api.joss", "routes.joss"}
 	for _, f := range rootFiles {
 		if data, err := ioutil.ReadFile(f); err == nil {
-			if f == "env.joss" {
-				if _, err := os.Stat("database.sqlite"); err == nil {
-					override := "\nDB_PATH=\"Storage/database.sqlite\""
-					data = append(data, []byte(override)...)
-					fmt.Println("Inyectando configuración DB_PATH=\"Storage/database.sqlite\" en env.joss embebido...")
-				}
-			}
 			files[f] = data
+		}
+	}
+
+	// Handle env.joss separately (Encrypt it)
+	if data, err := ioutil.ReadFile("env.joss"); err == nil {
+		if _, err := os.Stat("database.sqlite"); err == nil {
+			override := "\nDB_PATH=\"Storage/database.sqlite\""
+			data = append(data, []byte(override)...)
+			fmt.Println("Inyectando configuración DB_PATH=\"Storage/database.sqlite\" en env.joss embebido...")
+		}
+
+		// Encrypt to env.enc format
+		salt := make([]byte, 16)
+		rand.Read(salt)
+		masterSecret := []byte("JOSSECURITY_MASTER_SECRET_2025")
+		key := crypto.DeriveKey(masterSecret, salt)
+		encrypted, err := crypto.EncryptAES(data, key)
+		if err == nil {
+			finalData := append(salt, encrypted...)
+			files["env.enc"] = finalData
+			fmt.Println("Entorno encriptado y embebido como env.enc")
+		} else {
+			fmt.Printf("Error encriptando env para program: %v\n", err)
 		}
 	}
 
@@ -167,10 +183,18 @@ func buildProgram() {
 		return
 	}
 
-	// 5. Copy Database
+	// 5. Copy Database and WAL files
 	if _, err := os.Stat("database.sqlite"); err == nil {
 		copyFile("database.sqlite", filepath.Join(buildDir, "Storage", "database.sqlite"))
 		fmt.Println("Base de datos copiada a build/Storage/")
+
+		// Copy WAL files if they exist
+		if _, err := os.Stat("database.sqlite-shm"); err == nil {
+			copyFile("database.sqlite-shm", filepath.Join(buildDir, "Storage", "database.sqlite-shm"))
+		}
+		if _, err := os.Stat("database.sqlite-wal"); err == nil {
+			copyFile("database.sqlite-wal", filepath.Join(buildDir, "Storage", "database.sqlite-wal"))
+		}
 	}
 
 	// 6. Create error.log
@@ -223,5 +247,50 @@ func copyDir(src string, dst string) error {
 }
 
 func encryptEnvTo(destPath string) {
-	// Dummy implementation for now
+	data, err := ioutil.ReadFile("env.joss")
+	if err != nil {
+		fmt.Printf("Error leyendo env.joss: %v\n", err)
+		return
+	}
+
+	// Generate a random salt
+	salt := make([]byte, 16)
+	if _, err := rand.Read(salt); err != nil {
+		fmt.Printf("Error generando salt: %v\n", err)
+		return
+	}
+
+	// Derive key (In a real scenario, this key needs to be shared securely or embedded in a way the runtime can recover it,
+	// but for this "Gran Biblia" spec, the runtime generates a master key in RAM.
+	// However, to decrypt, the runtime needs the SAME key used here.
+	// The spec says: "Runtime: Al ejecutar main.joss, el motor genera una llave maestra efímera en RAM para desencriptar el entorno".
+	// This implies the key is either derived from something constant or embedded.
+	// For simplicity and to match the "embedded in build" concept, we will generate a key, encrypt the env,
+	// and then we need to decide how the runtime gets it.
+	// The spec says: "Encriptador de Entorno: Toma env.joss ... genera una sal ... y lo cifra ... El resultado se incrusta en el build."
+	// And "Runtime ... genera una llave maestra efímera ... para desencriptar".
+	// This is slightly contradictory if the key is ephemeral and random.
+	// Let's assume the "llave maestra" is derived from a hardcoded secret in the engine + the salt,
+	// or the key is stored in the build but obfuscated.
+	// Let's use a fixed internal secret for now to allow the runtime to decrypt it,
+	// as the runtime needs to know how to decrypt it without user input.
+
+	masterSecret := []byte("JOSSECURITY_MASTER_SECRET_2025") // Internal Engine Secret
+	key := crypto.DeriveKey(masterSecret, salt)
+
+	encrypted, err := crypto.EncryptAES(data, key)
+	if err != nil {
+		fmt.Printf("Error encriptando env: %v\n", err)
+		return
+	}
+
+	// Format: [Salt 16] [Encrypted Data]
+	finalData := append(salt, encrypted...)
+
+	err = ioutil.WriteFile(destPath, finalData, 0644)
+	if err != nil {
+		fmt.Printf("Error escribiendo %s: %v\n", destPath, err)
+		return
+	}
+	fmt.Printf("Entorno encriptado guardado en %s\n", destPath)
 }

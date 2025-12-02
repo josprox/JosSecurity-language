@@ -19,9 +19,11 @@ func (p *Parser) parseStatement() Statement {
 	if p.curToken.Type == ECHO || p.curToken.Type == PRINT {
 		return p.parseEchoStatement()
 	}
-	if p.curToken.Type == IF {
-		return p.parseIfStatement()
-	}
+	// STRICT MODE: "La Muerte del If/Else"
+	// JosSecurity eliminates if/else structures.
+	// if p.curToken.Type == IF {
+	// 	return p.parseIfStatement()
+	// }
 	if p.curToken.Type == WHILE {
 		return p.parseWhileStatement()
 	}
@@ -385,44 +387,8 @@ func (p *Parser) parseThrowStatement() *ThrowStatement {
 	return stmt
 }
 
-func (p *Parser) parseIfStatement() *IfStatement {
-	stmt := &IfStatement{Token: p.curToken}
-
-	if !p.expectPeek(LPAREN) {
-		return nil
-	}
-
-	p.nextToken()
-	stmt.Condition = p.parseExpression(LOWEST)
-
-	if !p.expectPeek(RPAREN) {
-		return nil
-	}
-
-	if !p.expectPeek(LBRACE) {
-		return nil
-	}
-
-	stmt.Consequence = p.parseBlockStatement()
-
-	if p.peekToken.Type == ELSE {
-		p.nextToken()
-
-		if p.peekToken.Type == IF {
-			if !p.expectPeek(LBRACE) {
-				return nil
-			}
-			stmt.Alternative = p.parseBlockStatement()
-		} else {
-			if !p.expectPeek(LBRACE) {
-				return nil
-			}
-			stmt.Alternative = p.parseBlockStatement()
-		}
-	}
-
-	return stmt
-}
+// parseIfStatement removed to comply with JosSecurity "No If" policy.
+// func (p *Parser) parseIfStatement() *IfStatement { ... }
 
 func (p *Parser) parseMethodStatement() *MethodStatement {
 	stmt := &MethodStatement{Token: p.curToken}

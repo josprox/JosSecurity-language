@@ -10,6 +10,7 @@ import (
 	"time"
 
 	_ "github.com/go-sql-driver/mysql"
+	"github.com/jossecurity/joss/pkg/crypto"
 	"github.com/jossecurity/joss/pkg/parser"
 	"github.com/jossecurity/joss/pkg/version"
 	_ "modernc.org/sqlite"
@@ -129,28 +130,58 @@ func (r *Runtime) LoadEnv(fs http.FileSystem) {
 	var content []byte
 	var err error
 
+	// 1. Try reading env.joss (Dev Mode)
 	if fs != nil {
 		f, err := fs.Open("env.joss")
 		if err == nil {
 			defer f.Close()
-			// Get size
 			stat, _ := f.Stat()
 			content = make([]byte, stat.Size())
 			f.Read(content)
 		}
 	} else {
-		// Try reading env.joss from disk
 		content, err = os.ReadFile("env.joss")
-		if err != nil {
-			// Try looking in parent directory (for examples/ scripts)
+	}
+
+	// 2. If not found, try reading env.enc (Production/Build Mode)
+	if len(content) == 0 {
+		var encData []byte
+		if fs != nil {
+			f, err := fs.Open("env.enc")
+			if err == nil {
+				defer f.Close()
+				stat, _ := f.Stat()
+				encData = make([]byte, stat.Size())
+				f.Read(encData)
+			}
+		} else {
+			encData, err = os.ReadFile("env.enc")
+		}
+
+		if len(encData) > 16 {
+			fmt.Println("[Security] Detectado entorno encriptado (env.enc). Desencriptando...")
+			salt := encData[:16]
+			ciphertext := encData[16:]
+
+			// Derive key using the same internal secret
+			masterSecret := []byte("JOSSECURITY_MASTER_SECRET_2025")
+			key := crypto.DeriveKey(masterSecret, salt)
+
+			decrypted, err := crypto.DecryptAES(ciphertext, key)
+			if err != nil {
+				fmt.Printf("[Security] Error fatal desencriptando entorno: %v\n", err)
+				return
+			}
+			content = decrypted
+		}
+	}
+
+	if len(content) == 0 {
+		// Try looking in parent directories (Dev fallback)
+		if fs == nil {
 			content, err = os.ReadFile("../env.joss")
 			if err != nil {
-				// Try looking in project root if running from subfolder
 				content, err = os.ReadFile("../../env.joss")
-				if err != nil {
-					// Try looking in the specific test folder
-					content, err = os.ReadFile("pruebas 271125/env.joss")
-				}
 			}
 		}
 	}

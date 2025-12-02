@@ -27,6 +27,12 @@ func main() {
 		log.Fatalf("Error getting executable path: %v", err)
 	}
 
+	// Fix: Change CWD to executable directory to ensure relative paths (like Storage/database.sqlite) work
+	exeDir := filepath.Dir(exePath)
+	if err := os.Chdir(exeDir); err != nil {
+		log.Printf("Warning: Could not change CWD to %s: %v", exeDir, err)
+	}
+
 	f, err := os.Open(exePath)
 	if err != nil {
 		log.Fatalf("Error opening executable: %v", err)
@@ -111,6 +117,15 @@ func setupLogging() {
 	logFile, err := os.OpenFile(filepath.Join(dir, "error.log"), os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
 	if err == nil {
 		log.SetOutput(logFile)
+		// Redirect Stdout and Stderr to capture fmt.Println from runtime
+		// Note: This works for fmt package but not necessarily for low-level writes,
+		// but for our runtime debugging it's sufficient.
+		// Actually, assigning to os.Stdout/Stderr is not thread-safe and might not work as expected
+		// if runtime uses the original file descriptors.
+		// A better way is to replace the file descriptors, but that's OS specific.
+		// For simplicity in Go, we can just set os.Stdout = logFile.
+		os.Stdout = logFile
+		os.Stderr = logFile
 	}
 }
 
