@@ -106,7 +106,20 @@ switch ($opcion) {
 
 ## Operadores Ternarios
 
-También puedes usar operadores ternarios para lógica concisa.
+También puedes usar operadores ternarios para lógica concisa y el operador de fusión nula (Null Coalescing).
+
+### Operador de Fusión Nula (??)
+
+El operador `??` devuelve el primer operando si existe y no es nulo; de lo contrario, devuelve el segundo operando.
+
+```joss
+// Sintaxis: valor ?? default
+$nombre = $usuario ?? "Invitado"
+$titulo = $post->titulo ?? "Sin título"
+
+// Equivalente a:
+// $nombre = (isset($usuario)) ? $usuario : "Invitado"
+```
 
 ### Ternario Simple
 
@@ -114,6 +127,10 @@ También puedes usar operadores ternarios para lógica concisa.
 // Sintaxis: (condición) ? valor_verdadero : valor_falso
 $estado = ($edad >= 18) ? "Mayor" : "Menor"
 $mensaje = ($activo) ? "Activo" : "Inactivo"
+
+// Ahora soporta expresiones complejas directamente:
+$descuento = ($es_vip) ? $precio * 0.20 : 0
+$clase = ($activo && !$bloqueado) ? "btn-success" : "btn-secondary"
 ```
 
 ### Ternario con Bloques

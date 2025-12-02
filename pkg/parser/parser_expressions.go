@@ -356,43 +356,21 @@ func (p *Parser) parseTernaryExpression(condition Expression) Expression {
 		Condition: condition,
 	}
 
-	// Check if it's a block ternary: ? {
-	if p.peekToken.Type == LBRACE {
-		p.nextToken()
-		expression.True = p.parseBlockStatement()
-	} else {
-		// Value ternary: ? "A"
-		p.nextToken()
-		exp := p.parseExpression(LOWEST)
-		expression.True = &BlockStatement{
-			Statements: []Statement{&ExpressionStatement{Expression: exp}},
-		}
-	}
+	p.nextToken() // Consume ?
 
-	// Allow newlines before colon
-	for p.peekToken.Type == NEWLINE {
-		p.nextToken()
-	}
+	// Parse True Expression
+	// We use precedence slightly lower than TERNARY to allow nested ternaries?
+	// Actually, standard is right-associative.
+	// But here we just parse expression.
+	expression.True = p.parseExpression(LOWEST)
 
 	if !p.expectPeek(COLON) {
 		return nil
 	}
+	p.nextToken() // Consume :
 
-	// Allow newlines after colon
-	for p.peekToken.Type == NEWLINE {
-		p.nextToken()
-	}
-
-	if p.peekToken.Type == LBRACE {
-		p.nextToken()
-		expression.False = p.parseBlockStatement()
-	} else {
-		p.nextToken()
-		exp := p.parseExpression(LOWEST)
-		expression.False = &BlockStatement{
-			Statements: []Statement{&ExpressionStatement{Expression: exp}},
-		}
-	}
+	// Parse False Expression
+	expression.False = p.parseExpression(LOWEST)
 
 	return expression
 }

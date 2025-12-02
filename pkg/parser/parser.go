@@ -8,6 +8,9 @@ const (
 	_ int = iota
 	LOWEST
 	ASSIGNMENT  // =
+	TERNARY     // ? :
+	COALESCE    // ??
+	LOGICAL     // && or ||
 	EQUALS      // ==
 	LESSGREATER // > or <
 	PIPE_OP     // |>
@@ -16,37 +19,36 @@ const (
 	PRODUCT     // *
 	MODULO      // %
 	PREFIX      // -X or !X
-	TERNARY     // ? :
-	LOGICAL     // && or ||
 	CALL        // myFunction(X)
 	INDEX       // array[index]
 )
 
 var precedences = map[TokenType]int{
-	ASSIGN:       ASSIGNMENT,
-	QUESTION:     TERNARY,
-	PIPE:         PIPE_OP,
-	PLUS:         SUM,
-	MINUS:        SUM,
-	SLASH:        PRODUCT,
-	ASTERISK:     PRODUCT,
-	PERCENT:      MODULO,
-	AND:          LOGICAL,
-	OR:           LOGICAL,
-	LT:           LESSGREATER,
-	GT:           LESSGREATER,
-	EQ:           EQUALS,
-	NOT_EQ:       EQUALS,
-	LTE:          LESSGREATER,
-	GTE:          LESSGREATER,
-	SHIFT_LEFT:   SHIFT,
-	SHIFT_RIGHT:  SHIFT,
-	LPAREN:       CALL,
-	LBRACKET:     INDEX,
-	DOT:          INDEX,
-	ARROW:        INDEX,
-	DOUBLE_COLON: INDEX,
-	INCREMENT:    INDEX,
+	ASSIGN:        ASSIGNMENT,
+	QUESTION:      TERNARY,
+	NULL_COALESCE: COALESCE,
+	PIPE:          PIPE_OP,
+	PLUS:          SUM,
+	MINUS:         SUM,
+	SLASH:         PRODUCT,
+	ASTERISK:      PRODUCT,
+	PERCENT:       MODULO,
+	AND:           LOGICAL,
+	OR:            LOGICAL,
+	LT:            LESSGREATER,
+	GT:            LESSGREATER,
+	EQ:            EQUALS,
+	NOT_EQ:        EQUALS,
+	LTE:           LESSGREATER,
+	GTE:           LESSGREATER,
+	SHIFT_LEFT:    SHIFT,
+	SHIFT_RIGHT:   SHIFT,
+	LPAREN:        CALL,
+	LBRACKET:      INDEX,
+	DOT:           INDEX,
+	ARROW:         INDEX,
+	DOUBLE_COLON:  INDEX,
+	INCREMENT:     INDEX,
 }
 
 type (
@@ -108,6 +110,7 @@ func NewParser(l *Lexer) *Parser {
 	p.registerInfix(PIPE, p.parseInfixExpression)
 	p.registerInfix(LPAREN, p.parseCallExpression)
 	p.registerInfix(QUESTION, p.parseTernaryExpression)
+	p.registerInfix(NULL_COALESCE, p.parseInfixExpression)
 	p.registerInfix(LBRACKET, p.parseIndexExpression)
 	p.registerInfix(DOT, p.parseMemberExpression)
 	p.registerInfix(ARROW, p.parseMemberExpression)

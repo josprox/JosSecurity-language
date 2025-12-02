@@ -312,6 +312,15 @@ return View::render("welcome", {"nombre": "Juan"})
 
 <!-- Null coalescing -->
 <p>{{ $nombre ?? "Anónimo" }}</p>
+
+<!-- Expresiones Complejas -->
+<div class="{{ ($error) ? 'alert-danger' : 'alert-success' }}">
+    {{ $mensaje }}
+</div>
+
+<!-- Lógica y Matemáticas -->
+<p>Total: {{ $precio * $cantidad }}</p>
+<p>Estado: {{ ($activo && !$banned) ? "OK" : "Bloqueado" }}</p>
 ```
 
 #### Herencia
@@ -440,6 +449,21 @@ Obtiene parámetro POST.
 
 ```joss
 $email = Request::post("email")
+// Alias de Request::input()
+```
+
+#### `Request::input(string $key)`
+Obtiene un parámetro de la petición (GET o POST).
+
+```joss
+$nombre = Request::input("nombre")
+```
+
+#### `Request::except(array $keys)`
+Obtiene todos los parámetros excepto los especificados.
+
+```joss
+$datos = Request::except(["_token", "password"])
 ```
 
 #### `Request::all()`

@@ -47,8 +47,8 @@ func (ce *CallExpression) String() string {
 type TernaryExpression struct {
 	Token     Token // ?
 	Condition Expression
-	True      *BlockStatement
-	False     *BlockStatement
+	True      Expression
+	False     Expression
 }
 
 func (te *TernaryExpression) expressionNode()      {}

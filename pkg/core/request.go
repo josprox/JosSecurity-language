@@ -5,7 +5,7 @@ import "fmt"
 // executeRequestMethod handles Request methods
 func (r *Runtime) executeRequestMethod(instance *Instance, method string, args []interface{}) interface{} {
 	switch method {
-	case "input":
+	case "input", "post":
 		if len(args) > 0 {
 			key, ok := args[0].(string)
 			if !ok {

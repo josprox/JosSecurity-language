@@ -71,7 +71,14 @@ func (l *Lexer) NextToken() Token {
 			tok = l.newToken(COLON, l.ch)
 		}
 	case '?':
-		tok = l.newToken(QUESTION, l.ch)
+		if l.peekChar() == '?' {
+			ch := l.ch
+			l.readChar()
+			literal := string(ch) + string(l.ch)
+			tok = Token{Type: NULL_COALESCE, Literal: literal, Line: l.line}
+		} else {
+			tok = l.newToken(QUESTION, l.ch)
+		}
 	case '!':
 		if l.peekChar() == '=' {
 			ch := l.ch

@@ -106,7 +106,14 @@ func (r *Runtime) RegisterNativeClasses() {
 	// Request
 	requestClass := &parser.ClassStatement{
 		Name: &parser.Identifier{Value: "Request"},
-		Body: &parser.BlockStatement{},
+		Body: &parser.BlockStatement{
+			Statements: []parser.Statement{
+				&parser.MethodStatement{Name: &parser.Identifier{Value: "input"}},
+				&parser.MethodStatement{Name: &parser.Identifier{Value: "post"}},
+				&parser.MethodStatement{Name: &parser.Identifier{Value: "all"}},
+				&parser.MethodStatement{Name: &parser.Identifier{Value: "except"}},
+			},
+		},
 	}
 	r.registerClass(requestClass)
 	r.Variables["Request"] = &Instance{Class: requestClass, Fields: make(map[string]interface{})}

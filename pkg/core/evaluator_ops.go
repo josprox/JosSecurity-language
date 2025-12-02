@@ -152,15 +152,10 @@ func (r *Runtime) evaluateTernary(te *parser.TernaryExpression) interface{} {
 	}
 
 	if isTrue {
-		if te.True != nil {
-			return r.executeBlock(te.True)
-		}
+		return r.evaluateExpression(te.True)
 	} else {
-		if te.False != nil {
-			return r.executeBlock(te.False)
-		}
+		return r.evaluateExpression(te.False)
 	}
-	return nil
 }
 
 func (r *Runtime) evaluateInfix(ie *parser.InfixExpression) interface{} {
@@ -375,6 +370,14 @@ func (r *Runtime) evaluateInfix(ie *parser.InfixExpression) interface{} {
 				return bLeft || bRight
 			}
 		}
+	}
+
+	// Null Coalescing Operator ??
+	if ie.Operator == "??" {
+		if left != nil && left != "" {
+			return left
+		}
+		return right
 	}
 
 	return nil
