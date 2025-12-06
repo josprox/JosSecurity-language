@@ -1,106 +1,131 @@
-# -----------------------------------------------------------
 # JosSecurity Build Script for Windows PowerShell
-# Genera todos los binarios de Go y copia la última extensión VSIX.
-# Debe ejecutarse desde la raíz del proyecto (junto a go.mod).
-# -----------------------------------------------------------
+# Must be run from the root of the project (next to go.mod).
+
 $ErrorActionPreference = "Stop"
 
 $SourcePackage = "./cmd/joss"
 $InstallerDir = "installer"
 $VSIXSourceDir = "vscode-joss"
 
-Write-Host "=======================================" -ForegroundColor Blue
-Write-Host "  🚀 JosSecurity Go Compilation" -ForegroundColor Blue
-Write-Host "=======================================" -ForegroundColor Blue
+Write-Host "==================" -ForegroundColor Blue
+Write-Host "  JosSecurity Build" -ForegroundColor Blue
+Write-Host "==================" -ForegroundColor Blue
 
-# 1. Crear el directorio de instalación
 if (-not (Test-Path $InstallerDir)) {
     New-Item -ItemType Directory -Path $InstallerDir | Out-Null
 }
-Write-Host "[INFO] Directorio '$InstallerDir' listo."
+Write-Host "Installer directory ready: $InstallerDir"
 
-# 2. Copiar el último archivo VSIX
-Write-Host "[INFO] Buscando el último archivo VSIX en '$VSIXSourceDir'..."
+# Build VSIX
+Write-Host "Building VSIX..."
+Push-Location $VSIXSourceDir
+try {
+    # Remove old vsix
+    Get-ChildItem -Filter "*.vsix" | Remove-Item -Force -ErrorAction SilentlyContinue
+    
+    # Build
+    Write-Host "Running 'npm run package'..."
+    cmd /c "npm run package"
+    
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "npm run package failed. Is Node.js installed?" -ForegroundColor Red
+        # Don't exit, maybe continuing with just binaries is desired? 
+        # But user requested this. Let's flag it.
+    }
+} catch {
+    Write-Host "VSIX Build Error: $($_.Exception.Message)" -ForegroundColor Red
+}
+Pop-Location
+
+# Copy new VSIX
 $LatestVSIX = Get-ChildItem -Path $VSIXSourceDir -Filter "*.vsix" | Sort-Object LastWriteTime -Descending | Select-Object -First 1
 
 if ($LatestVSIX) {
     Copy-Item -Path $LatestVSIX.FullName -Destination $InstallerDir -Force
-    Write-Host "[SUCCESS] VSIX copiado: $($LatestVSIX.Name)" -ForegroundColor Green
+    Write-Host "VSIX Built and Copied: $($LatestVSIX.Name)" -ForegroundColor Green
 } else {
-    Write-Host "[WARNING] No se encontró ningún archivo .vsix. Continuar sin VSIX." -ForegroundColor Yellow
+    Write-Host "VSIX Build Failed or Not Found." -ForegroundColor Yellow
 }
 
-# 3. Definir y ejecutar la compilación cruzada
+# Define Targets
 $Targets = @(
-    # Windows
     @{GOOS="windows"; GOARCH="amd64"; OutputName="joss.exe"},
     @{GOOS="windows"; GOARCH="arm64"; OutputName="joss-windows-arm64.exe"},
-    # Linux
     @{GOOS="linux"; GOARCH="amd64"; OutputName="joss-linux-amd64"},
     @{GOOS="linux"; GOARCH="arm64"; OutputName="joss-linux-arm64"},
     @{GOOS="linux"; GOARCH="arm"; OutputName="joss-linux-armv7"},
-    # macOS (Darwin)
     @{GOOS="darwin"; GOARCH="amd64"; OutputName="joss-macos-amd64"},
     @{GOOS="darwin"; GOARCH="arm64"; OutputName="joss-macos-arm64"}
 )
 
-Write-Host ""
-Write-Host "[INFO] Iniciando compilación de binarios..."
+Write-Host "Starting compilation..."
 
 foreach ($Target in $Targets) {
     $GOOS = $Target.GOOS
     $GOARCH = $Target.GOARCH
     $OutputName = $Target.OutputName
     
-    # Línea 63 corregida con ${}
-    Write-Host "  -> Compilando para ${GOOS}/${GOARCH} ($OutputName)..."
+    Write-Host "Compiling for $GOOS/$GOARCH ($OutputName)..."
 
-    # Establecer variables de entorno temporalmente
     $env:GOOS = $GOOS
     $env:GOARCH = $GOARCH
     $env:CGO_ENABLED = 0
 
-    # Ejecutar la compilación
     try {
-        # Línea corregida (antes línea 67)
         go build -o "$InstallerDir/$OutputName" $SourcePackage
-        Write-Host "  [OK] Creado." -ForegroundColor Green
+        Write-Host "  [OK]" -ForegroundColor Green
     } catch {
-        # Línea 68 corregida con ${}
-        Write-Host "  [ERROR] Falló la compilación para ${GOOS}/${GOARCH}: $($_.Exception.Message)" -ForegroundColor Red
+        Write-Host "  [ERROR] Compilation failed: $($_.Exception.Message)" -ForegroundColor Red
     }
     
-    # Limpiar variables de entorno
     Remove-Item Env:GOOS
     Remove-Item Env:GOARCH
     Remove-Item Env:CGO_ENABLED
 }
 
-# 4. Comprimir los binarios y el VSIX
-Write-Host ""
-Write-Host "=======================================" -ForegroundColor Cyan
-Write-Host "[INFO] 📦 Empaquetando para distribución..." -ForegroundColor Cyan
+# Zip Files
+Write-Host "Packaging..." -ForegroundColor Cyan
 
-try {
-    $ZipFileName = "jossecurity-binaries.zip"
-
-    # Eliminar archivo viejo si existe
-    if (Test-Path $ZipFileName) {
-        Remove-Item $ZipFileName -Force | Out-Null
+function Compress-Files {
+    param($Files, $ZipName)
+    if (Test-Path $ZipName) { Remove-Item $ZipName -Force | Out-Null }
+    
+    $TempZipDir = New-Item -ItemType Directory -Path "$env:TEMP/joss_zip_temp_$(Get-Random)" -Force
+    
+    foreach ($File in $Files) {
+        if (Test-Path "$InstallerDir/$File") {
+            Copy-Item "$InstallerDir/$File" $TempZipDir -Force
+        }
     }
     
-    # Comprimir el contenido de la carpeta 'installer' a jossecurity-binaries.zip en la raíz
-    # Esto asegura que el ZIP contenga solo los archivos, no la carpeta padre 'installer/'
-    Get-ChildItem -Path $InstallerDir -Recurse | Compress-Archive -DestinationPath $ZipFileName -Force
+    if ((Get-ChildItem $TempZipDir).Count -gt 0) {
+        Get-ChildItem -Path $TempZipDir -Recurse | Compress-Archive -DestinationPath $ZipName -Force
+        Write-Host "Created $ZipName" -ForegroundColor Green
+    } else {
+        Write-Host "Skipped $ZipName (files not found)" -ForegroundColor Yellow
+    }
     
-    Write-Host "[SUCCESS] Archivo de distribución creado: $ZipFileName" -ForegroundColor Green
-    Write-Host "[INFO] ¡Listo para subir a GitHub Releases!" -ForegroundColor Yellow
-
-} catch {
-    Write-Host "[ERROR] Falló la compresión del archivo ZIP: $($_.Exception.Message)" -ForegroundColor Red
+    Remove-Item $TempZipDir -Recurse -Force
 }
 
-Write-Host ""
-Write-Host "=======================================" -ForegroundColor Green
-Write-Host "✅ Tarea de compilación y empaquetado finalizada." -ForegroundColor Green
-Write-Host "=======================================" -ForegroundColor Green
+try {
+    # 1. Extension
+    $VSIXFiles = Get-ChildItem -Path $InstallerDir -Filter "*.vsix" | Select-Object -ExpandProperty Name
+    Compress-Files -Files $VSIXFiles -ZipName "jossecurity-vscode.zip"
+
+    # 2. Windows
+    Compress-Files -Files @("joss.exe", "joss-windows-arm64.exe") -ZipName "jossecurity-windows.zip"
+
+    # 3. Linux
+    Compress-Files -Files @("joss-linux-amd64", "joss-linux-arm64", "joss-linux-armv7") -ZipName "jossecurity-linux.zip"
+
+    # 4. macOS
+    Compress-Files -Files @("joss-macos-amd64", "joss-macos-arm64") -ZipName "jossecurity-macos.zip"
+
+    Write-Host "Ready for GitHub Releases." -ForegroundColor Yellow
+
+} catch {
+    Write-Host "Compression failed: $($_.Exception.Message)" -ForegroundColor Red
+}
+
+Write-Host "Done." -ForegroundColor Green

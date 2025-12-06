@@ -241,32 +241,74 @@ function Run-Update {
 
 # --- FLUJO DE TRABAJO PRINCIPAL ---
 
+# --- FUNCIONES DE CHEQUEO PREVIO ---
+
+function Ensure-VSCode {
+    if (Test-VSCode) { return $true }
+    
+    Write-Host "[?] Visual Studio Code not found." -ForegroundColor Yellow
+    $ans = Read-Host "Do you want to install VS Code? (y/n)"
+    if ($ans -eq 'y') {
+        try {
+            Write-Log "Installing VS Code via Winget..." "INFO"
+            winget install -e --id Microsoft.VisualStudioCode --accept-package-agreements --accept-source-agreements
+            
+            # Refresh PATH environment variable logic is messy in current session.
+            Write-Log "[OK] VS Code installed. Please Restart PowerShell after this script." "SUCCESS"
+            return $true
+        } catch {
+            Write-Log "[X] Auto-install failed: $($_.Exception.Message)" "ERROR"
+            Write-Host "Please install manually at https://code.visualstudio.com/" -ForegroundColor Yellow
+        }
+    }
+    return $false
+}
+
+# --- FLUJO DE TRABAJO PRINCIPAL ---
+
 # 1. Descarga y Extracción
+function Download-File {
+    param($Url, $Dest)
+    try {
+        Invoke-WebRequest -Uri $Url -OutFile $Dest -UseBasicParsing
+        return $true
+    } catch {
+        Write-Log "[X] Download failed ($Url): $($_.Exception.Message)" "ERROR"
+        return $false
+    }
+}
+
 function Download-And-Extract {
+    $WindowsZip = "jossecurity-windows.zip"
+    $ExtensionZip = "jossecurity-vscode.zip"
+    
+    $WindowsUrl = "https://github.com/$RepoOwner/$RepoName/releases/latest/download/$WindowsZip"
+    $ExtensionUrl = "https://github.com/$RepoOwner/$RepoName/releases/latest/download/$ExtensionZip"
+
     Write-Log "[INIT] Preparing temp directory..."
     if (Test-Path $TempDir) { Remove-Item $TempDir -Recurse -Force }
     New-Item -ItemType Directory -Path $TempDir -Force | Out-Null
 
-    Write-Host "[INIT] Downloading binaries and VSIX from $ZipUrl..." -ForegroundColor Yellow
-    $ZipPath = "$TempDir\binaries.zip"
-    try {
-        Invoke-WebRequest -Uri $ZipUrl -OutFile $ZipPath -UseBasicParsing
-    } catch {
-        Write-Log "[X] Failed to download zip file: $($_.Exception.Message)" "ERROR"
-        # Asegurarse de que el script termine si falla la descarga
-        return $false
-    }
+    # 1. Download Windows Binaries
+    Write-Host "[INIT] Downloading Binaries ($WindowsZip)..." -ForegroundColor Cyan
+    if (-not (Download-File -Url $WindowsUrl -Dest "$TempDir\$WindowsZip")) { return $false }
 
-    Write-Log "[INIT] Extracting files..."
-    try {
-        # Si la descarga tuvo éxito, el archivo $ZipPath existe.
-        Expand-Archive -Path $ZipPath -DestinationPath $TempDir -Force
-        Remove-Item $ZipPath -Force
-        return $true
-    } catch {
-        Write-Log "[X] Failed to extract zip file: $($_.Exception.Message). Check if required modules are installed." "ERROR"
-        return $false
-    }
+    Write-Log "[INIT] Extracting Binaries..."
+    Expand-Archive -Path "$TempDir\$WindowsZip" -DestinationPath $TempDir -Force
+    Remove-Item "$TempDir\$WindowsZip" -Force
+
+    # 2. Download Extension
+    Write-Host "[INIT] Downloading Extension ($ExtensionZip)..." -ForegroundColor Cyan
+    if (-not (Download-File -Url $ExtensionUrl -Dest "$TempDir\$ExtensionZip")) { return $false }
+    
+    Write-Log "[INIT] Extracting Extension..."
+    Expand-Archive -Path "$TempDir\$ExtensionZip" -DestinationPath $TempDir -Force
+    Remove-Item "$TempDir\$ExtensionZip" -Force
+    
+    # 3. Check/Install VS Code (Optional but part of flow)
+    Ensure-VSCode | Out-Null
+    
+    return $true
 }
 
 # 2. Menú de Acción

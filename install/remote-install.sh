@@ -179,22 +179,73 @@ run_update() {
 
 # --- FLUJO DE TRABAJO PRINCIPAL ---
 
+ensure_vscode() {
+    if detect_vscode; then
+        return 0
+    fi
+    
+    echo ""
+    log WARNING "Visual Studio Code is not installed."
+    read -p "Do you want to install VS Code? (y/n) " ans
+    if [ "$ans" = "y" ]; then
+        if [[ "$(uname -s)" == "Darwin" ]]; then
+             log INFO "Please install via Homebrew: brew install --cask visual-studio-code"
+             # Or try to run it? safer to just instruct.
+        else
+             # Linux attempt
+             if command -v snap &> /dev/null; then
+                 sudo snap install code --classic
+                 return 0
+             elif command -v apt-get &> /dev/null; then
+                 # Complex on debian/ubuntu without repo added.
+                 log INFO "Please install manually: https://code.visualstudio.com/download"
+             else
+                 log INFO "Please install manually: https://code.visualstudio.com/download"
+             fi
+        fi
+    fi
+}
+
 # 1. Descarga y Extracción
 download_and_extract() {
     log INFO "[INIT] Preparing temp directory..."
     rm -rf "$TEMP_DIR"
     mkdir -p "$TEMP_DIR"
+
+    # Determine correct ZIP
+    OS=$(uname -s)
+    if [[ "$OS" == "Darwin" ]]; then
+        OS_ZIP="jossecurity-macos.zip"
+    else
+        OS_ZIP="jossecurity-linux.zip"
+    fi
+    EXT_ZIP="jossecurity-vscode.zip"
+
+    BINARY_URL="https://github.com/$REPO_OWNER/$REPO_NAME/releases/latest/download/$OS_ZIP"
+    EXT_URL="https://github.com/$REPO_OWNER/$REPO_NAME/releases/latest/download/$EXT_ZIP"
     
-    log INFO "[INIT] Downloading binaries and VSIX from $ZIP_URL..."
-    curl -fsSL "$ZIP_URL" -o "$TEMP_DIR/binaries.zip"
-    
-    log INFO "[INIT] Extracting files..."
-    unzip -o "$TEMP_DIR/binaries.zip" -d "$TEMP_DIR"
-    
-    if [ $? -ne 0 ]; then
-        log ERROR "[X] Failed to extract zip. Do you have 'unzip' installed?"
+    # 1. Binaries
+    log INFO "[INIT] Downloading Binaries ($OS_ZIP)..."
+    if ! curl -fsSL "$BINARY_URL" -o "$TEMP_DIR/$OS_ZIP"; then
+        log ERROR "[X] Failed to download $OS_ZIP. Check internet or release version."
         return 1
     fi
+    
+    # 2. Extension
+    log INFO "[INIT] Downloading Extension ($EXT_ZIP)..."
+    if ! curl -fsSL "$EXT_URL" -o "$TEMP_DIR/$EXT_ZIP"; then
+        log ERROR "[X] Failed to download extension." 
+        # Non-fatal? Maybe we still proceed with binary. But let's fail safe.
+        return 1
+    fi
+    
+    log INFO "[INIT] Extracting files..."
+    unzip -o "$TEMP_DIR/$OS_ZIP" -d "$TEMP_DIR"
+    unzip -o "$TEMP_DIR/$EXT_ZIP" -d "$TEMP_DIR"
+    
+    # Check VS Code
+    ensure_vscode
+    
     return 0
 }
 
