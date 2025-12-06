@@ -24,8 +24,10 @@ func (r *Runtime) evaluateViewExpression(expr string, data map[string]interface{
 	// We can safely modify r.Variables.
 
 	// Inject data into variables
+	// Inject data into variables
 	for k, v := range data {
-		r.Variables["$"+k] = v
+		// Fix: Don't prepend $ here, as Parser/Evaluator expects raw identifier name
+		r.Variables[k] = v
 	}
 
 	l := parser.NewLexer(expr)
@@ -33,7 +35,7 @@ func (r *Runtime) evaluateViewExpression(expr string, data map[string]interface{
 	program := p.ParseProgram()
 
 	if len(p.Errors()) > 0 {
-		return fmt.Sprintf("Error parsing view expression: %s", expr)
+		return fmt.Sprintf("Error parsing view expression: %s | Details: %v", expr, p.Errors())
 	}
 
 	if len(program.Statements) == 0 {

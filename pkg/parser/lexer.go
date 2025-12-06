@@ -158,7 +158,11 @@ func (l *Lexer) NextToken() Token {
 		tok = Token{Type: VAR, Literal: "$", Line: l.line}
 	case '"':
 		tok.Type = STRING
-		tok.Literal = l.readString()
+		tok.Literal = l.readString('"')
+		tok.Line = l.line
+	case '\'':
+		tok.Type = STRING
+		tok.Literal = l.readString('\'')
 		tok.Line = l.line
 	case 0:
 		tok.Literal = ""
@@ -255,11 +259,11 @@ func isDigit(ch byte) bool {
 	return '0' <= ch && ch <= '9'
 }
 
-func (l *Lexer) readString() string {
+func (l *Lexer) readString(delimiter byte) string {
 	var out []byte
 	for {
 		l.readChar()
-		if l.ch == '"' || l.ch == 0 {
+		if l.ch == delimiter || l.ch == 0 {
 			break
 		}
 
@@ -274,6 +278,8 @@ func (l *Lexer) readString() string {
 				out = append(out, '\r')
 			case '"':
 				out = append(out, '"')
+			case '\'':
+				out = append(out, '\'')
 			case '\\':
 				out = append(out, '\\')
 			default:

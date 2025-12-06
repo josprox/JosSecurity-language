@@ -143,19 +143,32 @@ func (r *Runtime) evaluateIndex(ie *parser.IndexExpression) interface{} {
 
 func (r *Runtime) evaluateTernary(te *parser.TernaryExpression) interface{} {
 	cond := r.evaluateExpression(te.Condition)
-	isTrue := false
+	isTrue := isTruthy(cond)
 
-	if b, ok := cond.(bool); ok {
-		isTrue = b
-	} else if s, ok := cond.(string); ok {
-		isTrue = s == "true" || s == "TRUE"
-	}
+	var result interface{}
 
-	if isTrue {
-		return r.evaluateExpression(te.True)
+	if te.True == nil {
+		// Elvis Operator
+		if isTrue {
+			result = cond
+		} else {
+			result = r.evaluateExpression(te.False)
+		}
 	} else {
-		return r.evaluateExpression(te.False)
+		// Standard Ternary
+		if isTrue {
+			result = r.evaluateExpression(te.True)
+		} else {
+			result = r.evaluateExpression(te.False)
+		}
 	}
+
+	// If the result is a BlockStatement (e.g. from { ... }), execute it!
+	if block, ok := result.(*parser.BlockStatement); ok {
+		return r.executeBlock(block)
+	}
+
+	return result
 }
 
 func (r *Runtime) evaluateInfix(ie *parser.InfixExpression) interface{} {
@@ -374,7 +387,7 @@ func (r *Runtime) evaluateInfix(ie *parser.InfixExpression) interface{} {
 
 	// Null Coalescing Operator ??
 	if ie.Operator == "??" {
-		if left != nil && left != "" {
+		if left != nil {
 			return left
 		}
 		return right

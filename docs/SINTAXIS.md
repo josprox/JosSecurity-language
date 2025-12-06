@@ -25,6 +25,7 @@ Todas las variables deben iniciar con `$` y tienen un tipo estático:
 int $edad = 25
 float $precio = 99.99
 string $nombre = "Jose Luis"
+string $alias = 'Pepe' // Comillas simples también soportadas
 bool $activo = true
 
 // Null
@@ -108,17 +109,27 @@ switch ($opcion) {
 
 También puedes usar operadores ternarios para lógica concisa y el operador de fusión nula (Null Coalescing).
 
-### Operador de Fusión Nula (??)
+### Operador de Fusión Nula (??) - Strict Nil
 
-El operador `??` devuelve el primer operando si existe y no es nulo; de lo contrario, devuelve el segundo operando.
+El operador `??` comprueba estrictamente si el valor es `nil`. Si el valor es una cadena vacía `""` o `0`, **se conserva**.
 
 ```joss
 // Sintaxis: valor ?? default
-$nombre = $usuario ?? "Invitado"
-$titulo = $post->titulo ?? "Sin título"
+$usuario = nil
+$nombre = $usuario ?? "Invitado" // "Invitado"
 
-// Equivalente a:
-// $nombre = (isset($usuario)) ? $usuario : "Invitado"
+$titulo = ""
+$texto = $titulo ?? "Sin título" // "" (Cadena vacía se mantiene)
+```
+
+### Operador Elvis (?:)
+
+El operador Elvis `?:` es similar al ternario pero evalúa la "veracidad" (truthiness). Utilízalo si quieres defaults para valores vacíos o falsos.
+
+```joss
+// Sintaxis: valor ?: default
+$nombre = "" ?: "Anónimo"  // "Anónimo"
+$edad = 0 ?: 18            // 18
 ```
 
 ### Ternario Simple
@@ -126,23 +137,17 @@ $titulo = $post->titulo ?? "Sin título"
 ```joss
 // Sintaxis: (condición) ? valor_verdadero : valor_falso
 $estado = ($edad >= 18) ? "Mayor" : "Menor"
-$mensaje = ($activo) ? "Activo" : "Inactivo"
-
-// Ahora soporta expresiones complejas directamente:
-$descuento = ($es_vip) ? $precio * 0.20 : 0
-$clase = ($activo && !$bloqueado) ? "btn-success" : "btn-secondary"
 ```
 
-### Ternario con Bloques
+### Ternario con Bloques (Ejecución)
+
+Los bloques dentro de un ternario ahora se **ejecutan** correctamente, permitiendo `return` temprano.
 
 ```joss
-// Sintaxis: (condición) ? { bloque_verdad } : { bloque_falso }
 ($usuario->esValido()) ? {
     DB::save($usuario)
-    print("Usuario guardado")
     return true
 } : {
-    Log::error("Usuario inválido")
     return false
 }
 ```

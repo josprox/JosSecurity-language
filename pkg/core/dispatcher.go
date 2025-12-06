@@ -60,6 +60,15 @@ func (r *Runtime) Dispatch(method, path string, reqData, sessData map[string]int
 	}
 
 	if handler == nil {
+		fmt.Printf("[DEBUG] Route not found: %s %s\n", method, path)
+		fmt.Printf("[DEBUG] Available Routes for %s:\n", method)
+		if r.Routes[method] != nil {
+			for k := range r.Routes[method] {
+				fmt.Printf("\t%s\n", k)
+			}
+		} else {
+			fmt.Println("\t(None)")
+		}
 		return nil, fmt.Errorf("route not found: %s %s", method, path)
 	}
 

@@ -358,16 +358,20 @@ func (p *Parser) parseTernaryExpression(condition Expression) Expression {
 
 	p.nextToken() // Consume ?
 
-	// Parse True Expression
-	// We use precedence slightly lower than TERNARY to allow nested ternaries?
-	// Actually, standard is right-associative.
-	// But here we just parse expression.
-	expression.True = p.parseExpression(LOWEST)
+	if p.curToken.Type == COLON {
+		// Elvis Operator: condition ?: falsePart
+		// True part is implicitly the condition (evaluated once)
+		expression.True = nil // Will handle in Evaluator
+		p.nextToken()         // Consume :
+	} else {
+		// Standard Ternary: condition ? truePart : falsePart
+		expression.True = p.parseExpression(LOWEST)
 
-	if !p.expectPeek(COLON) {
-		return nil
+		if !p.expectPeek(COLON) {
+			return nil
+		}
+		p.nextToken() // Consume :
 	}
-	p.nextToken() // Consume :
 
 	// Parse False Expression
 	expression.False = p.parseExpression(LOWEST)
