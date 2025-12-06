@@ -9,7 +9,9 @@
     "vscode": "^1.75.0"
   },
   "main": "./out/extension.js",
-  "activationEvents": ["*"],
+  "activationEvents": [
+    "onLanguage:joss"
+  ],
   "categories": [
     "Programming Languages",
     "Snippets",
