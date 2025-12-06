@@ -21,9 +21,9 @@ func (r *Runtime) executeSmtpClientMethod(instance *Instance, method string, arg
 		return instance
 	case "send":
 		if len(args) >= 3 {
-			to := args[0].(string)
-			subject := args[1].(string)
-			body := args[2].(string)
+			to := fmt.Sprintf("%v", args[0])
+			subject := fmt.Sprintf("%v", args[1])
+			body := fmt.Sprintf("%v", args[2])
 
 			// Defaults
 			host := "smtp.gmail.com"
@@ -39,9 +39,14 @@ func (r *Runtime) executeSmtpClientMethod(instance *Instance, method string, arg
 			pass := ""
 			if u, ok := instance.Fields["user"]; ok {
 				user = u.(string)
+			} else if u, ok := r.Env["MAIL_USERNAME"]; ok {
+				user = u
 			}
+
 			if p, ok := instance.Fields["pass"]; ok {
 				pass = p.(string)
+			} else if p, ok := r.Env["MAIL_PASSWORD"]; ok {
+				pass = p
 			}
 
 			msg := []byte("From: " + user + "\r\n" +

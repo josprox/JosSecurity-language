@@ -12,6 +12,7 @@ Router::get("/", "HomeController@index")
 Router::middleware("guest")
 Router::match("GET|POST", "/login", "AuthController@showLogin@doLogin")
 Router::match("GET|POST", "/register", "AuthController@showRegister@doRegister")
+Router::get("/verify/{token}", "AuthController@verify")
 Router::end()
 
 // Rutas Protegidas (Solo autenticados)
@@ -19,6 +20,14 @@ Router::middleware("auth")
     Router::get("/dashboard", "DashboardController@index")
     Router::get("/profile", "ProfileController@index")
     Router::get("/logout", "AuthController@logout")
+Router::end()
+`,
+		filepath.Join(path, "api.joss"): `// API Routes
+Router::api() // Enable API headers
+Router::post("/api/login", "AuthController@apiLogin")
+
+Router::middleware("auth_api") // Assume middleware exists or will be created
+    // Router::get("/api/user", "UserController@index")
 Router::end()
 `,
 	}

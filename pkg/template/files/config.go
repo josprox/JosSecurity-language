@@ -36,7 +36,18 @@ DB_PASS=""
 # Database Table Prefix
 PREFIX="js_"
 
-JWT_SECRET="change_me_in_production"`,
+JWT_SECRET="change_me_in_production"
+
+# Application URL (for emails etc)
+APP_URL="http://localhost:8000"
+
+# Email Configuration (SMTP)
+MAIL_HOST="smtp.gmail.com"
+MAIL_PORT="587"
+MAIL_USERNAME="your_email@gmail.com"
+MAIL_PASSWORD="your_app_password"
+MAIL_FROM_ADDRESS="no-reply@jossecurity.com"
+MAIL_FROM_NAME="${APP_NAME}"`,
 		filepath.Join(path, "config", "reglas.joss"): fmt.Sprintf(`// Constantes Globales
 const string APP_NAME = "JosSecurity Enterprise"
 const string APP_VERSION = "%s"`, version.Version),

@@ -219,12 +219,8 @@ func MainHandler(w http.ResponseWriter, r *http.Request) {
 		// Save In-Memory (Write-Back)
 		// fmt.Printf("[HANDLER] %s: Acquiring session lock for write-back...\n", requestID)
 		sessionMu.Lock()
-		if sessionStore[sessionID] == nil {
-			sessionStore[sessionID] = make(map[string]interface{})
-		}
-		for k, v := range sessData {
-			sessionStore[sessionID][k] = v
-		}
+		// Overwrite the session data completely to ensure deletions (like logout) are persisted
+		sessionStore[sessionID] = sessData
 		sessionMu.Unlock()
 		// fmt.Printf("[HANDLER] %s: Session lock released (Write-back).\n", requestID)
 	}

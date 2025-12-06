@@ -106,8 +106,20 @@ func GetViewFiles(path string) map[string]string {
             <form method="POST" action="/register">
                 {{ csrf_field() }}
                 <div class="form-group">
-                    <label>Nombre Completo</label>
-                    <input type="text" name="name" class="form-control" required placeholder="Juan Pérez">
+                    <label>Nombre</label>
+                    <input type="text" name="first_name" class="form-control" required placeholder="Juan">
+                </div>
+                <div class="form-group">
+                    <label>Apellidos</label>
+                    <input type="text" name="last_name" class="form-control" required placeholder="Pérez">
+                </div>
+                <div class="form-group">
+                    <label>Usuario</label>
+                    <input type="text" name="username" class="form-control" required placeholder="juanperez">
+                </div>
+                <div class="form-group">
+                    <label>Teléfono</label>
+                    <input type="tel" name="phone" class="form-control" placeholder="+1234567890">
                 </div>
                 <div class="form-group">
                     <label>Correo Electrónico</label>

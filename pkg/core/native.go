@@ -200,6 +200,32 @@ func (r *Runtime) RegisterNativeClasses() {
 	}
 	r.registerClass(sessionClass)
 	// Session is instantiated per request, but we register the class here.
+
+	// UUID
+	r.registerClass(&parser.ClassStatement{
+		Name: &parser.Identifier{Value: "UUID"},
+		Body: &parser.BlockStatement{
+			Statements: []parser.Statement{
+				&parser.MethodStatement{Name: &parser.Identifier{Value: "generate"}},
+				&parser.MethodStatement{Name: &parser.Identifier{Value: "v4"}},
+			},
+		},
+	})
+	r.Variables["UUID"] = &Instance{Class: r.Classes["UUID"], Fields: make(map[string]interface{})}
+
+	// UserStorage
+	r.registerClass(&parser.ClassStatement{
+		Name: &parser.Identifier{Value: "UserStorage"},
+		Body: &parser.BlockStatement{
+			Statements: []parser.Statement{
+				&parser.MethodStatement{Name: &parser.Identifier{Value: "put"}},
+				&parser.MethodStatement{Name: &parser.Identifier{Value: "path"}},
+				&parser.MethodStatement{Name: &parser.Identifier{Value: "exists"}},
+				&parser.MethodStatement{Name: &parser.Identifier{Value: "delete"}},
+			},
+		},
+	})
+	r.Variables["UserStorage"] = &Instance{Class: r.Classes["UserStorage"], Fields: make(map[string]interface{})}
 }
 
 func (r *Runtime) executeNativeMethod(instance *Instance, method string, args []interface{}) interface{} {
@@ -245,6 +271,10 @@ func (r *Runtime) executeNativeMethod(instance *Instance, method string, args []
 			return r.executeMathMethod(instance, method, args)
 		case "Session":
 			return r.executeSessionMethod(instance, method, args)
+		case "UUID":
+			return r.executeUUIDMethod(instance, method, args)
+		case "UserStorage":
+			return r.executeUserStorageMethod(instance, method, args)
 		}
 
 		// Move to parent
