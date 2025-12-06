@@ -109,6 +109,14 @@
           "match": "(\\?|:)"
         },
         {
+          "name": "keyword.operator.null-coalescing.joss",
+          "match": "(\\?\\?)"
+        },
+        {
+          "name": "keyword.operator.elvis.joss",
+          "match": "(\\?:)"
+        },
+        {
           "name": "keyword.operator.logical.joss",
           "match": "(&&|\\|\\||!)"
         },
