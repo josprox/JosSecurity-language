@@ -24,3 +24,5 @@ install/joss-linux
 install/joss-macos
 install/*.vsix
 installer/*
+
+jossecurity-*.zip
