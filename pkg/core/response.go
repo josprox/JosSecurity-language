@@ -25,10 +25,14 @@ func (r *Runtime) executeResponseMethod(instance *Instance, method string, args 
 
 	case "json":
 		if len(args) > 0 {
-			return map[string]interface{}{
+			res := map[string]interface{}{
 				"_type": "JSON",
 				"data":  args[0],
 			}
+			if len(args) > 1 {
+				res["status_code"] = args[1]
+			}
+			return res
 		}
 	}
 	return nil

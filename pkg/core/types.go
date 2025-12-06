@@ -16,6 +16,7 @@ type Runtime struct {
 	DB                *sql.DB
 	Routes            map[string]map[string]interface{} // HTTP Method -> Path -> Handler
 	CurrentMiddleware []string
+	CustomMiddlewares map[string]interface{} // Name -> Closure/Handler
 }
 
 // Instance represents an instance of a class

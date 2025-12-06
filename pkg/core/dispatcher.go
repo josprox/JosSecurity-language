@@ -2,9 +2,11 @@ package core
 
 import (
 	"fmt"
+	"os"
 	"regexp"
 	"strings"
 
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/jossecurity/joss/pkg/parser"
 )
 
@@ -60,17 +62,20 @@ func (r *Runtime) Dispatch(method, path string, reqData, sessData map[string]int
 	}
 
 	if handler == nil {
-		fmt.Printf("[DEBUG] Route not found: %s %s\n", method, path)
+		fmt.Printf("[DEBUG] DISPATCH FAIL: Route not found: %s %s\n", method, path)
 		fmt.Printf("[DEBUG] Available Routes for %s:\n", method)
 		if r.Routes[method] != nil {
 			for k := range r.Routes[method] {
-				fmt.Printf("\t%s\n", k)
+				fmt.Printf("\t'%s'\n", k)
 			}
 		} else {
 			fmt.Println("\t(None)")
 		}
 		return nil, fmt.Errorf("route not found: %s %s", method, path)
 	}
+
+	// Debug Handler Type
+	fmt.Printf("[DEBUG] DISPATCH SUCCESS: Found handler for %s %s\n", method, path)
 
 	// Middleware Execution
 	for _, mw := range middleware {
@@ -129,6 +134,86 @@ func (r *Runtime) Dispatch(method, path string, reqData, sessData map[string]int
 					},
 				}, nil
 			}
+		case "auth_api":
+			// Check Authorization header
+			authHeader := ""
+			// We need to access headers securely. ReqData should have it.
+			// Assuming reqData["header"] or reqData["headers"]
+			if reqInst, ok := r.Variables["$__request"].(*Instance); ok {
+				// Try to find headers
+				if h, ok := reqInst.Fields["_headers"].(map[string]interface{}); ok {
+					if val, k := h["Authorization"].(string); k {
+						authHeader = val
+					}
+				}
+				// Fallback or variation
+				if authHeader == "" {
+					if h, ok := reqData["Authorization"].(string); ok {
+						authHeader = h
+					}
+				}
+			}
+
+			// Simple Bearer check
+			tokenString := strings.TrimPrefix(authHeader, "Bearer ")
+			if tokenString == "" {
+				return &Instance{Fields: map[string]interface{}{
+					"_type":  "JSON",
+					"status": 401,
+					"data":   map[string]interface{}{"error": "Unauthorized: Missing Token"},
+				}}, nil
+			}
+
+			// Verify JWT
+			token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
+				if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+					return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
+				}
+				secret := os.Getenv("JWT_SECRET")
+				if secret == "" {
+					secret = "joss_default_secret_change_in_production"
+				}
+				return []byte(secret), nil
+			})
+
+			if err != nil || !token.Valid {
+				return &Instance{Fields: map[string]interface{}{
+					"_type":  "JSON",
+					"status": 401,
+					"data":   map[string]interface{}{"error": "Unauthorized: Invalid Token"},
+				}}, nil
+			}
+
+			// Success: Inject user info into request?
+			if claims, ok := token.Claims.(jwt.MapClaims); ok {
+				// Inject into $__user or similar if needed. For now, pass.
+				// Maybe populate $__session with user info for this request context?
+				if sessInst, ok := r.Variables["$__session"].(*Instance); ok {
+					if uid, ok := claims["user_id"].(float64); ok {
+						sessInst.Fields["user_id"] = int(uid)
+					} else {
+						sessInst.Fields["user_id"] = claims["user_id"]
+					}
+					sessInst.Fields["user_email"] = claims["email"]
+					sessInst.Fields["user_name"] = claims["name"]
+				}
+			}
+
+		default:
+			// Custom Middleware
+			if r.CustomMiddlewares != nil {
+				if handler, ok := r.CustomMiddlewares[mw]; ok {
+					// Execute closure
+					res := r.applyFunction(handler, []interface{}{})
+					// If returns a Result/Response, stop and return it
+					if inst, ok := res.(*Instance); ok {
+						// Assuming standard response structure or check existence
+						if _, hasType := inst.Fields["_type"]; hasType {
+							return inst, nil
+						}
+					}
+				}
+			}
 		}
 	}
 
@@ -152,17 +237,13 @@ func (r *Runtime) Dispatch(method, path string, reqData, sessData map[string]int
 						if m.Name.Value == methodName {
 							// Extract parameters if dynamic route
 							args := []interface{}{}
-							if strings.Contains(path, "/") { // Simple check, better logic needed for exact vs dynamic
-								// Re-match to extract args if we haven't already
-								// Optimization: We should have saved the matches/params earlier.
-								// For now, let's re-match if it looks dynamic.
+							if strings.Contains(path, "/") {
 								for routePath := range r.Routes[method] {
 									if strings.Contains(routePath, "{") {
 										regexPath := "^" + regexp.MustCompile(`\{[a-zA-Z0-9_]+\}`).ReplaceAllString(routePath, "([^/]+)") + "$"
 										re := regexp.MustCompile(regexPath)
 										matches := re.FindStringSubmatch(path)
 										if len(matches) > 1 {
-											// matches[1:] are the params
 											for _, param := range matches[1:] {
 												args = append(args, param)
 											}
@@ -171,12 +252,17 @@ func (r *Runtime) Dispatch(method, path string, reqData, sessData map[string]int
 									}
 								}
 							}
-
+							fmt.Printf("[DEBUG] Executing method %s@%s\n", controllerName, methodName)
 							return r.CallMethodEvaluated(m, instance, args), nil
 						}
 					}
 				}
+				fmt.Printf("[DEBUG] Method %s not found in controller %s\n", methodName, controllerName)
 				return nil, fmt.Errorf("method %s not found in controller %s", methodName, controllerName)
+			}
+			fmt.Printf("[DEBUG] Controller %s not found. Available classes: %d\n", controllerName, len(r.Classes))
+			for k := range r.Classes {
+				fmt.Printf("\tClass: %s\n", k)
 			}
 			return nil, fmt.Errorf("controller %s not found", controllerName)
 		}

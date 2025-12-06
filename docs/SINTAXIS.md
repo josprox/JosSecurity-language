@@ -103,20 +103,6 @@ switch ($opcion) {
     default:
         print("Opción inválida")
 }
-```
-
-## Operadores Ternarios
-
-También puedes usar operadores ternarios para lógica concisa y el operador de fusión nula (Null Coalescing).
-
-### Operador de Fusión Nula (??) - Strict Nil
-
-El operador `??` comprueba estrictamente si el valor es `nil`. Si el valor es una cadena vacía `""` o `0`, **se conserva**.
-
-```joss
-// Sintaxis: valor ?? default
-$usuario = nil
-$nombre = $usuario ?? "Invitado" // "Invitado"
 
 $titulo = ""
 $texto = $titulo ?? "Sin título" // "" (Cadena vacía se mantiene)

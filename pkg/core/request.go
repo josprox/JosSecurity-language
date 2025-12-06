@@ -25,7 +25,14 @@ func (r *Runtime) executeRequestMethod(instance *Instance, method string, args [
 	case "all":
 		if reqVal, ok := r.Variables["$__request"]; ok {
 			if reqInstance, ok := reqVal.(*Instance); ok {
-				return reqInstance.Fields
+				// Filter out _headers
+				result := make(map[string]interface{})
+				for k, v := range reqInstance.Fields {
+					if k != "_headers" {
+						result[k] = v
+					}
+				}
+				return result
 			}
 		}
 		return make(map[string]interface{})
@@ -43,7 +50,7 @@ func (r *Runtime) executeRequestMethod(instance *Instance, method string, args [
 				if reqInstance, ok := reqVal.(*Instance); ok {
 					result := make(map[string]interface{})
 					for k, v := range reqInstance.Fields {
-						if !excludeMap[k] {
+						if !excludeMap[k] && k != "_headers" {
 							result[k] = v
 						}
 					}

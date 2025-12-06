@@ -52,12 +52,11 @@ const (
 	NULL_COALESCE = "??"
 
 	// Keywords
-	FUNCTION  = "FUNCTION"
-	VAR       = "VAR" // $
-	TRUE      = "TRUE"
-	FALSE     = "FALSE"
-	IF        = "IF"
-	ELSE      = "ELSE"
+	FUNCTION = "FUNCTION"
+	VAR      = "VAR" // $
+	TRUE     = "TRUE"
+	FALSE    = "FALSE"
+
 	RETURN    = "RETURN"
 	PRINT     = "PRINT"
 	ECHO      = "ECHO"
@@ -78,9 +77,6 @@ const (
 	CATCH   = "CATCH"
 	THROW   = "THROW"
 	EXTENDS = "EXTENDS"
-	SWITCH  = "SWITCH"
-	CASE    = "CASE"
-	DEFAULT = "DEFAULT"
 )
 
 type Token struct {
@@ -90,10 +86,9 @@ type Token struct {
 }
 
 var keywords = map[string]TokenType{
-	"true":      TRUE,
-	"false":     FALSE,
-	"if":        IF,
-	"else":      ELSE,
+	"true":  TRUE,
+	"false": FALSE,
+
 	"return":    RETURN,
 	"class":     CLASS,
 	"Init":      INIT,
@@ -117,9 +112,6 @@ var keywords = map[string]TokenType{
 	"extends":   EXTENDS,
 	"@import":   IMPORT,
 	"import":    IMPORT,
-	"switch":    SWITCH,
-	"case":      CASE,
-	"default":   DEFAULT,
 }
 
 func LookupIdent(ident string) TokenType {

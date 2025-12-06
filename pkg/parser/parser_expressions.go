@@ -234,7 +234,7 @@ func (p *Parser) parseBlockExpression() *BlockExpression {
 
 func isStatementStart(t TokenType) bool {
 	switch t {
-	case RETURN, IF, VAR, FOREACH, WHILE, DO, TRY, THROW, ECHO, PRINT:
+	case RETURN, VAR, FOREACH, WHILE, DO, TRY, THROW, ECHO, PRINT:
 		return true
 	}
 	return false

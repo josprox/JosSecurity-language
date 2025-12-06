@@ -104,6 +104,82 @@ func GetControllerFiles(path string) map[string]string {
         }
     }
 }`,
+		filepath.Join(path, "app", "controllers", "ApiController.joss"): `class ApiController {
+    func register() {
+        $data = {
+            "first_name": Request::input("first_name"),
+            "last_name": Request::input("last_name"),
+            "username": Request::input("username"),
+            "email": Request::input("email"),
+            "password": Request::input("password"),
+            "phone": Request::input("phone")
+        }
+        
+        var $token = Auth::create($data)
+        
+        ($token) ? {
+            // Send verification email logic could go here too
+            return Response::json({
+                "status": "success",
+                "message": "User created successfully",
+                "token": $token
+            }, 201)
+        } : {
+            return Response::json({
+                "status": "error",
+                "message": "Registration failed"
+            }, 400)
+        }
+    }
+
+    func login() {
+        $email = Request::input("email")
+        $password = Request::input("password")
+        
+        var $token = Auth::attempt($email, $password)
+        
+        ($token) ? {
+            return Response::json({
+                "status": "success",
+                "token": $token,
+                "user": Auth::user()
+            })
+        } : {
+            return Response::json({
+                "status": "error",
+                "message": "Invalid credentials or not verified"
+            }, 401)
+        }
+    }
+
+    func refresh() {
+        
+        $user = Auth::user()
+        ($user) ? {
+            $newToken = Auth::refresh($user.id)
+            return Response::json({
+                "status": "success",
+                "token": $newToken
+            })
+        } : {
+            return Response::json({"error": "Unauthorized"}, 401)
+        }
+    }
+
+    func delete() {
+        $user = Auth::user()
+        ($user) ? {
+            $deleted = Auth::delete($user.id)
+            ($deleted) ? {
+                 return Response::json({"status": "success", "message": "User deleted"})
+            } : {
+                 return Response::json({"error": "Failed to delete"}, 500)
+            }
+        } : {
+            return Response::json({"error": "Unauthorized"}, 401)
+        }
+    }
+}`,
 		filepath.Join(path, "app", "controllers", "DashboardController.joss"): `class DashboardController {
     func index() {
         // Protect Route

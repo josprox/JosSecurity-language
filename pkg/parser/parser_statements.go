@@ -19,13 +19,7 @@ func (p *Parser) parseStatement() Statement {
 	if p.curToken.Type == ECHO || p.curToken.Type == PRINT {
 		return p.parseEchoStatement()
 	}
-	// STRICT MODE: "La Muerte del If/Else" - REVOKED
-	if p.curToken.Type == IF {
-		return p.parseIfStatement()
-	}
-	if p.curToken.Type == SWITCH {
-		return p.parseSwitchStatement()
-	}
+
 	if p.curToken.Type == WHILE {
 		return p.parseWhileStatement()
 	}
@@ -420,45 +414,6 @@ func (p *Parser) parseThrowStatement() *ThrowStatement {
 	return stmt
 }
 
-func (p *Parser) parseIfStatement() *IfStatement {
-	stmt := &IfStatement{Token: p.curToken}
-
-	if !p.expectPeek(LPAREN) {
-		return nil
-	}
-
-	p.nextToken()
-	stmt.Condition = p.parseExpression(LOWEST)
-
-	if !p.expectPeek(RPAREN) {
-		return nil
-	}
-
-	if !p.expectPeek(LBRACE) {
-		return nil
-	}
-
-	stmt.Consequence = p.parseBlockStatement()
-
-	if p.peekToken.Type == ELSE {
-		p.nextToken()
-
-		if p.peekToken.Type == LBRACE {
-			p.nextToken()
-			stmt.Alternative = p.parseBlockStatement()
-		} else if p.peekToken.Type == IF {
-			// else if ...
-			// Treat as a block with a single statement (the if statement)
-			p.nextToken()
-			stmt.Alternative = &BlockStatement{
-				Statements: []Statement{p.parseIfStatement()},
-			}
-		}
-	}
-
-	return stmt
-}
-
 func (p *Parser) parseMethodStatement() *MethodStatement {
 	stmt := &MethodStatement{Token: p.curToken}
 
@@ -478,88 +433,6 @@ func (p *Parser) parseMethodStatement() *MethodStatement {
 	}
 
 	stmt.Body = p.parseBlockStatement()
-
-	return stmt
-}
-
-func (p *Parser) parseSwitchStatement() *SwitchStatement {
-	stmt := &SwitchStatement{Token: p.curToken}
-
-	if !p.expectPeek(LPAREN) {
-		return nil
-	}
-
-	p.nextToken()
-	stmt.Value = p.parseExpression(LOWEST)
-
-	if !p.expectPeek(RPAREN) {
-		return nil
-	}
-
-	if !p.expectPeek(LBRACE) {
-		return nil
-	}
-
-	p.nextToken() // Enter block
-
-	for p.curToken.Type != RBRACE && p.curToken.Type != EOF {
-		if p.curToken.Type == NEWLINE {
-			p.nextToken()
-			continue
-		}
-
-		if p.curToken.Type == CASE {
-			caseStmt := &CaseStatement{Token: p.curToken}
-			p.nextToken()
-			caseStmt.Value = p.parseExpression(LOWEST)
-
-			if !p.expectPeek(COLON) {
-				return nil
-			}
-
-			// Parse body until next CASE, DEFAULT or RBRACE
-			caseStmt.Body = &BlockStatement{Token: p.curToken, Statements: []Statement{}}
-			p.nextToken()
-
-			for p.curToken.Type != CASE && p.curToken.Type != DEFAULT && p.curToken.Type != RBRACE && p.curToken.Type != EOF {
-				if p.curToken.Type == NEWLINE {
-					p.nextToken()
-					continue
-				}
-				s := p.parseStatement()
-				if s != nil {
-					caseStmt.Body.Statements = append(caseStmt.Body.Statements, s)
-				}
-				p.nextToken()
-			}
-			stmt.Choices = append(stmt.Choices, caseStmt)
-			continue
-		}
-
-		if p.curToken.Type == DEFAULT {
-			if !p.expectPeek(COLON) {
-				return nil
-			}
-
-			stmt.Default = &BlockStatement{Token: p.curToken, Statements: []Statement{}}
-			p.nextToken()
-
-			for p.curToken.Type != CASE && p.curToken.Type != DEFAULT && p.curToken.Type != RBRACE && p.curToken.Type != EOF {
-				if p.curToken.Type == NEWLINE {
-					p.nextToken()
-					continue
-				}
-				s := p.parseStatement()
-				if s != nil {
-					stmt.Default.Statements = append(stmt.Default.Statements, s)
-				}
-				p.nextToken()
-			}
-			continue
-		}
-
-		p.nextToken()
-	}
 
 	return stmt
 }

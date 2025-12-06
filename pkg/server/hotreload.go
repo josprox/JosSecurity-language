@@ -267,29 +267,37 @@ func reloadApp(changedFile string) {
 			fmt.Printf("[DEBUG] Error walking app directory: %v\n", err)
 		}
 
-		// Load Routes
+		// Load Routes (routes.joss)
 		routesPath := "routes.joss"
-		// Check existence
-		exists := false
-		if GlobalFileSystem != nil {
-			f, err := GlobalFileSystem.Open(routesPath)
-			if err == nil {
-				f.Close()
-				exists = true
-			}
-		} else {
-			if _, err := os.Stat(routesPath); err == nil {
-				exists = true
-			}
-		}
-
-		if exists {
+		if existsFile(routesPath) {
 			loadFile(routesPath)
 		} else {
 			fmt.Println("[DEBUG] routes.joss not found")
 		}
+
+		// Load API Routes (api.joss)
+		apiRoutesPath := "api.joss"
+		if existsFile(apiRoutesPath) {
+			loadFile(apiRoutesPath)
+		}
+
 		notifyClients()
 	}
+}
+
+func existsFile(path string) bool {
+	if GlobalFileSystem != nil {
+		f, err := GlobalFileSystem.Open(path)
+		if err == nil {
+			f.Close()
+			return true
+		}
+		return false
+	}
+	if _, err := os.Stat(path); err == nil {
+		return true
+	}
+	return false
 }
 
 // Helpers for VFS support

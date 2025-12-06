@@ -177,11 +177,14 @@ func (r *Runtime) executeAuthMethod(instance *Instance, method string, args []in
 		}
 
 	case "user":
+		fmt.Println("[DEBUG] Auth::user() called")
 		if sessVal, ok := r.Variables["$__session"]; ok {
 			if sessInst, ok := sessVal.(*Instance); ok {
+				fmt.Printf("[DEBUG] Session dump: %v\n", sessInst.Fields)
 				if uid, ok := sessInst.Fields["user_id"]; ok {
 					// Fetch full user from DB
 					if r.DB == nil {
+						fmt.Println("[DEBUG] Auth::user DB is nil")
 						return nil
 					}
 
@@ -206,10 +209,18 @@ func (r *Runtime) executeAuthMethod(instance *Instance, method string, args []in
 						user["role_id"] = roleId
 						user["user_token"] = userToken
 
-						return user
+						return &Instance{
+							Fields: user,
+						}
+					} else {
+						fmt.Printf("[DEBUG] Auth::user DB Error: %v (uid: %v)\n", err, uid)
 					}
+				} else {
+					fmt.Println("[DEBUG] Auth::user - No user_id in session")
 				}
 			}
+		} else {
+			fmt.Println("[DEBUG] Auth::user - No $__session variable")
 		}
 		return nil
 
@@ -243,6 +254,53 @@ func (r *Runtime) executeAuthMethod(instance *Instance, method string, args []in
 		}
 		return false
 
+	case "refresh":
+		if len(args) == 1 {
+			// Auth::refresh(token)
+			// Actually, refresh logic usually validates the refresh token.
+			// But for simplicity/MVP, we can accept the current valid token and issue a new one.
+			// Or just take userId.
+
+			// Let's assume the argument is the userId or we extract it from context?
+			// The API controller will pass the user ID from the validated token.
+
+			if id, ok := args[0].(int); ok {
+				// Fetch user to get email/name
+				var email, username string
+				query := fmt.Sprintf("SELECT email, username FROM %s WHERE id = ?", usersTable)
+				err := r.DB.QueryRow(query, id).Scan(&email, &username)
+				if err != nil {
+					return false
+				}
+
+				// Generate new token (refresh=true)
+				return r.generateJWT(id, email, username, true) // Wait, refresh=true gives 6 months.
+				// Maybe we want a short-lived access token?
+				// User wants "refresh token", usually implies getting a new access token using a refresh token.
+				// But here we are simplifying: "Refresh the session extend life".
+				// Let's return a new token with standard expiry?
+				// Arguments: userId, email, username, isRefresh
+				// If we use isRefresh=true, we get 6 months.
+				// If we use false, we get 3 months.
+				// Let's use false for "Standard Token Refresh".
+				return r.generateJWT(id, email, username, false)
+			}
+			// If arg is a string (token), we need to parse it? Too complex for core.
+			// Better to rely on middleware to extract user and pass ID here.
+		}
+
+	case "delete":
+		if len(args) == 1 {
+			if id, ok := args[0].(int); ok {
+				if r.DB == nil {
+					return false
+				}
+				query := fmt.Sprintf("DELETE FROM %s WHERE id = ?", usersTable)
+				_, err := r.DB.Exec(query, id)
+				return err == nil
+			}
+		}
+
 	case "logout":
 		if sessVal, ok := r.Variables["$__session"]; ok {
 			if sessInst, ok := sessVal.(*Instance); ok {
@@ -256,6 +314,31 @@ func (r *Runtime) executeAuthMethod(instance *Instance, method string, args []in
 			}
 		}
 		return true
+	case "validateToken":
+		if len(args) == 1 {
+			tokenString := args[0].(string)
+			// Remove "Bearer " prefix if present
+			if len(tokenString) > 7 && tokenString[:7] == "Bearer " {
+				tokenString = tokenString[7:]
+			}
+
+			// Validate JWT
+			claims, valid := r.validateJWT(tokenString)
+			if valid {
+				// Populate Session for Auth::user()
+				if sessVal, ok := r.Variables["$__session"]; ok {
+					if sessInst, ok := sessVal.(*Instance); ok {
+						sessInst.Fields["user_id"] = int(claims["user_id"].(float64))
+						sessInst.Fields["user_email"] = claims["email"]
+						sessInst.Fields["user_name"] = claims["name"]
+						// Force DB lookup for role if not in claim? Claims usually have strict size limits.
+						// For now, assume it's valid.
+					}
+				}
+				return true
+			}
+			return false
+		}
 	}
 	return nil
 }
@@ -433,4 +516,30 @@ func (r *Runtime) generateJWT(userId int, email string, userName string, isRefre
 	}
 
 	return tokenString
+}
+
+// validateJWT parses and validates a JWT token
+func (r *Runtime) validateJWT(tokenString string) (jwt.MapClaims, bool) {
+	jwtSecret := os.Getenv("JWT_SECRET")
+	if jwtSecret == "" {
+		jwtSecret = "joss_default_secret_change_in_production"
+	}
+
+	token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
+		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+			return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
+		}
+		return []byte(jwtSecret), nil
+	})
+
+	if err != nil {
+		// fmt.Printf("[Security] JWT Invalid: %v\n", err)
+		return nil, false
+	}
+
+	if claims, ok := token.Claims.(jwt.MapClaims); ok && token.Valid {
+		return claims, true
+	}
+
+	return nil, false
 }

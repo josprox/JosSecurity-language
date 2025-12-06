@@ -63,6 +63,9 @@ func isFalsy(val interface{}) bool {
 	if val == nil {
 		return true
 	}
+	if _, ok := val.(*Instance); ok {
+		return false // Instances are always Truthy
+	}
 	if b, ok := val.(bool); ok {
 		return !b
 	}

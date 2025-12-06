@@ -56,6 +56,7 @@ func CreateBibleProject(path string) {
 	merge(files.GetViewFiles(path))
 	merge(files.GetAssetFiles(path))
 	merge(files.GetNpmFiles(path))
+	merge(files.GetBrunoFiles(path))
 
 	// Write files
 	for file, content := range allFiles {

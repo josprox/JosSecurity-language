@@ -117,6 +117,38 @@ Auth::logout()
 print("Sesión cerrada")
 ```
 
+#### `Auth::verify(string $token)`
+Verifica una cuenta de usuario mediante su token.
+Retorna `true` si la verificación fue exitosa.
+
+```joss
+$verificado = Auth::verify($token)
+```
+
+#### `Auth::refresh(int $userId)`
+Genera un nuevo token JWT para el usuario especificado.
+
+```joss
+$newToken = Auth::refresh(Auth::id())
+```
+
+#### `Auth::delete(int $userId)`
+Elimina un usuario y sus datos de la base de datos.
+Retorna `true` si la eliminación fue exitosa.
+
+```joss
+Auth::delete(Auth::id())
+```
+
+### Base de Datos (Automática)
+El módulo Auth gestiona automáticamente una tabla `users` (con prefijo opcional `js_`) con **17 columnas** optimizadas, incluyendo:
+- `user_token` (UUID)
+- `verificado` (Control de email)
+- `role_id` (RBAC)
+- Timestamps: `created_at`, `updated_at`, `last_login_at`, `last_refresh_at`, `last_logout_at`.
+
+El sistema incluye "Self-Healing": si faltan columnas, se agregan automáticamente sin perder datos.
+
 ---
 
 ## GranMySQL

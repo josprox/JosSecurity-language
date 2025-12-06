@@ -24,10 +24,15 @@ Router::end()
 `,
 		filepath.Join(path, "api.joss"): `// API Routes
 Router::api() // Enable API headers
-Router::post("/api/login", "AuthController@apiLogin")
 
-Router::middleware("auth_api") // Assume middleware exists or will be created
-    // Router::get("/api/user", "UserController@index")
+// Public Routes
+Router::post("/api/register", "ApiController@register")
+Router::post("/api/login", "ApiController@login")
+
+// Protected Routes (JWT)
+Router::middleware("auth_api")
+    Router::post("/api/refresh", "ApiController@refresh")
+    Router::delete("/api/delete", "ApiController@delete")
 Router::end()
 `,
 	}

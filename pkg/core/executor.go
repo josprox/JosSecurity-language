@@ -127,10 +127,7 @@ func (r *Runtime) executeStatement(stmt parser.Statement) interface{} {
 		return r.executeReturn(s)
 	case *parser.MethodStatement:
 		r.Functions[s.Name.Value] = s
-	case *parser.IfStatement:
-		return r.executeIf(s)
-	case *parser.SwitchStatement:
-		return r.executeSwitch(s)
+
 	}
 	return nil
 }
@@ -138,16 +135,6 @@ func (r *Runtime) executeStatement(stmt parser.Statement) interface{} {
 func (r *Runtime) executeReturn(rs *parser.ReturnStatement) interface{} {
 	if rs.ReturnValue != nil {
 		return r.evaluateExpression(rs.ReturnValue)
-	}
-	return nil
-}
-
-func (r *Runtime) executeIf(is *parser.IfStatement) interface{} {
-	cond := r.evaluateExpression(is.Condition)
-	if isTruthy(cond) {
-		return r.executeBlock(is.Consequence)
-	} else if is.Alternative != nil {
-		return r.executeBlock(is.Alternative)
 	}
 	return nil
 }
@@ -263,28 +250,5 @@ func (r *Runtime) executeTryCatch(tcs *parser.TryCatchStatement) (result interfa
 func (r *Runtime) executeThrow(ts *parser.ThrowStatement) interface{} {
 	val := r.evaluateExpression(ts.Value)
 	panic(val)
-	return nil
-}
-
-func (r *Runtime) executeSwitch(ss *parser.SwitchStatement) interface{} {
-	val := r.evaluateExpression(ss.Value)
-
-	matched := false
-	for _, choice := range ss.Choices {
-		caseVal := r.evaluateExpression(choice.Value)
-
-		if val == caseVal {
-			matched = true
-			res := r.executeBlock(choice.Body)
-			if res != nil {
-				return res
-			}
-		}
-	}
-
-	if !matched && ss.Default != nil {
-		return r.executeBlock(ss.Default)
-	}
-
 	return nil
 }

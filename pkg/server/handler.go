@@ -112,17 +112,44 @@ func MainHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// 3. Parse Request Data
-	r.ParseMultipartForm(10 << 20) // 10MB
 	reqData := make(map[string]interface{})
 	for k, v := range r.URL.Query() {
 		if len(v) > 0 {
 			reqData[k] = v[0]
 		}
 	}
-	for k, v := range r.PostForm {
-		if len(v) > 0 {
-			reqData[k] = v[0]
+
+	contentType := r.Header.Get("Content-Type")
+	if strings.Contains(contentType, "application/json") {
+		var jsonMap map[string]interface{}
+		// Use a temporary decoder to avoid EOF errors if body is empty
+		if r.Body != nil {
+			if err := json.NewDecoder(r.Body).Decode(&jsonMap); err == nil {
+				for k, v := range jsonMap {
+					reqData[k] = v
+				}
+			}
 		}
+	} else {
+		r.ParseMultipartForm(10 << 20) // 10MB
+		for k, v := range r.PostForm {
+			if len(v) > 0 {
+				reqData[k] = v[0]
+			}
+		}
+	}
+
+	// Inject Headers
+	headers := make(map[string]interface{})
+	for k, v := range r.Header {
+		if len(v) > 0 {
+			headers[k] = v[0]
+		}
+	}
+	reqData["_headers"] = headers
+	// Explicitly map Authorization for cleaner access
+	if val := r.Header.Get("Authorization"); val != "" {
+		reqData["Authorization"] = val
 	}
 	reqData["_method"] = r.Method
 	reqData["_referer"] = r.Referer()
@@ -193,7 +220,8 @@ func MainHandler(w http.ResponseWriter, r *http.Request) {
 		sessData["csrf_token"] = csrfToken
 	}
 
-	if r.Method == "POST" || r.Method == "PUT" || r.Method == "DELETE" || r.Method == "PATCH" {
+	// Exempt API routes from CSRF
+	if (r.Method == "POST" || r.Method == "PUT" || r.Method == "DELETE" || r.Method == "PATCH") && !strings.HasPrefix(r.URL.Path, "/api/") {
 		reqToken := ""
 		if val, ok := reqData["_token"]; ok {
 			reqToken = fmt.Sprintf("%v", val)
@@ -226,15 +254,55 @@ func MainHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err == nil {
-		// Handle Redirect (Map)
+		// Handle Redirect or JSON (Map)
 		if resMap, ok := result.(map[string]interface{}); ok {
-			if val, ok := resMap["_type"]; ok && val == "REDIRECT" {
-				http.Redirect(w, r, resMap["url"].(string), http.StatusFound)
-				return
+			if val, ok := resMap["_type"]; ok {
+				if val == "REDIRECT" {
+					http.Redirect(w, r, resMap["url"].(string), http.StatusFound)
+					return
+				}
+				if val == "JSON" {
+					w.Header().Set("Content-Type", "application/json")
+					statusCode := http.StatusOK
+					if code, ok := resMap["status_code"]; ok {
+						switch v := code.(type) {
+						case int:
+							statusCode = v
+						case int64:
+							statusCode = int(v)
+						case float64:
+							statusCode = int(v)
+						}
+					}
+					w.WriteHeader(statusCode)
+					json.NewEncoder(w).Encode(resMap["data"])
+					return
+				}
 			}
 		}
-		// Handle Redirect (Instance)
+
+		// Handle Redirect or JSON (Instance)
 		if resInst, ok := result.(*core.Instance); ok {
+			// JSON handling from Instance
+			if val, ok := resInst.Fields["_type"]; ok && val == "JSON" {
+				w.Header().Set("Content-Type", "application/json")
+				statusCode := http.StatusOK
+				if code, ok := resInst.Fields["status"]; ok {
+					switch v := code.(type) {
+					case int:
+						statusCode = v
+					case int64:
+						statusCode = int(v)
+					case float64:
+						statusCode = int(v)
+					}
+				}
+				w.WriteHeader(statusCode)
+				json.NewEncoder(w).Encode(resInst.Fields["data"])
+				return
+			}
+
+			// Redirect handling
 			if val, ok := resInst.Fields["_type"]; ok && val == "REDIRECT" {
 				if flash, ok := resInst.Fields["flash"].(map[string]interface{}); ok {
 					sessionMu.Lock()

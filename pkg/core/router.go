@@ -50,6 +50,19 @@ func (r *Runtime) executeRouterMethod(instance *Instance, method string, args []
 		}
 		return nil
 
+	case "registerMiddleware":
+		if len(args) >= 2 {
+			name := args[0].(string)
+			handler := args[1]
+
+			if r.CustomMiddlewares == nil {
+				r.CustomMiddlewares = make(map[string]interface{})
+			}
+			r.CustomMiddlewares[name] = handler
+			fmt.Printf("[DEBUG] Middleware registered: %s\n", name)
+		}
+		return nil
+
 	case "end":
 		// End middleware group (pop last)
 		if r.CurrentMiddleware != nil && len(r.CurrentMiddleware) > 0 {
