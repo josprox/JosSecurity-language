@@ -183,10 +183,10 @@ func (r *Runtime) executeAuthMethod(instance *Instance, method string, args []in
 					if r.DB == nil {
 						return nil
 					}
-					
+
 					// Objeto usuario a retornar
 					user := make(map[string]interface{})
-					
+
 					var id, roleId int
 					var username, email, firstName, lastName, userToken sql.NullString
 					var pPhone sql.NullString
@@ -205,6 +205,8 @@ func (r *Runtime) executeAuthMethod(instance *Instance, method string, args []in
 						user["phone"] = pPhone.String
 						user["role_id"] = roleId
 						user["user_token"] = userToken.String
+						// Compatibility for templates using user.name
+						user["name"] = firstName.String
 
 						return &Instance{
 							Fields: user,
@@ -399,7 +401,7 @@ func patchColumn(db *sql.DB, table, col, def string, isMySQL bool) {
 
 	// Si falla, asumimos que no existe y la creamos
 	fmt.Printf("[Auth] Auto-patching: Agregando columna '%s' a tabla '%s'...\n", col, table)
-	
+
 	alter := fmt.Sprintf("ALTER TABLE %s ADD COLUMN %s %s", table, col, def)
 	if isMySQL {
 		alter = fmt.Sprintf("ALTER TABLE %s ADD COLUMN %s %s", table, col, def)

@@ -470,7 +470,7 @@ func (r *Runtime) evaluateMember(me *parser.MemberExpression) interface{} {
 	}
 
 	instance, ok := left.(*Instance)
-	if !ok {
+	if !ok || instance == nil {
 		// Check if it's a Static Class Access (e.g. Session::get)
 		// In this case, 'left' might be nil if the identifier wasn't found as a variable.
 		// We need to check if the original expression was an Identifier matching a known class.
@@ -578,7 +578,11 @@ func (r *Runtime) evaluateMember(me *parser.MemberExpression) interface{} {
 		}
 	}
 
-	fmt.Printf("Error: Propiedad o método '%s' no encontrado en clase '%s'\n", propName, instance.Class.Name.Value)
+	className := "Anonymous"
+	if instance.Class != nil {
+		className = instance.Class.Name.Value
+	}
+	fmt.Printf("Error: Propiedad o método '%s' no encontrado en clase '%s'\n", propName, className)
 	return nil
 }
 
