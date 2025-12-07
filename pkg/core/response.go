@@ -34,6 +34,24 @@ func (r *Runtime) executeResponseMethod(instance *Instance, method string, args 
 			}
 			return res
 		}
+	case "raw":
+		if len(args) > 0 {
+			res := map[string]interface{}{
+				"_type": "RAW",
+				"data":  args[0],
+			}
+			res["status_code"] = 200
+			res["content_type"] = "text/plain"
+
+			if len(args) > 1 {
+				res["status_code"] = args[1]
+			}
+			if len(args) > 2 {
+				res["content_type"] = args[2]
+			}
+			return res
+		}
+
 	}
 	return nil
 }

@@ -5,6 +5,30 @@ import "fmt"
 // executeRequestMethod handles Request methods
 func (r *Runtime) executeRequestMethod(instance *Instance, method string, args []interface{}) interface{} {
 	switch method {
+
+	case "file":
+		if len(args) > 0 {
+			key, ok := args[0].(string)
+			if !ok {
+				return nil
+			}
+
+			// Access $__request variable
+			if reqVal, ok := r.Variables["$__request"]; ok {
+				if reqInstance, ok := reqVal.(*Instance); ok {
+					// Check _files map
+					if filesVal, ok := reqInstance.Fields["_files"]; ok {
+						if filesMap, ok := filesVal.(map[string]interface{}); ok {
+							if file, ok := filesMap[key]; ok {
+								return file // Returns the map {name, content, ...}
+							}
+						}
+					}
+				}
+			}
+			return nil
+		}
+
 	case "input", "post":
 		if len(args) > 0 {
 			key, ok := args[0].(string)

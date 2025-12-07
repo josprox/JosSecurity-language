@@ -35,6 +35,7 @@ func (r *Runtime) RegisterNativeClasses() {
 	// GranDB
 	r.registerNative("GranDB", []string{}, (*Runtime).executeGranMySQLMethod)
 	// Alias for compatibility
+	r.registerNative("GranMySQL", []string{}, (*Runtime).executeGranMySQLMethod)
 	r.NativeHandlers["GranMySQL"] = (*Runtime).executeGranMySQLMethod
 
 	// Auth
@@ -65,11 +66,11 @@ func (r *Runtime) RegisterNativeClasses() {
 	r.Variables["Router"] = &Instance{Class: r.Classes["Router"], Fields: make(map[string]interface{})}
 
 	// Request
-	r.registerNative("Request", []string{"input", "post", "all", "except", "get"}, (*Runtime).executeRequestMethod)
+	r.registerNative("Request", []string{"input", "post", "all", "except", "get", "file"}, (*Runtime).executeRequestMethod)
 	r.Variables["Request"] = &Instance{Class: r.Classes["Request"], Fields: make(map[string]interface{})}
 
 	// Response
-	r.registerNative("Response", []string{"json", "redirect", "error"}, (*Runtime).executeResponseMethod)
+	r.registerNative("Response", []string{"json", "redirect", "error", "raw"}, (*Runtime).executeResponseMethod)
 	r.Variables["Response"] = &Instance{Class: r.Classes["Response"], Fields: make(map[string]interface{})}
 
 	// RedirectResponse
@@ -106,7 +107,7 @@ func (r *Runtime) RegisterNativeClasses() {
 	r.Variables["UUID"] = &Instance{Class: r.Classes["UUID"], Fields: make(map[string]interface{})}
 
 	// UserStorage
-	r.registerNative("UserStorage", []string{"put", "path", "exists", "delete"}, (*Runtime).executeUserStorageMethod)
+	r.registerNative("UserStorage", []string{"put", "get", "update", "path", "exists", "delete"}, (*Runtime).executeUserStorageMethod)
 	r.Variables["UserStorage"] = &Instance{Class: r.Classes["UserStorage"], Fields: make(map[string]interface{})}
 }
 

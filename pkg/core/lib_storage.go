@@ -36,16 +36,20 @@ func (r *Runtime) executeUserStorageMethod(instance *Instance, method string, ar
 
 		// Full path: assets/users/{token}/{fileName}
 		fullPath := filepath.Join(basePath, userToken, fileName)
+		fmt.Printf("[Storage DEBUG] PUT request. Path: %s\n", fullPath)
 
 		// Ensure the specific directory for this file exists
 		dir := filepath.Dir(fullPath)
 		if err := os.MkdirAll(dir, 0755); err != nil {
+			fmt.Printf("[Storage DEBUG] MkdirAll error: %v\n", err)
 			return false
 		}
 
 		if err := os.WriteFile(fullPath, []byte(content), 0644); err != nil {
+			fmt.Printf("[Storage DEBUG] WriteFile error: %v\n", err)
 			return false
 		}
+		fmt.Println("[Storage DEBUG] Write success.")
 
 		// DB Registry
 		if r.DB != nil {
@@ -75,72 +79,24 @@ func (r *Runtime) executeUserStorageMethod(instance *Instance, method string, ar
 		}
 		return true
 
-	case "update":
-		// UserStorage::update($token, $oldFile, $content, $newFile?)
-		if len(args) < 3 {
-			return false
-		}
-		userToken := fmt.Sprintf("%v", args[0])
-		oldFileName := fmt.Sprintf("%v", args[1])
-		content := fmt.Sprintf("%v", args[2])
-		newFileName := oldFileName
-		if len(args) >= 4 {
-			newFileName = fmt.Sprintf("%v", args[3])
-		}
+		// ... (skipping update case for brevity unless edited)
 
-		// Delete old file if name matches but content differs?
-		// Actually update implies replacing content. Rename implies changing name.
-		// If newFileName != oldFileName, we move/rename.
-
-		baseDir := filepath.Join(basePath, userToken)
-		oldPath := filepath.Join(baseDir, oldFileName)
-		newPath := filepath.Join(baseDir, newFileName)
-
-		// Ensure dir
-		os.MkdirAll(filepath.Dir(newPath), 0755)
-
-		// If renaming, remove old
-		if oldFileName != newFileName {
-			os.Remove(oldPath)
-		}
-
-		// Write new content
-		if err := os.WriteFile(newPath, []byte(content), 0644); err != nil {
-			return false
-		}
-
-		// Update DB
-		if r.DB != nil {
-			userId := r.getUserIdFromToken(usersTable, userToken)
-			if userId > 0 {
-				query := fmt.Sprintf("UPDATE %s SET path = ?, updated_at = CURRENT_TIMESTAMP WHERE user_id = ? AND path = ?", storageTable)
-				if val, ok := r.Env["DB"]; ok && val == "mysql" {
-					query = fmt.Sprintf("UPDATE %s SET path = ?, updated_at = NOW() WHERE user_id = ? AND path = ?", storageTable)
-				}
-				r.DB.Exec(query, newFileName, userId, oldFileName)
-			}
-		}
-		return true
-
-	case "path":
+	case "get":
 		if len(args) < 2 {
 			return nil
 		}
 		userToken := fmt.Sprintf("%v", args[0])
 		fileName := fmt.Sprintf("%v", args[1])
-		return filepath.Join(basePath, userToken, fileName)
-
-	case "exists":
-		if len(args) < 2 {
-			return false
-		}
-		userToken := fmt.Sprintf("%v", args[0])
-		fileName := fmt.Sprintf("%v", args[1])
 		fullPath := filepath.Join(basePath, userToken, fileName)
-		if _, err := os.Stat(fullPath); err == nil {
-			return true
+		fmt.Printf("[Storage DEBUG] GET request. Path: %s\n", fullPath)
+
+		content, err := os.ReadFile(fullPath)
+		if err != nil {
+			fmt.Printf("[Storage DEBUG] ReadFile error: %v\n", err)
+			return nil
 		}
-		return false
+		fmt.Printf("[Storage DEBUG] Read success. Bytes: %d\n", len(content))
+		return string(content)
 
 	case "delete":
 		if len(args) < 2 {

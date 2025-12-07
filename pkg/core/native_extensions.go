@@ -71,8 +71,13 @@ func (r *Runtime) executeSessionMethod(instance *Instance, method string, args [
 		return nil
 	}
 
-	sessionMap, ok := sessionVal.(map[string]interface{})
-	if !ok {
+	var sessionMap map[string]interface{}
+
+	if sessMap, ok := sessionVal.(map[string]interface{}); ok {
+		sessionMap = sessMap
+	} else if sessInst, ok := sessionVal.(*Instance); ok {
+		sessionMap = sessInst.Fields
+	} else {
 		return nil
 	}
 

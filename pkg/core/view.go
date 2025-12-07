@@ -305,14 +305,24 @@ func (r *Runtime) executeViewMethod(instance *Instance, method string, args []in
 							result += itemHtml
 						}
 					} else if listMap, ok := listVal.([]map[string]interface{}); ok {
-						// Handle []map[string]interface{} (from GranDB)
 						for _, itemMap := range listMap {
 							itemHtml := blockContent
 							for k, v := range itemMap {
-								valStr := fmt.Sprintf("%v", v)
-								// Use regex to replace {{ $item.key }} with flexibility for spaces
-								reItem := regexp.MustCompile(fmt.Sprintf(`\{\{\s*\$%s\.%s\s*\}\}`, regexp.QuoteMeta(itemName), regexp.QuoteMeta(k)))
-								itemHtml = reItem.ReplaceAllString(itemHtml, valStr)
+								// Prepare value (quoted if string, raw if number/bool)
+								var valStr string
+								switch val := v.(type) {
+								case string:
+									valStr = fmt.Sprintf("%q", val) // Quoted "val"
+								default:
+									valStr = fmt.Sprintf("%v", val)
+								}
+
+								// Replace $item.key
+								itemHtml = strings.ReplaceAll(itemHtml, fmt.Sprintf("$%s.%s", itemName, k), valStr)
+								// Replace $item['key']
+								itemHtml = strings.ReplaceAll(itemHtml, fmt.Sprintf("$%s['%s']", itemName, k), valStr)
+								// Replace $item["key"]
+								itemHtml = strings.ReplaceAll(itemHtml, fmt.Sprintf("$%s[\"%s\"]", itemName, k), valStr)
 							}
 							result += itemHtml
 						}

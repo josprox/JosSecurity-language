@@ -54,11 +54,11 @@
   "Router Group": {
     "prefix": "route:group",
     "body": [
-      "Router::middleware(\"${1:auth}\")",
+      "Router::group(\"/${1:prefix}\")",
       "$0",
       "Router::end()"
     ],
-    "description": "Define a middleware group"
+    "description": "Define a router group"
   },
   "Router Put": {
     "prefix": "route:put",
@@ -525,5 +525,19 @@
       "env(\"${1:KEY}\")"
     ],
     "description": "Get environment variable"
+  },
+  "Import": {
+    "prefix": "import",
+    "body": [
+      "import \"${1:path/to/file.joss}\""
+    ],
+    "description": "Import a file"
+  },
+  "Auth Validate": {
+    "prefix": "auth:validate",
+    "body": [
+      "\\$valid = Auth::validateToken(${1:\\$token})"
+    ],
+    "description": "Validate a Bearer token"
   }
 }

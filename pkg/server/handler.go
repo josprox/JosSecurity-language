@@ -137,6 +137,33 @@ func MainHandler(w http.ResponseWriter, r *http.Request) {
 				reqData[k] = v[0]
 			}
 		}
+
+		// Handle Files
+		if r.MultipartForm != nil && r.MultipartForm.File != nil {
+			files := make(map[string]interface{})
+			for k, fheaders := range r.MultipartForm.File {
+				if len(fheaders) > 0 {
+					fh := fheaders[0]
+					file, err := fh.Open()
+					if err == nil {
+						// Read content
+						content := make([]byte, fh.Size)
+						file.Read(content)
+						file.Close()
+
+						// Create file object
+						fileObj := map[string]interface{}{
+							"name":    fh.Filename,
+							"type":    fh.Header.Get("Content-Type"),
+							"size":    fh.Size,
+							"content": string(content), // Store as string for JOSS compatibility
+						}
+						files[k] = fileObj
+					}
+				}
+			}
+			reqData["_files"] = files
+		}
 	}
 
 	// Inject Headers
@@ -259,9 +286,11 @@ func MainHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err == nil {
+		fmt.Printf("[HANDLER DEBUG] Result Type: %T\n", result)
 		// Handle Redirect or JSON (Map)
 		if resMap, ok := result.(map[string]interface{}); ok {
 			if val, ok := resMap["_type"]; ok {
+				fmt.Printf("[HANDLER DEBUG] Map Type: %v\n", val)
 				if val == "REDIRECT" {
 					http.Redirect(w, r, resMap["url"].(string), http.StatusFound)
 					return
@@ -281,6 +310,37 @@ func MainHandler(w http.ResponseWriter, r *http.Request) {
 					}
 					w.WriteHeader(statusCode)
 					json.NewEncoder(w).Encode(resMap["data"])
+					return
+				}
+				if val == "RAW" {
+					contentType := "text/plain"
+					if ct, ok := resMap["content_type"].(string); ok {
+						contentType = ct
+					}
+					w.Header().Set("Content-Type", contentType)
+
+					statusCode := http.StatusOK
+					if code, ok := resMap["status_code"]; ok {
+						switch v := code.(type) {
+						case int:
+							statusCode = v
+						case int64:
+							statusCode = int(v)
+						case float64:
+							statusCode = int(v)
+						}
+					}
+					w.WriteHeader(statusCode)
+
+					data := resMap["data"]
+					switch v := data.(type) {
+					case string:
+						w.Write([]byte(v))
+					case []byte:
+						w.Write(v)
+					default:
+						fmt.Fprintf(w, "%v", v)
+					}
 					return
 				}
 			}
@@ -304,6 +364,39 @@ func MainHandler(w http.ResponseWriter, r *http.Request) {
 				}
 				w.WriteHeader(statusCode)
 				json.NewEncoder(w).Encode(resInst.Fields["data"])
+				return
+			}
+
+			// RAW handling
+			if val, ok := resInst.Fields["_type"]; ok && val == "RAW" {
+				contentType := "text/plain"
+				if ct, ok := resInst.Fields["content_type"].(string); ok {
+					contentType = ct
+				}
+				w.Header().Set("Content-Type", contentType)
+
+				statusCode := http.StatusOK
+				if code, ok := resInst.Fields["status_code"]; ok {
+					switch v := code.(type) {
+					case int:
+						statusCode = v
+					case int64:
+						statusCode = int(v)
+					case float64:
+						statusCode = int(v)
+					}
+				}
+				w.WriteHeader(statusCode)
+
+				data := resInst.Fields["data"]
+				switch v := data.(type) {
+				case string:
+					w.Write([]byte(v))
+				case []byte:
+					w.Write(v)
+				default:
+					fmt.Fprintf(w, "%v", v)
+				}
 				return
 			}
 
