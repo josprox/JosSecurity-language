@@ -6,6 +6,8 @@ import (
 	"os"
 	"time"
 
+	"strings" // Added for TrimSpace
+
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
 	"golang.org/x/crypto/bcrypt"
@@ -41,7 +43,7 @@ func (r *Runtime) executeAuthMethod(instance *Instance, method string, args []in
 				username := getString(data, "username", "")
 				firstName := getString(data, "first_name", "")
 				lastName := getString(data, "last_name", "")
-				email := getString(data, "email", "")
+				email := strings.TrimSpace(getString(data, "email", "")) // Trim Email
 				phone := getString(data, "phone", "")
 				password := getString(data, "password", "")
 
@@ -81,7 +83,7 @@ func (r *Runtime) executeAuthMethod(instance *Instance, method string, args []in
 			if args[0] == nil || args[1] == nil {
 				return false
 			}
-			email := args[0].(string)
+			email := strings.TrimSpace(args[0].(string)) // Trim Email
 			password := args[1].(string)
 
 			if r.DB == nil {
