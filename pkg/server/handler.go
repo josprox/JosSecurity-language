@@ -65,7 +65,14 @@ func MainHandler(w http.ResponseWriter, r *http.Request) {
 	// rt.LoadEnv(core.GlobalFileSystem) // Fork already has Env copied
 
 	// 2. Rate Limiting (60 req/min)
-	ip := strings.Split(r.RemoteAddr, ":")[0]
+	ip := r.Header.Get("X-Forwarded-For")
+	if ip == "" {
+		ip = strings.Split(r.RemoteAddr, ":")[0]
+	} else {
+		// XFF can be "client, proxy1, proxy2"
+		ip = strings.TrimSpace(strings.Split(ip, ",")[0])
+	}
+
 	rateLimitMu.Lock()
 	entry, exists := rateLimitStore[ip]
 	if !exists {
