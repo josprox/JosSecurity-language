@@ -202,6 +202,27 @@ func reloadApp(changedFile string) {
 		}
 	}
 
+	if changedFile != "" && strings.HasSuffix(changedFile, "env.joss") {
+		fmt.Println("Recargando entorno...")
+		if currentRuntime != nil {
+			currentRuntime.LoadEnv(GlobalFileSystem)
+			// Re-init Redis if configuration changed
+			if currentRuntime.Env["SESSION_DRIVER"] == "redis" {
+				host := "localhost:6379"
+				if val, ok := currentRuntime.Env["REDIS_HOST"]; ok {
+					host = val
+				}
+				pass := ""
+				if val, ok := currentRuntime.Env["REDIS_PASSWORD"]; ok {
+					pass = val
+				}
+				core.InitRedis(host, pass, 0)
+			}
+		}
+		notifyClients()
+		return
+	}
+
 	if changedFile != "" && strings.HasSuffix(changedFile, ".joss") {
 		if strings.HasSuffix(changedFile, "routes.joss") {
 			// Reload Routes

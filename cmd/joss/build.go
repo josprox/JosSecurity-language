@@ -11,6 +11,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 
 	_ "embed"
 
@@ -79,7 +80,20 @@ func buildWeb() {
 		}
 	}
 
-	// 4. Encrypt env.joss to build/env.enc
+	// 4. Create nginx_port.conf
+	port := getEnvPort("env.joss")
+	if port == "" {
+		port = "8000" // Default default
+	}
+
+	nginxContent := fmt.Sprintf("set $joss_port %s;", port)
+	if err := ioutil.WriteFile(filepath.Join(buildDir, "nginx_port.conf"), []byte(nginxContent), 0644); err != nil {
+		fmt.Printf("Error creando nginx_port.conf: %v\n", err)
+	} else {
+		fmt.Printf("Archivo nginx_port.conf creado con puerto %s\n", port)
+	}
+
+	// 5. Encrypt env.joss to build/env.enc
 	fmt.Println("Encriptando entorno para producción...")
 	encryptEnvTo(filepath.Join(buildDir, "env.enc"))
 
@@ -334,4 +348,26 @@ func encryptEnvTo(destPath string) {
 		return
 	}
 	fmt.Printf("Entorno encriptado guardado en %s\n", destPath)
+}
+
+func getEnvPort(envPath string) string {
+	content, err := ioutil.ReadFile(envPath)
+	if err != nil {
+		return ""
+	}
+
+	lines := strings.Split(string(content), "\n")
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if strings.HasPrefix(line, "PORT=") || strings.HasPrefix(line, "JOSS_PORT=") {
+			parts := strings.SplitN(line, "=", 2)
+			if len(parts) == 2 {
+				val := strings.TrimSpace(parts[1])
+				val = strings.Trim(val, "\"")
+				val = strings.Trim(val, "'")
+				return val
+			}
+		}
+	}
+	return ""
 }

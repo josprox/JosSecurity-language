@@ -9,7 +9,7 @@ joss server start
 ```
 
 **Puerto**: 8000 (configurable en `env.joss`)  
-**URL**: http://localhost:8000
+**URL**: http://localhost:PORT
 
 ## Características
 

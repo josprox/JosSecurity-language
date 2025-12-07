@@ -58,7 +58,8 @@ func GetControllerFiles(path string) map[string]string {
         
         ($token) ? {
             // Send Verification Email
-            $link = env("APP_URL") + "/verify/" + $token
+            // $link = env("APP_URL") + "/verify/" + $token
+            $link = Request::root() + "/verify/" + $token
             $body = "<h1>Bienvenido a JosSecurity</h1><p>Por favor verifica tu cuenta haciendo click en el siguiente enlace:</p><a href='" + $link + "'>Verificar Cuenta</a>"
             
             SmtpClient::send($data["email"], "Verifica tu cuenta", $body)

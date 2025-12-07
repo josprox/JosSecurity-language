@@ -180,6 +180,12 @@ func MainHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	reqData["_method"] = r.Method
 	reqData["_referer"] = r.Referer()
+	reqData["_host"] = r.Host
+	if r.TLS != nil || r.Header.Get("X-Forwarded-Proto") == "https" {
+		reqData["_scheme"] = "https"
+	} else {
+		reqData["_scheme"] = "http"
+	}
 
 	// 4. Session Management
 	sessionID := ""

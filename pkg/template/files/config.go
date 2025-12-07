@@ -38,9 +38,6 @@ PREFIX="js_"
 
 JWT_SECRET="change_me_in_production"
 
-# Application URL (for emails etc)
-APP_URL="http://localhost:8000"
-
 # Email Configuration (SMTP)
 MAIL_HOST="smtp.gmail.com"
 MAIL_PORT="587"

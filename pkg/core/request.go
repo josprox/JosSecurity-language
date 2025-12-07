@@ -83,6 +83,23 @@ func (r *Runtime) executeRequestMethod(instance *Instance, method string, args [
 			}
 		}
 		return make(map[string]interface{})
+
+	case "root":
+		// Return scheme://host
+		if reqVal, ok := r.Variables["$__request"]; ok {
+			if reqInstance, ok := reqVal.(*Instance); ok {
+				scheme := "http"
+				if s, ok := reqInstance.Fields["_scheme"].(string); ok {
+					scheme = s
+				}
+				host := "localhost"
+				if h, ok := reqInstance.Fields["_host"].(string); ok {
+					host = h
+				}
+				return scheme + "://" + host
+			}
+		}
+		return ""
 	}
 	return nil
 }

@@ -73,7 +73,7 @@ joss server start
 - CSRF protection
 - Rate limiting
 
-**Acceso**: `http://localhost:8000`
+**Acceso**: `http://localhost:<PORT>`
 
 ### `joss run [archivo]`
 
