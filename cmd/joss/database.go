@@ -94,6 +94,15 @@ func changeDatabaseEngine(target string) {
 			continue
 		}
 
+		// --- AUTO-SCHEMA SYNC ---
+		// Before inserting, we ensure the destination table exists and has all columns
+		if err := ensureTableSchema(destDB, target, table, rows); err != nil {
+			fmt.Printf("Error sincronizando esquema para tabla %s: %v\n", table, err)
+			rows.Close()
+			continue
+		}
+		// ------------------------
+
 		cols, _ := rows.Columns()
 		vals := make([]interface{}, len(cols))
 		valPtrs := make([]interface{}, len(cols))
@@ -262,14 +271,6 @@ func updateSourceCodePrefix(oldPrefix, newPrefix string) {
 				if err == nil {
 					strContent := string(content)
 					// Replace "oldPrefix" with "newPrefix"
-					// We look for the prefix followed by a letter, inside quotes ideally, but simple replacement is safer for now given the context
-					// To be safer, we can look for specific patterns like:
-					// "js_users" -> "comion_users"
-					// We should simply replace all occurrences of the old prefix if it looks like a table name start
-					// But simple string replacement of oldPrefix -> newPrefix might be too aggressive if oldPrefix is common (e.g. "a_")
-					// However, usually prefixes are unique enough (js_, comion_db).
-					// Let's replace occurrences of `"` + oldPrefix and `'` + oldPrefix
-
 					newContent := strings.ReplaceAll(strContent, "\""+oldPrefix, "\""+newPrefix)
 					newContent = strings.ReplaceAll(newContent, "'"+oldPrefix, "'"+newPrefix)
 
@@ -286,4 +287,128 @@ func updateSourceCodePrefix(oldPrefix, newPrefix string) {
 			return nil
 		})
 	}
+}
+
+func ensureTableSchema(destDB *sql.DB, driver string, table string, rows *sql.Rows) error {
+	colTypes, err := rows.ColumnTypes()
+	if err != nil {
+		return err
+	}
+
+	// 1. Check if table exists
+	tableExists := false
+	if driver == "sqlite" {
+		var name string
+		err = destDB.QueryRow("SELECT name FROM sqlite_master WHERE type='table' AND name=?", table).Scan(&name)
+		if err == nil {
+			tableExists = true
+		}
+	} else {
+		// MySQL
+		if _, err := destDB.Query("SELECT 1 FROM " + table + " LIMIT 1"); err == nil {
+			tableExists = true
+		} else {
+			// Error might mean table doesn't exist, technically should check specific error, but simpler here
+			// Actually, SELECT 1 usually fails if table missing.
+		}
+		// Better check for MySQL:
+		var name string
+		err = destDB.QueryRow("SELECT TABLE_NAME FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ?", table).Scan(&name)
+		if err == nil {
+			tableExists = true
+		}
+	}
+
+	if !tableExists {
+		fmt.Printf("Tabla %s no existe en destino. Creándola dinámicamente...\n", table)
+		// Build CREATE TABLE
+		var colsDef []string
+		for _, ct := range colTypes {
+			sqlType := mapTypeToSQL(ct.DatabaseTypeName(), driver)
+			colDef := fmt.Sprintf("%s %s", ct.Name(), sqlType)
+			// Simple Primary Key heuristic: if name is 'id', make it PK
+			if strings.ToLower(ct.Name()) == "id" {
+				if driver == "sqlite" {
+					colDef += " INTEGER PRIMARY KEY AUTOINCREMENT"
+				} else {
+					colDef = "id BIGINT AUTO_INCREMENT PRIMARY KEY"
+				}
+			}
+			colsDef = append(colsDef, colDef)
+		}
+		query := fmt.Sprintf("CREATE TABLE %s (%s)", table, strings.Join(colsDef, ", "))
+		_, err := destDB.Exec(query)
+		if err != nil {
+			return fmt.Errorf("falló CREATE TABLE: %v", err)
+		}
+	} else {
+		// 2. Table exists: Check for missing columns
+		destCols, err := getColumnNames(destDB, driver, table)
+		if err == nil {
+			destColMap := make(map[string]bool)
+			for _, c := range destCols {
+				destColMap[c] = true
+			}
+
+			for _, ct := range colTypes {
+				if !destColMap[ct.Name()] {
+					fmt.Printf("Columna %s no existe en %s. Agregándola...\n", ct.Name(), table)
+					sqlType := mapTypeToSQL(ct.DatabaseTypeName(), driver)
+					query := fmt.Sprintf("ALTER TABLE %s ADD COLUMN %s %s", table, ct.Name(), sqlType)
+					if _, err := destDB.Exec(query); err != nil {
+						fmt.Printf("Advertencia: No se pudo agregar columna %s: %v\n", ct.Name(), err)
+					}
+				}
+			}
+		}
+	}
+
+	return nil
+}
+
+func mapTypeToSQL(srcType string, driver string) string {
+	srcType = strings.ToUpper(srcType)
+	// General simplification
+	if strings.Contains(srcType, "INT") {
+		if driver == "sqlite" {
+			return "INTEGER"
+		}
+		return "BIGINT"
+	}
+	if strings.Contains(srcType, "CHAR") || strings.Contains(srcType, "TEXT") || srcType == "BLOB" {
+		if driver == "sqlite" {
+			return "TEXT"
+		}
+		return "VARCHAR(255)" // Safe default
+	}
+	if strings.Contains(srcType, "TIME") || strings.Contains(srcType, "DATE") {
+		if driver == "sqlite" {
+			return "TEXT" // SQLite stores timestamps as strings/ints
+		}
+		return "TIMESTAMP NULL"
+	}
+	if strings.Contains(srcType, "BOOL") {
+		return "INT"
+	}
+	if strings.Contains(srcType, "FLOAT") || strings.Contains(srcType, "DOUBLE") || strings.Contains(srcType, "REAL") {
+		if driver == "sqlite" {
+			return "REAL"
+		}
+		return "DOUBLE"
+	}
+
+	// Fallback
+	if driver == "sqlite" {
+		return "TEXT"
+	}
+	return "VARCHAR(255)"
+}
+
+func getColumnNames(db *sql.DB, driver string, table string) ([]string, error) {
+	rows, err := db.Query(fmt.Sprintf("SELECT * FROM %s LIMIT 0", table))
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	return rows.Columns()
 }
