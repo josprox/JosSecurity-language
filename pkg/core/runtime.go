@@ -50,7 +50,12 @@ func SetFileSystem(fs http.FileSystem) {
 }
 
 // NewRuntime gets a runtime from the pool
+
+// NewRuntime gets a runtime from the pool
 func NewRuntime() *Runtime {
+	// Initialize Logger globally once
+	InitLogger()
+
 	r := runtimePool.Get().(*Runtime)
 	// Ensure native classes are registered (if recycled)
 	if _, ok := r.Variables["View"]; !ok {
