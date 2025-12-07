@@ -81,12 +81,14 @@ func (r *Runtime) executeAuthMethod(instance *Instance, method string, args []in
 	case "attempt":
 		if len(args) >= 2 {
 			if args[0] == nil || args[1] == nil {
+				fmt.Println("[ERROR] [Auth] Attempt failed: Email or Password is nil")
 				return false
 			}
 			email := strings.TrimSpace(args[0].(string)) // Trim Email
 			password := args[1].(string)
 
 			if r.DB == nil {
+				fmt.Println("[ERROR] [Auth] Attempt failed: Database connection is nil")
 				return false
 			}
 
@@ -108,25 +110,25 @@ func (r *Runtime) executeAuthMethod(instance *Instance, method string, args []in
 			err := r.DB.QueryRow(query, email).Scan(&userId, &userToken, &userName, &storedHash, &verificado, &roleName)
 			if err != nil {
 				if err == sql.ErrNoRows {
-					fmt.Println("[Security] Usuario no encontrado.")
+					fmt.Printf("[ERROR] [Auth] User not found for email: '%s'\n", email)
 				} else {
-					fmt.Printf("[Security] Error DB: %v\n", err)
+					fmt.Printf("[ERROR] [Auth] Database error looking up '%s': %v\n", email, err)
 				}
 				return false
 			}
 
 			if verificado == 0 {
-				fmt.Println("[Security] Cuenta no verificada.")
+				fmt.Printf("[ERROR] [Auth] Account not verified for '%s'\n", email)
 				return false // Fallar si no está verificado
 			}
 
 			err = bcrypt.CompareHashAndPassword([]byte(storedHash.String), []byte(password))
 			if err != nil {
-				fmt.Println("[Security] Contraseña incorrecta.")
+				fmt.Printf("[ERROR] [Auth] Password mismatch for '%s'\n", email)
 				return false
 			}
 
-			fmt.Println("[Security] Login exitoso.")
+			fmt.Printf("[INFO] [Auth] Login successful for '%s' (ID: %d)\n", email, userId)
 
 			// Guardar en Sesión ($__session)
 			if sessVal, ok := r.Variables["$__session"]; ok {
