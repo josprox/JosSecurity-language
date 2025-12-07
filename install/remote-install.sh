@@ -186,7 +186,7 @@ ensure_vscode() {
     
     echo ""
     log WARNING "Visual Studio Code is not installed."
-    read -p "Do you want to install VS Code? (y/n) " ans
+    read -p "Do you want to install VS Code? (y/n) " ans < /dev/tty
     if [ "$ans" = "y" ]; then
         if [[ "$(uname -s)" == "Darwin" ]]; then
              log INFO "Please install via Homebrew: brew install --cask visual-studio-code"
@@ -265,7 +265,7 @@ main_menu() {
     echo "  [3] Uninstall (Remove Binary + Extension)"
     echo "  [0] Exit"
     echo ""
-    read -p "Option: " option
+    read -p "Option: " option < /dev/tty
     
     case $option in
         1) # INSTALAR
