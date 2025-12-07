@@ -1,4 +1,4 @@
-# JosSecurity v3.0.2 - Quick Commands
+# JosSecurity v3.0.3 - Quick Commands
 
 ## 🚀 Installation
 

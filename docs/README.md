@@ -187,5 +187,5 @@ Crear issue en el repositorio con:
 
 ---
 
-**Versión**: JosSecurity v3.0.2
+**Versión**: JosSecurity v3.0.3
 **Última actualización**: 2025-12-06
