@@ -214,7 +214,20 @@
       "\\$db.where(\"${2:column}\", ${3:value})",
       "\\$result = \\$db.get()"
     ],
+    ],
     "description": "Query database with GranMySQL"
+  },
+  "GranMySQL Pagination": {
+    "prefix": "dbpaginate",
+    "body": [
+      "\\$db = new GranMySQL()",
+      "\\$page = Request::input(\"page\")",
+      "\\$perPage = ${1:10}",
+      "\\$offset = (Math.abs(\\$page) - 1) * \\$perPage",
+      "\\$total = \\$db.table(\"${2:tableName}\").count()",
+      "\\$results = \\$db.table(\"${2:tableName}\").orderBy(\"id\", \"DESC\").limit(\\$perPage).offset(\\$offset).get()"
+    ],
+    "description": "Paginate database results"
   },
   "GranMySQL Insert": {
     "prefix": "dbinsert",

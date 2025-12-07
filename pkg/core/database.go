@@ -1,7 +1,6 @@
 package core
 
 import (
-	"database/sql"
 	"fmt"
 	"strings"
 )
@@ -150,83 +149,45 @@ func (r *Runtime) executeGranMySQLMethod(instance *Instance, method string, args
 		}
 		return instance
 
-	case "get":
-		if r.DB == nil {
-			fmt.Println("[GranMySQL] Error: No DB connection")
-			return []map[string]interface{}{}
+	case "orderBy":
+		if len(args) >= 2 {
+			col := quoteIdentifier(r.applyColumnPrefix(args[0].(string)))
+			dir := strings.ToUpper(args[1].(string))
+			if dir != "ASC" && dir != "DESC" {
+				dir = "ASC"
+			}
+			instance.Fields["_order"] = fmt.Sprintf("%s %s", col, dir)
 		}
+		return instance
 
-		table := r.getTable(instance)
-		sel := instance.Fields["_select"].(string)
-		wheres := instance.Fields["_wheres"].([]string)
-		bindings := instance.Fields["_bindings"].([]interface{})
-
-		query := fmt.Sprintf("SELECT %s FROM %s", sel, table)
-
-		if joins, ok := instance.Fields["_joins"]; ok {
-			for _, j := range joins.([]string) {
-				query += " " + j
+	case "limit":
+		if len(args) >= 1 {
+			if limit, ok := args[0].(int); ok {
+				instance.Fields["_limit"] = limit
+			} else if limit, ok := args[0].(int64); ok {
+				instance.Fields["_limit"] = int(limit)
 			}
 		}
+		return instance
 
-		if len(wheres) > 0 {
-			query += " WHERE " + strings.Join(wheres, " AND ")
+	case "offset":
+		if len(args) >= 1 {
+			if offset, ok := args[0].(int); ok {
+				instance.Fields["_offset"] = offset
+			} else if offset, ok := args[0].(int64); ok {
+				instance.Fields["_offset"] = int(offset)
+			}
 		}
+		return instance
 
-		// Reset state after query build
-		instance.Fields["_wheres"] = []string{}
-		instance.Fields["_bindings"] = []interface{}{}
-		instance.Fields["_select"] = "*"
-		instance.Fields["_joins"] = []string{}
+	case "get":
+		return r.executeGetMethod(instance, args)
 
-		rows, err := r.DB.Query(query, bindings...)
-		if err != nil {
-			fmt.Printf("[GranMySQL] Error en get: %v\n", err)
-			return []map[string]interface{}{}
-		}
-		defer rows.Close()
-
-		return rowsToMap(rows)
+	case "count":
+		return r.executeCountMethod(instance, args)
 
 	case "first":
-		if r.DB == nil {
-			return nil
-		}
-
-		table := r.getTable(instance)
-		sel := instance.Fields["_select"].(string)
-		wheres := instance.Fields["_wheres"].([]string)
-		bindings := instance.Fields["_bindings"].([]interface{})
-
-		query := fmt.Sprintf("SELECT %s FROM %s", sel, table)
-
-		if joins, ok := instance.Fields["_joins"]; ok {
-			for _, j := range joins.([]string) {
-				query += " " + j
-			}
-		}
-
-		if len(wheres) > 0 {
-			query += " WHERE " + strings.Join(wheres, " AND ")
-		}
-		query += " LIMIT 1"
-
-		// Reset state
-		instance.Fields["_wheres"] = []string{}
-		instance.Fields["_bindings"] = []interface{}{}
-		instance.Fields["_joins"] = []string{}
-
-		rows, err := r.DB.Query(query, bindings...)
-		if err != nil {
-			return nil
-		}
-		defer rows.Close()
-
-		results := rowsToMap(rows)
-		if len(results) > 0 {
-			return results[0]
-		}
-		return nil
+		return r.executeFirstMethod(instance, args)
 
 	case "insert":
 		return r.executeInsertMethod(instance, args)
@@ -259,206 +220,4 @@ func (r *Runtime) executeGranMySQLMethod(instance *Instance, method string, args
 		}
 	}
 	return nil
-}
-
-func rowsToMap(rows *sql.Rows) []map[string]interface{} {
-	var results []map[string]interface{}
-	cols, _ := rows.Columns()
-	vals := make([]interface{}, len(cols))
-	valPtrs := make([]interface{}, len(cols))
-	for i := range cols {
-		valPtrs[i] = &vals[i]
-	}
-
-	for rows.Next() {
-		rows.Scan(valPtrs...)
-		row := make(map[string]interface{})
-		for i, colName := range cols {
-			valVal := vals[i]
-			if b, ok := valVal.([]byte); ok {
-				row[colName] = string(b)
-			} else {
-				row[colName] = valVal
-			}
-		}
-		results = append(results, row)
-	}
-	return results
-}
-
-func rowsToJSON(rows *sql.Rows) string {
-	var results []string
-	cols, _ := rows.Columns()
-	vals := make([]interface{}, len(cols))
-	valPtrs := make([]interface{}, len(cols))
-	for i := range cols {
-		valPtrs[i] = &vals[i]
-	}
-
-	for rows.Next() {
-		rows.Scan(valPtrs...)
-		rowStr := "{"
-		for i, colName := range cols {
-			valVal := vals[i]
-			if b, ok := valVal.([]byte); ok {
-				valVal = string(b)
-			}
-			rowStr += fmt.Sprintf("\"%s\": \"%v\"", colName, valVal)
-			if i < len(cols)-1 {
-				rowStr += ", "
-			}
-		}
-		rowStr += "}"
-		results = append(results, rowStr)
-	}
-	return "[" + strings.Join(results, ", ") + "]"
-}
-
-// Helper to quote identifiers (basic protection)
-func quoteIdentifier(name string) string {
-	name = strings.TrimSpace(name)
-	if name == "*" {
-		return "*"
-	}
-	// Don't quote if it contains spaces (likely a function or complex expression)
-	if strings.Contains(name, " ") || strings.Contains(name, "(") {
-		return name
-	}
-	// Handle table.column
-	if strings.Contains(name, ".") {
-		parts := strings.Split(name, ".")
-		for i, p := range parts {
-			parts[i] = quoteIdentifier(p)
-		}
-		return strings.Join(parts, ".")
-	}
-	if strings.HasPrefix(name, "`") && strings.HasSuffix(name, "`") {
-		return name
-	}
-	return "`" + name + "`"
-}
-
-// Helper to apply prefix to table names
-func (r *Runtime) applyTablePrefix(name string) string {
-	prefix := "js_"
-	if val, ok := r.Env["PREFIX"]; ok {
-		prefix = val
-	}
-	if prefix == "" {
-		return name
-	}
-	if !strings.HasPrefix(name, prefix) {
-		return prefix + name
-	}
-	return name
-}
-
-// Helper to apply prefix to column names (only if qualified with table)
-func (r *Runtime) applyColumnPrefix(name string) string {
-	prefix := "js_"
-	if val, ok := r.Env["PREFIX"]; ok {
-		prefix = val
-	}
-	if prefix == "" {
-		return name
-	}
-
-	// Handle "table.column"
-	if strings.Contains(name, ".") {
-		parts := strings.SplitN(name, ".", 2)
-		tablePart := parts[0]
-		colPart := parts[1]
-
-		// Don't prefix if already prefixed
-		if !strings.HasPrefix(tablePart, prefix) {
-			tablePart = prefix + tablePart
-		}
-		return tablePart + "." + colPart
-	}
-
-	// If no dot, return as is (it's a column name)
-	return name
-}
-
-// Helper to get table name from instance
-// Checks _table (internal), tabla (legacy property), or infers from class name
-func (r *Runtime) getTable(instance *Instance) string {
-	// 1. Check internal _table field (set via table() method)
-	if val, ok := instance.Fields["_table"]; ok {
-		if str, ok := val.(string); ok && str != "" {
-			return str
-		}
-	}
-
-	// 2. Check public tabla property (set in constructor)
-	if val, ok := instance.Fields["tabla"]; ok {
-		if str, ok := val.(string); ok && str != "" {
-			// Sync to _table for future use
-			instance.Fields["_table"] = str
-			return str
-		}
-	}
-
-	// 3. Infer from Class Name (e.g. User -> js_users)
-	className := instance.Class.Name.Value
-	if className == "GranDB" || className == "Model" {
-		return ""
-	}
-
-	// Smart pluralization
-	prefix := "js_"
-	if val, ok := r.Env["PREFIX"]; ok {
-		prefix = val
-	}
-
-	tableName := prefix + strings.ToLower(r.pluralize(className))
-
-	// Sync to _table
-	instance.Fields["_table"] = tableName
-
-	return tableName
-}
-
-// Helper for pluralization (simple English rules)
-func (r *Runtime) pluralize(s string) string {
-	s = strings.TrimSpace(s)
-	if s == "" {
-		return ""
-	}
-
-	lower := strings.ToLower(s)
-
-	// Irregular words
-	irregular := map[string]string{
-		"person": "people",
-		"man":    "men",
-		"child":  "children",
-		"foot":   "feet",
-		"tooth":  "teeth",
-		"mouse":  "mice",
-	}
-
-	if val, ok := irregular[lower]; ok {
-		return val
-	}
-
-	// Ends in 'y' preceded by consonant -> 'ies'
-	if strings.HasSuffix(lower, "y") && len(lower) > 1 {
-		lastChar := lower[len(lower)-1]
-		secondLast := lower[len(lower)-2]
-		if lastChar == 'y' && !isVowel(secondLast) {
-			return s[:len(s)-1] + "ies"
-		}
-	}
-
-	// Ends in s, x, z, ch, sh -> 'es'
-	if strings.HasSuffix(lower, "s") || strings.HasSuffix(lower, "x") || strings.HasSuffix(lower, "z") || strings.HasSuffix(lower, "ch") || strings.HasSuffix(lower, "sh") {
-		return s + "es"
-	}
-
-	return s + "s"
-}
-
-func isVowel(c byte) bool {
-	return c == 'a' || c == 'e' || c == 'i' || c == 'o' || c == 'u'
 }

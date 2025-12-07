@@ -272,6 +272,9 @@ func (r *Runtime) evaluateInfix(ie *parser.InfixExpression) interface{} {
 		if i, ok := val.(int64); ok {
 			return float64(i), true
 		}
+		if i, ok := val.(int); ok {
+			return float64(i), true
+		}
 		if f, ok := val.(float64); ok {
 			return f, true
 		}

@@ -8,6 +8,25 @@ import (
 )
 
 func (r *Runtime) executeMathMethod(instance *Instance, method string, args []interface{}) interface{} {
+	toFloat := func(val interface{}) (float64, bool) {
+		if i, ok := val.(int64); ok {
+			return float64(i), true
+		}
+		if i, ok := val.(int); ok {
+			return float64(i), true
+		}
+		if f, ok := val.(float64); ok {
+			return f, true
+		}
+		if s, ok := val.(string); ok {
+			var f float64
+			if _, err := fmt.Sscanf(s, "%f", &f); err == nil {
+				return f, true
+			}
+		}
+		return 0, false
+	}
+
 	switch method {
 	case "random":
 		// random(min, max)
@@ -28,16 +47,16 @@ func (r *Runtime) executeMathMethod(instance *Instance, method string, args []in
 		if len(args) != 1 {
 			return nil
 		}
-		if f, ok := args[0].(float64); ok {
+		if f, ok := toFloat(args[0]); ok {
 			return math.Floor(f)
 		}
-		return args[0] // If int, return as is
+		return args[0]
 
 	case "ceil":
 		if len(args) != 1 {
 			return nil
 		}
-		if f, ok := args[0].(float64); ok {
+		if f, ok := toFloat(args[0]); ok {
 			return math.Ceil(f)
 		}
 		return args[0]
@@ -46,13 +65,7 @@ func (r *Runtime) executeMathMethod(instance *Instance, method string, args []in
 		if len(args) != 1 {
 			return nil
 		}
-		if i, ok := args[0].(int64); ok {
-			if i < 0 {
-				return -i
-			}
-			return i
-		}
-		if f, ok := args[0].(float64); ok {
+		if f, ok := toFloat(args[0]); ok {
 			return math.Abs(f)
 		}
 		return nil

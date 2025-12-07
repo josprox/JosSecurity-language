@@ -206,6 +206,30 @@ $db->where("edad", ">", 18)
 $db->where("nombre", "LIKE", "%Juan%")
 ```
 
+#### `orderBy(string $columna, string $direccion)`
+Ordena los resultados.
+```joss
+$db->table("users")->orderBy("created_at", "DESC")->get()
+```
+
+#### `limit(int $cantidad)`
+Limita el número de resultados.
+```joss
+$db->table("users")->limit(5)->get()
+```
+
+#### `offset(int $desplazamiento)`
+Salta un número de resultados (paginación).
+```joss
+$db->table("users")->limit(5)->offset(10)->get()
+```
+
+#### `count()`
+Cuenta el número de registros que coinciden con la consulta.
+```joss
+$total = $db->table("users")->where("active", 1)->count()
+```
+
 #### `get()`
 Ejecuta la consulta y retorna resultados como JSON.
 
@@ -218,6 +242,44 @@ Obtiene el primer resultado.
 
 ```joss
 $usuario = $db->table("users")->where("email", "user@example.com")->first()
+```
+
+---
+
+## Math
+
+Funciones matemáticas de utilidad. Soporta `int`, `float` y `string` (parseo automático).
+
+### Métodos
+
+#### `Math::random(int $min, int $max)`
+Genera un número entero aleatorio entre min y max.
+
+```joss
+$dado = Math::random(1, 6)
+```
+
+#### `Math::floor(float $val)`
+Redondea hacia abajo.
+
+```joss
+$entero = Math::floor(4.9) // 4
+```
+
+#### `Math::ceil(float $val)`
+Redondea hacia arriba.
+
+```joss
+$entero = Math::ceil(4.1) // 5
+$paginas = Math::ceil("2.5") // 3 (soporta strings)
+```
+
+#### `Math::abs(number $val)`
+Valor absoluto.
+
+```joss
+$positivo = Math::abs(-10) // 10
+$positivo = Math::abs("-5") // 5
 ```
 
 #### `insert(array $columnas, array $valores)`
