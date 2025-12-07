@@ -214,7 +214,6 @@
       "\\$db.where(\"${2:column}\", ${3:value})",
       "\\$result = \\$db.get()"
     ],
-    ],
     "description": "Query database with GranMySQL"
   },
   "GranMySQL Pagination": {
