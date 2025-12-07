@@ -166,6 +166,8 @@ func (r *Runtime) executeGranMySQLMethod(instance *Instance, method string, args
 				instance.Fields["_limit"] = limit
 			} else if limit, ok := args[0].(int64); ok {
 				instance.Fields["_limit"] = int(limit)
+			} else if limit, ok := args[0].(float64); ok {
+				instance.Fields["_limit"] = int(limit)
 			}
 		}
 		return instance
@@ -175,6 +177,8 @@ func (r *Runtime) executeGranMySQLMethod(instance *Instance, method string, args
 			if offset, ok := args[0].(int); ok {
 				instance.Fields["_offset"] = offset
 			} else if offset, ok := args[0].(int64); ok {
+				instance.Fields["_offset"] = int(offset)
+			} else if offset, ok := args[0].(float64); ok {
 				instance.Fields["_offset"] = int(offset)
 			}
 		}
