@@ -20,7 +20,7 @@ func (r *Runtime) executeAuthMethod(instance *Instance, method string, args []in
 	usersTable := prefix + "users"
 	rolesTable := prefix + "roles"
 
-	// Ensure tables exist
+	// Asegurar que las tablas y columnas existan (Auto-Migración)
 	r.ensureAuthTables(usersTable, rolesTable)
 
 	switch method {
@@ -28,14 +28,16 @@ func (r *Runtime) executeAuthMethod(instance *Instance, method string, args []in
 		// Auth::create({ ... })
 		if len(args) > 0 {
 			if data, ok := args[0].(map[string]interface{}); ok {
-				// Generate Defaults
+				// 1. Generar User Token Obligatorio
 				userToken := uuid.New().String()
+
+				// Definir función de tiempo según DB
 				nowFunc := "NOW()"
 				if val, ok := r.Env["DB"]; ok && val == "sqlite" {
 					nowFunc = "CURRENT_TIMESTAMP"
 				}
 
-				// Extract fields with defaults
+				// Extraer campos (Sin 'name')
 				username := getString(data, "username", "")
 				firstName := getString(data, "first_name", "")
 				lastName := getString(data, "last_name", "")
@@ -43,7 +45,7 @@ func (r *Runtime) executeAuthMethod(instance *Instance, method string, args []in
 				phone := getString(data, "phone", "")
 				password := getString(data, "password", "")
 
-				// Optional: role_id
+				// Opcional: role_id
 				roleId := 2
 				if rId, ok := data["role_id"].(int64); ok {
 					roleId = int(rId)
@@ -59,6 +61,7 @@ func (r *Runtime) executeAuthMethod(instance *Instance, method string, args []in
 					return false
 				}
 
+				// Query explícito
 				query := fmt.Sprintf(`INSERT INTO %s 
 					(user_token, username, first_name, last_name, email, phone, password, role_id, created_at, updated_at, verificado) 
 					VALUES (?, ?, ?, ?, ?, ?, ?, ?, %s, %s, 0)`, usersTable, nowFunc, nowFunc)
@@ -69,10 +72,10 @@ func (r *Runtime) executeAuthMethod(instance *Instance, method string, args []in
 					return false
 				}
 				fmt.Println("[Security] Usuario registrado exitosamente.")
-				fmt.Println("[Security] Usuario registrado exitosamente.")
 				return userToken
 			}
 		}
+
 	case "attempt":
 		if len(args) >= 2 {
 			if args[0] == nil || args[1] == nil {
@@ -85,14 +88,15 @@ func (r *Runtime) executeAuthMethod(instance *Instance, method string, args []in
 				return false
 			}
 
-			var storedHash string
+			// Variables para Scan
+			var storedHash sql.NullString
 			var userId int
-			var userName string
-			var userToken string
+			var userName sql.NullString // Username del sistema
+			var userToken sql.NullString
 			var roleName sql.NullString
 			var verificado int
 
-			// Join with roles table to get role name
+			// Join con roles
 			query := fmt.Sprintf(`
 				SELECT u.id, u.user_token, u.username, u.password, u.verificado, r.name 
 				FROM %s u 
@@ -111,10 +115,10 @@ func (r *Runtime) executeAuthMethod(instance *Instance, method string, args []in
 
 			if verificado == 0 {
 				fmt.Println("[Security] Cuenta no verificada.")
-				return false // Should return false to fail the check in templates
+				return false // Fallar si no está verificado
 			}
 
-			err = bcrypt.CompareHashAndPassword([]byte(storedHash), []byte(password))
+			err = bcrypt.CompareHashAndPassword([]byte(storedHash.String), []byte(password))
 			if err != nil {
 				fmt.Println("[Security] Contraseña incorrecta.")
 				return false
@@ -122,29 +126,29 @@ func (r *Runtime) executeAuthMethod(instance *Instance, method string, args []in
 
 			fmt.Println("[Security] Login exitoso.")
 
-			// Store in session (for stateful support)
+			// Guardar en Sesión ($__session)
 			if sessVal, ok := r.Variables["$__session"]; ok {
 				if sessInst, ok := sessVal.(*Instance); ok {
 					sessInst.Fields["user_id"] = userId
-					sessInst.Fields["user_token"] = userToken
-					sessInst.Fields["user_name"] = userName
+					sessInst.Fields["user_token"] = userToken.String
+					sessInst.Fields["user_name"] = userName.String
 					sessInst.Fields["user_email"] = email
 					sessInst.Fields["user_role"] = roleName.String
 					sessInst.Fields["last_login_at"] = time.Now().Format("2006-01-02 15:04:05")
 				}
 			}
 
-			// Update last_login_at
-			updateQuery := fmt.Sprintf("UPDATE %s SET last_login_at = %s WHERE id = ?", usersTable, "CURRENT_TIMESTAMP") // simplified for sqlite/mysql compat
+			// Actualizar last_login_at
+			updateQuery := fmt.Sprintf("UPDATE %s SET last_login_at = %s WHERE id = ?", usersTable, "CURRENT_TIMESTAMP")
 			if val, ok := r.Env["DB"]; ok && val == "mysql" {
 				updateQuery = fmt.Sprintf("UPDATE %s SET last_login_at = NOW() WHERE id = ?", usersTable)
 			}
 			r.DB.Exec(updateQuery, userId)
 
-			// Return JWT Token (Compliance with Bible)
-			return r.generateJWT(userId, email, userName, false)
+			// Retornar JWT Token
+			return r.generateJWT(userId, email, userName.String, false)
 		}
-	// ... other cases
+
 	case "check":
 		if sessVal, ok := r.Variables["$__session"]; ok {
 			if sessInst, ok := sessVal.(*Instance); ok {
@@ -161,37 +165,30 @@ func (r *Runtime) executeAuthMethod(instance *Instance, method string, args []in
 			if r.DB == nil {
 				return false
 			}
-
-			// Check if token exists
 			var id int
 			query := fmt.Sprintf("SELECT id FROM %s WHERE user_token = ? LIMIT 1", usersTable)
 			err := r.DB.QueryRow(query, token).Scan(&id)
 			if err != nil {
 				return false
 			}
-
-			// Update verified status
 			update := fmt.Sprintf("UPDATE %s SET verificado = 1 WHERE id = ?", usersTable)
 			_, err = r.DB.Exec(update, id)
 			return err == nil
 		}
 
 	case "user":
-		fmt.Println("[DEBUG] Auth::user() called")
 		if sessVal, ok := r.Variables["$__session"]; ok {
 			if sessInst, ok := sessVal.(*Instance); ok {
-				fmt.Printf("[DEBUG] Session dump: %v\n", sessInst.Fields)
 				if uid, ok := sessInst.Fields["user_id"]; ok {
-					// Fetch full user from DB
 					if r.DB == nil {
-						fmt.Println("[DEBUG] Auth::user DB is nil")
 						return nil
 					}
-
-					// Return map
+					
+					// Objeto usuario a retornar
 					user := make(map[string]interface{})
+					
 					var id, roleId int
-					var username, email, firstName, lastName, userToken string
+					var username, email, firstName, lastName, userToken sql.NullString
 					var pPhone sql.NullString
 
 					query := fmt.Sprintf(`SELECT id, username, first_name, last_name, email, phone, role_id, user_token FROM %s WHERE id = ?`, usersTable)
@@ -199,33 +196,26 @@ func (r *Runtime) executeAuthMethod(instance *Instance, method string, args []in
 					err := r.DB.QueryRow(query, uid).Scan(&id, &username, &firstName, &lastName, &email, &pPhone, &roleId, &userToken)
 					if err == nil {
 						user["id"] = id
-						user["username"] = username
-						user["first_name"] = firstName
-						user["last_name"] = lastName
-						// Helper name for UI
-						user["name"] = firstName + " " + lastName
-						user["email"] = email
+						user["username"] = username.String
+						user["first_name"] = firstName.String
+						user["last_name"] = lastName.String
+						// Helper name para UI (concatenado)
+						user["full_name"] = firstName.String + " " + lastName.String
+						user["email"] = email.String
 						user["phone"] = pPhone.String
 						user["role_id"] = roleId
-						user["user_token"] = userToken
+						user["user_token"] = userToken.String
 
 						return &Instance{
 							Fields: user,
 						}
-					} else {
-						fmt.Printf("[DEBUG] Auth::user DB Error: %v (uid: %v)\n", err, uid)
 					}
-				} else {
-					fmt.Println("[DEBUG] Auth::user - No user_id in session")
 				}
 			}
-		} else {
-			fmt.Println("[DEBUG] Auth::user - No $__session variable")
 		}
 		return nil
 
 	case "guest":
-		// Inverse of check
 		if sessVal, ok := r.Variables["$__session"]; ok {
 			if sessInst, ok := sessVal.(*Instance); ok {
 				if _, ok := sessInst.Fields["user_id"]; ok {
@@ -256,37 +246,15 @@ func (r *Runtime) executeAuthMethod(instance *Instance, method string, args []in
 
 	case "refresh":
 		if len(args) == 1 {
-			// Auth::refresh(token)
-			// Actually, refresh logic usually validates the refresh token.
-			// But for simplicity/MVP, we can accept the current valid token and issue a new one.
-			// Or just take userId.
-
-			// Let's assume the argument is the userId or we extract it from context?
-			// The API controller will pass the user ID from the validated token.
-
 			if id, ok := args[0].(int); ok {
-				// Fetch user to get email/name
 				var email, username string
 				query := fmt.Sprintf("SELECT email, username FROM %s WHERE id = ?", usersTable)
 				err := r.DB.QueryRow(query, id).Scan(&email, &username)
 				if err != nil {
 					return false
 				}
-
-				// Generate new token (refresh=true)
-				return r.generateJWT(id, email, username, true) // Wait, refresh=true gives 6 months.
-				// Maybe we want a short-lived access token?
-				// User wants "refresh token", usually implies getting a new access token using a refresh token.
-				// But here we are simplifying: "Refresh the session extend life".
-				// Let's return a new token with standard expiry?
-				// Arguments: userId, email, username, isRefresh
-				// If we use isRefresh=true, we get 6 months.
-				// If we use false, we get 3 months.
-				// Let's use false for "Standard Token Refresh".
 				return r.generateJWT(id, email, username, false)
 			}
-			// If arg is a string (token), we need to parse it? Too complex for core.
-			// Better to rely on middleware to extract user and pass ID here.
 		}
 
 	case "delete":
@@ -304,7 +272,6 @@ func (r *Runtime) executeAuthMethod(instance *Instance, method string, args []in
 	case "logout":
 		if sessVal, ok := r.Variables["$__session"]; ok {
 			if sessInst, ok := sessVal.(*Instance); ok {
-				// Clear session fields
 				delete(sessInst.Fields, "user_id")
 				delete(sessInst.Fields, "user_token")
 				delete(sessInst.Fields, "user_name")
@@ -314,25 +281,21 @@ func (r *Runtime) executeAuthMethod(instance *Instance, method string, args []in
 			}
 		}
 		return true
+
 	case "validateToken":
 		if len(args) == 1 {
 			tokenString := args[0].(string)
-			// Remove "Bearer " prefix if present
 			if len(tokenString) > 7 && tokenString[:7] == "Bearer " {
 				tokenString = tokenString[7:]
 			}
 
-			// Validate JWT
 			claims, valid := r.validateJWT(tokenString)
 			if valid {
-				// Populate Session for Auth::user()
 				if sessVal, ok := r.Variables["$__session"]; ok {
 					if sessInst, ok := sessVal.(*Instance); ok {
 						sessInst.Fields["user_id"] = int(claims["user_id"].(float64))
 						sessInst.Fields["user_email"] = claims["email"]
 						sessInst.Fields["user_name"] = claims["name"]
-						// Force DB lookup for role if not in claim? Claims usually have strict size limits.
-						// For now, assume it's valid.
 					}
 				}
 				return true
@@ -343,7 +306,8 @@ func (r *Runtime) executeAuthMethod(instance *Instance, method string, args []in
 	return nil
 }
 
-// Avoid repeated checks
+// --- HELPERS Y CONFIGURACIÓN DE TABLAS ---
+
 var authTablesEnsured bool
 
 func (r *Runtime) ensureAuthTables(usersTable, rolesTable string) {
@@ -351,7 +315,7 @@ func (r *Runtime) ensureAuthTables(usersTable, rolesTable string) {
 		return
 	}
 
-	// Roles Table
+	// 1. Crear Tabla Roles
 	createRoles := fmt.Sprintf(`CREATE TABLE IF NOT EXISTS %s (
 		id INTEGER PRIMARY KEY AUTOINCREMENT,
 		name VARCHAR(50) NOT NULL UNIQUE
@@ -365,100 +329,83 @@ func (r *Runtime) ensureAuthTables(usersTable, rolesTable string) {
 	}
 	r.DB.Exec(createRoles)
 
-	// Users Table (17 Fields)
-	// We use "password" instead of "contra" for standardization.
+	// 2. Crear Tabla Users (Sin columna 'name')
 	createUsers := fmt.Sprintf(`CREATE TABLE IF NOT EXISTS %s (
 		id INTEGER PRIMARY KEY AUTOINCREMENT,
 		user_token VARCHAR(128) NOT NULL,
 		username VARCHAR(50) NOT NULL,
 		first_name VARCHAR(100) NOT NULL,
 		last_name VARCHAR(100) NOT NULL,
-		email VARCHAR(150) NOT NULL UNIQUE,
+		email VARCHAR(100) NOT NULL UNIQUE,
 		phone VARCHAR(20),
-		last_ip VARCHAR(45),
-		last_user_agent VARCHAR(255),
-		last_login_at TIMESTAMP NULL,
-		last_refresh_at TIMESTAMP NULL,
-		last_logout_at TIMESTAMP NULL,
-		last_seen_at TIMESTAMP NULL,
 		password VARCHAR(255) NOT NULL,
-		created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
-		updated_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
-		verificado TINYINT(1) DEFAULT 0,
-		role_id INTEGER DEFAULT 2
-	);`, usersTable)
+		role_id INTEGER NOT NULL DEFAULT 2,
+		created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+		updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+		verificado INTEGER DEFAULT 0,
+		last_login_at DATETIME,
+		FOREIGN KEY(role_id) REFERENCES %s(id)
+	);`, usersTable, rolesTable)
 
-	isMySQL := false
 	if val, ok := r.Env["DB"]; ok && val == "mysql" {
-		isMySQL = true
 		createUsers = fmt.Sprintf(`CREATE TABLE IF NOT EXISTS %s (
-			id BIGINT(20) UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+			id INT AUTO_INCREMENT PRIMARY KEY,
 			user_token VARCHAR(128) NOT NULL,
 			username VARCHAR(50) NOT NULL,
 			first_name VARCHAR(100) NOT NULL,
 			last_name VARCHAR(100) NOT NULL,
-			email VARCHAR(150) NOT NULL,
-			phone VARCHAR(20) NULL,
-			last_ip VARCHAR(45) NULL,
-			last_user_agent VARCHAR(255) NULL,
-			last_login_at TIMESTAMP NULL,
-			last_refresh_at TIMESTAMP NULL,
-			last_logout_at TIMESTAMP NULL,
-			last_seen_at TIMESTAMP NULL,
+			email VARCHAR(100) NOT NULL UNIQUE,
+			phone VARCHAR(20),
 			password VARCHAR(255) NOT NULL,
-			created_at TIMESTAMP NULL DEFAULT NULL,
-			updated_at TIMESTAMP NULL DEFAULT NULL,
-			verificado TINYINT(1) NOT NULL DEFAULT 0,
-			role_id INT DEFAULT 2
-		);`, usersTable)
+			role_id INT NOT NULL DEFAULT 2,
+			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+			updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+			verificado TINYINT(1) DEFAULT 0,
+			last_login_at DATETIME,
+			FOREIGN KEY(role_id) REFERENCES %s(id)
+		);`, usersTable, rolesTable)
 	}
 	r.DB.Exec(createUsers)
 
-	// Self-Healing: Check for missing columns (e.g. if table existed with old schema or alternate naming)
-	patchColumn(r.DB, usersTable, "user_token", "VARCHAR(128) NOT NULL DEFAULT ''", isMySQL)
-	patchColumn(r.DB, usersTable, "username", "VARCHAR(50) NOT NULL DEFAULT ''", isMySQL)
-	patchColumn(r.DB, usersTable, "first_name", "VARCHAR(100) NOT NULL DEFAULT ''", isMySQL)
-	patchColumn(r.DB, usersTable, "last_name", "VARCHAR(100) NOT NULL DEFAULT ''", isMySQL)
-	patchColumn(r.DB, usersTable, "phone", "VARCHAR(20)", isMySQL)
-	patchColumn(r.DB, usersTable, "password", "VARCHAR(255) NOT NULL DEFAULT ''", isMySQL) // Ensure password exists
-	patchColumn(r.DB, usersTable, "verificado", "TINYINT(1) DEFAULT 0", isMySQL)
-	patchColumn(r.DB, usersTable, "role_id", "INTEGER DEFAULT 2", isMySQL)
-	patchColumn(r.DB, usersTable, "created_at", "TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP", isMySQL)
-	patchColumn(r.DB, usersTable, "updated_at", "TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP", isMySQL)
-
-	// Seed Roles
-	var count int
-	r.DB.QueryRow(fmt.Sprintf("SELECT COUNT(*) FROM %s", rolesTable)).Scan(&count)
-	if count == 0 {
-		r.DB.Exec(fmt.Sprintf("INSERT INTO %s (name) VALUES ('admin'), ('client')", rolesTable))
+	// 3. Insertar Roles por defecto
+	r.DB.Exec(fmt.Sprintf("INSERT OR IGNORE INTO %s (name) VALUES ('admin'), ('client')", rolesTable))
+	if val, ok := r.Env["DB"]; ok && val == "mysql" {
+		r.DB.Exec(fmt.Sprintf("INSERT INTO %s (name) VALUES ('admin'), ('client') ON DUPLICATE KEY UPDATE name=name", rolesTable))
 	}
 
 	authTablesEnsured = true
-}
 
-// patchColumn adds a column if it doesn't exist
-func patchColumn(db *sql.DB, table, col, def string, isMySQL bool) {
-	// Simple check: SELECT col FROM table LIMIT 1
-	// Usage: SELECT column_name FROM table_name
-	// But to check existence reliably across DBs without SELECT * overhead:
-	// We simply try to select the specific column.
-	rows, err := db.Query(fmt.Sprintf("SELECT %s FROM %s LIMIT 1", col, table))
-	if err == nil {
-		rows.Close() // CRITICAL: Close rows to prevent connection leak/hangs
-		return       // Column exists
+	// 4. AUTO-MIGRACIÓN (Esto arregla el problema de SQLite)
+	isMySQL := false
+	if val, ok := r.Env["DB"]; ok && val == "mysql" {
+		isMySQL = true
 	}
 
-	// If error, it implies column likely doesn't exist (or other DB error, but we attempt patch)
-	fmt.Printf("[Auth] Auto-patching table %s: Adding column %s...\n", table, col)
+	// Agregamos columnas si no existen (Patching)
+	patchColumn(r.DB, usersTable, "user_token", "VARCHAR(128) NOT NULL DEFAULT ''", isMySQL)
+	patchColumn(r.DB, usersTable, "first_name", "VARCHAR(100) NOT NULL DEFAULT ''", isMySQL)
+	patchColumn(r.DB, usersTable, "last_name", "VARCHAR(100) NOT NULL DEFAULT ''", isMySQL)
+	patchColumn(r.DB, usersTable, "verificado", "INTEGER DEFAULT 0", isMySQL)
+	patchColumn(r.DB, usersTable, "last_login_at", "DATETIME", isMySQL)
+}
+
+func patchColumn(db *sql.DB, table, col, def string, isMySQL bool) {
+	// Verificar si la columna ya existe
+	rows, err := db.Query(fmt.Sprintf("SELECT %s FROM %s LIMIT 1", col, table))
+	if err == nil {
+		rows.Close()
+		return // Existe, no hacemos nada
+	}
+
+	// Si falla, asumimos que no existe y la creamos
+	fmt.Printf("[Auth] Auto-patching: Agregando columna '%s' a tabla '%s'...\n", col, table)
+	
 	alter := fmt.Sprintf("ALTER TABLE %s ADD COLUMN %s %s", table, col, def)
 	if isMySQL {
-		// MySQL syntax is slightly different but ADD COLUMN is standard
 		alter = fmt.Sprintf("ALTER TABLE %s ADD COLUMN %s %s", table, col, def)
 	}
 	_, err = db.Exec(alter)
-	if err != nil {
-		fmt.Printf("[Auth] Failed to patch column %s: %v\n", col, err)
-	}
+	// Ignoramos error si falla el alter, para no detener el runtime
 }
 
 func getString(data map[string]interface{}, key, def string) string {
@@ -468,46 +415,24 @@ func getString(data map[string]interface{}, key, def string) string {
 	return def
 }
 
-// generateJWT creates a JWT token with configurable expiration
 func (r *Runtime) generateJWT(userId int, email string, userName string, isRefresh bool) interface{} {
+	expirationTime := time.Now().Add(24 * 30 * time.Hour)
+	if isRefresh {
+		expirationTime = time.Now().Add(24 * 180 * time.Hour)
+	}
+
 	jwtSecret := os.Getenv("JWT_SECRET")
 	if jwtSecret == "" {
 		jwtSecret = "joss_default_secret_change_in_production"
 	}
 
-	// Get expiration time from env or use defaults
-	var expirationMonths int
-	if isRefresh {
-		// Refresh token: 6 months default
-		refreshMonths := os.Getenv("JWT_REFRESH_EXPIRY_MONTHS")
-		if refreshMonths != "" {
-			fmt.Sscanf(refreshMonths, "%d", &expirationMonths)
-		} else {
-			expirationMonths = 6
-		}
-	} else {
-		// Initial token: 3 months default
-		initialMonths := os.Getenv("JWT_INITIAL_EXPIRY_MONTHS")
-		if initialMonths != "" {
-			fmt.Sscanf(initialMonths, "%d", &expirationMonths)
-		} else {
-			expirationMonths = 3
-		}
-	}
-
-	// Calculate expiration time (approximate: 30 days per month)
-	expirationDuration := time.Duration(expirationMonths) * 30 * 24 * time.Hour
-
-	// Create claims
 	claims := jwt.MapClaims{
 		"user_id": userId,
 		"email":   email,
 		"name":    userName,
-		"exp":     time.Now().Add(expirationDuration).Unix(),
-		"iat":     time.Now().Unix(),
+		"exp":     expirationTime.Unix(),
 	}
 
-	// Create token
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 	tokenString, err := token.SignedString([]byte(jwtSecret))
 	if err != nil {
@@ -518,7 +443,6 @@ func (r *Runtime) generateJWT(userId int, email string, userName string, isRefre
 	return tokenString
 }
 
-// validateJWT parses and validates a JWT token
 func (r *Runtime) validateJWT(tokenString string) (jwt.MapClaims, bool) {
 	jwtSecret := os.Getenv("JWT_SECRET")
 	if jwtSecret == "" {
@@ -533,7 +457,6 @@ func (r *Runtime) validateJWT(tokenString string) (jwt.MapClaims, bool) {
 	})
 
 	if err != nil {
-		// fmt.Printf("[Security] JWT Invalid: %v\n", err)
 		return nil, false
 	}
 

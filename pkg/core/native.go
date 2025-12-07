@@ -4,277 +4,124 @@ import (
 	"github.com/jossecurity/joss/pkg/parser"
 )
 
+// Helper to register a native class and its handler
+func (r *Runtime) registerNative(name string, methods []string, handler NativeHandler) {
+	// Build MethodStatements
+	stmts := []parser.Statement{}
+	for _, m := range methods {
+		stmts = append(stmts, &parser.MethodStatement{Name: &parser.Identifier{Value: m}})
+	}
+
+	classStmt := &parser.ClassStatement{
+		Name: &parser.Identifier{Value: name},
+		Body: &parser.BlockStatement{Statements: stmts},
+	}
+	r.registerClass(classStmt)
+	r.NativeHandlers[name] = handler
+}
+
 // RegisterNativeClasses injects the native class definitions into the runtime
 func (r *Runtime) RegisterNativeClasses() {
+	// Note: We use (*Runtime).methodName to register UNBOUND methods as handlers.
+	// This ensures that when they are called, we pass the *current* execution runtime 'r',
+	// not the original 'r' that tried to register them.
+
 	// Stack
-	r.registerClass(&parser.ClassStatement{
-		Name: &parser.Identifier{Value: "Stack"},
-		Body: &parser.BlockStatement{},
-	})
+	r.registerNative("Stack", []string{}, (*Runtime).executeStackMethod)
 
 	// Queue
-	r.registerClass(&parser.ClassStatement{
-		Name: &parser.Identifier{Value: "Queue"},
-		Body: &parser.BlockStatement{},
-	})
+	r.registerNative("Queue", []string{}, (*Runtime).executeQueueMethod)
 
-	// GranDB (Database Abstraction)
-	r.registerClass(&parser.ClassStatement{
-		Name: &parser.Identifier{Value: "GranDB"},
-		Body: &parser.BlockStatement{},
-	})
+	// GranDB
+	r.registerNative("GranDB", []string{}, (*Runtime).executeGranMySQLMethod)
+	// Alias for compatibility
+	r.NativeHandlers["GranMySQL"] = (*Runtime).executeGranMySQLMethod
 
 	// Auth
-	authClass := &parser.ClassStatement{
-		Name: &parser.Identifier{Value: "Auth"},
-		Body: &parser.BlockStatement{
-			Statements: []parser.Statement{
-				&parser.MethodStatement{Name: &parser.Identifier{Value: "user"}},
-				&parser.MethodStatement{Name: &parser.Identifier{Value: "check"}},
-				&parser.MethodStatement{Name: &parser.Identifier{Value: "guest"}},
-				&parser.MethodStatement{Name: &parser.Identifier{Value: "id"}},
-				&parser.MethodStatement{Name: &parser.Identifier{Value: "logout"}},
-				&parser.MethodStatement{Name: &parser.Identifier{Value: "attempt"}},
-			},
-		},
-	}
-	r.registerClass(authClass)
-	r.Variables["Auth"] = &Instance{Class: authClass, Fields: make(map[string]interface{})}
+	r.registerNative("Auth", []string{"user", "check", "guest", "id", "logout", "attempt", "create", "hasRole", "verify", "refresh", "delete"}, (*Runtime).executeAuthMethod)
+	r.Variables["Auth"] = &Instance{Class: r.Classes["Auth"], Fields: make(map[string]interface{})}
 
 	// System
-	systemClass := &parser.ClassStatement{
-		Name: &parser.Identifier{Value: "System"},
-		Body: &parser.BlockStatement{},
-	}
-	r.registerClass(systemClass)
-	r.Variables["System"] = &Instance{Class: systemClass, Fields: make(map[string]interface{})}
+	r.registerNative("System", []string{"env", "Run", "load_driver"}, (*Runtime).executeSystemMethod)
+	r.Variables["System"] = &Instance{Class: r.Classes["System"], Fields: make(map[string]interface{})}
 
 	// SmtpClient
-	r.registerClass(&parser.ClassStatement{
-		Name: &parser.Identifier{Value: "SmtpClient"},
-		Body: &parser.BlockStatement{},
-	})
+	r.registerNative("SmtpClient", []string{"auth", "secure", "send"}, (*Runtime).executeSmtpClientMethod)
 
 	// Cron
-	cronClass := &parser.ClassStatement{
-		Name: &parser.Identifier{Value: "Cron"},
-		Body: &parser.BlockStatement{},
-	}
-	r.registerClass(cronClass)
-	r.Variables["Cron"] = &Instance{Class: cronClass, Fields: make(map[string]interface{})}
+	r.registerNative("Cron", []string{"schedule"}, (*Runtime).executeCronMethod)
+	r.Variables["Cron"] = &Instance{Class: r.Classes["Cron"], Fields: make(map[string]interface{})}
 
 	// Task
-	taskClass := &parser.ClassStatement{
-		Name: &parser.Identifier{Value: "Task"},
-		Body: &parser.BlockStatement{},
-	}
-	r.registerClass(taskClass)
-	r.Variables["Task"] = &Instance{Class: taskClass, Fields: make(map[string]interface{})}
+	r.registerNative("Task", []string{"on_request"}, (*Runtime).executeTaskMethod)
+	r.Variables["Task"] = &Instance{Class: r.Classes["Task"], Fields: make(map[string]interface{})}
 
 	// View
-	viewClass := &parser.ClassStatement{
-		Name: &parser.Identifier{Value: "View"},
-		Body: &parser.BlockStatement{
-			Statements: []parser.Statement{
-				&parser.MethodStatement{Name: &parser.Identifier{Value: "render"}},
-			},
-		},
-	}
-	r.registerClass(viewClass)
-	r.Variables["View"] = &Instance{Class: viewClass, Fields: make(map[string]interface{})}
+	r.registerNative("View", []string{"render"}, (*Runtime).executeViewMethod)
+	r.Variables["View"] = &Instance{Class: r.Classes["View"], Fields: make(map[string]interface{})}
 
 	// Router
-	routerClass := &parser.ClassStatement{
-		Name: &parser.Identifier{Value: "Router"},
-		Body: &parser.BlockStatement{
-			Statements: []parser.Statement{
-				&parser.MethodStatement{Name: &parser.Identifier{Value: "get"}},
-				&parser.MethodStatement{Name: &parser.Identifier{Value: "post"}},
-				&parser.MethodStatement{Name: &parser.Identifier{Value: "put"}},
-				&parser.MethodStatement{Name: &parser.Identifier{Value: "delete"}},
-				&parser.MethodStatement{Name: &parser.Identifier{Value: "match"}},
-				&parser.MethodStatement{Name: &parser.Identifier{Value: "api"}},
-				&parser.MethodStatement{Name: &parser.Identifier{Value: "group"}},
-				&parser.MethodStatement{Name: &parser.Identifier{Value: "middleware"}},
-				&parser.MethodStatement{Name: &parser.Identifier{Value: "end"}},
-			},
-		},
-	}
-	r.registerClass(routerClass)
-	r.Variables["Router"] = &Instance{Class: routerClass, Fields: make(map[string]interface{})}
+	r.registerNative("Router", []string{"get", "post", "put", "delete", "match", "api", "group", "middleware", "end"}, (*Runtime).executeRouterMethod)
+	r.Variables["Router"] = &Instance{Class: r.Classes["Router"], Fields: make(map[string]interface{})}
 
 	// Request
-	requestClass := &parser.ClassStatement{
-		Name: &parser.Identifier{Value: "Request"},
-		Body: &parser.BlockStatement{
-			Statements: []parser.Statement{
-				&parser.MethodStatement{Name: &parser.Identifier{Value: "input"}},
-				&parser.MethodStatement{Name: &parser.Identifier{Value: "post"}},
-				&parser.MethodStatement{Name: &parser.Identifier{Value: "all"}},
-				&parser.MethodStatement{Name: &parser.Identifier{Value: "except"}},
-			},
-		},
-	}
-	r.registerClass(requestClass)
-	r.Variables["Request"] = &Instance{Class: requestClass, Fields: make(map[string]interface{})}
+	r.registerNative("Request", []string{"input", "post", "all", "except", "get"}, (*Runtime).executeRequestMethod)
+	r.Variables["Request"] = &Instance{Class: r.Classes["Request"], Fields: make(map[string]interface{})}
 
 	// Response
-	responseClass := &parser.ClassStatement{
-		Name: &parser.Identifier{Value: "Response"},
-		Body: &parser.BlockStatement{},
-	}
-	r.registerClass(responseClass)
-	r.Variables["Response"] = &Instance{Class: responseClass, Fields: make(map[string]interface{})}
+	r.registerNative("Response", []string{"json", "redirect", "error"}, (*Runtime).executeResponseMethod)
+	r.Variables["Response"] = &Instance{Class: r.Classes["Response"], Fields: make(map[string]interface{})}
 
-	// RedirectResponse (Helper for chaining)
-	r.registerClass(&parser.ClassStatement{
-		Name: &parser.Identifier{Value: "RedirectResponse"},
-		Body: &parser.BlockStatement{},
-	})
+	// RedirectResponse
+	r.registerNative("RedirectResponse", []string{}, (*Runtime).executeRedirectResponseMethod)
 
 	// WebSocket
-	wsClass := &parser.ClassStatement{
-		Name: &parser.Identifier{Value: "WebSocket"},
-		Body: &parser.BlockStatement{},
-	}
-	r.registerClass(wsClass)
-	r.Variables["WebSocket"] = &Instance{Class: wsClass, Fields: make(map[string]interface{})}
+	r.registerNative("WebSocket", []string{"broadcast"}, (*Runtime).executeWebSocketMethod)
+	r.Variables["WebSocket"] = &Instance{Class: r.Classes["WebSocket"], Fields: make(map[string]interface{})}
 
 	// Schema
-	schemaClass := &parser.ClassStatement{
-		Name: &parser.Identifier{Value: "Schema"},
-		Body: &parser.BlockStatement{},
-	}
-	r.registerClass(schemaClass)
-	r.Variables["Schema"] = &Instance{Class: schemaClass, Fields: make(map[string]interface{})}
+	r.registerNative("Schema", []string{"create", "table"}, (*Runtime).executeSchemaMethod)
+	r.Variables["Schema"] = &Instance{Class: r.Classes["Schema"], Fields: make(map[string]interface{})}
 
-	// Blueprint (for Schema migrations)
-	blueprintClass := &parser.ClassStatement{
-		Name: &parser.Identifier{Value: "Blueprint"},
-		Body: &parser.BlockStatement{},
-	}
-	r.registerClass(blueprintClass)
+	// Blueprint
+	r.registerNative("Blueprint", []string{}, (*Runtime).executeBlueprintMethod)
 
 	// Redis
-	redisClass := &parser.ClassStatement{
-		Name: &parser.Identifier{Value: "Redis"},
-		Body: &parser.BlockStatement{},
-	}
-	r.registerClass(redisClass)
-	r.Variables["Redis"] = &Instance{Class: redisClass, Fields: make(map[string]interface{})}
+	r.registerNative("Redis", []string{}, (*Runtime).executeRedisMethod)
+	r.Variables["Redis"] = &Instance{Class: r.Classes["Redis"], Fields: make(map[string]interface{})}
+
 	// Migration
-	migrationClass := &parser.ClassStatement{
-		Name: &parser.Identifier{Value: "Migration"},
-		Body: &parser.BlockStatement{},
-	}
-	r.registerClass(migrationClass)
-	r.registerClass(migrationClass)
+	r.registerNative("Migration", []string{}, nil) // No direct native method handler probably, or handled via Schema?
 
 	// Math
-	mathClass := &parser.ClassStatement{
-		Name: &parser.Identifier{Value: "Math"},
-		Body: &parser.BlockStatement{
-			Statements: []parser.Statement{
-				&parser.MethodStatement{Name: &parser.Identifier{Value: "random"}},
-				&parser.MethodStatement{Name: &parser.Identifier{Value: "floor"}},
-				&parser.MethodStatement{Name: &parser.Identifier{Value: "ceil"}},
-				&parser.MethodStatement{Name: &parser.Identifier{Value: "abs"}},
-			},
-		},
-	}
-	r.registerClass(mathClass)
-	r.Variables["Math"] = &Instance{Class: mathClass, Fields: make(map[string]interface{})}
+	r.registerNative("Math", []string{"random", "floor", "ceil", "abs"}, (*Runtime).executeMathMethod)
+	r.Variables["Math"] = &Instance{Class: r.Classes["Math"], Fields: make(map[string]interface{})}
 
 	// Session
-	sessionClass := &parser.ClassStatement{
-		Name: &parser.Identifier{Value: "Session"},
-		Body: &parser.BlockStatement{
-			Statements: []parser.Statement{
-				&parser.MethodStatement{Name: &parser.Identifier{Value: "get"}},
-				&parser.MethodStatement{Name: &parser.Identifier{Value: "put"}},
-				&parser.MethodStatement{Name: &parser.Identifier{Value: "has"}},
-				&parser.MethodStatement{Name: &parser.Identifier{Value: "forget"}},
-				&parser.MethodStatement{Name: &parser.Identifier{Value: "all"}},
-			},
-		},
-	}
-	r.registerClass(sessionClass)
-	// Session is instantiated per request, but we register the class here.
+	r.registerNative("Session", []string{"get", "put", "has", "forget", "all"}, (*Runtime).executeSessionMethod)
+	// Session is instantiated per request
 
 	// UUID
-	r.registerClass(&parser.ClassStatement{
-		Name: &parser.Identifier{Value: "UUID"},
-		Body: &parser.BlockStatement{
-			Statements: []parser.Statement{
-				&parser.MethodStatement{Name: &parser.Identifier{Value: "generate"}},
-				&parser.MethodStatement{Name: &parser.Identifier{Value: "v4"}},
-			},
-		},
-	})
+	r.registerNative("UUID", []string{"generate", "v4"}, (*Runtime).executeUUIDMethod)
 	r.Variables["UUID"] = &Instance{Class: r.Classes["UUID"], Fields: make(map[string]interface{})}
 
 	// UserStorage
-	r.registerClass(&parser.ClassStatement{
-		Name: &parser.Identifier{Value: "UserStorage"},
-		Body: &parser.BlockStatement{
-			Statements: []parser.Statement{
-				&parser.MethodStatement{Name: &parser.Identifier{Value: "put"}},
-				&parser.MethodStatement{Name: &parser.Identifier{Value: "path"}},
-				&parser.MethodStatement{Name: &parser.Identifier{Value: "exists"}},
-				&parser.MethodStatement{Name: &parser.Identifier{Value: "delete"}},
-			},
-		},
-	})
+	r.registerNative("UserStorage", []string{"put", "path", "exists", "delete"}, (*Runtime).executeUserStorageMethod)
 	r.Variables["UserStorage"] = &Instance{Class: r.Classes["UserStorage"], Fields: make(map[string]interface{})}
 }
 
 func (r *Runtime) executeNativeMethod(instance *Instance, method string, args []interface{}) interface{} {
-	// Check class and super classes for native handler
+	// Traverse class hierarchy (bottom-up)
 	currentClass := instance.Class
 	for currentClass != nil {
-		switch currentClass.Name.Value {
-		case "Stack":
-			return r.executeStackMethod(instance, method, args)
-		case "Queue":
-			return r.executeQueueMethod(instance, method, args)
-		case "GranMySQL", "GranDB":
-			return r.executeGranMySQLMethod(instance, method, args)
-		case "Auth":
-			return r.executeAuthMethod(instance, method, args)
-		case "System":
-			return r.executeSystemMethod(instance, method, args)
-		case "SmtpClient":
-			return r.executeSmtpClientMethod(instance, method, args)
-		case "Cron":
-			return r.executeCronMethod(instance, method, args)
-		case "Task":
-			return r.executeTaskMethod(instance, method, args)
-		case "View":
-			return r.executeViewMethod(instance, method, args)
-		case "Router":
-			return r.executeRouterMethod(instance, method, args)
-		case "Request":
-			return r.executeRequestMethod(instance, method, args)
-		case "Response":
-			return r.executeResponseMethod(instance, method, args)
-		case "RedirectResponse":
-			return r.executeRedirectResponseMethod(instance, method, args)
-		case "WebSocket":
-			return r.executeWebSocketMethod(instance, method, args)
-		case "Schema":
-			return r.executeSchemaMethod(instance, method, args)
-		case "Blueprint":
-			return r.executeBlueprintMethod(instance, method, args)
-		case "Redis":
-			return r.executeRedisMethod(instance, method, args)
-		case "Math":
-			return r.executeMathMethod(instance, method, args)
-		case "Session":
-			return r.executeSessionMethod(instance, method, args)
-		case "UUID":
-			return r.executeUUIDMethod(instance, method, args)
-		case "UserStorage":
-			return r.executeUserStorageMethod(instance, method, args)
+		className := currentClass.Name.Value
+
+		// Optimize: Check simple map lookup
+		if handler, ok := r.NativeHandlers[className]; ok {
+			if handler != nil {
+				// PASS 'r' (the current runtime) as the first argument
+				return handler(r, instance, method, args)
+			}
 		}
 
 		// Move to parent

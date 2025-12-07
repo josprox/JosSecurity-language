@@ -1,10 +1,12 @@
 # Sintaxis de JosSecurity
 
+> [!WARNING]
+> **Nota Importante sobre Control de Flujo**: JosSecurity utiliza un paradigma funcional para el control de flujo. **No existen** las sentencias `if`, `else` o `switch` tradicionales. Todo el flujo condicional se maneja mediante **Operadores Ternarios** y **Evaluación de Bloques**.
+
 ## Tabla de Contenidos
 - [Variables y Tipos](#variables-y-tipos)
-- [Operadores Ternarios](#operadores-ternarios)
+- [Control de Flujo (Ternarios)](#control-de-flujo-ternarios)
 - [Clases y Herencia](#clases-y-herencia)
-- [Estructuras de Control](#estructuras-de-control)
 - [Funciones](#funciones)
 - [Loops](#loops)
 - [Try-Catch](#try-catch)
@@ -18,17 +20,14 @@
 
 ### Declaración de Variables
 
-Todas las variables deben iniciar con `$` y tienen un tipo estático:
+Todas las variables deben iniciar con `$` y tienen un tipo estático inferido o explícito:
 
 ```joss
 // Tipos primitivos
 int $edad = 25
 float $precio = 99.99
 string $nombre = "Jose Luis"
-string $alias = 'Pepe' // Comillas simples también soportadas
 bool $activo = true
-
-// Null
 $valor = null
 ```
 
@@ -42,135 +41,75 @@ $numeros = [1, 2, 3, 4, 5]
 // Maps (diccionarios)
 $config = {
     "host": "localhost",
-    "port": 3306,
-    "debug": true
+    "port": 3306
 }
 
-// Acceso a maps
-print($config["host"])  // "localhost"
-
-// Asignación en Maps
-$config["port"] = 3307
-
-// Indexación de Strings
-string $texto = "Hola"
-print($texto[0]) // "H"
-
+// Acceso
+print($config["host"])
+print($lista[0])
 ```
 
 ### Constantes
 
 ```joss
-// En config/reglas.joss
 const string APP_NAME = "Mi Aplicación"
-const int MAX_USERS = 100
-const bool DEBUG = true
-```
-
-### Variables Especiales
-
-```joss
-__DIR__   // Directorio actual
-__FILE__  // Archivo actual
 ```
 
 ---
 
-## Estructuras de Control
+## Control de Flujo (Ternarios)
 
-JosSecurity soporta tanto estructuras de control tradicionales (`if/else`, `switch`) como operadores ternarios avanzados.
+En lugar de `if/else`, JosSecurity utiliza el operador ternario `? :`. Los bloques de código `{ ... }` son expresiones evaluables.
 
-### If / Else
-
-```joss
-if ($edad >= 18) {
-    print("Mayor de edad")
-} else if ($edad >= 13) {
-    print("Adolescente")
-} else {
-    print("Menor de edad")
-}
-```
-
-### Switch
+### Ternario Básico
 
 ```joss
-switch ($opcion) {
-    case 1:
-        print("Opción 1 seleccionada")
-    case 2:
-        print("Opción 2 seleccionada")
-    default:
-        print("Opción inválida")
-}
-
-$titulo = ""
-$texto = $titulo ?? "Sin título" // "" (Cadena vacía se mantiene)
-```
-
-### Operador Elvis (?:)
-
-El operador Elvis `?:` es similar al ternario pero evalúa la "veracidad" (truthiness). Utilízalo si quieres defaults para valores vacíos o falsos.
-
-```joss
-// Sintaxis: valor ?: default
-$nombre = "" ?: "Anónimo"  // "Anónimo"
-$edad = 0 ?: 18            // 18
-```
-
-### Ternario Simple
-
-```joss
-// Sintaxis: (condición) ? valor_verdadero : valor_falso
+// (condición) ? valor_si_true : valor_si_false
 $estado = ($edad >= 18) ? "Mayor" : "Menor"
 ```
 
-### Ternario con Bloques (Ejecución)
+### Ternario como "If/Else" (Bloques Ejecutables)
 
-Los bloques dentro de un ternario ahora se **ejecutan** correctamente, permitiendo `return` temprano.
+Para ejecutar código condicionalmente, use bloques `{}` como valores de retorno:
 
 ```joss
+// Estilo "If"
 ($usuario->esValido()) ? {
     DB::save($usuario)
-    return true
+    print("Guardado")
 } : {
-    return false
+    print("Datos inválidos")
 }
 ```
 
-### Escalera Lógica (Múltiples Condiciones)
+### "Escalera Lógica" (Reemplazo de else-if)
+
+Puede encadenar ternarios formateados verticalmente para emular `else if` o `switch`:
 
 ```joss
-// Reemplazo de if/elseif/else
-$nivel = ($puntos > 1000) ? "Oro"
-         ($puntos > 500)  ? "Plata"
+$nivel = ($puntos > 1000) ? "Oro" :
+         ($puntos > 500)  ? "Plata" :
          ($puntos > 100)  ? "Bronce" :
                             "Novato"
 
-// Ejemplo con bloques
+// Ejecución Condicional Múltiple
 ($rol == "admin") ? {
-    print("Acceso total")
-    $permisos = ["read", "write", "delete"]
+    print("Acceso Total")
 } : ($rol == "editor") ? {
-    print("Acceso limitado")
-    $permisos = ["read", "write"]
+    print("Edición")
 } : {
-    print("Solo lectura")
-    $permisos = ["read"]
+    print("Solo Lectura")
 }
 ```
 
-### Operadores de Comparación
+### Operador Elvis (?:) y Null Coalescing (??)
 
 ```joss
-==  // Igual
-!=  // Diferente
->   // Mayor que
-<   // Menor que
->=  // Mayor o igual
-<=  // Menor o igual
-%   // Módulo (Resto de la división)
+// Elvis: Si el valor es "truthy", úsalo; si no, el default.
+$nombre = $input_nombre ?: "Anónimo"
 
+// Null Coalescing: Si es null, usa el default.
+$puerto = $config["port"] ?? 3306
 ```
 
 ### Operadores Lógicos
@@ -180,10 +119,11 @@ $nivel = ($puntos > 1000) ? "Oro"
 ||  // OR
 !   // NOT
 
-// Ejemplos
-($edad >= 18 && $activo) ? "Permitido" : "Denegado"
-($admin || $moderador) ? "Acceso" : "Sin acceso"
-(!$bloqueado) ? "Activo" : "Bloqueado"
+($edad >= 18 && $activo) ? {
+    print("Puede entrar")
+} : {
+    print("Denegado")
+}
 ```
 
 ---
@@ -194,184 +134,72 @@ $nivel = ($puntos > 1000) ? "Oro"
 
 ```joss
 class Usuario {
-    // Propiedades
     string $nombre
-    string $email
     int $edad
     
-    // Constructor
-    Init constructor($n, $e, $ed) {
+    // Constructor obligatorio 'Init'
+    Init constructor($n, $e) {
         $this->nombre = $n
-        $this->email = $e
-        $this->edad = $ed
+        $this->edad = $e
     }
     
-    // Métodos
     function saludar() {
         print("Hola, soy " . $this->nombre)
     }
-    
-    function esMayor() {
-        return ($this->edad >= 18) ? true : false
-    }
 }
 ```
 
-### Instanciación
+### Herencia (`extends`)
 
 ```joss
-$usuario = new Usuario("Juan", "juan@example.com", 25)
-$usuario->saludar()  // "Hola, soy Juan"
-```
-
-### Herencia
-
-```joss
-class Animal {
-    string $nombre
-    
-    Init constructor($n) {
-        $this->nombre = $n
-    }
-    
-    function hacerSonido() {
-        print("...")
+class Admin extends Usuario {
+    function borrarTodo() {
+        print("Borrando...")
     }
 }
-
-class Perro extends Animal {
-    // Sobrescribir método
-    function hacerSonido() {
-        print("Guau!")
-    }
-    
-    // Nuevo método
-    function moverCola() {
-        print($this->nombre . " mueve la cola")
-    }
-}
-
-$perro = new Perro("Rex")
-$perro->hacerSonido()  // "Guau!"
-$perro->moverCola()    // "Rex mueve la cola"
-```
-
-### Acceso a Propiedades
-
-```joss
-// Lectura
-$nombre = $usuario->nombre
-
-// Escritura
-$usuario->email = "nuevo@example.com"
-
-// Llamada a métodos
-$resultado = $usuario->calcular()
 ```
 
 ---
 
 ## Funciones
 
-### Declaración
-
 ```joss
-// Función simple
-function saludar() {
-    print("Hola!")
-}
-
-// Con parámetros
+// Función global
 function sumar($a, $b) {
     return $a + $b
 }
 
-// Con tipo de retorno
-string function obtenerNombre() {
-    return "Jose"
-}
-
-// Void (sin retorno)
-void function mostrarMensaje($msg) {
-    print($msg)
-}
-```
-
-### Llamada
-
-```joss
-saludar()
-$resultado = sumar(5, 3)
-$nombre = obtenerNombre()
-```
-
-### Funciones en Clases
-
-```joss
-class Calculadora {
-    function sumar($a, $b) {
-        return $a + $b
-    }
-    
-    function multiplicar($a, $b) {
-        return $a * $b
-    }
-}
-
-$calc = new Calculadora()
-$suma = $calc->sumar(10, 5)
+// Llamada
+$res = sumar(10, 20)
 ```
 
 ---
 
 ## Loops
 
-### Foreach (Principal)
+El lenguaje soporta `foreach`, `while` y `do-while`.
+
+### Foreach
 
 ```joss
-// Iterar array
-$nombres = ["Juan", "María", "Pedro"]
+$nombres = ["Juan", "María"]
+
 foreach ($nombres as $nombre) {
     print($nombre)
 }
 
-// Con índice
-foreach ($nombres as $i => $nombre) {
-    print("$i: $nombre")
-}
-
-// Iterar map
-$config = {"host": "localhost", "port": 3306}
-foreach ($config as $key => $value) {
-    print("$key = $value")
-}
-
-// Iterar resultados de base de datos
-$usuarios = $db->table("users")->get()
-foreach ($usuarios as $usuario) {
-    print($usuario->nombre)
+// Mapas
+foreach ($config as $key => $val) {
+    print($key . ": " . $val)
 }
 ```
 
-### Break y Continue
+### While
 
 ```joss
-// Break: salir del loop
-foreach ($items as $item) {
-    ($item == "stop") ? {
-        break
-    } : {
-        print($item)
-    }
-}
-
-// Continue: siguiente iteración
-foreach ($numeros as $num) {
-    ($num % 2 == 0) ? {
-        continue
-    } : {
-        print($num)  // Solo impares
-    }
+while ($x > 0) {
+    print($x)
+    $x--
 }
 ```
 
@@ -379,276 +207,51 @@ foreach ($numeros as $num) {
 
 ## Try-Catch
 
-### Manejo de Errores
-
-```joss
-try {
-    $resultado = operacionRiesgosa()
-    print("Éxito: " . $resultado)
-} catch ($error) {
-    print("Error: " . $error)
-}
-```
-
-### Try-Catch con Base de Datos
+Manejo de errores robusto.
 
 ```joss
 try {
     $db = new GranMySQL()
-    $db->table("users")->insert(["nombre"], ["Juan"])
-    print("Usuario creado")
+    $db->connect()
 } catch ($error) {
-    print("Error al crear usuario: " . $error)
+    print("Error crítico: " . $error)
 }
+
+// Lanzar errores
+throw "Validación fallida"
+```
+
+---
+
+## Operador Pipe (`|>`)
+
+Encadenamiento funcional. Pasa el resultado de la izquierda como primer argumento a la derecha.
+
+```joss
+// Equivalente a: print(strtoupper("hola"))
+"hola" |> strtoupper |> print
 ```
 
 ---
 
 ## Arrays y Maps
 
-### Arrays
+### Funciones Útiles
 
-```joss
-// Declaración
-$lista = []
-$numeros = [1, 2, 3, 4, 5]
-$nombres = ["Ana", "Luis", "Carlos"]
-
-// Acceso por índice
-$primero = $lista[0]
-$segundo = $lista[1]
-
-// Modificación
-$lista[0] = "Nuevo valor"
-
-// Agregar elemento (Append)
-$lista[] = "Elemento nuevo"
-
-// Arrays Multilínea
-$matriz = [
-    [1, 2, 3],
-    [4, 5, 6]
-]
-
-```
-
-### Maps (Diccionarios)
-
-```joss
-// Declaración
-$config = {
-    "host": "localhost",
-    "port": 3306,
-    "debug": true
-}
-
-// Acceso
-$host = $config["host"]
-
-// Modificación
-$config["port"] = 3307
-
-// Agregar clave
-$config["timeout"] = 30
-```
-
-### Funciones de Arrays
-
-```joss
-// Longitud
-$cantidad = count($lista)
-
-// Verificar si existe
-$existe = isset($lista[0])
-
-// Vacío
-$vacio = empty($lista)
-```
+- `count($arr)`: Cantidad de elementos.
+- `isset($arr[0])`: Verifica existencia.
+- `empty($arr)`: Verifica si está vacío.
+- `push($arr, $val)`: Agrega al final (o usar `$arr[] = $val`).
 
 ---
 
 ## Operadores Aritméticos
 
-```joss
-$suma = 10 + 5       // 15
-$resta = 10 - 5      // 5
-$mult = 10 * 5       // 50
-$div = 10 / 3        // 3.333... (siempre float)
-$mod = 10 % 3        // 1
-
-// Incremento/Decremento
-$x++
-$x--
-++$x
---$x
-
-// Asignación compuesta
-$x += 5
-$x -= 3
-$x *= 2
-$x /= 4
-```
+Estándar: `+`, `-`, `*`, `/`, `%`.
+Incremento: `++`, `--`.
+Asignación: `+=`, `-=`, etc.
 
 ---
 
-## Operador Pipe
-
-El operador `|>` permite encadenar llamadas de funciones de manera fluida, pasando el resultado de la izquierda como el **primer argumento** de la función de la derecha.
-
-### Uso Básico
-
-```joss
-// Equivalente a: square(10 + 5)
-$resultado = 10 + 5 |> square
-print($resultado) // 225
-```
-
-### Encadenamiento
-
-```joss
-// Equivalente a: mul(add(10, 5), 2)
-$res = 10 |> add(5) |> mul(2)
-print($res) // 30
-```
-
-### Con Funciones Anónimas
-
-```joss
-$res = 20 |> func($x) {
-    return $x / 2
-}
-print($res) // 10
-```
-
-### Con Builtins
-
-```joss
-"hello" |> len |> print
-// Imprime: 5
-```
-
----
-
-## Concatenación de Strings
-
-```joss
-$nombre = "Jose"
-$apellido = "Luis"
-
-// Con operador .
-$completo = $nombre . " " . $apellido
-
-// En print
-print("Hola " . $nombre)
-
-// Interpolación en strings
-$mensaje = "Bienvenido, $nombre"
-```
-
----
-
-## Comentarios
-
-```joss
-// Comentario de una línea
-
-/*
- * Comentario
- * de múltiples
- * líneas
- */
-```
-
----
-
-## Ejemplos Completos
-
-### Ejemplo 1: Validación de Usuario
-
-```joss
-class Validador {
-    function validarEmail($email) {
-        // Verificar que contenga @
-        $tieneArroba = (strpos($email, "@") > 0) ? true : false
-        
-        return ($tieneArroba) ? {
-            return true
-        } : {
-            return false
-        }
-    }
-}
-
-$validador = new Validador()
-$email = "usuario@example.com"
-
-($validador->validarEmail($email)) ? {
-    print("Email válido")
-} : {
-    print("Email inválido")
-}
-```
-
-### Ejemplo 2: Procesamiento de Lista
-
-```joss
-$numeros = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
-$pares = []
-$impares = []
-
-foreach ($numeros as $num) {
-    ($num % 2 == 0) ? {
-        $pares[] = $num
-    } : {
-        $impares[] = $num
-    }
-}
-
-print("Pares: " . count($pares))
-print("Impares: " . count($impares))
-```
-
-### Ejemplo 3: Sistema de Permisos
-
-```joss
-class Usuario {
-    string $rol
-    
-    Init constructor($r) {
-        $this->rol = $r
-    }
-    
-    function puedeEditar() {
-        return ($this->rol == "admin" || $this->rol == "editor") ? true : false
-    }
-    
-    function puedeEliminar() {
-        return ($this->rol == "admin") ? true : false
-    }
-}
-
-$usuario = new Usuario("editor")
-
-($usuario->puedeEditar()) ? {
-    print("Puede editar contenido")
-} : {
-    print("Sin permisos de edición")
-}
-
-($usuario->puedeEliminar()) ? {
-    print("Puede eliminar")
-} : {
-    print("No puede eliminar")
-}
-```
-
----
-
-## Concurrencia
-
-JosSecurity soporta concurrencia moderna estilo Go.
-
-- **Async/Await**: Ejecución asíncrona.
-- **Canales**: Comunicación entre procesos.
-
-Ver [CONCURRENCIA.md](./CONCURRENCIA.md) para la guía completa.
+> [!TIP]
+> Use `print` o `echo` para depuración rápida. Use `var_dump` (si disponible) para inspección profunda.

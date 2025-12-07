@@ -48,15 +48,7 @@ MAIL_USERNAME="your_email@gmail.com"
 MAIL_PASSWORD="your_app_password"
 MAIL_FROM_ADDRESS="no-reply@jossecurity.com"
 MAIL_FROM_NAME="${APP_NAME}"
-
-// Auth API Middleware (JWT)
-Router::registerMiddleware("auth_api", func() {
-    $token = Request::header("Authorization")
-    if (Auth::validateToken($token)) {
-        return true
-    }
-    return Response::json({"error": "Unauthorized", "message": "Invalid or expired token"}, 401)
-})`,
+`,
 		filepath.Join(path, "config", "reglas.joss"): fmt.Sprintf(`// Constantes Globales
 const string APP_NAME = "JosSecurity Enterprise"
 const string APP_VERSION = "%s"`, version.Version),

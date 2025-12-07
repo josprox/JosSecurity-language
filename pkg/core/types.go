@@ -6,6 +6,10 @@ import (
 	"github.com/jossecurity/joss/pkg/parser"
 )
 
+// NativeHandler is a function that executes a native method
+// NativeHandler is a function that executes a native method
+type NativeHandler func(r *Runtime, instance *Instance, method string, args []interface{}) interface{}
+
 // Runtime manages the execution environment of a Joss program
 type Runtime struct {
 	Env               map[string]string
@@ -17,6 +21,7 @@ type Runtime struct {
 	Routes            map[string]map[string]interface{} // HTTP Method -> Path -> Handler
 	CurrentMiddleware []string
 	CustomMiddlewares map[string]interface{} // Name -> Closure/Handler
+	NativeHandlers    map[string]NativeHandler
 }
 
 // Instance represents an instance of a class

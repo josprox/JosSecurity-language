@@ -569,6 +569,9 @@ Utilidades del sistema.
 
 ### Métodos
 
+> [!CAUTION]
+> **Riesgo de Seguridad**: El método `System::Run` permite la ejecución de comandos del sistema operativo. Por defecto está **bloqueado**. Para habilitarlo, debe configurar `ALLOW_SYSTEM_RUN=true` en su archivo de entorno. Úselo con extrema precaución.
+
 #### `System::env(string $key, mixed $default)`
 Lee variable de entorno.
 
@@ -672,7 +675,11 @@ $id = Session::get("carrito_id")
 Verifica si existe una clave.
 
 ```joss
-if (Session::has("user_id")) { ... }
+(Session::has("user_id")) ? {
+    // ...
+} : {
+    // ...
+}
 ```
 
 #### `Session::forget(string $key)`

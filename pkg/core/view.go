@@ -76,7 +76,9 @@ func (r *Runtime) executeViewMethod(instance *Instance, method string, args []in
 			data["auth_role"] = ""
 
 			if sessVal, ok := r.Variables["$__session"]; ok {
+				// fmt.Println("[View DEBUG] Found $__session")
 				if sessInst, ok := sessVal.(*Instance); ok {
+					// fmt.Printf("[View DEBUG] Session keys: %v\n", sessInst.Fields)
 					if _, ok := sessInst.Fields["user_id"]; ok {
 						data["auth_check"] = true
 						data["auth_guest"] = false
@@ -98,9 +100,20 @@ func (r *Runtime) executeViewMethod(instance *Instance, method string, args []in
 					}
 					// Inject CSRF Token
 					if csrfVal, ok := sessInst.Fields["csrf_token"]; ok {
+						// fmt.Printf("[View DEBUG] Injecting CSRF token: %v\n", csrfVal)
 						data["csrf_token"] = csrfVal
+					} else {
+						fmt.Println("[View DEBUG] CSRF token NOT FOUND in $__session fields")
+						// Print all keys for debugging
+						for k := range sessInst.Fields {
+							fmt.Printf("[View DEBUG] Available Key: %s\n", k)
+						}
 					}
+				} else {
+					fmt.Println("[View DEBUG] $__session is not an Instance")
 				}
+			} else {
+				fmt.Println("[View DEBUG] $__session variable NOT FOUND in Runtime")
 			}
 
 			// 1. Read View Content
@@ -309,18 +322,30 @@ func (r *Runtime) executeViewMethod(instance *Instance, method string, args []in
 			}
 
 			// 3.8 Handle Helpers (Pre-Evaluator)
+			tokenVal := ""
 			if token, ok := data["csrf_token"]; ok {
-				field := fmt.Sprintf(`<input type="hidden" name="_token" value="%v">`, token)
-				finalHtml = strings.ReplaceAll(finalHtml, "{{ csrf_field() }}", field)
+				tokenVal = fmt.Sprintf("%v", token)
+			}
+
+			// Use Regex for whitespace flexibility
+			reCsrf := regexp.MustCompile(`\{\{\s*csrf_field\(\)\s*\}\}`)
+			if reCsrf.MatchString(finalHtml) {
+				fmt.Printf("[View DEBUG] Replaced {{ csrf_field() }} via Regex with token: %s\n", tokenVal)
+				field := fmt.Sprintf(`<input type="hidden" name="_token" value="%s">`, tokenVal)
+				finalHtml = reCsrf.ReplaceAllString(finalHtml, field)
+			} else {
+				// Fallback
+				if strings.Contains(finalHtml, "csrf_field()") {
+					fmt.Println("[View DEBUG] Regex failed but found 'csrf_field()'. Attempting direct replace.")
+					field := fmt.Sprintf(`<input type="hidden" name="_token" value="%s">`, tokenVal)
+					finalHtml = strings.ReplaceAll(finalHtml, "{{ csrf_field() }}", field)
+					finalHtml = strings.ReplaceAll(finalHtml, "{{csrf_field()}}", field)
+				}
 			}
 
 			// 4. Variable Replacement (Evaluator Based)
 
 			// Handle {{ ... }}
-			// We use a loop to find all {{ ... }} blocks that are NOT {{! ... }} (raw) or control structures already handled.
-			// Actually, we should handle {{! ... }} first to avoid confusion, or handle them together.
-
-			// Regex to find {{ ... }}
 			reTags := regexp.MustCompile(`\{\{(.*?)\}\}`)
 			finalHtml = reTags.ReplaceAllStringFunc(finalHtml, func(match string) string {
 				content := match[2 : len(match)-2] // Remove {{ and }}
@@ -334,13 +359,18 @@ func (r *Runtime) executeViewMethod(instance *Instance, method string, args []in
 				}
 
 				// Skip if it looks like a block ternary start/end or other control structure leftovers
-				// (Though block ternaries should be handled by now)
 				if strings.Contains(content, "? {") {
-					return match // Skip, let block ternary handler deal with it (if any left)
+					return match // Skip
 				}
 
 				// Evaluate
 				val := r.evaluateViewExpression(content, data)
+
+				// Handle nil explicitly to avoid printing "<nil>"
+				if val == nil {
+					return ""
+				}
+
 				valStr := fmt.Sprintf("%v", val)
 
 				if isRaw {

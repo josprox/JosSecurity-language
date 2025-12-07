@@ -228,9 +228,14 @@ func MainHandler(w http.ResponseWriter, r *http.Request) {
 		} else {
 			reqToken = r.Header.Get("X-CSRF-TOKEN")
 		}
+
+		fmt.Printf("[CSRF DEBUG] Session: %s | Stored: %s | Received: %s\n", sessionID, csrfToken, reqToken)
+
 		if reqToken == "" || reqToken != csrfToken {
 			w.WriteHeader(http.StatusForbidden)
 			fmt.Fprintf(w, "<h1>419 Page Expired</h1><p>CSRF token mismatch.</p>")
+			// Print debug info to browser too (for development)
+			fmt.Fprintf(w, "<!-- Debug: Stored='%s' Received='%s' -->", csrfToken, reqToken)
 			return
 		}
 	}

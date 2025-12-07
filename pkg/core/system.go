@@ -20,6 +20,13 @@ func (r *Runtime) executeSystemMethod(instance *Instance, method string, args []
 			return ""
 		}
 	case "Run":
+		// Security Check
+		allow, ok := r.Env["ALLOW_SYSTEM_RUN"]
+		if !ok || (allow != "true" && allow != "1") {
+			fmt.Println("[System::Security] Error: Ejecución de comandos bloqueada. Configure ALLOW_SYSTEM_RUN=true en su entorno.")
+			return ""
+		}
+
 		if len(args) > 0 {
 			cmdName := args[0].(string)
 			cmdArgs := []string{}
