@@ -12,6 +12,7 @@
 - [Try-Catch](#try-catch)
 - [Arrays y Maps](#arrays-y-maps)
 - [Operador Pipe](#operador-pipe)
+- [Inclusión de Archivos](#inclusión-de-archivos)
 - [Concurrencia](#concurrencia)
 
 ---
@@ -250,6 +251,21 @@ Encadenamiento funcional. Pasa el resultado de la izquierda como primer argument
 Estándar: `+`, `-`, `*`, `/`, `%`.
 Incremento: `++`, `--`.
 Asignación: `+=`, `-=`, etc.
+
+---
+
+---
+
+## Inclusión de Archivos
+
+Puede dividir su código en múltiples archivos y reutilizarlos mediante `import`.
+
+```joss
+import "config/database.joss"
+import "app/models/User.joss"
+
+// El código importado se ejecuta y sus definiciones (clases/funciones) quedan disponibles.
+```
 
 ---
 

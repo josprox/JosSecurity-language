@@ -59,7 +59,7 @@ $success = Auth::attempt("user@example.com", "password123")
 }
 ```
 
-**Retorna**: `bool` - true si las credenciales son válidas
+**Retorna**: `string|bool` - Token JWT si es exitoso, `false` si falla.
 
 #### `Auth::check()`
 Verifica si hay un usuario autenticado.
@@ -140,6 +140,13 @@ Retorna `true` si la eliminación fue exitosa.
 Auth::delete(Auth::id())
 ```
 
+#### `Auth::validateToken(string $token)`
+Valida un token Bearer y establece la sesión del usuario si es válido.
+
+```joss
+$valid = Auth::validateToken("Bearer eyJhb...")
+```
+
 ### Base de Datos (Automática)
 El módulo Auth gestiona automáticamente una tabla `users` (con prefijo opcional `js_`) con **17 columnas** optimizadas, incluyendo:
 - `user_token` (UUID)
@@ -148,6 +155,7 @@ El módulo Auth gestiona automáticamente una tabla `users` (con prefijo opciona
 - Timestamps: `created_at`, `updated_at`, `last_login_at`, `last_refresh_at`, `last_logout_at`.
 
 El sistema incluye "Self-Healing": si faltan columnas, se agregan automáticamente sin perder datos.
+Las tablas se sincronizan automáticamente con las correcciones del motor (e.g. adición de `last_login_at`, `verificado`, etc).
 
 ---
 
@@ -291,6 +299,22 @@ Router::match("GET|POST", "/contact", "ContactController@handle")
 
 // Handlers diferentes por método
 Router::match("GET|POST", "/form", "FormController@show@submit")
+```
+
+#### `Router::api(string $path, string $handler)`
+Ruta API (sin CSRF, retorno JSON).
+
+```joss
+Router::api("/users", "ApiController@getUsers")
+```
+
+#### `Router::group(string $prefix)`
+Agrupa rutas bajo un prefijo común.
+
+```joss
+Router::group("/admin")
+Router::get("/dashboard", "AdminController@dashboard") // /admin/dashboard
+Router::end()
 ```
 
 #### `Router::middleware(string $nombre)`
