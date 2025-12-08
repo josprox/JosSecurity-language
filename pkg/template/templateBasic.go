@@ -29,6 +29,7 @@ func CreateBibleProject(path string) {
 		filepath.Join(path, "public", "css"),
 		filepath.Join(path, "public", "js"),
 		filepath.Join(path, "public", "images"),
+		filepath.Join(path, "storage"),
 	}
 
 	for _, dir := range dirs {

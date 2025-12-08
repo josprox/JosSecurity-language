@@ -52,7 +52,7 @@ func buildWeb() {
 
 	// 3. Copy Project Files
 	fmt.Println("Copiando archivos del proyecto...")
-	dirsToCopy := []string{"app", "config", "public", "assets"}
+	dirsToCopy := []string{"app", "config", "public", "assets", "storage"}
 	for _, dir := range dirsToCopy {
 		if _, err := os.Stat(dir); err == nil {
 			copyDir(dir, filepath.Join(buildDir, dir))

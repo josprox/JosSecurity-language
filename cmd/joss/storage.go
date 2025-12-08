@@ -63,7 +63,7 @@ func configureOCI() {
 		{"OCI_USER_ID", "User OCID"},
 		{"OCI_REGION", "Region (e.g. mx-queretaro-1)"},
 		{"OCI_FINGERPRINT", "Fingerprint"},
-		{"OCI_PRIVATE_KEY_PATH", "Private Key Path (e.g. storage/app/credentials/oci_api_key.pem)"},
+		{"OCI_PRIVATE_KEY_PATH", "Private Key Path (e.g. storage/oci_api_key.pem)"},
 		{"OCI_PASSPHRASE", "Passphrase (dejar vacío si no tiene)"},
 	}
 
