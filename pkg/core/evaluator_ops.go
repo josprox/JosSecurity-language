@@ -174,6 +174,25 @@ func (r *Runtime) evaluateTernary(te *parser.TernaryExpression) interface{} {
 func (r *Runtime) evaluateInfix(ie *parser.InfixExpression) interface{} {
 	left := r.evaluateExpression(ie.Left)
 
+	// Short-Circuit Logic for && and ||
+	if ie.Operator == "&&" {
+		if !isTruthy(left) {
+			return false
+		}
+		// Evaluate Right only if Left is Truthy
+		right := r.evaluateExpression(ie.Right)
+		return isTruthy(right)
+	}
+
+	if ie.Operator == "||" {
+		if isTruthy(left) {
+			return true
+		}
+		// Evaluate Right only if Left is Falsy
+		right := r.evaluateExpression(ie.Right)
+		return isTruthy(right)
+	}
+
 	// Handle cin >> $var (Special case: Right is not evaluated as expression, but as l-value)
 	if ie.Operator == ">>" {
 		if _, ok := left.(*Cin); ok {

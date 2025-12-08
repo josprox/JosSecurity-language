@@ -214,9 +214,29 @@ func (r *Runtime) executeGranMySQLMethod(instance *Instance, method string, args
 				if r.DB == nil {
 					return nil
 				}
+
+				// Check if it is a SELECT query
+				trimmed := strings.ToUpper(strings.TrimSpace(sqlStr))
+				if strings.HasPrefix(trimmed, "SELECT") || strings.HasPrefix(trimmed, "SHOW") || strings.HasPrefix(trimmed, "DESCRIBE") {
+					rows, err := r.DB.Query(sqlStr)
+					if err != nil {
+						fmt.Printf("[GranMySQL] Error query SELECT: %v\n", err)
+						return nil
+					}
+					defer rows.Close()
+					rowsMap := rowsToMap(rows)
+					// Convert to []interface{} for runtime compatibility
+					var result []interface{}
+					for _, r := range rowsMap {
+						result = append(result, r)
+					}
+					return result
+				}
+
+				// Otherwise Exec (INSERT, UPDATE, DELETE, ALTER...)
 				_, err := r.DB.Exec(sqlStr)
 				if err != nil {
-					fmt.Printf("[GranMySQL] Error query: %v\n", err)
+					fmt.Printf("[GranMySQL] Error query EXEC: %v\n", err)
 					return false
 				}
 				return true

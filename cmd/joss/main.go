@@ -144,6 +144,12 @@ func main() {
 			// Default: web project
 			template.CreateBibleProject(os.Args[2])
 		}
+	case "userstorage":
+		if len(os.Args) < 3 {
+			fmt.Println("Uso: joss userstorage [local | OCI | AWS | Azure]")
+			return
+		}
+		handleUserStorage(os.Args[2])
 	case "version":
 		fmt.Printf("JosSecurity v%s (Gold Master)\n", version.Version)
 	case "change":

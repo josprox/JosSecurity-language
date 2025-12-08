@@ -1,10 +1,16 @@
 package core
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
+	"strings"
+
+	"github.com/oracle/oci-go-sdk/v65/common"
+	"github.com/oracle/oci-go-sdk/v65/objectstorage"
 )
 
 // UserStorage Native Class Implementation
@@ -13,6 +19,10 @@ import (
 //	UserStorage::path($user_token, "profile.jpg")
 func (r *Runtime) executeUserStorageMethod(instance *Instance, method string, args []interface{}) interface{} {
 	basePath := "assets/users"
+	storageType := "local"
+	if val, ok := r.Env["STORAGE"]; ok {
+		storageType = val
+	}
 
 	// Get Prefix and Table Names
 	prefix := "js_"
@@ -34,24 +44,7 @@ func (r *Runtime) executeUserStorageMethod(instance *Instance, method string, ar
 		fileName := fmt.Sprintf("%v", args[1]) // Can be "photos/my_pic.jpg"
 		content := fmt.Sprintf("%v", args[2])
 
-		// Full path: assets/users/{token}/{fileName}
-		fullPath := filepath.Join(basePath, userToken, fileName)
-		fmt.Printf("[Storage DEBUG] PUT request. Path: %s\n", fullPath)
-
-		// Ensure the specific directory for this file exists
-		dir := filepath.Dir(fullPath)
-		if err := os.MkdirAll(dir, 0755); err != nil {
-			fmt.Printf("[Storage DEBUG] MkdirAll error: %v\n", err)
-			return false
-		}
-
-		if err := os.WriteFile(fullPath, []byte(content), 0644); err != nil {
-			fmt.Printf("[Storage DEBUG] WriteFile error: %v\n", err)
-			return false
-		}
-		fmt.Println("[Storage DEBUG] Write success.")
-
-		// DB Registry
+		// DB Registry Logic (Common for both)
 		if r.DB != nil {
 			userId := r.getUserIdFromToken(usersTable, userToken)
 			if userId > 0 {
@@ -77,9 +70,24 @@ func (r *Runtime) executeUserStorageMethod(instance *Instance, method string, ar
 				}
 			}
 		}
-		return true
 
-		// ... (skipping update case for brevity unless edited)
+		if storageType == "OCI" {
+			return r.ociPut(userToken, fileName, content)
+		} else {
+			// LOCAL STORAGE
+			fullPath := filepath.Join(basePath, userToken, fileName)
+			dir := filepath.Dir(fullPath)
+			if err := os.MkdirAll(dir, 0755); err != nil {
+				fmt.Printf("[Storage DEBUG] MkdirAll error: %v\n", err)
+				return false
+			}
+
+			if err := os.WriteFile(fullPath, []byte(content), 0644); err != nil {
+				fmt.Printf("[Storage DEBUG] WriteFile error: %v\n", err)
+				return false
+			}
+			return true
+		}
 
 	case "get":
 		if len(args) < 2 {
@@ -87,16 +95,17 @@ func (r *Runtime) executeUserStorageMethod(instance *Instance, method string, ar
 		}
 		userToken := fmt.Sprintf("%v", args[0])
 		fileName := fmt.Sprintf("%v", args[1])
-		fullPath := filepath.Join(basePath, userToken, fileName)
-		fmt.Printf("[Storage DEBUG] GET request. Path: %s\n", fullPath)
 
-		content, err := os.ReadFile(fullPath)
-		if err != nil {
-			fmt.Printf("[Storage DEBUG] ReadFile error: %v\n", err)
-			return nil
+		if storageType == "OCI" {
+			return r.ociGet(userToken, fileName)
+		} else {
+			fullPath := filepath.Join(basePath, userToken, fileName)
+			content, err := os.ReadFile(fullPath)
+			if err != nil {
+				return nil
+			}
+			return string(content)
 		}
-		fmt.Printf("[Storage DEBUG] Read success. Bytes: %d\n", len(content))
-		return string(content)
 
 	case "delete":
 		if len(args) < 2 {
@@ -104,12 +113,8 @@ func (r *Runtime) executeUserStorageMethod(instance *Instance, method string, ar
 		}
 		userToken := fmt.Sprintf("%v", args[0])
 		fileName := fmt.Sprintf("%v", args[1])
-		fullPath := filepath.Join(basePath, userToken, fileName)
-		if err := os.Remove(fullPath); err != nil {
-			// Continue to delete from DB even if file missing
-		}
 
-		// DB Registry
+		// DB Registry Delete
 		if r.DB != nil {
 			userId := r.getUserIdFromToken(usersTable, userToken)
 			if userId > 0 {
@@ -117,9 +122,117 @@ func (r *Runtime) executeUserStorageMethod(instance *Instance, method string, ar
 				r.DB.Exec(query, userId, fileName)
 			}
 		}
-		return true
+
+		if storageType == "OCI" {
+			return r.ociDelete(userToken, fileName)
+		} else {
+			fullPath := filepath.Join(basePath, userToken, fileName)
+			if err := os.Remove(fullPath); err != nil {
+				return false
+			}
+			return true
+		}
 	}
 	return nil
+}
+
+// --- OCI Helpers ---
+
+func (r *Runtime) getOCIClient() (objectstorage.ObjectStorageClient, context.Context, error) {
+	privateKeyPath := r.Env["OCI_PRIVATE_KEY_PATH"]
+	privateKey, err := os.ReadFile(privateKeyPath)
+	if err != nil {
+		return objectstorage.ObjectStorageClient{}, nil, err
+	}
+
+	passphrase := r.Env["OCI_PASSPHRASE"]
+	confProvider := common.NewRawConfigurationProvider(
+		r.Env["OCI_TENANCY_ID"],
+		r.Env["OCI_USER_ID"],
+		r.Env["OCI_REGION"],
+		r.Env["OCI_FINGERPRINT"],
+		string(privateKey),
+		&passphrase,
+	)
+
+	client, err := objectstorage.NewObjectStorageClientWithConfigurationProvider(confProvider)
+	return client, context.Background(), err
+}
+
+func (r *Runtime) ociPut(userToken, fileName, content string) bool {
+	client, ctx, err := r.getOCIClient()
+	if err != nil {
+		fmt.Printf("[OCI Error] Client Init: %v\n", err)
+		return false
+	}
+
+	namespace := r.Env["OCI_NAMESPACE"]
+	bucketName := r.Env["OCI_BUCKET_NAME"]
+	objectName := userToken + "/" + fileName // Use forward slash for OCI
+
+	req := objectstorage.PutObjectRequest{
+		NamespaceName: &namespace,
+		BucketName:    &bucketName,
+		ObjectName:    &objectName,
+		PutObjectBody: io.NopCloser(strings.NewReader(content)),
+		ContentLength: common.Int64(int64(len(content))),
+	}
+
+	_, err = client.PutObject(ctx, req)
+	if err != nil {
+		fmt.Printf("[OCI Error] PutObject: %v\n", err)
+		return false
+	}
+	return true
+}
+
+func (r *Runtime) ociGet(userToken, fileName string) interface{} {
+	client, ctx, err := r.getOCIClient()
+	if err != nil {
+		return nil
+	}
+
+	namespace := r.Env["OCI_NAMESPACE"]
+	bucketName := r.Env["OCI_BUCKET_NAME"]
+	objectName := userToken + "/" + fileName
+
+	req := objectstorage.GetObjectRequest{
+		NamespaceName: &namespace,
+		BucketName:    &bucketName,
+		ObjectName:    &objectName,
+	}
+
+	resp, err := client.GetObject(ctx, req)
+	if err != nil {
+		return nil
+	}
+	defer resp.Content.Close()
+
+	content, err := io.ReadAll(resp.Content)
+	if err != nil {
+		return nil
+	}
+	return string(content)
+}
+
+func (r *Runtime) ociDelete(userToken, fileName string) bool {
+	client, ctx, err := r.getOCIClient()
+	if err != nil {
+		return false
+	}
+
+	namespace := r.Env["OCI_NAMESPACE"]
+	bucketName := r.Env["OCI_BUCKET_NAME"]
+	objectName := userToken + "/" + fileName
+
+	req := objectstorage.DeleteObjectRequest{
+		NamespaceName: &namespace,
+		BucketName:    &bucketName,
+		ObjectName:    &objectName,
+	}
+
+	_, err = client.DeleteObject(ctx, req)
+	return err == nil
 }
 
 // Helper to get User ID
