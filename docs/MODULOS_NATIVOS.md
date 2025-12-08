@@ -19,6 +19,7 @@ Documentación completa de todos los módulos nativos disponibles en JosSecurity
 - [WebSocket](#websocket) - Comunicación en tiempo real
 - [Math](#math) - Funciones matemáticas
 - [Session](#session) - Gestión de sesiones
+- [JSON](#json) - Manipulación de JSON
 
 
 ---
@@ -586,6 +587,7 @@ $datos = Request::except(["_token", "password"])
 
 #### `Request::all()`
 Obtiene todos los parámetros.
+*Nota: Filtra automáticamente campos internos como `_host`, `_scheme`, `_files` para evitar errores en base de datos.*
 
 ```joss
 $datos = Request::all()
@@ -781,4 +783,34 @@ Obtiene todos los datos de la sesión.
 ```joss
 $datos = Session::all()
 ```
+
+---
+
+## JSON
+
+Herramientas para codificar y decodificar JSON nativamente. Ideal para APIs y almacenamiento.
+
+### Métodos
+
+#### `JSON::parse(string $json)`
+Convierte un string JSON en un mapa o array.
+
+```joss
+$data = JSON::parse('{"nombre": "Juan", "edad": 30}')
+print($data["nombre"]) // Juan
+```
+
+#### `JSON::stringify(mixed $data)`
+Convierte un objeto, mapa o array en un string JSON.
+
+```joss
+$json = JSON::stringify({"id": 1, "activo": true})
+```
+
+#### `JSON::decode(string $json)`
+Alias de `parse`.
+
+#### `JSON::encode(mixed $data)`
+Alias de `stringify`.
+
 

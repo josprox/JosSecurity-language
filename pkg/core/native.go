@@ -109,6 +109,10 @@ func (r *Runtime) RegisterNativeClasses() {
 	// UserStorage
 	r.registerNative("UserStorage", []string{"put", "get", "update", "path", "exists", "delete"}, (*Runtime).executeUserStorageMethod)
 	r.Variables["UserStorage"] = &Instance{Class: r.Classes["UserStorage"], Fields: make(map[string]interface{})}
+
+	// JSON
+	r.registerNative("JSON", []string{"parse", "stringify", "decode", "encode"}, (*Runtime).executeJSONMethod)
+	r.Variables["JSON"] = &Instance{Class: r.Classes["JSON"], Fields: make(map[string]interface{})}
 }
 
 func (r *Runtime) executeNativeMethod(instance *Instance, method string, args []interface{}) interface{} {
