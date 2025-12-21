@@ -113,6 +113,10 @@ func (r *Runtime) RegisterNativeClasses() {
 	// JSON
 	r.registerNative("JSON", []string{"parse", "stringify", "decode", "encode"}, (*Runtime).executeJSONMethod)
 	r.Variables["JSON"] = &Instance{Class: r.Classes["JSON"], Fields: make(map[string]interface{})}
+
+	// Markdown
+	r.registerNative("Markdown", []string{"toHtml", "readFile"}, (*Runtime).executeMarkdownMethod)
+	r.Variables["Markdown"] = &Instance{Class: r.Classes["Markdown"], Fields: make(map[string]interface{})}
 }
 
 func (r *Runtime) executeNativeMethod(instance *Instance, method string, args []interface{}) interface{} {

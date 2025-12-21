@@ -13,7 +13,8 @@ func (r *Runtime) evaluateAssign(ae *parser.AssignExpression) interface{} {
 		// Strict Typing Check
 		if expectedType, exists := r.VarTypes[ident.Value]; exists {
 			if !r.checkType(val, expectedType) {
-				panic(fmt.Sprintf("Error de Tipado: No se puede asignar valor a '%s' (se espera %s)", ident.Value, expectedType))
+				fmt.Printf("Error de Tipado: No se puede asignar valor a '%s' (se espera %s)\n", ident.Value, expectedType)
+				return nil
 			}
 		}
 		r.Variables[ident.Value] = val
@@ -196,6 +197,12 @@ func (r *Runtime) evaluateInfix(ie *parser.InfixExpression) interface{} {
 	// Handle cin >> $var (Special case: Right is not evaluated as expression, but as l-value)
 	if ie.Operator == ">>" {
 		if _, ok := left.(*Cin); ok {
+			// Non-Interactive Mode Check
+			if noInteract, ok := r.Env["NON_INTERACTIVE"]; ok && (noInteract == "true" || noInteract == "1") {
+				fmt.Println("[Cin] Input skipped (NON_INTERACTIVE mode)")
+				return nil
+			}
+
 			if ident, ok := ie.Right.(*parser.Identifier); ok {
 				var input string
 				fmt.Scanln(&input)
