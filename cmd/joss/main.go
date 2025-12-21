@@ -151,7 +151,7 @@ func main() {
 		}
 		handleUserStorage(os.Args[2])
 	case "version":
-		fmt.Printf("JosSecurity v%s (Gold Master)\n", version.Version)
+		fmt.Printf("JosSecurity v%s (Node Version)\n", version.Version)
 	case "change":
 		if len(os.Args) < 4 || os.Args[2] != "db" {
 			fmt.Println("Uso: joss change db [motor] o joss change db prefix [nuevo_prefijo]")

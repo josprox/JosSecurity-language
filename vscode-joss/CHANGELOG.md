@@ -1,5 +1,16 @@
 # Changelog
 
+## [3.0.7] - 2025-12-21
+### Added
+- **Node Version Support**: Integrated with JOSS v3.0.4.
+- **Node.js Asset Detection**: Improved intelligence for NPM dependency highlighting.
+- **New Commands**: Full support for `remove:crud` and advanced migration tools.
+- **Hot Reload Integration**: Enhanced communication with the backend dev server.
+
+## [3.0.6] - 2025-12-10
+- Stability improvements for Windows paths.
+- Performance optimizations for workspace indexing.
+
 ## [2.0.0] - 2025-11-28
 
 ### Added
