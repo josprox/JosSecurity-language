@@ -78,6 +78,10 @@ COOKIE_SESSION="2592000"  # 30 días en segundos
 - `REDIS_PASSWORD` - Contraseña de Redis
 - `COOKIE_SESSION` - Duración de cookies en segundos
 
+#### Runtime
+- `NON_INTERACTIVE` - (true/false) Si es true, bloquea `cin >>` para evitar hangs en servidores.
+- `ALLOW_SYSTEM_RUN` - (true/false) Si es true, permite ejecutar `System::Run()`. Por defecto bloqueado por seguridad.
+
 ### Acceso en Código
 
 ```joss

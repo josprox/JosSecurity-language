@@ -58,6 +58,10 @@ func (r *Runtime) evaluateViewExpression(expr string, data map[string]interface{
 
 // View Implementation
 func (r *Runtime) executeViewMethod(instance *Instance, method string, args []interface{}) interface{} {
+	// Initialize AssetManager on first use
+	am := GetAssetManager()
+	am.Initialize()
+
 	if method == "render" {
 		if len(args) >= 1 {
 			viewName := args[0].(string)
@@ -166,8 +170,8 @@ func (r *Runtime) executeViewMethod(instance *Instance, method string, args []in
 
 			if strings.HasPrefix(strings.TrimSpace(viewContent), "@extends") {
 				// Extract layout name
-				// Allow spaces: @extends ( 'layout' )
-				reExtends := regexp.MustCompile(`@extends\s*\(\s*'([^']+)'\s*\)`)
+				// Support both ' and " quotes
+				reExtends := regexp.MustCompile(`@extends\s*\(\s*['"]([^'"]+)['"]\s*\)`)
 				match := reExtends.FindStringSubmatch(viewContent)
 				if len(match) > 1 {
 					layoutName := match[1]
@@ -218,11 +222,8 @@ func (r *Runtime) executeViewMethod(instance *Instance, method string, args []in
 
 				// Extract Sections
 				// @section('name') ... @endsection
-				// We need a loop to find all sections
-				// Extract Sections
-				// @section('name') ... @endsection
-				// Allow spaces: @section ( 'name' )
-				reSection := regexp.MustCompile(`@section\s*\(\s*'([^']+)'\s*\)([\s\S]*?)@endsection`)
+				// Support both ' and " quotes
+				reSection := regexp.MustCompile(`@section\s*\(\s*['"]([^'"]+)['"]\s*\)([\s\S]*?)@endsection`)
 				sectionMatches := reSection.FindAllStringSubmatch(viewContent, -1)
 				for _, sm := range sectionMatches {
 					sections[sm[1]] = sm[2]
@@ -235,11 +236,12 @@ func (r *Runtime) executeViewMethod(instance *Instance, method string, args []in
 				finalHtml = layoutContent
 				// Replace @yield('name') with section content
 				for name, content := range sections {
-					placeholder := fmt.Sprintf("@yield('%s')", name)
-					finalHtml = strings.ReplaceAll(finalHtml, placeholder, content)
+					// Make placeholder regex-safe or try both quote types
+					finalHtml = strings.ReplaceAll(finalHtml, fmt.Sprintf("@yield('%s')", name), content)
+					finalHtml = strings.ReplaceAll(finalHtml, fmt.Sprintf("@yield(\"%s\")", name), content)
 				}
 				// Remove any remaining @yields
-				reYield := regexp.MustCompile(`@yield\s*\(\s*'[^']+'\s*\)`)
+				reYield := regexp.MustCompile(`@yield\s*\(\s*['"][^'"]+['"]\s*\)`)
 				finalHtml = reYield.ReplaceAllString(finalHtml, "")
 			}
 
@@ -388,6 +390,31 @@ func (r *Runtime) executeViewMethod(instance *Instance, method string, args []in
 				}
 				return html.EscapeString(valStr)
 			})
+
+			// 5. Asset Injection (Node Modules Only)
+			vendorCSS, vendorJS := am.GetVendorIncludes()
+
+			// REVERT: Dynamic CSS removed by user request.
+			// System relies on static <link href="/public/css/app.css"> in layout.
+
+			// Inject CSS (Vendor Only)
+			if strings.Contains(finalHtml, "<!-- JOSS_ASSETS -->") {
+				// Custom placeholder
+				finalHtml = strings.Replace(finalHtml, "<!-- JOSS_ASSETS -->", vendorCSS, 1) // Removed dynamicCSS
+			} else if strings.Contains(finalHtml, "</head>") {
+				// Inject before head close
+				finalHtml = strings.Replace(finalHtml, "</head>", vendorCSS+"</head>", 1) // Removed dynamicCSS
+			} else {
+				// Just prepend
+				finalHtml = vendorCSS + finalHtml // Removed dynamicCSS
+			}
+
+			// Inject JS
+			if strings.Contains(finalHtml, "</body>") {
+				finalHtml = strings.Replace(finalHtml, "</body>", vendorJS+"</body>", 1)
+			} else {
+				finalHtml = finalHtml + vendorJS
+			}
 
 			return finalHtml
 		}

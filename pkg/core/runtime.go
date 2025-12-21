@@ -63,6 +63,10 @@ func NewRuntime() *Runtime {
 		r.Variables["cin"] = &Cin{}
 		r.Variables["JOSS_VERSION"] = version.Version
 		r.RegisterNativeClasses()
+
+		// Initialize GlobalAssetManager once
+		am := GetAssetManager()
+		am.Initialize()
 	}
 	return r
 }

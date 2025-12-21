@@ -16,8 +16,10 @@ joss server start
 ### Hot Reload
 Recarga automática al detectar cambios en:
 - Archivos `.joss`
+- Archivos `.joss`
 - Archivos `.joss.html`
 - Archivos `.scss`
+- **Dependencias NPM**: Cambios en `package.json` o `node_modules` recargan assets automáticamente.
 
 ### Compilación SCSS
 Compila automáticamente `assets/css/*.scss` → `public/css/*.css`

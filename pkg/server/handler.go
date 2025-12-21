@@ -118,6 +118,27 @@ func MainHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Handle Virtual Assets (Node Modules)
+	if strings.HasPrefix(r.URL.Path, "/assets/vendor/") {
+		// Path: /assets/vendor/PACKAGE/FILE...
+		// Real: node_modules/PACKAGE/FILE...
+		relPath := strings.TrimPrefix(r.URL.Path, "/assets/vendor/")
+		fullPath := "node_modules/" + relPath // Simple mapping, security risk minimal in dev tool context but beware traversal
+
+		// Security Check: Prevent directory traversal up
+		if strings.Contains(relPath, "..") {
+			http.Error(w, "Invalid path", http.StatusForbidden)
+			return
+		}
+
+		if _, err := os.Stat(fullPath); err == nil {
+			http.ServeFile(w, r, fullPath)
+			return
+		}
+		http.NotFound(w, r)
+		return
+	}
+
 	// 3. Parse Request Data
 	reqData := make(map[string]interface{})
 	for k, v := range r.URL.Query() {

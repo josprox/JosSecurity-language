@@ -3,6 +3,8 @@ package server
 import (
 	"fmt"
 	"net/http"
+	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 	"time"
@@ -58,6 +60,32 @@ func Start(fileSystem http.FileSystem) {
 
 	// WebSocket Endpoint for Hot Reload
 	http.HandleFunc("/__hot_reload", hotReloadHandler)
+
+	// Vendor Assets (Node Modules) - Must be more specific than /assets/
+	http.HandleFunc("/assets/vendor/", func(w http.ResponseWriter, r *http.Request) {
+		// Only allowed in Disk Mode (Development)
+		if GlobalFileSystem != nil {
+			http.NotFound(w, r)
+			return
+		}
+
+		relPath := strings.TrimPrefix(r.URL.Path, "/assets/vendor/")
+		// Security Check: simple traversal prevention
+		if strings.Contains(relPath, "..") {
+			http.Error(w, "Invalid path", http.StatusForbidden)
+			return
+		}
+
+		fullPath := filepath.Join("node_modules", relPath)
+		if _, err := os.Stat(fullPath); err == nil {
+			// serve
+			http.ServeFile(w, r, fullPath)
+			return
+		}
+
+		fmt.Printf("[Server] Vendor Asset 404: %s\n", fullPath)
+		http.NotFound(w, r)
+	})
 
 	// WebSocket Endpoint
 	InitWebSocket()

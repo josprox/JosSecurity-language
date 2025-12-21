@@ -69,6 +69,7 @@ func watchChanges() {
 
 	// Store file hashes: path -> hash
 	fileHashes := make(map[string]string)
+	var lastNodeModulesHash string
 
 	// Helper to calculate hash
 	getHash := func(path string) string {
@@ -84,8 +85,14 @@ func watchChanges() {
 	// Initial scan
 	filepath.Walk(".", func(path string, info os.FileInfo, err error) error {
 		if err == nil && !info.IsDir() {
+			// ext is already declared above if checking duplicate lines, but based on error it seems I added it twice.
+			// Checking context:
+			// output from view might be needed but I'll trust the error.
+			// better to match exact content.
+			// The previous edit likely added `ext := ...` again.
+			// I will replace the block to be clean.
 			ext := filepath.Ext(path)
-			if ext == ".joss" || ext == ".html" || ext == ".css" || ext == ".js" || ext == ".scss" {
+			if ext == ".joss" || ext == ".html" || ext == ".css" || ext == ".js" || ext == ".scss" || filepath.Base(path) == "package.json" {
 				fileHashes[path] = getHash(path)
 			}
 		}
@@ -94,6 +101,25 @@ func watchChanges() {
 
 	for {
 		time.Sleep(500 * time.Millisecond)
+
+		// Check node_modules separately (lightweight)
+		if nmInfo, err := os.Stat("node_modules"); err == nil {
+			// Construct a simple hash from ModTime + IsDir
+			// Use ModTime string
+			currentNMHash := nmInfo.ModTime().String()
+			if lastNodeModulesHash != "" && currentNMHash != lastNodeModulesHash {
+				fmt.Println("[HotReload] 'node_modules' changed. Rescanning assets...")
+				core.GetAssetManager().ScanNodeModules()
+				notifyClients()
+			}
+			lastNodeModulesHash = currentNMHash
+		} else if lastNodeModulesHash != "" {
+			// It existed, now it doesn't (Deleted)
+			fmt.Println("[HotReload] 'node_modules' deleted. Clearing assets...")
+			core.GetAssetManager().ScanNodeModules() // Will clear map
+			notifyClients()
+			lastNodeModulesHash = ""
+		}
 
 		var changedPaths []string
 		err := filepath.Walk(".", func(path string, info os.FileInfo, err error) error {
@@ -108,7 +134,7 @@ func watchChanges() {
 			}
 
 			ext := filepath.Ext(path)
-			if ext == ".joss" || ext == ".html" || ext == ".css" || ext == ".js" || ext == ".scss" {
+			if ext == ".joss" || ext == ".html" || ext == ".css" || ext == ".js" || ext == ".scss" || filepath.Base(path) == "package.json" {
 				currentHash := getHash(path)
 				if lastHash, ok := fileHashes[path]; ok {
 					if currentHash != lastHash {
@@ -153,6 +179,15 @@ func reloadApp(changedFile string) {
 			notifyClients()
 			return
 		}
+	}
+
+	// 1.5 Package.json (Node Modules)
+	if strings.HasSuffix(changedFile, "package.json") {
+		fmt.Println("[HotReload] Detectado cambio en dependencias (package.json). Escaneando assets...")
+		am := core.GetAssetManager()
+		am.ScanNodeModules()
+		notifyClients()
+		return
 	}
 
 	// 2. Views (HTML)

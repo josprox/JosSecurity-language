@@ -26,6 +26,8 @@ joss new web mi_proyecto
 mi_proyecto/
 ├── main.joss              # Entry Point (obligatorio)
 ├── env.joss               # Variables de entorno (obligatorio)
+├── package.json           # Dependencias NPM (Auto-Vendor)
+├── node_modules/          # Librerías (Bootstrap, etc.)
 ├── api.joss               # Rutas API (JSON/TOON)
 ├── routes.joss            # Rutas Web (HTML)
 ├── config/
@@ -124,6 +126,8 @@ Recursos fuente que se compilan a `public/`.
 - **SCSS** → CSS (compilación automática)
 - **JS** → Minificación (futuro)
 - **Images** → Optimización (futuro)
+
+> Ver [ASSETS.md](./ASSETS.md) para más detalles sobre integración con Node.js.
 
 #### `public/`
 Archivos servidos directamente por el servidor.
