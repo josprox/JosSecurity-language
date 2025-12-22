@@ -465,9 +465,11 @@ func (r *Runtime) ensureAuthTables(usersTable, rolesTable string) {
 	}
 
 	// Agregamos columnas si no existen (Patching)
+	patchColumn(r.DB, usersTable, "username", "VARCHAR(50) NOT NULL DEFAULT ''", isMySQL)
 	patchColumn(r.DB, usersTable, "user_token", "VARCHAR(128) NOT NULL DEFAULT ''", isMySQL)
 	patchColumn(r.DB, usersTable, "first_name", "VARCHAR(100) NOT NULL DEFAULT ''", isMySQL)
 	patchColumn(r.DB, usersTable, "last_name", "VARCHAR(100) NOT NULL DEFAULT ''", isMySQL)
+	patchColumn(r.DB, usersTable, "phone", "VARCHAR(20) NOT NULL DEFAULT ''", isMySQL)
 	patchColumn(r.DB, usersTable, "verificado", "INTEGER DEFAULT 0", isMySQL)
 	patchColumn(r.DB, usersTable, "created_at", "DATETIME DEFAULT CURRENT_TIMESTAMP", isMySQL)
 	patchColumn(r.DB, usersTable, "updated_at", "DATETIME DEFAULT CURRENT_TIMESTAMP", isMySQL)
