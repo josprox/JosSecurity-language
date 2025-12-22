@@ -85,12 +85,24 @@ Verifica si el usuario es invitado (no autenticado).
 ```
 
 #### `Auth::user()`
-Obtiene el nombre del usuario autenticado.
+Obtiene el objeto del usuario autenticado.
 
 ```joss
-$nombre = Auth::user()
-print("Hola, " . $nombre)
+$user = Auth::user()
+print("Hola, " . $user.first_name)
+print("ID: " . $user.id)
 ```
+
+**Propiedades disponibles**:
+- `id`
+- `username`
+- `first_name`
+- `last_name`
+- `email`
+- `role_id`
+- `user_token`
+- `created_at`
+- `phone`
 
 #### `Auth::id()`
 Obtiene el ID del usuario autenticado.
@@ -131,6 +143,18 @@ Genera un nuevo token JWT para el usuario especificado.
 
 ```joss
 $newToken = Auth::refresh(Auth::id())
+```
+
+#### `Auth::update(int $userId, map $datos)`
+Actualiza la información del usuario en la base de datos.
+Retorna `true` si la actualización fue exitosa.
+
+```joss
+$datos = {
+    "first_name": "Nuevo Nombre",
+    "phone": "+1234567890"
+}
+Auth::update(Auth::id(), $datos)
 ```
 
 #### `Auth::delete(int $userId)`
@@ -541,6 +565,13 @@ Redirección.
 return Response::redirect("/dashboard")
 ```
 
+#### `Response::redirect()->withCookie(string $name, string $value)`
+Redirección con cookie HTTP-Only.
+
+```joss
+return Response::redirect("/dashboard")->withCookie("token", "xyz")
+```
+
 #### `Response::error(string $mensaje, int $code)`
 Respuesta de error.
 
@@ -795,9 +826,40 @@ $datos = Session::all()
 
 ---
 
-## JSON
 
-Herramientas para codificar y decodificar JSON nativamente. Ideal para APIs y almacenamiento.
+---
+
+## Funciones Globales
+
+Funciones nativas disponibles en cualquier contexto.
+
+### Strings y Arrays
+
+#### `explode(string $delimiter, string $string)`
+Divide un string en un array.
+
+```joss
+$partes = explode("/", "a/b/c")
+// ["a", "b", "c"]
+```
+
+#### `end(array $array)`
+Obtiene el último elemento de un array.
+
+```joss
+$ultimo = end($partes)
+// "c"
+```
+
+### Sistema de Archivos
+
+#### `file_get_contents(string $path)`
+Lee el contenido completo de un archivo.
+
+```joss
+$contenido = file_get_contents("/etc/hosts")
+```
+
 
 ### Métodos
 
@@ -878,5 +940,34 @@ Alias de `parse`.
 
 #### `JSON::encode(mixed $data)`
 Alias de `stringify`.
+
+---
+
+## Funciones Globales
+
+Funciones nativas disponibles en cualquier contexto.
+
+#### `explode(string $delimiter, string $string)`
+Divide un string en un array.
+
+```joss
+$parts = explode("/", "a/b/c")
+// ["a", "b", "c"]
+```
+
+#### `end(array $array)`
+Obtiene el último elemento de un array.
+
+```joss
+$ultimo = end($partes)
+// "c"
+```
+
+#### `file_get_contents(string $path)`
+Lee el contenido completo de un archivo.
+
+```joss
+$contenido = file_get_contents("/etc/hosts")
+```
 
 

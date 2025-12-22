@@ -25,3 +25,10 @@ Este documento sirve como memoria persistente para futuros agentes que trabajen 
 ### 4. Estilo de Código
 - Usar bloques `{ ... }` explícitos dentro de los ternarios para flujos complejos.
 - Para concatenar strings usar `.`.
+
+### 5. Autenticación y Sesiones (JWT Update)
+- **Stateless**: La autenticación ya no depende de `storage/sessions.json`.
+- **JWT Cookie**: El login exitoso setea una cookie `joss_token` (HTTP-Only).
+- **Validación**: El servidor (`handler.go`) valida el JWT en cada petición y restaura la sesión (`user_id`, `email`, etc.) desde los claims del token.
+- **API**: El endpoint `/api/login` retorna el JWT en el JSON para clientes externos.
+- **Uso**: Usar `Response::redirect(...)->withCookie("joss_token", $token)` en el login.

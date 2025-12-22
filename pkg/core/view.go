@@ -92,6 +92,9 @@ func (r *Runtime) executeViewMethod(instance *Instance, method string, args []in
 						if role, ok := sessInst.Fields["user_role"]; ok {
 							data["auth_role"] = role
 						}
+						if email, ok := sessInst.Fields["user_email"]; ok {
+							data["auth_email"] = email
+						}
 					}
 					// Inject Flash Messages
 					if errVal, ok := sessInst.Fields["error"]; ok {

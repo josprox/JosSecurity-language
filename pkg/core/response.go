@@ -72,9 +72,10 @@ func (r *Runtime) createRedirectResponse(url string) *Instance {
 	instance := &Instance{
 		Class: r.Classes["RedirectResponse"],
 		Fields: map[string]interface{}{
-			"_type": "REDIRECT",
-			"url":   url,
-			"flash": make(map[string]interface{}),
+			"_type":   "REDIRECT",
+			"url":     url,
+			"flash":   make(map[string]interface{}),
+			"cookies": make(map[string]interface{}),
 		},
 	}
 	return instance
@@ -93,6 +94,18 @@ func (r *Runtime) executeRedirectResponseMethod(instance *Instance, method strin
 			}
 
 			// Return the instance itself to allow chaining
+			return instance
+		}
+
+	case "withCookie":
+		// ->withCookie(name, value)
+		if len(args) >= 2 {
+			key := args[0].(string)
+			val := args[1]
+
+			if cookies, ok := instance.Fields["cookies"].(map[string]interface{}); ok {
+				cookies[key] = val
+			}
 			return instance
 		}
 	}

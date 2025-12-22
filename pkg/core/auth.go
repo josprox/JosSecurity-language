@@ -152,7 +152,7 @@ func (r *Runtime) executeAuthMethod(instance *Instance, method string, args []in
 			r.DB.Exec(updateQuery, userId)
 
 			// Retornar JWT Token
-			return r.generateJWT(userId, email, userName.String, false)
+			return r.generateJWT(userId, email, userName.String, roleName.String, false)
 		}
 
 	case "check":
@@ -194,12 +194,12 @@ func (r *Runtime) executeAuthMethod(instance *Instance, method string, args []in
 					user := make(map[string]interface{})
 
 					var id, roleId int
-					var username, email, firstName, lastName, userToken sql.NullString
+					var username, email, firstName, lastName, userToken, createdAt sql.NullString
 					var pPhone sql.NullString
 
-					query := fmt.Sprintf(`SELECT id, username, first_name, last_name, email, phone, role_id, user_token FROM %s WHERE id = ?`, usersTable)
+					query := fmt.Sprintf(`SELECT id, username, first_name, last_name, email, phone, role_id, user_token, created_at FROM %s WHERE id = ?`, usersTable)
 
-					err := r.DB.QueryRow(query, uid).Scan(&id, &username, &firstName, &lastName, &email, &pPhone, &roleId, &userToken)
+					err := r.DB.QueryRow(query, uid).Scan(&id, &username, &firstName, &lastName, &email, &pPhone, &roleId, &userToken, &createdAt)
 					if err != nil {
 						fmt.Printf("[Auth Error] User Query Failed for ID %v: %v\n", uid, err)
 					}
@@ -214,8 +214,12 @@ func (r *Runtime) executeAuthMethod(instance *Instance, method string, args []in
 						user["phone"] = pPhone.String
 						user["role_id"] = roleId
 						user["user_token"] = userToken.String
+						user["created_at"] = createdAt.String
 						// Compatibility for templates using user.name
 						user["name"] = firstName.String
+
+						// Debug Print
+						fmt.Printf("[Auth] User found: %s (ID: %d)\n", firstName.String, id)
 
 						return &Instance{
 							Fields: user,
@@ -258,13 +262,81 @@ func (r *Runtime) executeAuthMethod(instance *Instance, method string, args []in
 	case "refresh":
 		if len(args) == 1 {
 			if id, ok := args[0].(int); ok {
-				var email, username string
-				query := fmt.Sprintf("SELECT email, username FROM %s WHERE id = ?", usersTable)
-				err := r.DB.QueryRow(query, id).Scan(&email, &username)
+				var email, username, roleName string
+				// Need to join with roles to get role name
+				prefix := "js_"
+				if val, ok := r.Env["PREFIX"]; ok {
+					prefix = val
+				}
+				usersTable := prefix + "users"
+				rolesTable := prefix + "roles"
+
+				// Fixed query to include role
+				query := fmt.Sprintf(`
+					SELECT u.email, u.username, r.name 
+					FROM %s u 
+					LEFT JOIN %s r ON u.role_id = r.id 
+					WHERE u.id = ?`, usersTable, rolesTable)
+
+				err := r.DB.QueryRow(query, id).Scan(&email, &username, &roleName)
 				if err != nil {
 					return false
 				}
-				return r.generateJWT(id, email, username, false)
+				return r.generateJWT(id, email, username, roleName, false)
+			}
+		}
+
+	case "update":
+		if len(args) == 2 {
+			id, ok1 := args[0].(int)
+			data, ok2 := args[1].(map[string]interface{})
+
+			if ok1 && ok2 {
+				if r.DB == nil {
+					return false
+				}
+
+				// Handle Password Hashing
+				if pwd, ok := data["password"]; ok {
+					passwordStr := fmt.Sprintf("%v", pwd)
+					if passwordStr != "" {
+						hashedBytes, err := bcrypt.GenerateFromPassword([]byte(passwordStr), bcrypt.DefaultCost)
+						if err == nil {
+							data["password"] = string(hashedBytes)
+						}
+					} else {
+						// Don't update empty password
+						delete(data, "password")
+					}
+				}
+
+				// Construct Query
+				var sets []string
+				var vals []interface{}
+
+				// Add updated_at automatically
+				if val, ok := r.Env["DB"]; ok && val == "sqlite" {
+					sets = append(sets, "updated_at = CURRENT_TIMESTAMP")
+				} else {
+					sets = append(sets, "updated_at = NOW()")
+				}
+
+				for k, v := range data {
+					// Protect strict columns if needed, but for now trust controller
+					if k != "id" && k != "user_token" && k != "created_at" && k != "updated_at" {
+						sets = append(sets, fmt.Sprintf("%s = ?", k))
+						vals = append(vals, v)
+					}
+				}
+				vals = append(vals, id)
+
+				if len(sets) == 0 {
+					return true // Nothing to update
+				}
+
+				query := fmt.Sprintf("UPDATE %s SET %s WHERE id = ?", usersTable, strings.Join(sets, ", "))
+				_, err := r.DB.Exec(query, vals...)
+				return err == nil
 			}
 		}
 
@@ -300,7 +372,7 @@ func (r *Runtime) executeAuthMethod(instance *Instance, method string, args []in
 				tokenString = tokenString[7:]
 			}
 
-			claims, valid := r.validateJWT(tokenString)
+			claims, valid := r.ValidateJWT(tokenString)
 			if valid {
 				if sessVal, ok := r.Variables["$__session"]; ok {
 					if sessInst, ok := sessVal.(*Instance); ok {
@@ -397,6 +469,8 @@ func (r *Runtime) ensureAuthTables(usersTable, rolesTable string) {
 	patchColumn(r.DB, usersTable, "first_name", "VARCHAR(100) NOT NULL DEFAULT ''", isMySQL)
 	patchColumn(r.DB, usersTable, "last_name", "VARCHAR(100) NOT NULL DEFAULT ''", isMySQL)
 	patchColumn(r.DB, usersTable, "verificado", "INTEGER DEFAULT 0", isMySQL)
+	patchColumn(r.DB, usersTable, "created_at", "DATETIME DEFAULT CURRENT_TIMESTAMP", isMySQL)
+	patchColumn(r.DB, usersTable, "updated_at", "DATETIME DEFAULT CURRENT_TIMESTAMP", isMySQL)
 	patchColumn(r.DB, usersTable, "last_login_at", "DATETIME", isMySQL)
 }
 
@@ -426,7 +500,7 @@ func getString(data map[string]interface{}, key, def string) string {
 	return def
 }
 
-func (r *Runtime) generateJWT(userId int, email string, userName string, isRefresh bool) interface{} {
+func (r *Runtime) generateJWT(userId int, email string, userName string, roleName string, isRefresh bool) interface{} {
 	expirationTime := time.Now().Add(24 * 30 * time.Hour)
 	if isRefresh {
 		expirationTime = time.Now().Add(24 * 180 * time.Hour)
@@ -441,6 +515,7 @@ func (r *Runtime) generateJWT(userId int, email string, userName string, isRefre
 		"user_id": userId,
 		"email":   email,
 		"name":    userName,
+		"role":    roleName,
 		"exp":     expirationTime.Unix(),
 	}
 
@@ -454,7 +529,7 @@ func (r *Runtime) generateJWT(userId int, email string, userName string, isRefre
 	return tokenString
 }
 
-func (r *Runtime) validateJWT(tokenString string) (jwt.MapClaims, bool) {
+func (r *Runtime) ValidateJWT(tokenString string) (map[string]interface{}, bool) {
 	jwtSecret := os.Getenv("JWT_SECRET")
 	if jwtSecret == "" {
 		jwtSecret = "joss_default_secret_change_in_production"

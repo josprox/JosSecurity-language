@@ -22,6 +22,7 @@ var DefaultLogo []byte
 var (
 	sessionStore = make(map[string]map[string]interface{})
 	sessionMu    sync.Mutex
+
 	// Rate Limiter
 	rateLimitStore = make(map[string]*rateLimitEntry)
 	rateLimitMu    sync.Mutex
@@ -33,8 +34,14 @@ type rateLimitEntry struct {
 }
 
 func MainHandler(w http.ResponseWriter, r *http.Request) {
-	// Request Watchdog: Log progress every second to find hangs
+	// Lazy load sessions on first request if empty? No, better to do it once.
+	// We can do it in init() but variables might not be ready.
+	// Let's do it in a sync.Once or just check if empty?
+	// Actually, `Start` in server.go calls MainHandler only via http.Handle.
+	// We can add a sync.Once here.
+
 	requestID := fmt.Sprintf("%s %s", r.Method, r.URL.Path)
+
 	requestStartTime := time.Now()
 	done := make(chan struct{})
 	go func() {
@@ -225,6 +232,16 @@ func MainHandler(w http.ResponseWriter, r *http.Request) {
 		sessionID = cookie.Value
 	}
 
+	// JWT Persistence Logic (Stateless fallback)
+	jwtCookie, err := r.Cookie("joss_token")
+	var jwtClaims map[string]interface{}
+	if err == nil && jwtCookie.Value != "" {
+		claims, valid := rt.ValidateJWT(jwtCookie.Value)
+		if valid {
+			jwtClaims = claims
+		}
+	}
+
 	// fmt.Printf("[HANDLER] %s: Acquiring session lock...\n", requestID)
 	sessionMu.Lock()
 	// fmt.Printf("[HANDLER] %s: Session lock acquired.\n", requestID)
@@ -254,6 +271,29 @@ func MainHandler(w http.ResponseWriter, r *http.Request) {
 		sessionMu.Unlock()
 	}
 	// fmt.Printf("[HANDLER] %s: Session lock released (Load).\n", requestID)
+
+	// If session is empty but we have a valid JWT, restore session state
+	if jwtClaims != nil {
+		if _, ok := sessData["user_id"]; !ok {
+			// Restore User from JWT
+			if uid, ok := jwtClaims["user_id"].(float64); ok {
+				sessData["user_id"] = int(uid)
+			}
+			if email, ok := jwtClaims["email"].(string); ok {
+				sessData["user_email"] = email
+			}
+			if name, ok := jwtClaims["name"].(string); ok {
+				sessData["user_name"] = name
+			}
+			if role, ok := jwtClaims["role"].(string); ok {
+				sessData["user_role"] = role
+			}
+			// Token itself
+			sessData["user_token"] = jwtCookie.Value // Or from claims if stored
+
+			fmt.Printf("[HANDLER] Session restored from JWT for user: %v\n", sessData["user_email"])
+		}
+	}
 
 	// 5. Security Headers
 	w.Header().Set("X-Content-Type-Options", "nosniff")
@@ -311,12 +351,10 @@ func MainHandler(w http.ResponseWriter, r *http.Request) {
 		core.GlobalRedis.Set(core.Ctx, "session:"+sessionID, data, 24*time.Hour)
 	} else {
 		// Save In-Memory (Write-Back)
-		// fmt.Printf("[HANDLER] %s: Acquiring session lock for write-back...\n", requestID)
 		sessionMu.Lock()
-		// Overwrite the session data completely to ensure deletions (like logout) are persisted
+		// Overwrite the session data completely
 		sessionStore[sessionID] = sessData
 		sessionMu.Unlock()
-		// fmt.Printf("[HANDLER] %s: Session lock released (Write-back).\n", requestID)
 	}
 
 	if err == nil {
@@ -470,6 +508,26 @@ func MainHandler(w http.ResponseWriter, r *http.Request) {
 					}
 					sessionMu.Unlock()
 				}
+
+				// Handle Cookies
+				if cookies, ok := resInst.Fields["cookies"].(map[string]interface{}); ok {
+					for k, v := range cookies {
+						valStr := fmt.Sprintf("%v", v)
+						maxAge := 86400 * 30 // 30 Days
+						if valStr == "" {
+							maxAge = -1
+						}
+						http.SetCookie(w, &http.Cookie{
+							Name:     k,
+							Value:    valStr,
+							Path:     "/",
+							HttpOnly: true,
+							// Secure:   r.TLS != nil, // Optional: Force secure if HTTPS
+							MaxAge: maxAge,
+						})
+					}
+				}
+
 				http.Redirect(w, r, resInst.Fields["url"].(string), http.StatusFound)
 				return
 			}
