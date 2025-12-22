@@ -82,7 +82,24 @@ function Add-ToPath {
 # 1. Instalación
 function Install-JosSecurity {
     Write-Log "[1/3] Installing JosSecurity..." "INFO"
+    
+    # 1. Check Administrator Privileges (Enforced)
+    if (-not (Test-Administrator)) {
+        Write-Log "[X] Error: Administrator privileges are required to install to Program Files." "ERROR"
+        Write-Log "    Please restart PowerShell as Administrator and run the command again." "WARNING"
+        return $false
+    }
+
     try {
+        # 2. Stop running instances
+        $running = Get-Process "joss" -ErrorAction SilentlyContinue
+        if ($running) {
+             Write-Log "Stopping running joss.exe processes..." "INFO"
+             $running | Stop-Process -Force
+             Start-Sleep -Seconds 2
+        }
+
+        # 3. Prepare Directory
         if (-not (Test-Path $InstallDir)) {
             New-Item -ItemType Directory -Path $InstallDir -Force | Out-Null
         }
@@ -95,6 +112,11 @@ function Install-JosSecurity {
             return $false
         }
         
+        # 4. Remove old file explicitly (helps with some lock cases/replacements)
+        if (Test-Path "$InstallDir\joss.exe") {
+            Remove-Item "$InstallDir\joss.exe" -Force -ErrorAction SilentlyContinue
+        }
+
         Copy-Item -Path $binaryPath.FullName -Destination "$InstallDir\joss.exe" -Force
         
         if (Test-Path "$InstallDir\joss.exe") {

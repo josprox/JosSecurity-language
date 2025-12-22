@@ -92,6 +92,11 @@ install_jossecurity() {
     
     log INFO "Found binary: $BINARY_FILE. Installing to $INSTALL_DIR..."
     
+    # Remove existing binary to prevent "Text file busy" error
+    if [ -f "$INSTALL_DIR/joss" ]; then
+        sudo rm -f "$INSTALL_DIR/joss"
+    fi
+
     if sudo cp "$BINARY_PATH" "$INSTALL_DIR/joss"; then
         sudo chmod +x "$INSTALL_DIR/joss"
         log SUCCESS "[OK] Binary installed and executable."
