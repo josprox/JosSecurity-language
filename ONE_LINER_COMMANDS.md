@@ -14,31 +14,17 @@ curl -fsSL https://raw.githubusercontent.com/josprox/JosSecurity-language/main/i
 
 ---
 
-## 🔄 Update
+## 🔄 Update / 🗑️ Uninstall
 
-### Windows
-```powershell
-iwr -useb https://raw.githubusercontent.com/josprox/JosSecurity-language/main/install/update.ps1 | iex
+Run the **Installation command above**. The script will detect your existing installation and show a menu:
+
+```text
+[1] Install
+[2] Update
+[3] Uninstall
 ```
 
-### Linux/macOS
-```bash
-curl -fsSL https://raw.githubusercontent.com/josprox/JosSecurity-language/main/install/update.sh | bash
-```
-
----
-
-## 🗑️ Uninstall
-
-### Windows
-```powershell
-iwr -useb https://raw.githubusercontent.com/josprox/JosSecurity-language/main/install/uninstall.ps1 | iex
-```
-
-### Linux/macOS
-```bash
-curl -fsSL https://raw.githubusercontent.com/josprox/JosSecurity-language/main/install/uninstall.sh | bash
-```
+Simply select the option you need.
 
 ---
 
@@ -51,13 +37,10 @@ If you prefer to download and run locally:
 git clone https://github.com/josprox/JosSecurity-language.git
 cd JosSecurity-language/install
 
-# 1. Download jossecurity-binaries.zip from GitHub Releases
-# 2. Extract to this folder
-# 3. Run installer:
-
-./install.sh  # Linux/macOS
+# Run the menu-driven installer
+bash remote-install.sh    # Linux/macOS
 # or
-.\install.ps1  # Windows
+.\remote-install.ps1   # Windows
 ```
 
 ---

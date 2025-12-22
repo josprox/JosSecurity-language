@@ -56,35 +56,26 @@ curl -fsSL https://raw.githubusercontent.com/josprox/JosSecurity-language/main/i
 git clone https://github.com/josprox/JosSecurity-language.git
 cd JosSecurity-language/install
 
-# Ejecutar instalador
-./install.sh  # Linux/macOS
+# Ejecutar menú de acciones (Instalar, Actualizar, Desinstalar)
+bash remote-install.sh    # Linux/macOS
 # o
-.\install.ps1  # Windows
+.\remote-install.ps1   # Windows
 ```
 
-### 🔄 Actualizar
+### 🔄 Actualizar y 🗑️ Desinstalar
 
-**Windows**:
-```powershell
-iwr -useb https://raw.githubusercontent.com/josprox/JosSecurity-language/main/install/update.ps1 | iex
+Para **actualizar** o **desinstalar**, simplemente ejecuta el mismo comando de instalación (One-Liner o Manual).
+El script detectará si ya está instalado y te mostrará un menú interactivo:
+
+```text
+Select an action:
+  [1] Install (JosSecurity Binary + Extension)
+  [2] Update (Check and Reinstall)
+  [3] Uninstall (Remove Binary + Extension)
+  [0] Exit
 ```
 
-**Linux/macOS**:
-```bash
-curl -fsSL https://raw.githubusercontent.com/josprox/JosSecurity-language/main/install/update.sh | bash
-```
-
-### 🗑️ Desinstalar
-
-**Windows**:
-```powershell
-iwr -useb https://raw.githubusercontent.com/josprox/JosSecurity-language/main/install/uninstall.ps1 | iex
-```
-
-**Linux/macOS**:
-```bash
-curl -fsSL https://raw.githubusercontent.com/josprox/JosSecurity-language/main/install/uninstall.sh | bash
-```
+Simplemente selecciona la opción deseada (2 para actualizar, 3 para desinstalar).
 
 **Ver más comandos**: [ONE_LINER_COMMANDS.md](ONE_LINER_COMMANDS.md)
 
