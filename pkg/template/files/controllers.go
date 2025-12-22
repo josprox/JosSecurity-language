@@ -81,7 +81,7 @@ func GetControllerFiles(path string) map[string]string {
 
     func logout() {
         Auth::logout()
-        return Response::redirect("/login")
+        return Response::redirect("/login")->withCookie("joss_token", "")
     }
     
     // API JWT Login

@@ -32,3 +32,5 @@ Este documento sirve como memoria persistente para futuros agentes que trabajen 
 - **Validación**: El servidor (`handler.go`) valida el JWT en cada petición y restaura la sesión (`user_id`, `email`, etc.) desde los claims del token.
 - **API**: El endpoint `/api/login` retorna el JWT en el JSON para clientes externos.
 - **Uso**: Usar `Response::redirect(...)->withCookie("joss_token", $token)` en el login.
+- **Gotcha: Roles**: El Token JWT DEBE incluir el rol del usuario (claim `role`). Si no, al restaurar sesión tras un reinicio, se pierden los permisos de admin.
+- **Gotcha: Logout**: `Auth::logout()` solo limpia memoria. Para invalidar realmente la sesión, SE DEBE setear la cookie con valor vacío: `withCookie("joss_token", "")`. El servidor procesará esto (`handler.go`) seteando `MaxAge: -1`.
