@@ -1,0 +1,18 @@
+func (r *Runtime) evaluatePrefix(pe *parser.PrefixExpression) interface{} {
+	right := r.evaluateExpression(pe.Right)
+
+	if pe.Operator == "!" {
+		return !isTruthy(right)
+	}
+
+	if pe.Operator == "-" {
+		if i, ok := right.(int64); ok {
+			return -i
+		}
+		if f, ok := right.(float64); ok {
+			return -f
+		}
+	}
+
+	return nil
+}

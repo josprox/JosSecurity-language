@@ -22,6 +22,8 @@ func (r *Runtime) executeAuthMethod(instance *Instance, method string, args []in
 	usersTable := prefix + "users"
 	rolesTable := prefix + "roles"
 
+	fmt.Printf("[Auth Debug] Prefix: '%s', Users Table: '%s'\n", prefix, usersTable)
+
 	// Asegurar que las tablas y columnas existan (Auto-Migración)
 	r.ensureAuthTables(usersTable, rolesTable)
 
@@ -198,6 +200,9 @@ func (r *Runtime) executeAuthMethod(instance *Instance, method string, args []in
 					query := fmt.Sprintf(`SELECT id, username, first_name, last_name, email, phone, role_id, user_token FROM %s WHERE id = ?`, usersTable)
 
 					err := r.DB.QueryRow(query, uid).Scan(&id, &username, &firstName, &lastName, &email, &pPhone, &roleId, &userToken)
+					if err != nil {
+						fmt.Printf("[Auth Error] User Query Failed for ID %v: %v\n", uid, err)
+					}
 					if err == nil {
 						user["id"] = id
 						user["username"] = username.String

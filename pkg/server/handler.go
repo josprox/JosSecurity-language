@@ -351,6 +351,12 @@ func MainHandler(w http.ResponseWriter, r *http.Request) {
 					if ct, ok := resMap["content_type"].(string); ok {
 						contentType = ct
 					}
+					// Support for custom headers
+					if headers, ok := resMap["headers"].(map[string]interface{}); ok {
+						for k, v := range headers {
+							w.Header().Set(k, fmt.Sprintf("%v", v))
+						}
+					}
 					w.Header().Set("Content-Type", contentType)
 
 					statusCode := http.StatusOK
@@ -362,6 +368,11 @@ func MainHandler(w http.ResponseWriter, r *http.Request) {
 							statusCode = int(v)
 						case float64:
 							statusCode = int(v)
+						}
+					}
+					if headers, ok := resMap["headers"].(map[string]interface{}); ok {
+						for k, v := range headers {
+							w.Header().Set(k, fmt.Sprintf("%v", v))
 						}
 					}
 					w.WriteHeader(statusCode)
@@ -418,6 +429,11 @@ func MainHandler(w http.ResponseWriter, r *http.Request) {
 						statusCode = int(v)
 					case float64:
 						statusCode = int(v)
+					}
+				}
+				if headers, ok := resInst.Fields["headers"].(map[string]interface{}); ok {
+					for k, v := range headers {
+						w.Header().Set(k, fmt.Sprintf("%v", v))
 					}
 				}
 				w.WriteHeader(statusCode)

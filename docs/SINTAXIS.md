@@ -193,6 +193,13 @@ foreach ($nombres as $nombre) {
 foreach ($config as $key => $val) {
     print($key . ": " . $val)
 }
+
+// Resultados de Base de Datos (Lista de Mapas)
+$users = DB::table("users")->get()
+foreach ($users as $user) {
+    print($user["email"])
+}
+
 ```
 
 ### While

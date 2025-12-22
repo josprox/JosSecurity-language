@@ -548,6 +548,15 @@ Respuesta de error.
 return Response::error("No autorizado", 401)
 ```
 
+#### `Response::raw(mixed $data, int $status, string $contentType, map $headers)`
+Respuesta cruda (archivos, texto plano).
+
+```joss
+return Response::raw($pdfContent, 200, "application/pdf", {
+    "Content-Disposition": "attachment; filename=\"doc.pdf\""
+})
+```
+
 ---
 
 ## Request
@@ -798,6 +807,63 @@ Convierte un string JSON en un mapa o array.
 ```joss
 $data = JSON::parse('{"nombre": "Juan", "edad": 30}')
 print($data["nombre"]) // Juan
+```
+
+#### `JSON::stringify(mixed $data)`
+Convierte un objeto, mapa o array en un string JSON.
+
+```joss
+$json = JSON::stringify({"id": 1, "activo": true})
+```
+
+#### `JSON::decode(string $json)`
+Alias de `parse`.
+
+#### `JSON::encode(mixed $data)`
+Alias de `stringify`.
+
+---
+
+## Response
+
+Gestión de respuestas HTTP.
+
+### Métodos
+
+#### `Response::raw(string $data, int $statusCode = 200, string $contentType = "text/plain", map $headers = {})`
+Envía una respuesta HTTP cruda.
+
+```joss
+return Response::raw("<h1>Hola Mundo</h1>", 200, "text/html")
+```
+
+---
+
+## Utilidades Globales
+
+Funciones nativas disponibles en cualquier contexto sin prefijo de clase.
+
+### `explode(string $separator, string $string)`
+Divide un string en un array.
+
+```joss
+$partes = explode(".", "archivo.txt") // ["archivo", "txt"]
+```
+
+### `end(array $list)`
+Retorna el último elemento de un array.
+
+```joss
+$ext = end($partes) // "txt"
+```
+
+### `file_get_contents(string $path)`
+Lee el contenido completo de un archivo.
+
+```joss
+$contenido = file_get_contents("/path/to/file.txt")
+```
+
 ```
 
 #### `JSON::stringify(mixed $data)`

@@ -47,6 +47,8 @@ func (r *Runtime) evaluateExpression(exp parser.Expression) interface{} {
 		return e.Block
 	case *parser.FunctionLiteral:
 		return e
+	case *parser.PrefixExpression:
+		return r.evaluatePrefix(e)
 	case *parser.PostfixExpression:
 		return r.evaluatePostfix(e)
 	}

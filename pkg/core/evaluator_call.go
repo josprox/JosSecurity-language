@@ -2,6 +2,8 @@ package core
 
 import (
 	"fmt"
+	"os"
+	"strings"
 
 	"github.com/jossecurity/joss/pkg/parser"
 )
@@ -336,6 +338,42 @@ func (r *Runtime) callBuiltin(name string, args []interface{}) (interface{}, boo
 		if len(args) == 1 {
 			if url, ok := args[0].(string); ok {
 				return r.createRedirectResponse(url), true
+			}
+		}
+		return nil, true
+	case "explode":
+		if len(args) == 2 {
+			sep, ok1 := args[0].(string)
+			str, ok2 := args[1].(string)
+			if ok1 && ok2 {
+				parts := strings.Split(str, sep)
+				// Convert to []interface{}
+				result := []interface{}{}
+				for _, p := range parts {
+					result = append(result, p)
+				}
+				return result, true
+			}
+		}
+		return nil, true
+	case "end":
+		if len(args) == 1 {
+			if list, ok := args[0].([]interface{}); ok {
+				if len(list) > 0 {
+					return list[len(list)-1], true
+				}
+				return nil, true
+			}
+		}
+		return nil, true
+	case "file_get_contents":
+		if len(args) == 1 {
+			if path, ok := args[0].(string); ok {
+				content, err := os.ReadFile(path)
+				if err != nil {
+					return nil, true
+				}
+				return string(content), true
 			}
 		}
 		return nil, true

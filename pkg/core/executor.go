@@ -88,7 +88,15 @@ func (r *Runtime) executeBlock(block *parser.BlockStatement) interface{} {
 	var result interface{}
 	for _, stmt := range block.Statements {
 		result = r.executeStatement(stmt)
+		// Early exit if it is a ReturnStatement
+		if _, ok := stmt.(*parser.ReturnStatement); ok {
+			// Debug Block Return (Explicit)
+			// fmt.Printf("[DEBUG] executeBlock explicitly returning: %v\n", result)
+			return result
+		}
 	}
+	// Debug Block Return
+	// fmt.Printf("[DEBUG] executeBlock result: %v\n", result)
 	return result
 }
 
@@ -134,7 +142,9 @@ func (r *Runtime) executeStatement(stmt parser.Statement) interface{} {
 
 func (r *Runtime) executeReturn(rs *parser.ReturnStatement) interface{} {
 	if rs.ReturnValue != nil {
-		return r.evaluateExpression(rs.ReturnValue)
+		val := r.evaluateExpression(rs.ReturnValue)
+		// fmt.Printf("[DEBUG] executeReturn: %v\n", val)
+		return val
 	}
 	return nil
 }
@@ -188,6 +198,11 @@ func (r *Runtime) executeForeach(fs *parser.ForeachStatement) interface{} {
 	iterable := r.evaluateExpression(fs.Iterable)
 
 	if list, ok := iterable.([]interface{}); ok {
+		for _, item := range list {
+			r.Variables[fs.Value] = item
+			r.executeBlock(fs.Body)
+		}
+	} else if list, ok := iterable.([]map[string]interface{}); ok {
 		for _, item := range list {
 			r.Variables[fs.Value] = item
 			r.executeBlock(fs.Body)

@@ -49,6 +49,9 @@ func (r *Runtime) executeResponseMethod(instance *Instance, method string, args 
 			if len(args) > 2 {
 				res["content_type"] = args[2]
 			}
+			if len(args) > 3 {
+				res["headers"] = args[3]
+			}
 			return res
 		}
 

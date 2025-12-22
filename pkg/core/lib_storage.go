@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/oracle/oci-go-sdk/v65/common"
 	"github.com/oracle/oci-go-sdk/v65/objectstorage"
@@ -160,11 +161,16 @@ func (r *Runtime) getOCIClient() (objectstorage.ObjectStorageClient, context.Con
 }
 
 func (r *Runtime) ociPut(userToken, fileName, content string) bool {
+	fmt.Println("[OCI Debug] Initializing Client...")
 	client, ctx, err := r.getOCIClient()
 	if err != nil {
 		fmt.Printf("[OCI Error] Client Init: %v\n", err)
 		return false
 	}
+
+	// Add Timeout
+	ctx, cancel := context.WithTimeout(ctx, 60*time.Second)
+	defer cancel()
 
 	namespace := r.Env["OCI_NAMESPACE"]
 	bucketName := r.Env["OCI_BUCKET_NAME"]
@@ -178,11 +184,13 @@ func (r *Runtime) ociPut(userToken, fileName, content string) bool {
 		ContentLength: common.Int64(int64(len(content))),
 	}
 
+	fmt.Printf("[OCI Debug] Uploading %s (%d bytes)...\n", objectName, len(content))
 	_, err = client.PutObject(ctx, req)
 	if err != nil {
 		fmt.Printf("[OCI Error] PutObject: %v\n", err)
 		return false
 	}
+	fmt.Println("[OCI Debug] Upload Success!")
 	return true
 }
 
