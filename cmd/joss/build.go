@@ -53,13 +53,29 @@ func buildWeb() {
 	// 3. Copy Project Files
 	fmt.Println("Copiando archivos del proyecto...")
 	dirsToCopy := []string{"app", "config", "public", "assets", "storage"}
+
+	// Check for node_modules
+	if _, err := os.Stat("node_modules"); err == nil {
+		fmt.Print("¿Desea incluir 'node_modules' en el build? (y/n): ")
+		var response string
+		fmt.Scanln(&response)
+		response = strings.ToLower(strings.TrimSpace(response))
+
+		if response == "y" || response == "s" || response == "si" || response == "yes" {
+			dirsToCopy = append(dirsToCopy, "node_modules")
+			fmt.Println("-> Se incluirá node_modules (esto puede tardar un poco).")
+		} else {
+			fmt.Println("-> Se omitirá node_modules (recuerda ejecutar 'npm install' en el servidor).")
+		}
+	}
+
 	for _, dir := range dirsToCopy {
 		if _, err := os.Stat(dir); err == nil {
 			copyDir(dir, filepath.Join(buildDir, dir))
 		}
 	}
 
-	filesToCopy := []string{"main.joss", "api.joss", "routes.joss", "package.json"}
+	filesToCopy := []string{"main.joss", "api.joss", "routes.joss", "package.json", "package-lock.json"}
 	for _, f := range filesToCopy {
 		if _, err := os.Stat(f); err == nil {
 			copyFile(f, filepath.Join(buildDir, f))
