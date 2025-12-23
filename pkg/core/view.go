@@ -314,9 +314,18 @@ func (r *Runtime) executeViewMethod(instance *Instance, method string, args []in
 							itemHtml := blockContent
 							for k, v := range itemMap {
 								valStr := fmt.Sprintf("%v", v)
-								// Use regex to replace {{ $item.key }} with flexibility for spaces
-								reItem := regexp.MustCompile(fmt.Sprintf(`\{\{\s*\$%s\.%s\s*\}\}`, regexp.QuoteMeta(itemName), regexp.QuoteMeta(k)))
-								itemHtml = reItem.ReplaceAllString(itemHtml, valStr)
+
+								// 1. Dot notation: {{ $item.key }}
+								reDot := regexp.MustCompile(fmt.Sprintf(`\{\{\s*\$%s\.%s\s*\}\}`, regexp.QuoteMeta(itemName), regexp.QuoteMeta(k)))
+								itemHtml = reDot.ReplaceAllString(itemHtml, valStr)
+
+								// 2. Bracket notation (single quote): {{ $item['key'] }}
+								reBracket1 := regexp.MustCompile(fmt.Sprintf(`\{\{\s*\$%s\['%s'\]\s*\}\}`, regexp.QuoteMeta(itemName), regexp.QuoteMeta(k)))
+								itemHtml = reBracket1.ReplaceAllString(itemHtml, valStr)
+
+								// 3. Bracket notation (double quote): {{ $item["key"] }}
+								reBracket2 := regexp.MustCompile(fmt.Sprintf(`\{\{\s*\$%s\["%s"\]\s*\}\}`, regexp.QuoteMeta(itemName), regexp.QuoteMeta(k)))
+								itemHtml = reBracket2.ReplaceAllString(itemHtml, valStr)
 							}
 							result += itemHtml
 						}
