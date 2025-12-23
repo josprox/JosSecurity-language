@@ -267,4 +267,68 @@ export function registerCommands(context: vscode.ExtensionContext, client: Langu
             terminal.sendText('joss migrate');
         })
     );
+
+    // Change DB Engine
+    context.subscriptions.push(
+        vscode.commands.registerCommand('joss.changeDbEngine', async () => {
+            const engine = await vscode.window.showQuickPick(['mysql', 'sqlite'], {
+                placeHolder: 'Select database engine'
+            });
+
+            if (engine) {
+                const workspaceFolders = vscode.workspace.workspaceFolders;
+                if (!workspaceFolders) return;
+                const terminal = vscode.window.createTerminal('Joss Change DB');
+                terminal.show();
+                terminal.sendText(`joss change db ${engine}`);
+            }
+        })
+    );
+
+    // User Storage
+    context.subscriptions.push(
+        vscode.commands.registerCommand('joss.userstorage', async () => {
+            const driver = await vscode.window.showQuickPick(['local', 'OCI', 'AWS', 'Azure'], {
+                placeHolder: 'Select storage driver'
+            });
+
+            if (driver) {
+                const terminal = vscode.window.createTerminal('Joss User Storage');
+                terminal.show();
+                terminal.sendText(`joss userstorage ${driver}`);
+            }
+        })
+    );
+
+    // Make View
+    context.subscriptions.push(
+        vscode.commands.registerCommand('joss.makeView', async () => {
+            const name = await vscode.window.showInputBox({
+                prompt: 'View name (e.g., users/index)',
+                placeHolder: 'users/index'
+            });
+
+            if (name) {
+                const terminal = vscode.window.createTerminal('Joss Make View');
+                terminal.show();
+                terminal.sendText(`joss make:view ${name}`);
+            }
+        })
+    );
+
+    // Make MVC
+    context.subscriptions.push(
+        vscode.commands.registerCommand('joss.makeMVC', async () => {
+            const name = await vscode.window.showInputBox({
+                prompt: 'Resource name (e.g., Product)',
+                placeHolder: 'Product'
+            });
+
+            if (name) {
+                const terminal = vscode.window.createTerminal('Joss Make MVC');
+                terminal.show();
+                terminal.sendText(`joss make:mvc ${name}`);
+            }
+        })
+    );
 }
