@@ -379,6 +379,7 @@ func (r *Runtime) executeAuthMethod(instance *Instance, method string, args []in
 						sessInst.Fields["user_id"] = int(claims["user_id"].(float64))
 						sessInst.Fields["user_email"] = claims["email"]
 						sessInst.Fields["user_name"] = claims["name"]
+						sessInst.Fields["user_role"] = claims["role"]
 					}
 				}
 				return true

@@ -19,6 +19,7 @@ import { setupDiagnostics } from './providers/diagnosticsProvider';
 import { setupCustomRequests } from './providers/customRequests';
 import { setupDocumentSymbolProvider } from './providers/documentSymbolProvider';
 import { JossSettings, getDefaultSettings } from './config/settings';
+import { URI } from 'vscode-uri';
 
 // Create connection
 export const connection = createConnection(ProposedFeatures.all);
@@ -81,7 +82,7 @@ connection.onInitialized(async () => {
     // Index workspace on startup
     const workspaceFolders = await connection.workspace.getWorkspaceFolders();
     if (workspaceFolders && workspaceFolders.length > 0) {
-        const workspaceRoot = workspaceFolders[0].uri.replace('file:///', '').replace(/\//g, '\\');
+        const workspaceRoot = URI.parse(workspaceFolders[0].uri).fsPath;
         indexer.setWorkspaceRoot(workspaceRoot);
 
         connection.console.log(`Indexing workspace: ${workspaceRoot}`);

@@ -22,20 +22,54 @@ func GetViewFiles(path string) map[string]string {
                 <div class="col-md-8">
                     <h3>Información de la Cuenta</h3>
                     <hr>
-                    <form>
-                        <div class="form-group">
-                            <label>Nombre Completo</label>
-                            <input type="text" class="form-control" value="{{ $user.name }}" readonly>
+                    <form action="/profile/update" method="POST">
+                        {{ csrf_field() }}
+                        
+                        <div class="row">
+                            <div class="col-md-6 form-group">
+                                <label>Nombre</label>
+                                <input type="text" name="first_name" class="form-control" value="{{ $user.first_name }}" required>
+                            </div>
+                            <div class="col-md-6 form-group">
+                                <label>Apellido</label>
+                                <input type="text" name="last_name" class="form-control" value="{{ $user.last_name }}" required>
+                            </div>
                         </div>
+
+                        <div class="form-group">
+                            <label>Teléfono</label>
+                            <input type="text" name="phone" class="form-control" value="{{ $user.phone }}">
+                        </div>
+
                         <div class="form-group">
                             <label>Correo Electrónico</label>
-                            <input type="email" class="form-control" value="{{ $user.email }}" readonly>
+                            <input type="email" class="form-control" value="{{ $user.email }}" readonly disabled>
+                            <small class="text-muted">El correo no se puede cambiar.</small>
                         </div>
+
+                        <hr>
+                        <h5>Cambiar Contraseña</h5>
+                        <p class="text-muted small">Deja en blanco para mantener la actual.</p>
+                        
                         <div class="form-group">
-                            <label>Miembro desde</label>
-                            <input type="text" class="form-control" value="{{ $user.created_at }}" readonly>
+                            <label>Nueva Contraseña</label>
+                            <input type="password" name="password" class="form-control" placeholder="********">
                         </div>
+
+                        <button type="submit" class="btn btn-primary d-block w-100 mt-3">Guardar Cambios</button>
                     </form>
+
+                    <hr class="my-5">
+
+                    <div class="alert alert-danger">
+                        <h4>Zona de Peligro</h4>
+                        <p>Una vez que elimines tu cuenta, no hay vuelta atrás. Por favor, asegúrate.</p>
+                        
+                        <form action="/profile/delete" method="POST" onsubmit="return confirm('¿Estás SEGURO de que deseas eliminar tu cuenta permanentemente?');">
+                             {{ csrf_field() }}
+                             <button type="submit" class="btn btn-danger">Eliminar Cuenta</button>
+                        </form>
+                    </div>
                 </div>
             </div>
         </div>

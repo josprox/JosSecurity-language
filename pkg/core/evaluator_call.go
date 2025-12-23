@@ -337,7 +337,7 @@ func (r *Runtime) callBuiltin(name string, args []interface{}) (interface{}, boo
 	case "redirect":
 		if len(args) == 1 {
 			if url, ok := args[0].(string); ok {
-				return r.createRedirectResponse(url), true
+				return r.createWebResponse("REDIRECT", url, nil, 302), true
 			}
 		}
 		return nil, true

@@ -66,15 +66,15 @@ func (r *Runtime) RegisterNativeClasses() {
 	r.Variables["Router"] = &Instance{Class: r.Classes["Router"], Fields: make(map[string]interface{})}
 
 	// Request
-	r.registerNative("Request", []string{"input", "post", "all", "except", "get", "file"}, (*Runtime).executeRequestMethod)
+	r.registerNative("Request", []string{"input", "post", "all", "except", "get", "file", "cookie"}, (*Runtime).executeRequestMethod)
 	r.Variables["Request"] = &Instance{Class: r.Classes["Request"], Fields: make(map[string]interface{})}
 
 	// Response
 	r.registerNative("Response", []string{"json", "redirect", "error", "raw"}, (*Runtime).executeResponseMethod)
 	r.Variables["Response"] = &Instance{Class: r.Classes["Response"], Fields: make(map[string]interface{})}
 
-	// RedirectResponse
-	r.registerNative("RedirectResponse", []string{}, (*Runtime).executeRedirectResponseMethod)
+	// WebResponse (replaces RedirectResponse)
+	r.registerNative("WebResponse", []string{"with", "withCookie", "withHeader", "status"}, (*Runtime).executeWebResponseMethod)
 
 	// WebSocket
 	r.registerNative("WebSocket", []string{"broadcast"}, (*Runtime).executeWebSocketMethod)

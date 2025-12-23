@@ -56,6 +56,11 @@ func (r *Runtime) insertFromMap(table string, data map[string]interface{}) bool 
 
 	// Build column names, placeholders, and bindings
 	for colName, value := range data {
+		// Skip unsupported types (like maps)
+		if _, ok := value.(map[string]interface{}); ok {
+			continue
+		}
+
 		colNames = append(colNames, quoteIdentifier(colName))
 
 		// Check if value is a SQL function (like CURRENT_TIMESTAMP)

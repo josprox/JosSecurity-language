@@ -2,15 +2,15 @@
   "name": "joss-language",
   "displayName": "JosSecurity Language Support",
   "description": "Advanced language support for JosSecurity with LSP, go-to-definition, hover, diagnostics, and security analysis",
-  "version": "3.0.7",
+  "version": "3.2.9",
   "icon": "images/icon.png",
   "publisher": "jossecurity",
   "engines": {
-    "vscode": "^1.75.0"
+    "vscode": "^1.82.0"
   },
   "main": "./out/extension.js",
   "activationEvents": [
-    "onLanguage:joss"
+    "*"
   ],
   "categories": [
     "Programming Languages",
@@ -38,6 +38,17 @@
           ".joss"
         ],
         "configuration": "./language-configuration.json"
+      },
+      {
+        "id": "joss-html",
+        "aliases": [
+          "JosSecurity HTML",
+          "joss-html"
+        ],
+        "extensions": [
+          ".joss.html"
+        ],
+        "configuration": "./language-configuration.json"
       }
     ],
     "grammars": [
@@ -45,6 +56,14 @@
         "language": "joss",
         "scopeName": "source.joss",
         "path": "./syntaxes/joss.tmLanguage.json"
+      },
+      {
+        "language": "joss-html",
+        "scopeName": "text.html.joss",
+        "path": "./syntaxes/joss-html.tmLanguage.json",
+        "embeddedLanguages": {
+          "source.joss": "joss"
+        }
       }
     ],
     "snippets": [
@@ -165,7 +184,8 @@
     "level": "^8.0.0",
     "vscode-languageclient": "^9.0.1",
     "vscode-languageserver": "^9.0.1",
-    "vscode-languageserver-textdocument": "^1.0.11"
+    "vscode-languageserver-textdocument": "^1.0.11",
+    "vscode-uri": "^3.0.0"
   },
   "repository": {
     "type": "git",

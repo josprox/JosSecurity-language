@@ -588,6 +588,30 @@ return Response::raw($pdfContent, 200, "application/pdf", {
 })
 ```
 
+### Encadenamiento (Fluent API)
+Todos los métodos de respuesta (`json`, `redirect`, `raw`) retornan una instancia `WebResponse` que permite encadenar métodos para modificar la respuesta.
+
+#### `->withCookie(string $name, string $value)`
+Agrega una cookie a la respuesta.
+
+```joss
+return Response::json({"status": "ok"})->withCookie("preferencia", "dark_mode")
+```
+
+#### `->withHeader(string $key, string $value)`
+Agrega un encabezado HTTP personalizado.
+
+```joss
+return Response::json({"data": "..."})->withHeader("X-Custom-Auth", "secret")
+```
+
+#### `->status(int $code)`
+Modifica el código de estado HTTP.
+
+```joss
+return Response::json({"error": "No encontrado"})->status(404)
+```
+
 ---
 
 ## Request
@@ -631,6 +655,13 @@ Obtiene todos los parámetros.
 
 ```joss
 $datos = Request::all()
+```
+
+#### `Request::cookie(string $key)`
+Obtiene el valor de una cookie.
+
+```joss
+$token = Request::cookie("joss_token")
 ```
 
 ---

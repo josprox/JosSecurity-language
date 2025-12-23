@@ -215,6 +215,13 @@ func MainHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	reqData["_method"] = r.Method
 	reqData["_referer"] = r.Referer()
+	// Inject Cookies
+	cookies := make(map[string]interface{})
+	for _, c := range r.Cookies() {
+		cookies[c.Name] = c.Value
+	}
+	reqData["_cookies"] = cookies
+
 	reqData["_host"] = r.Host
 	if r.TLS != nil || r.Header.Get("X-Forwarded-Proto") == "https" {
 		reqData["_scheme"] = "https"
@@ -431,6 +438,32 @@ func MainHandler(w http.ResponseWriter, r *http.Request) {
 
 		// Handle Redirect or JSON (Instance)
 		if resInst, ok := result.(*core.Instance); ok {
+
+			// Handle Cookies (Universal for all WebResponse types)
+			if cookies, ok := resInst.Fields["cookies"].(map[string]interface{}); ok {
+				for k, v := range cookies {
+					valStr := fmt.Sprintf("%v", v)
+					maxAge := 86400 * 30 // 30 Days
+					if valStr == "" {
+						maxAge = -1
+					}
+					http.SetCookie(w, &http.Cookie{
+						Name:     k,
+						Value:    valStr,
+						Path:     "/",
+						HttpOnly: true,
+						// Secure:   r.TLS != nil,
+						MaxAge: maxAge,
+					})
+				}
+			}
+
+			// Handle Headers (Universal)
+			if headers, ok := resInst.Fields["headers"].(map[string]interface{}); ok {
+				for k, v := range headers {
+					w.Header().Set(k, fmt.Sprintf("%v", v))
+				}
+			}
 			// JSON handling from Instance
 			if val, ok := resInst.Fields["_type"]; ok && val == "JSON" {
 				w.Header().Set("Content-Type", "application/json")

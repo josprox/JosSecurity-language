@@ -36,7 +36,7 @@
         },
         {
           "name": "keyword.other.joss",
-          "match": "\\b(class|Init|Import|Namespace|public|private|protected|function)\\b"
+          "match": "\\b(class|Init|Import|Namespace|public|private|protected|function|func)\\b"
         },
         {
           "name": "keyword.operator.logical.joss",
@@ -154,7 +154,7 @@
       "patterns": [
         {
           "name": "entity.name.type.class.joss",
-          "match": "\\b(Auth|GranMySQL|GranDB|Stack|Queue|Main|Security|Server|Log|Task|Router|SmtpClient|View|Request|Response|Cron|Session|Redirect|RedirectResponse|WebSocket|Schema|Blueprint|Redis|Migration)\\b"
+          "match": "\\b(Auth|GranMySQL|GranDB|Stack|Queue|Main|Security|Server|Log|Task|Router|SmtpClient|View|Request|Response|Cron|Session|Redirect|RedirectResponse|WebResponse|WebSocket|Schema|Blueprint|Redis|Migration|Math|JSON|System|UserStorage|Markdown)\\b"
         },
         {
           "name": "support.class.joss",

@@ -9,6 +9,37 @@ func GetControllerFiles(path string) map[string]string {
         $user = Auth.user()
         return View.render("profile/index", {"user": $user, "title": "Mi Perfil"})
     }
+
+    function update() {
+        $id = Auth.user().id
+        
+        $data = {
+            "first_name": Request::input("first_name"),
+            "last_name":  Request::input("last_name"),
+            "phone":      Request::input("phone"),
+            "password":   Request::input("password")
+        }
+
+        // Auth.update returns true/false
+        $success = Auth.update($id, $data)
+
+        return ($success) ? Response::redirect("/profile")->with("success", "Perfil actualizado correctamente.") :
+                            Response::back()->with("error", "Error al actualizar el perfil.")
+    }
+
+    function delete() {
+        $id = Auth.user().id
+        
+        // Remove account
+        $success = Auth.delete($id)
+
+        return ($success) ? {
+            Auth::logout()
+            Response::redirect("/login")->with("success", "Tu cuenta ha sido eliminada permanentemente.")
+        } : {
+            Response::back()->with("error", "Error al eliminar la cuenta.")
+        }
+    }
 }`,
 		filepath.Join(path, "app", "controllers", "HomeController.joss"): `class HomeController {
     func index() {
@@ -37,7 +68,7 @@ func GetControllerFiles(path string) map[string]string {
         var $acceso = Auth::attempt($email, $password)
         
         ($acceso) ? {
-            return Response::redirect("/dashboard")
+            return Response::redirect("/dashboard")->withCookie("joss_token", $acceso)
         } : {
             return Response::back()->with("error", "Credenciales inválidas o cuenta no verificada.")
         }

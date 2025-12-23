@@ -10,7 +10,7 @@ export interface ParsedRoute {
 }
 
 export class RouteParser {
-    private readonly ROUTE_PATTERN = /Router::(get|post|put|delete|match|api)\s*\(\s*["']([^"']+)["'](?:\s*,\s*["']([^"']+)["'])?\s*,\s*["']([^"'@]+)@([^"']+)["']\s*\)/g;
+    private readonly ROUTE_PATTERN = /Router(?:::|\.)(get|post|put|delete|match|api)\s*\(\s*["']([^"']+)["'](?:\s*,\s*["']([^"']+)["'])?\s*,\s*["']([^"'@]+)@([^"']+)["']\s*\)/g;
 
     parseDocument(text: string): ParsedRoute[] {
         const routes: ParsedRoute[] = [];

@@ -164,9 +164,11 @@ class Admin extends Usuario {
 
 ## Funciones
 
+Se pueden definir usando la palabra clave `function` o su alias corto `func`.
+
 ```joss
 // Función global
-function sumar($a, $b) {
+func sumar($a, $b) {
     return $a + $b
 }
 

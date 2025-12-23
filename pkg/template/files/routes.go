@@ -19,6 +19,8 @@ Router::end()
 Router::middleware("auth")
     Router::get("/dashboard", "DashboardController@index")
     Router::get("/profile", "ProfileController@index")
+    Router::post("/profile/update", "ProfileController@update")
+    Router::post("/profile/delete", "ProfileController@delete")
     Router::get("/logout", "AuthController@logout")
 Router::end()
 `,

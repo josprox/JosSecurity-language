@@ -9,24 +9,33 @@ import {
 import * as cp from 'child_process';
 
 import { registerCommands } from './commands';
+import { getCompletionItemProvider } from './completion';
 
 let client: LanguageClient;
 
 export function activate(context: vscode.ExtensionContext) {
     console.log('JosSecurity Extension v3.0 is now active!');
 
-    // Start Language Server
-    client = startLanguageServer(context);
+    try {
+        // Start Language Server
+        client = startLanguageServer(context);
 
-    // Register Commands
-    registerCommands(context, client);
+        // Register Commands
+        registerCommands(context, client);
 
-    // Status Bar
-    const statusBarItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 100);
-    statusBarItem.text = '$(database) Joss';
-    statusBarItem.tooltip = 'JosSecurity Language Server';
-    statusBarItem.show();
-    context.subscriptions.push(statusBarItem);
+        // Register Completion Provider
+        context.subscriptions.push(getCompletionItemProvider());
+
+        // Status Bar
+        const statusBarItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 100);
+        statusBarItem.text = '$(database) Joss';
+        statusBarItem.tooltip = 'JosSecurity Language Server';
+        statusBarItem.show();
+        context.subscriptions.push(statusBarItem);
+    } catch (e) {
+        vscode.window.showErrorMessage(`JosSecurity Extension failed to activate: ${e}`);
+        console.error('Activation failed:', e);
+    }
 }
 
 export function deactivate(): Thenable<void> | undefined {

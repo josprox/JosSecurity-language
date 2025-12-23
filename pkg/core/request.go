@@ -53,7 +53,7 @@ func (r *Runtime) executeRequestMethod(instance *Instance, method string, args [
 				result := make(map[string]interface{})
 				for k, v := range reqInstance.Fields {
 					// exclude internal fields starting with _
-					if k != "_headers" && k != "_host" && k != "_scheme" && k != "_files" {
+					if k != "_headers" && k != "_host" && k != "_scheme" && k != "_files" && k != "_cookies" && k != "_method" && k != "_referer" && k != "_token" {
 						result[k] = v
 					}
 				}
@@ -76,7 +76,7 @@ func (r *Runtime) executeRequestMethod(instance *Instance, method string, args [
 					result := make(map[string]interface{})
 					for k, v := range reqInstance.Fields {
 						// exclude internal fields
-						if !excludeMap[k] && k != "_headers" && k != "_host" && k != "_scheme" && k != "_files" {
+						if !excludeMap[k] && k != "_headers" && k != "_host" && k != "_scheme" && k != "_files" && k != "_cookies" && k != "_method" && k != "_referer" && k != "_token" {
 							result[k] = v
 						}
 					}
@@ -99,6 +99,27 @@ func (r *Runtime) executeRequestMethod(instance *Instance, method string, args [
 					host = h
 				}
 				return scheme + "://" + host
+			}
+		}
+		return ""
+
+	case "cookie":
+		if len(args) > 0 {
+			key, ok := args[0].(string)
+			if !ok {
+				return ""
+			}
+			if reqVal, ok := r.Variables["$__request"]; ok {
+				if reqInstance, ok := reqVal.(*Instance); ok {
+					// Check _cookies map
+					if cookieVal, ok := reqInstance.Fields["_cookies"]; ok {
+						if cookieMap, ok := cookieVal.(map[string]interface{}); ok {
+							if val, ok := cookieMap[key]; ok {
+								return fmt.Sprintf("%v", val)
+							}
+						}
+					}
+				}
 			}
 		}
 		return ""

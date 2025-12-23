@@ -23,6 +23,7 @@ Guía completa de JosSecurity v3.0 (Gold Master)
   - Desarrollo (server, run, build)
   - Base de datos (migrate, change db)
   - Generadores (make:controller, make:model)
+- [VSCODE_EXTENSION.md](./VSCODE_EXTENSION.md) - Extensión para VS Code (IntelliSense, Highlighting)
 
 ### Módulos
 - [MODULOS_NATIVOS.md](./MODULOS_NATIVOS.md) - Módulos nativos del lenguaje

@@ -2,6 +2,7 @@ import { Location, Range, SymbolKind, Position } from 'vscode-languageserver/nod
 import * as levenshtein from 'fast-levenshtein';
 import * as fs from 'fs';
 import * as path from 'path';
+import { URI } from 'vscode-uri';
 
 export interface Symbol {
     name: string;
@@ -53,7 +54,7 @@ export class Indexer {
     private async indexFile(filePath: string): Promise<void> {
         try {
             const content = fs.readFileSync(filePath, 'utf-8');
-            const uri = `file:///${filePath.replace(/\\/g, '/')}`;
+            const uri = URI.file(filePath).toString();
 
             // Extract classes
             const classRegex = /class\s+(\w+)/g;
@@ -79,7 +80,7 @@ export class Indexer {
                 const classEnd = this.findClassEnd(content, classStart);
                 const classContent = content.substring(classStart, classEnd);
 
-                const methodRegex = /function\s+(\w+)\s*\(/g;
+                const methodRegex = /(?:function|func)\s+(\w+)\s*\(/g;
                 let methodMatch;
                 while ((methodMatch = methodRegex.exec(classContent)) !== null) {
                     const methodName = methodMatch[1];
@@ -100,7 +101,7 @@ export class Indexer {
             }
 
             // Extract standalone functions
-            const functionRegex = /^function\s+(\w+)\s*\(/gm;
+            const functionRegex = /^(?:function|func)\s+(\w+)\s*\(/gm;
             while ((match = functionRegex.exec(content)) !== null) {
                 const functionName = match[1];
                 const line = content.substring(0, match.index).split('\n').length - 1;
@@ -119,7 +120,7 @@ export class Indexer {
             }
 
             // Extract routes
-            const routeRegex = /Router::(get|post|put|delete|patch)\s*\(\s*["']([^"']+)["']\s*,\s*["'](\w+)@(\w+)["']/g;
+            const routeRegex = /Router(?:::|\.)(get|post|put|delete|patch)\s*\(\s*["']([^"']+)["']\s*,\s*["'](\w+)@(\w+)["']/g;
             while ((match = routeRegex.exec(content)) !== null) {
                 const [_, method, routePath, controller, action] = match;
                 const line = content.substring(0, match.index).split('\n').length - 1;

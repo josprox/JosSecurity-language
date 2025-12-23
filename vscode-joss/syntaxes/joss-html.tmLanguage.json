@@ -1,0 +1,33 @@
+{
+	"fileTypes": ["joss.html"],
+	"name": "JosSecurity HTML",
+	"patterns": [
+		{
+			"begin": "\\{\\{",
+			"end": "\\}\\}",
+			"name": "meta.embedded.block.joss",
+			"patterns": [
+				{
+					"begin": "\\{",
+					"end": "\\}",
+					"patterns": [
+						{
+							"include": "text.html.joss"
+						}
+					]
+				},
+				{
+					"include": "source.joss"
+				}
+			]
+		},
+		{
+			"match": "(@yield|@extends|@section|@endsection|@foreach|@endforeach)\\b",
+			"name": "keyword.control.directive.joss"
+		},
+		{
+			"include": "text.html.basic"
+		}
+	],
+	"scopeName": "text.html.joss"
+}
