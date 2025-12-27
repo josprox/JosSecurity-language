@@ -1,3 +1,7 @@
 package version
 
-const Version = "3.0.7"
+const Name = "JosSecurity"
+
+const Version = "3.0.8"
+
+const NameVersion = "ChrismaSecurity"
