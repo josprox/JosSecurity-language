@@ -115,4 +115,10 @@ Router::middleware("auth_api")
         Router::post("/api/purchase", "ShopController@buy")
     Router::end()
 Router::end()
+```javascript
+Router::middleware("auth_api")
+    Router::middleware("check_balance")
+        Router::post("/api/purchase", "ShopController@buy")
+    Router::end()
+Router::end()
 ```

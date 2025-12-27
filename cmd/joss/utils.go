@@ -49,6 +49,7 @@ func printHelp() {
 	fmt.Println("  run [archivo]           - Ejecuta un script .joss")
 	fmt.Println("  build [web|program]     - Compila el proyecto para distribución")
 	fmt.Println("  make:controller [Name]  - Crea un nuevo controlador")
+	fmt.Println("  make:middleware [Name]  - Crea un nuevo middleware")
 	fmt.Println("  make:model [Name]       - Crea un nuevo modelo")
 	fmt.Println("  make:view [Name]        - Crea una nueva vista (solo web)")
 	fmt.Println("  make:mvc [Name]         - Crea Modelo, Vista y Controlador")

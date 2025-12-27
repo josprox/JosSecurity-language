@@ -738,6 +738,13 @@ Lee variable de entorno.
 $debug = System::env("DEBUG", false)
 ```
 
+#### `System::log(string $mensaje)`
+Escribe un mensaje en la salida de registros del sistema (consola). useful para depuración.
+
+```joss
+System::log("Iniciando proceso...")
+```
+
 ---
 
 ## Redis

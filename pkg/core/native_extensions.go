@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"math"
 	"math/rand"
+	"strings"
 	"time"
 )
 
@@ -140,5 +141,75 @@ func (r *Runtime) executeSessionMethod(instance *Instance, method string, args [
 		return sessionMap
 	}
 
+	return nil
+}
+
+func (r *Runtime) executeStrMethod(instance *Instance, method string, args []interface{}) interface{} {
+	switch method {
+	case "length":
+		if len(args) != 1 {
+			return int64(0)
+		}
+		if s, ok := args[0].(string); ok {
+			return int64(len(s))
+		}
+		return int64(0)
+
+	case "random":
+		length := 16
+		if len(args) > 0 {
+			if l, ok := args[0].(int64); ok {
+				length = int(l)
+			}
+			if l, ok := args[0].(int); ok {
+				length = l
+			}
+		}
+		const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+		b := make([]byte, length)
+		rand.Seed(time.Now().UnixNano())
+		for i := range b {
+			b[i] = charset[rand.Intn(len(charset))]
+		}
+		return string(b)
+
+	case "startsWith":
+		if len(args) != 2 {
+			return false
+		}
+		s, ok1 := args[0].(string)
+		prefix, ok2 := args[1].(string)
+		if !ok1 || !ok2 {
+			return false
+		}
+		return strings.HasPrefix(s, prefix)
+
+	case "substring":
+		if len(args) < 2 {
+			return nil
+		}
+		s, ok := args[0].(string)
+		start, ok2 := args[1].(int64)
+		if !ok || !ok2 {
+			return nil
+		}
+		runes := []rune(s)
+		if start < 0 {
+			start = 0
+		}
+		if start >= int64(len(runes)) {
+			return ""
+		}
+		end := int64(len(runes))
+		if len(args) >= 3 {
+			if l, ok := args[2].(int64); ok {
+				end = start + l
+				if end > int64(len(runes)) {
+					end = int64(len(runes))
+				}
+			}
+		}
+		return string(runes[start:end])
+	}
 	return nil
 }

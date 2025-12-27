@@ -33,6 +33,7 @@ var (
 				Functions:         make(map[string]*parser.MethodStatement),
 				Routes:            make(map[string]map[string]interface{}),
 				CurrentMiddleware: make([]string, 0),
+				CustomMiddlewares: make(map[string]interface{}),
 				NativeHandlers:    make(map[string]NativeHandler),
 			}
 			r.Variables["cout"] = &Cout{}
@@ -94,14 +95,16 @@ func (r *Runtime) Free() {
 func (r *Runtime) Fork() *Runtime {
 	// fmt.Println("[RUNTIME] Forking...")
 	newR := &Runtime{
-		Env:            make(map[string]string),
-		Classes:        r.Classes,   // Share Classes (Read-Only)
-		Functions:      r.Functions, // Share Functions (Read-Only)
-		Routes:         make(map[string]map[string]interface{}),
-		DB:             r.DB, // Share DB Connection (Thread-Safe)
-		Variables:      make(map[string]interface{}),
-		VarTypes:       make(map[string]string),
-		NativeHandlers: r.NativeHandlers, // Share Dispatch Table
+		Env:               make(map[string]string),
+		Classes:           r.Classes,   // Share Classes (Read-Only)
+		Functions:         r.Functions, // Share Functions (Read-Only)
+		Routes:            make(map[string]map[string]interface{}),
+		CurrentMiddleware: make([]string, 0),
+		CustomMiddlewares: make(map[string]interface{}),
+		DB:                r.DB, // Share DB Connection (Thread-Safe)
+		Variables:         make(map[string]interface{}),
+		VarTypes:          make(map[string]string),
+		NativeHandlers:    r.NativeHandlers, // Share Dispatch Table
 	}
 
 	// Copy Env
@@ -115,6 +118,11 @@ func (r *Runtime) Fork() *Runtime {
 		for path, handler := range routes {
 			newR.Routes[method][path] = handler
 		}
+	}
+
+	// Copy Custom Middlewares
+	for name, handler := range r.CustomMiddlewares {
+		newR.CustomMiddlewares[name] = handler
 	}
 
 	// Initialize standard variables

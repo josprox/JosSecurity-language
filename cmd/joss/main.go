@@ -78,6 +78,12 @@ func main() {
 			return
 		}
 		createController(os.Args[2])
+	case "make:middleware":
+		if len(os.Args) < 3 {
+			fmt.Println("Uso: joss make:middleware [Nombre]")
+			return
+		}
+		createMiddleware(os.Args[2])
 	case "make:model":
 		if len(os.Args) < 3 {
 			fmt.Println("Uso: joss make:model [Nombre]")

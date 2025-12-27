@@ -203,15 +203,28 @@ func (r *Runtime) Dispatch(method, path string, reqData, sessData map[string]int
 			// Custom Middleware
 			if r.CustomMiddlewares != nil {
 				if handler, ok := r.CustomMiddlewares[mw]; ok {
+					// Debug Log
+					fmt.Printf("[DEBUG] Executing Custom Middleware: %s\n", mw)
+					fmt.Printf("[DEBUG] Middleware Handler Type: %T\n", handler)
+
 					// Execute closure
-					res := r.applyFunction(handler, []interface{}{})
+					res := r.applyFunction(handler, []interface{}{mw})
+
+					// Debug Result
+					if res != nil {
+						fmt.Printf("[DEBUG] Middleware Result Type: %T\n", res)
+					}
+
 					// If returns a Result/Response, stop and return it
 					if inst, ok := res.(*Instance); ok {
 						// Assuming standard response structure or check existence
 						if _, hasType := inst.Fields["_type"]; hasType {
+							fmt.Printf("[DEBUG] Middleware %s returned Response (Redirect/JSON), stopping request.\n", mw)
 							return inst, nil
 						}
 					}
+				} else {
+					fmt.Printf("[DEBUG] Custom Middleware %s NOT FOUND in execution map.\n", mw)
 				}
 			}
 		}

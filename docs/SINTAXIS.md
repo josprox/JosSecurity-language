@@ -71,16 +71,27 @@ $estado = ($edad >= 18) ? "Mayor" : "Menor"
 
 ### Ternario como "If/Else" (Bloques Ejecutables)
 
-Para ejecutar código condicionalmente, use bloques `{}` como valores de retorno:
+Para ejecutar código condicionalmente, use bloques `{}` como valores de retorno.
+
+> [!CAUTION]
+> **No existe `if`**: Cualquier intento de usar `if (...)` será interpretado como una llamada a una función inexistente llamada `if`, resultando en error.
+> **Scope y Retorno**: El comando `return` dentro de un bloque ternario NO detiene la ejecución de la función contenedora inmediatamente si el intérprete no lo soporta explícitamente. Se recomienda envolver la lógica de éxito en el bloque `true` en lugar de intentar un "early exit" en el bloque `false`.
 
 ```joss
-// Estilo "If"
-($usuario->esValido()) ? {
-    DB::save($usuario)
-    print("Guardado")
+// CORRECTO: Envolver lógica
+($esAdmin) ? {
+    // Lógica segura
+    DB::insert(...)
+    return Response::ok()
 } : {
-    print("Datos inválidos")
+    return Response::error("No autorizado")
 }
+
+// INCORRECTO: Intentar early exit (puede fallar según versión)
+(!$esAdmin) ? {
+    return Response::error(...) // Puede no detener la ejecución posterior
+} : {}
+DB::insert(...) // Se ejecutaría aunque no sea admin
 ```
 
 ### "Escalera Lógica" (Reemplazo de else-if)

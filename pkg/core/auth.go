@@ -194,12 +194,16 @@ func (r *Runtime) executeAuthMethod(instance *Instance, method string, args []in
 					user := make(map[string]interface{})
 
 					var id, roleId int
-					var username, email, firstName, lastName, userToken, createdAt sql.NullString
+					var username, email, firstName, lastName, userToken, createdAt, roleName sql.NullString
 					var pPhone sql.NullString
 
-					query := fmt.Sprintf(`SELECT id, username, first_name, last_name, email, phone, role_id, user_token, created_at FROM %s WHERE id = ?`, usersTable)
+					// Join with roles table
+					query := fmt.Sprintf(`SELECT u.id, u.username, u.first_name, u.last_name, u.email, u.phone, u.role_id, r.name, u.user_token, u.created_at 
+						FROM %s u 
+						LEFT JOIN %s r ON u.role_id = r.id 
+						WHERE u.id = ?`, usersTable, rolesTable)
 
-					err := r.DB.QueryRow(query, uid).Scan(&id, &username, &firstName, &lastName, &email, &pPhone, &roleId, &userToken, &createdAt)
+					err := r.DB.QueryRow(query, uid).Scan(&id, &username, &firstName, &lastName, &email, &pPhone, &roleId, &roleName, &userToken, &createdAt)
 					if err != nil {
 						fmt.Printf("[Auth Error] User Query Failed for ID %v: %v\n", uid, err)
 					}
@@ -213,6 +217,7 @@ func (r *Runtime) executeAuthMethod(instance *Instance, method string, args []in
 						user["email"] = email.String
 						user["phone"] = pPhone.String
 						user["role_id"] = roleId
+						user["role"] = roleName.String // Add role name
 						user["user_token"] = userToken.String
 						user["created_at"] = createdAt.String
 						// Compatibility for templates using user.name
@@ -258,6 +263,16 @@ func (r *Runtime) executeAuthMethod(instance *Instance, method string, args []in
 			}
 		}
 		return false
+
+	case "id":
+		if sessVal, ok := r.Variables["$__session"]; ok {
+			if sessInst, ok := sessVal.(*Instance); ok {
+				if uid, ok := sessInst.Fields["user_id"]; ok {
+					return uid
+				}
+			}
+		}
+		return nil
 
 	case "refresh":
 		if len(args) == 1 {

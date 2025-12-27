@@ -123,6 +123,31 @@ func (r *Runtime) executeRequestMethod(instance *Instance, method string, args [
 			}
 		}
 		return ""
+
+	case "header":
+		if len(args) > 0 {
+			key, ok := args[0].(string)
+			if !ok {
+				return nil
+			}
+			if reqVal, ok := r.Variables["$__request"]; ok {
+				if reqInstance, ok := reqVal.(*Instance); ok {
+					// 1. Check Top-Level Overrides (e.g. Authorization)
+					if val, ok := reqInstance.Fields[key]; ok {
+						return fmt.Sprintf("%v", val)
+					}
+					// 2. Check _headers map
+					if headersVal, ok := reqInstance.Fields["_headers"]; ok {
+						if headersMap, ok := headersVal.(map[string]interface{}); ok {
+							if val, ok := headersMap[key]; ok {
+								return fmt.Sprintf("%v", val)
+							}
+						}
+					}
+				}
+			}
+			return nil
+		}
 	}
 	return nil
 }

@@ -43,7 +43,7 @@ func (r *Runtime) RegisterNativeClasses() {
 	r.Variables["Auth"] = &Instance{Class: r.Classes["Auth"], Fields: make(map[string]interface{})}
 
 	// System
-	r.registerNative("System", []string{"env", "Run", "load_driver"}, (*Runtime).executeSystemMethod)
+	r.registerNative("System", []string{"env", "Run", "load_driver", "log"}, (*Runtime).executeSystemMethod)
 	r.Variables["System"] = &Instance{Class: r.Classes["System"], Fields: make(map[string]interface{})}
 
 	// SmtpClient
@@ -94,6 +94,9 @@ func (r *Runtime) RegisterNativeClasses() {
 	// Migration
 	r.registerNative("Migration", []string{}, nil) // No direct native method handler probably, or handled via Schema?
 
+	// Middleware
+	r.registerNative("Middleware", []string{}, nil)
+
 	// Math
 	r.registerNative("Math", []string{"random", "floor", "ceil", "abs"}, (*Runtime).executeMathMethod)
 	r.Variables["Math"] = &Instance{Class: r.Classes["Math"], Fields: make(map[string]interface{})}
@@ -105,6 +108,10 @@ func (r *Runtime) RegisterNativeClasses() {
 	// UUID
 	r.registerNative("UUID", []string{"generate", "v4"}, (*Runtime).executeUUIDMethod)
 	r.Variables["UUID"] = &Instance{Class: r.Classes["UUID"], Fields: make(map[string]interface{})}
+
+	// Str
+	r.registerNative("Str", []string{"length", "random", "startsWith", "substring"}, (*Runtime).executeStrMethod)
+	r.Variables["Str"] = &Instance{Class: r.Classes["Str"], Fields: make(map[string]interface{})}
 
 	// UserStorage
 	r.registerNative("UserStorage", []string{"put", "get", "update", "path", "exists", "delete"}, (*Runtime).executeUserStorageMethod)

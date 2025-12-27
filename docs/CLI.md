@@ -216,6 +216,23 @@ class UserController {
 }
 ```
 
+### `joss make:middleware [Nombre]`
+
+Crea un nuevo middleware.
+
+```bash
+joss make:middleware AuthToken
+```
+
+**Archivo generado**: `app/middleware/AuthToken.joss`
+
+```joss
+// Middleware: AuthToken
+Router::registerMiddleware("AuthToken", function() {
+    // Middleware Logic
+})
+```
+
 ### `joss make:model [Nombre]`
 
 Crea un nuevo modelo.
@@ -398,6 +415,7 @@ Comandos:
   migrate                  - Ejecutar migraciones
   change db [motor]        - Cambiar base de datos
   make:controller [Nombre] - Crear controlador
+  make:middleware [Nombre] - Crear middleware
   make:model [Nombre]      - Crear modelo
   make:crud [Tabla]        - Crear CRUD completo
   remove:crud [Tabla]      - Eliminar CRUD generado

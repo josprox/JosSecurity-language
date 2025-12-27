@@ -52,6 +52,12 @@ func (r *Runtime) executeSystemMethod(instance *Instance, method string, args []
 			fmt.Printf("[System] Cargando driver externo desde: %s (Simulación)\n", path)
 			return true
 		}
+	case "log":
+		if len(args) > 0 {
+			msg := fmt.Sprintf("%v", args[0])
+			fmt.Println("[System Log] " + msg)
+			return nil
+		}
 	}
 	return nil
 }
