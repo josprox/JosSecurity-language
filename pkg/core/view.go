@@ -248,6 +248,66 @@ func (r *Runtime) executeViewMethod(instance *Instance, method string, args []in
 				finalHtml = reYield.ReplaceAllString(finalHtml, "")
 			}
 
+			// 3.4 Handle @include('view.name')
+			reInclude := regexp.MustCompile(`@include\s*\(\s*['"]([^'"]+)['"]\s*\)`)
+			for {
+				match := reInclude.FindStringSubmatch(finalHtml)
+				if match == nil {
+					break
+				}
+				fullMatch := match[0]
+				includeName := match[1]
+				includePath := strings.ReplaceAll(includeName, ".", "/")
+				var includeContent []byte
+
+				// Resolve Path (reuse logic or simplify)
+				// Note: We are repeating file reading logic here. In a full refactor we should extract 'readView(name)' helper.
+				// For now, inline to be safe.
+
+				if GlobalFileSystem != nil {
+					// VFS
+					iPath := path.Join("app", "views", includePath+".joss.html")
+					f, err := GlobalFileSystem.Open(iPath)
+					if err == nil {
+						stat, _ := f.Stat()
+						c := make([]byte, stat.Size())
+						f.Read(c)
+						f.Close()
+						includeContent = c
+					} else {
+						// Try .html
+						iPath = path.Join("app", "views", includePath+".html")
+						f, err = GlobalFileSystem.Open(iPath)
+						if err == nil {
+							stat, _ := f.Stat()
+							c := make([]byte, stat.Size())
+							f.Read(c)
+							f.Close()
+							includeContent = c
+						} else {
+							includeContent = []byte(fmt.Sprintf("<!-- Error: Include '%s' not found -->", includeName))
+						}
+					}
+				} else {
+					// Disk
+					iPath := filepath.Join("app", "views", includePath+".joss.html")
+					c, err := os.ReadFile(iPath)
+					if err == nil {
+						includeContent = c
+					} else {
+						iPath = filepath.Join("app", "views", includePath+".html")
+						c, err := os.ReadFile(iPath)
+						if err == nil {
+							includeContent = c
+						} else {
+							includeContent = []byte(fmt.Sprintf("<!-- Error: Include '%s' not found -->", includeName))
+						}
+					}
+				}
+
+				finalHtml = strings.Replace(finalHtml, fullMatch, string(includeContent), 1)
+			}
+
 			// 3.5 Handle Control Structures
 
 			// A. Handle Block Ternaries: {{ ($var) ? { trueBlock } : { falseBlock } }}

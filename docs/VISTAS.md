@@ -87,6 +87,14 @@ Usa `@extends` al inicio y `@section`...`@endsection` para inyectar contenido.
 @endsection
 ```
 
+### 3. Inclusión de Vistas Parciales (@include)
+Puedes reutilizar fragmentos de código (como menús, pies de página, alertas) usando `@include`.
+
+```html
+<!-- Cargar app/views/partials/menu.joss.html -->
+@include('partials.menu')
+```
+
 ## Renderizar Vistas
 
 Desde un controlador:

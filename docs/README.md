@@ -157,6 +157,7 @@ joss run main.joss
 **Vistas**
 - Renderizar HTML → [MODULOS_NATIVOS.md#view](./MODULOS_NATIVOS.md#view)
 - Herencia de plantillas → [MODULOS_NATIVOS.md#herencia](./MODULOS_NATIVOS.md#herencia)
+- Inclusión de parciales → [VISTAS.md#3-inclusión-de-vistas-parciales-include](./VISTAS.md#3-inclusión-de-vistas-parciales-include)
 - Pasar datos → [MODULOS_NATIVOS.md#viewrenderstringnombre-mapdatos](./MODULOS_NATIVOS.md#viewrenderstringnombre-mapdatos)
 
 **Rutas**
