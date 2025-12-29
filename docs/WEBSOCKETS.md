@@ -60,3 +60,24 @@ socket.onmessage = (event) => {
     console.log("Recibido:", event.data);
 };
 ```
+
+## Despliegue en Producción (Nginx/Apache)
+
+Si usas un proxy reverso como Nginx (por ejemplo con HestiaCP), es **CRÍTICO** asegurar que las cabeceras `Upgrade` y `Connection` pasen correctamente.
+
+### Nginx ("Missing Upgrade Header")
+
+Si recibes errores de handshake, verifica que tu configuración de Nginx NO tenga:
+
+```nginx
+proxy_hide_header Upgrade; # ELIMINAR ESTA LÍNEA
+```
+
+Y asegúrate de incluir:
+
+```nginx
+proxy_set_header Upgrade $http_upgrade;
+proxy_set_header Connection "Upgrade";
+```
+
+Esto es común en plantillas por defecto de paneles de control.

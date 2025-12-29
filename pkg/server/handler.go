@@ -45,6 +45,13 @@ func MainHandler(w http.ResponseWriter, r *http.Request) {
 	requestStartTime := time.Now()
 	done := make(chan struct{})
 	go func() {
+		// Dynamic Watchdog Suppression
+		// Detect WebSockets or SSE (AI Streams) to avoid false positives
+		if strings.EqualFold(r.Header.Get("Upgrade"), "websocket") ||
+			strings.Contains(r.Header.Get("Accept"), "text/event-stream") {
+			return
+		}
+
 		ticker := time.NewTicker(2 * time.Second)
 		defer ticker.Stop()
 		for {

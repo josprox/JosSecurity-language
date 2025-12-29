@@ -154,6 +154,10 @@ func (r *Runtime) applyFunction(fn interface{}, args []interface{}) interface{} 
 		return r.CallMethodEvaluated(method, nil, args)
 	}
 
+	if fn == nil {
+		return nil
+	}
+
 	fmt.Printf("Error: '%v' (tipo %T) no es una función invocable\n", fn, fn)
 	return nil
 }

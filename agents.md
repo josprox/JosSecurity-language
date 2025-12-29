@@ -59,3 +59,7 @@ Este documento sirve como memoria persistente para futuros agentes que trabajen 
   - Nuevos comandos se registran en `cmd/joss/main.go`.
   - Implementado `joss ai:activate` con prompts interactivos (`bufio`).
   - **Gotcha Environment**: El Runtime de Joss carga `env.joss` en memoria (`r.Env`). Los módulos nativos deben preferir `r.Env["KEY"]` antes que `os.Getenv("KEY")`, ya que `joss server start` no siempre exporta las variables al entorno del SO.
+  - **Runtime & Deployment**:
+    - **Watchdog**: Se implementó supresión dinámica para WebSockets (`Upgrade: websocket`) y SSE.
+    - **Runtime Noise**: Se parcheó `evaluator_call.go` para ignorar llamadas a funciones `nil` silenciosamente, eliminando errores causados por ambigüedad del parser en código sin `;`.
+    - **Nginx Proxies**: En paneles como HestiaCP, `proxy_hide_header Upgrade;` debe ser ELIMINADO de las plantillas para permitir WebSockets.
