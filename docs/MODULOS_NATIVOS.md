@@ -20,6 +20,8 @@ Documentación completa de todos los módulos nativos disponibles en JosSecurity
 - [Math](#math) - Funciones matemáticas
 - [Session](#session) - Gestión de sesiones
 - [JSON](#json) - Manipulación de JSON
+- [IA Nativa](IA_NATIVA.md) - **NUEVO**
+- [WebSockets Nativos](WEBSOCKETS.md) - **NUEVO**
 
 
 ---

@@ -127,6 +127,7 @@ func MainHandler(w http.ResponseWriter, r *http.Request) {
 
 	// Handle Virtual Assets (Node Modules)
 	if strings.HasPrefix(r.URL.Path, "/assets/vendor/") {
+		// ... existing code ...
 		// Path: /assets/vendor/PACKAGE/FILE...
 		// Real: node_modules/PACKAGE/FILE...
 		relPath := strings.TrimPrefix(r.URL.Path, "/assets/vendor/")
@@ -143,6 +144,51 @@ func MainHandler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		http.NotFound(w, r)
+		return
+	}
+
+	// 2.5 Check for WebSocket Upgrade for Routes
+	if r.URL.Path == "/api/chat-ws" {
+		fmt.Printf("[WS DEBUG] Headers for %s:\n", r.URL.Path)
+		for k, v := range r.Header {
+			fmt.Printf("\t%s: %v\n", k, v)
+		}
+	}
+
+	if strings.EqualFold(r.Header.Get("Upgrade"), "websocket") {
+		// Only if not ignored internal paths
+		conn, err := upgrader.Upgrade(w, r, nil)
+		if err != nil {
+			fmt.Printf("[WS] Upgrade failed: %v\n", err)
+			return
+		}
+
+		// Create Reader Closure to avoid importing websocket in core
+		reader := func() (int, []byte, error) {
+			return conn.ReadMessage()
+		}
+
+		// Create Sender Closure
+		sender := func(v interface{}) error {
+			// If v is string/byte, use WriteMessage?
+			// Joss usually sends JSON string via .send().
+			// But native logic in websocket.go gets `msg`.
+			// If `msg` is string, we should use WriteMessage(TextMessage, []byte(msg))?
+			// Or just WriteJSON?
+			// Controller logic: $ws.send(JSON.stringify(...)) -> String.
+			// WriteJSON would wrap it in quotes again: `"{\"type\":...}"`.
+			// We want raw text if it's a string, or JSON if object.
+
+			// Simple check
+			if str, ok := v.(string); ok {
+				return conn.WriteMessage(1, []byte(str)) // 1 = TextMessage
+			}
+			return conn.WriteJSON(v)
+		}
+
+		// Dispatch to WebSocket Handler in Core (Blocking)
+		rt.DispatchWebSocket(r.URL.Path, conn, reader, sender)
+
 		return
 	}
 
@@ -517,6 +563,36 @@ func MainHandler(w http.ResponseWriter, r *http.Request) {
 					w.Write(v)
 				default:
 					fmt.Fprintf(w, "%v", v)
+				}
+				return
+			}
+
+			// STREAM handling
+			if val, ok := resInst.Fields["_type"]; ok && val == "STREAM" {
+				// Headers for SSE
+				w.Header().Set("Content-Type", "text/event-stream")
+				w.Header().Set("Cache-Control", "no-cache")
+				w.Header().Set("Connection", "keep-alive")
+				w.Header().Set("X-Accel-Buffering", "no")
+
+				// Flush headers immediately
+				w.WriteHeader(http.StatusOK)
+				if f, ok := w.(http.Flusher); ok {
+					f.Flush()
+				}
+
+				// Create Stream Instance (inject writer)
+				streamInst := core.NewStreamInstance(rt, w)
+				if streamInst == nil {
+					fmt.Println("[HANDLER] Error creating Stream instance (Class not found?)")
+					return
+				}
+
+				// Retrieve Callback
+				if callback, ok := resInst.Fields["callback"]; ok {
+					// Execute Callback
+					// pass streamInst as argument
+					rt.CallFunction(callback, []interface{}{streamInst})
 				}
 				return
 			}

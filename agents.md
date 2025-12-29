@@ -34,3 +34,28 @@ Este documento sirve como memoria persistente para futuros agentes que trabajen 
 - **Uso**: Usar `Response::redirect(...)->withCookie("joss_token", $token)` en el login.
 - **Gotcha: Roles**: El Token JWT DEBE incluir el rol del usuario (claim `role`). Si no, al restaurar sesión tras un reinicio, se pierden los permisos de admin.
 - **Gotcha: Logout**: `Auth::logout()` solo limpia memoria. Para invalidar realmente la sesión, SE DEBE setear la cookie con valor vacío: `withCookie("joss_token", "")`. El servidor procesará esto (`handler.go`) seteando `MaxAge: -1`.
+
+### 6. Integración Flutter & Backups (Sesión 27/12/2025)
+- **API Standard**: Flutter debe usar siempre el prefijo `/api/` (ej: `/api/listfiles`) y autenticación `Authorization: Bearer <token>`. Headers viejos como `X-JossRed-Auth` son obsoletos.
+- **Backups**:
+  - `listfiles` retorna los paths completos.
+  - Para descargas, el path puede ser de 2 partes (`appName/file`) o 3 partes. El cliente debe manejar ambos casos.
+  - **Borrado**: `UserStorage::delete($token, $path)` funciona correctamente. Se implementó `DELETE /api/backup/{id}`.
+- **Flutter UI**:
+  - Migración de widgets legacy a componentes modernos y aislados (ej: `JossChips`).
+### 7. IA Nativa, WebSockets y CLI (Sesión 28/12/2025)
+- **IA Nativa**:
+  - Implementada abstracción fluida `AI::client()->user(...)->call()`.
+  - Soporte de Streaming Token-by-Token (`streamTo($ws)`).
+  - Documentación en `docs/IA_NATIVA.md`.
+- **WebSockets**:
+  - Implementado `Router::ws("/path", "Controller@method")`.
+  - Manejo de conexiones crudas mediante actualización en `MainHandler`. **Critico**: Los WebSockets actualmente se ejecutan *antes* del middleware de sesión estándar en `handler.go`, por lo que `Auth::user()` puede no estar disponible automáticamente. Se recomienda enviar el token en el primer mensaje o headers y validarlo manualmente si es crítico.
+  - Documentación en `docs/WEBSOCKETS.md`.
+- **Flutter Integration**:
+  - Usar `web_socket_channel` para chat en tiempo real.
+  - El protocolo actual usa JSON events: `{type: "chunk", content: "..."}`.
+- **CLI**:
+  - Nuevos comandos se registran en `cmd/joss/main.go`.
+  - Implementado `joss ai:activate` con prompts interactivos (`bufio`).
+  - **Gotcha Environment**: El Runtime de Joss carga `env.joss` en memoria (`r.Env`). Los módulos nativos deben preferir `r.Env["KEY"]` antes que `os.Getenv("KEY")`, ya que `joss server start` no siempre exporta las variables al entorno del SO.

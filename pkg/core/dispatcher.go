@@ -283,3 +283,86 @@ func (r *Runtime) Dispatch(method, path string, reqData, sessData map[string]int
 
 	return nil, nil
 }
+
+// DispatchWebSocket handles WebSocket upgrades
+func (r *Runtime) DispatchWebSocket(path string, conn interface{}, reader func() (int, []byte, error), sender func(interface{}) error) {
+	// Conn is passed as interface{}, expected to be *websocket.Conn
+	// Reader is a closure wrapping conn.ReadMessage()
+	// Sender is a closure wrapping conn.WriteJSON()
+
+	// Match Route
+	var handler interface{}
+	if r.Routes["WS"] != nil {
+		if routeInfo, ok := r.Routes["WS"][path].(map[string]interface{}); ok {
+			handler = routeInfo["handler"]
+		} else if h, ok := r.Routes["WS"][path]; ok {
+			handler = h
+		}
+	}
+
+	if handler == nil {
+		fmt.Printf("[WS] No handler found for %s\n", path)
+		return
+	}
+
+	// Create WebSocket Instance
+	if _, ok := r.Classes["WebSocket"]; !ok {
+		fmt.Println("[WS] Error: WebSocket class not found in runtime")
+		return
+	}
+
+	wsInstance := &Instance{
+		Class: r.Classes["WebSocket"],
+		Fields: map[string]interface{}{
+			"_conn":   conn,
+			"_sender": sender,
+		},
+	}
+
+	// Execute Handler (Controller@Method)
+	// This sets up the callbacks (onMessage, etc.)
+	handlerExecuted := false
+	if handlerName, ok := handler.(string); ok {
+		parts := strings.Split(handlerName, "@")
+		if len(parts) == 2 {
+			controllerName := parts[0]
+			methodName := parts[1]
+
+			if classStmt, ok := r.Classes[controllerName]; ok {
+				instance := &Instance{Class: classStmt, Fields: make(map[string]interface{})}
+				for _, stmt := range classStmt.Body.Statements {
+					if m, ok := stmt.(*parser.MethodStatement); ok {
+						if m.Name.Value == methodName {
+							fmt.Printf("[WS] Executing Setup %s@%s\n", controllerName, methodName)
+							r.CallMethodEvaluated(m, instance, []interface{}{wsInstance})
+							handlerExecuted = true
+							break // Found
+						}
+					}
+				}
+			}
+		}
+	}
+
+	if !handlerExecuted {
+		fmt.Println("[WS] Handler execution failed (method not found?)")
+		return
+	}
+
+	// Blocking Event Loop
+	fmt.Println("[WS] Starting Event Loop")
+	for {
+		_, msg, err := reader()
+		if err != nil {
+			fmt.Printf("[WS] Connection Error/Closed: %v\n", err)
+			break
+		}
+
+		// Trigger onMessage
+		if cb, ok := wsInstance.Fields["_on_message"]; ok {
+			// cb should be a Joss Function/Closure
+			// Use CallFunction
+			r.CallFunction(cb, []interface{}{string(msg)})
+		}
+	}
+}

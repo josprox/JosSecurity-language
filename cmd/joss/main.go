@@ -158,6 +158,8 @@ func main() {
 		handleUserStorage(os.Args[2])
 	case "version":
 		fmt.Printf("%s v%s (%s)\n", version.Name, version.Version, version.NameVersion)
+	case "ai:activate":
+		activateAI()
 	case "change":
 		if len(os.Args) < 4 || os.Args[2] != "db" {
 			fmt.Println("Uso: joss change db [motor] o joss change db prefix [nuevo_prefijo]")

@@ -1,6 +1,10 @@
 package core
 
-import "fmt"
+import (
+	"fmt"
+
+	"github.com/jossecurity/joss/pkg/parser"
+)
 
 // WebSocket Implementation
 func (r *Runtime) executeWebSocketMethod(instance *Instance, method string, args []interface{}) interface{} {
@@ -16,6 +20,39 @@ func (r *Runtime) executeWebSocketMethod(instance *Instance, method string, args
 			}
 		}
 		return false
+
+	case "send":
+		// $ws->send(msg)
+		if len(args) > 0 {
+			msg := args[0]
+			if connVal, ok := instance.Fields["_sender"]; ok {
+				if sender, ok := connVal.(func(interface{}) error); ok {
+					sender(msg)
+					return true
+				}
+			}
+		}
+		return false
+
+	case "onMessage":
+		// $ws->onMessage(func($msg) { ... })
+		if len(args) > 0 {
+			// BoundMethod (e.g. $this.handle)
+			if fn, ok := args[0].(*BoundMethod); ok {
+				instance.Fields["_on_message"] = fn
+				return true
+			}
+			// FunctionLiteral (Anonymous function)
+			if fn, ok := args[0].(*parser.FunctionLiteral); ok {
+				instance.Fields["_on_message"] = fn
+				return true
+			}
+		}
+		return false
+
+	case "close":
+		// Not implemented yet
+		return true
 	}
 	return nil
 }

@@ -148,6 +148,17 @@ func (r *Runtime) executeRouterMethod(instance *Instance, method string, args []
 		}
 		return nil
 
+	case "ws":
+		// Router.ws("/path", "Controller@method")
+		if len(args) >= 2 {
+			path := args[0].(string)
+			handler := args[1]
+			// Internally we treat WS as a special method "WS"
+			addRoute("WS", path, handler)
+			fmt.Printf("[DEBUG] executeRouterMethod called: ws (%s)\n", path)
+		}
+		return nil
+
 	case "group":
 		// Router.group("middleware", function() { ... })
 		if len(args) >= 2 {

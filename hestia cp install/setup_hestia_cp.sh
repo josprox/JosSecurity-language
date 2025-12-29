@@ -73,7 +73,7 @@ server {
         
         proxy_http_version 1.1;
         proxy_set_header Upgrade \$http_upgrade;
-        proxy_set_header Connection 'upgrade';
+        proxy_set_header Connection "Upgrade";
         proxy_set_header Host \$host;
         proxy_set_header X-Real-IP \$remote_addr;
         proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
@@ -95,7 +95,7 @@ server {
         proxy_pass http://127.0.0.1:\$joss_port;
         proxy_http_version 1.1;
         proxy_set_header Upgrade \$http_upgrade;
-        proxy_set_header Connection 'upgrade';
+        proxy_set_header Connection "Upgrade";
         proxy_set_header Host \$host;
     }
 
@@ -131,7 +131,7 @@ server {
         
         proxy_http_version 1.1;
         proxy_set_header Upgrade \$http_upgrade;
-        proxy_set_header Connection 'upgrade';
+        proxy_set_header Connection "Upgrade";
         proxy_set_header Host \$host;
         proxy_set_header X-Real-IP \$remote_addr;
         proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
@@ -152,7 +152,7 @@ server {
         proxy_pass http://127.0.0.1:\$joss_port;
         proxy_http_version 1.1;
         proxy_set_header Upgrade \$http_upgrade;
-        proxy_set_header Connection 'upgrade';
+        proxy_set_header Connection "Upgrade";
         proxy_set_header Host \$host;
     }
 
@@ -160,7 +160,6 @@ server {
         alias %home%/%user%/web/%domain%/document_errors/;
     }
 
-    proxy_hide_header Upgrade;
     include %home%/%user%/conf/web/%domain%/nginx.ssl.conf_*;
 }
 EOF

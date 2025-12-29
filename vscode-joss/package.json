@@ -10,7 +10,9 @@
   },
   "main": "./out/extension.js",
   "activationEvents": [
-    "*"
+    "onLanguage:joss",
+    "onLanguage:joss-html",
+    "onCommand:joss.newProject"
   ],
   "categories": [
     "Programming Languages",

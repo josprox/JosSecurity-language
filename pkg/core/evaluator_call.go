@@ -158,6 +158,11 @@ func (r *Runtime) applyFunction(fn interface{}, args []interface{}) interface{} 
 	return nil
 }
 
+// Public API for executing functions (from Server etc)
+func (r *Runtime) CallFunction(fn interface{}, args []interface{}) interface{} {
+	return r.applyFunction(fn, args)
+}
+
 func (r *Runtime) callBuiltin(name string, args []interface{}) (interface{}, bool) {
 	switch name {
 	case "print", "echo":
@@ -374,6 +379,29 @@ func (r *Runtime) callBuiltin(name string, args []interface{}) (interface{}, boo
 					return nil, true
 				}
 				return string(content), true
+			}
+		}
+		return nil, true
+	case "append":
+		if len(args) == 2 {
+			if list, ok := args[0].([]interface{}); ok {
+				// Create new list to avoid mutating original if passed by value (slices are ref though)
+				// But interface{} slice logic in Go:
+				newList := append(list, args[1])
+				return newList, true
+			}
+		}
+		return nil, true
+	case "merge":
+		// merge(list1, list2)
+		if len(args) == 2 {
+			l1, ok1 := args[0].([]interface{})
+			l2, ok2 := args[1].([]interface{})
+			if ok1 && ok2 {
+				newList := make([]interface{}, len(l1)+len(l2))
+				copy(newList, l1)
+				copy(newList[len(l1):], l2)
+				return newList, true
 			}
 		}
 		return nil, true

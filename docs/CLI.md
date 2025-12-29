@@ -157,6 +157,20 @@ $schema->create("posts", {
 })
 ```
 
+### `joss ai:activate`
+
+Configura interactivamente el proveedor de IA (Groq, OpenAI, Gemini) y la clave API.
+
+```bash
+joss ai:activate
+```
+
+**Proceso**:
+1. Pregunta el proveedor deseado.
+2. Sugiere modelos por defecto.
+3. Solicita la API Key.
+4. Actualiza `env.joss` (o `.env`) automáticamente.
+
 ### `joss change db [motor]`
 
 Cambia el motor de base de datos y migra los datos.

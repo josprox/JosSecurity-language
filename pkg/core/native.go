@@ -70,14 +70,14 @@ func (r *Runtime) RegisterNativeClasses() {
 	r.Variables["Request"] = &Instance{Class: r.Classes["Request"], Fields: make(map[string]interface{})}
 
 	// Response
-	r.registerNative("Response", []string{"json", "redirect", "error", "raw"}, (*Runtime).executeResponseMethod)
+	r.registerNative("Response", []string{"json", "redirect", "error", "raw", "stream"}, (*Runtime).executeResponseMethod)
 	r.Variables["Response"] = &Instance{Class: r.Classes["Response"], Fields: make(map[string]interface{})}
 
 	// WebResponse (replaces RedirectResponse)
 	r.registerNative("WebResponse", []string{"with", "withCookie", "withHeader", "status"}, (*Runtime).executeWebResponseMethod)
 
 	// WebSocket
-	r.registerNative("WebSocket", []string{"broadcast"}, (*Runtime).executeWebSocketMethod)
+	r.registerNative("WebSocket", []string{"broadcast", "send", "onMessage", "close"}, (*Runtime).executeWebSocketMethod)
 	r.Variables["WebSocket"] = &Instance{Class: r.Classes["WebSocket"], Fields: make(map[string]interface{})}
 
 	// Schema
@@ -124,6 +124,20 @@ func (r *Runtime) RegisterNativeClasses() {
 	// Markdown
 	r.registerNative("Markdown", []string{"toHtml", "readFile"}, (*Runtime).executeMarkdownMethod)
 	r.Variables["Markdown"] = &Instance{Class: r.Classes["Markdown"], Fields: make(map[string]interface{})}
+
+	// AI (Native)
+	r.registerNative("AI", []string{"chat", "stream", "client"}, (*Runtime).executeAIMethod)
+	r.Variables["AI"] = &Instance{Class: r.Classes["AI"], Fields: make(map[string]interface{})}
+
+	// Cache (Native)
+	r.registerNative("Cache", []string{"put", "get", "has", "forget"}, (*Runtime).executeCacheMethod)
+	r.Variables["Cache"] = &Instance{Class: r.Classes["Cache"], Fields: make(map[string]interface{})}
+
+	// Stream (Native - Instantiated by Server)
+	r.registerNative("Stream", []string{"send", "close"}, (*Runtime).executeStreamMethod)
+
+	// ChatClient (Fluent AI)
+	r.registerNative("ChatClient", []string{"user", "system", "prompt", "assistant", "call", "stream", "streamTo"}, (*Runtime).executeChatClientMethod)
 }
 
 func (r *Runtime) executeNativeMethod(instance *Instance, method string, args []interface{}) interface{} {

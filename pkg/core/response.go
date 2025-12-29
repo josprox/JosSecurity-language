@@ -57,6 +57,15 @@ func (r *Runtime) executeResponseMethod(instance *Instance, method string, args 
 			}
 			return res
 		}
+
+	case "stream":
+		// Response::stream(callback)
+		if len(args) > 0 {
+			callback := args[0] // Is a *parser.FunctionLiteral or closure
+			res := r.createWebResponse("STREAM", "", nil, 200)
+			res.Fields["callback"] = callback
+			return res
+		}
 	}
 	return nil
 }
