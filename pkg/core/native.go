@@ -141,6 +141,9 @@ func (r *Runtime) RegisterNativeClasses() {
 
 	// Process (Native Execution)
 	r.registerNative("Process", []string{"constructor", "start", "wait", "kill", "pid", "stdin", "stdout_chan", "stderr_chan"}, (*Runtime).executeProcessMethod)
+
+	// Server Control
+	r.registerNative("Server", []string{"start"}, (*Runtime).executeServerControlMethod)
 }
 
 func (r *Runtime) executeNativeMethod(instance *Instance, method string, args []interface{}) interface{} {

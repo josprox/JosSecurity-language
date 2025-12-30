@@ -12,7 +12,7 @@ func GetConfigFiles(path string) map[string]string {
 		filepath.Join(path, "main.joss"): `class Main {
     Init main() {
         print("Iniciando Sistema JosSecurity...")
-        System.Run("joss", ["server", "start"])
+        Server::start()
     }
 }`,
 		filepath.Join(path, "env.joss"): `APP_ENV="development"

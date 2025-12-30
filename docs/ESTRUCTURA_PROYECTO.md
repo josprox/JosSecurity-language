@@ -190,7 +190,7 @@ Proyectos de consola son ideales para:
 class Main {
     Init main() {
         print("Iniciando Sistema JosSecurity...")
-        System.Run("joss", ["server", "start"])
+        Server::start()
     }
 }
 ```

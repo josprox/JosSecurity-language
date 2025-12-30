@@ -18,6 +18,10 @@ var (
 	GlobalFileSystem http.FileSystem // Exposed for hotreload.go
 )
 
+func init() {
+	core.ServerStartCallback = Start
+}
+
 // Start initializes and starts the Joss HTTP server with Hot Reload
 // fs can be nil, in which case it defaults to http.Dir("public")
 func Start(fileSystem http.FileSystem) {

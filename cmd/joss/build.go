@@ -52,9 +52,21 @@ func buildWeb() {
 
 	// 3. Copy Project Files
 	fmt.Println("Copiando archivos del proyecto...")
-	dirsToCopy := []string{"app", "config", "public", "assets", "storage"}
 
-	// Check for node_modules
+	// Default ignore list
+	ignoredDirs := map[string]bool{
+		".git":         true,
+		".vscode":      true,
+		".idea":        true,
+		"build":        true,
+		"vendor":       true,
+		"node_modules": true, // Handled separately
+		".gemini":      true, // Agent artifacts
+		"storage":      true, // Usually link, handled separately? Or copy structure? User said "anexe todas".
+	}
+
+	// Check for node_modules inclusion
+	includeNodeModules := false
 	if _, err := os.Stat("node_modules"); err == nil {
 		fmt.Print("¿Desea incluir 'node_modules' en el build? (y/n): ")
 		var response string
@@ -62,24 +74,42 @@ func buildWeb() {
 		response = strings.ToLower(strings.TrimSpace(response))
 
 		if response == "y" || response == "s" || response == "si" || response == "yes" {
-			dirsToCopy = append(dirsToCopy, "node_modules")
-			fmt.Println("-> Se incluirá node_modules (esto puede tardar un poco).")
+			includeNodeModules = true
+			fmt.Println("-> Se incluirá node_modules.")
 		} else {
-			fmt.Println("-> Se omitirá node_modules (recuerda ejecutar 'npm install' en el servidor).")
+			fmt.Println("-> Se omitirá node_modules.")
 		}
 	}
 
-	for _, dir := range dirsToCopy {
-		if _, err := os.Stat(dir); err == nil {
-			copyDir(dir, filepath.Join(buildDir, dir))
+	// Dynamic copy of root directories
+	files, err := ioutil.ReadDir(".")
+	if err == nil {
+		for _, f := range files {
+			name := f.Name()
+			if f.IsDir() {
+				if ignoredDirs[name] {
+					continue
+				}
+				// Copy Directory
+				if _, err := os.Stat(name); err == nil {
+					copyDir(name, filepath.Join(buildDir, name))
+				}
+			} else {
+				// Copy Files (only specific extensions or all?)
+				// The previous code copied specific root files.
+				// User said "anexe todas las carpetas". He didn't specify files, but implied "everything".
+				// Let's copy all root files except specific ignores
+				if name == "joss.exe" || strings.HasSuffix(name, ".log") || strings.HasSuffix(name, ".enc") {
+					continue
+				}
+				copyFile(name, filepath.Join(buildDir, name))
+			}
 		}
 	}
 
-	filesToCopy := []string{"main.joss", "api.joss", "routes.joss", "package.json", "package-lock.json"}
-	for _, f := range filesToCopy {
-		if _, err := os.Stat(f); err == nil {
-			copyFile(f, filepath.Join(buildDir, f))
-		}
+	// Handle node_modules if requested
+	if includeNodeModules {
+		copyDir("node_modules", filepath.Join(buildDir, "node_modules"))
 	}
 
 	// 4. Copy Database and WAL files
@@ -152,27 +182,53 @@ func buildProgram() {
 	}
 
 	files := make(map[string][]byte)
-	dirsToWalk := []string{"app", "config", "assets", "public"}
-	for _, dir := range dirsToWalk {
-		filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
-			if err != nil || info.IsDir() {
-				return nil
-			}
-			data, err := ioutil.ReadFile(path)
-			if err == nil {
-				relPath := filepath.ToSlash(path)
-				files[relPath] = data
-			}
-			return nil
-		})
+
+	// Dynamic Walk
+	ignoredDirs := map[string]bool{
+		".git":         true,
+		".vscode":      true,
+		".idea":        true,
+		"build":        true,
+		"vendor":       true,
+		"node_modules": true, // Usually too big for embedded exe
+		".gemini":      true,
 	}
 
-	rootFiles := []string{"main.joss", "api.joss", "routes.joss"}
-	for _, f := range rootFiles {
-		if data, err := ioutil.ReadFile(f); err == nil {
-			files[f] = data
+	filepath.Walk(".", func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return nil
 		}
-	}
+
+		// Skip root directory itself
+		if path == "." {
+			return nil
+		}
+
+		// Check ignore list for top-level directories
+		parts := strings.Split(path, string(os.PathSeparator))
+		if len(parts) > 0 && ignoredDirs[parts[0]] {
+			if info.IsDir() {
+				return filepath.SkipDir // Skip entire ignored directory
+			}
+			return nil
+		}
+
+		if info.IsDir() {
+			return nil
+		}
+
+		// Filter files
+		if info.Name() == "joss.exe" || strings.HasSuffix(info.Name(), ".log") || strings.HasSuffix(info.Name(), ".enc") {
+			return nil
+		}
+
+		data, err := ioutil.ReadFile(path)
+		if err == nil {
+			relPath := filepath.ToSlash(path)
+			files[relPath] = data
+		}
+		return nil
+	})
 
 	// Handle env.joss separately (Encrypt it)
 	if data, err := ioutil.ReadFile("env.joss"); err == nil {

@@ -796,8 +796,42 @@ Genera un número entero aleatorio entre min y max.
 $dado = Math::random(1, 6)
 ```
 
-#### `Math::floor(float $val)`
+### `Math::floor(float $val)`
 Redondea hacia abajo.
+
+```joss
+$entero = Math::floor(4.9) // 4
+```
+
+---
+
+## Server
+
+Control nativo del servidor web.
+
+### Métodos
+
+#### `Server::start()`
+Inicia el servidor web utilizando la configuración actual y el sistema de archivos (VFS o disco).
+Este método es **bloqueante** y debe ser llamado al final de la inicialización de `main.joss` en aplicaciones compiladas.
+
+```joss
+// main.joss
+class Main {
+    Init main() {
+        print("Iniciando aplicación...")
+        
+        // Iniciar servidor web
+        Server::start()
+        
+        // El código después de esto no se ejecutará inmediatamente
+        // a menos que el servidor se detenga.
+    }
+}
+```
+
+---
+
 
 ```joss
 $entero = Math::floor(4.9) // 4

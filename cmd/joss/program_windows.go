@@ -3,11 +3,15 @@
 package main
 
 import (
+	"fmt"
 	"log"
 	"net"
+	"os"
 	"time"
 
 	"github.com/jchv/go-webview2"
+	"github.com/jossecurity/joss/pkg/core"
+	"github.com/jossecurity/joss/pkg/parser"
 	"github.com/jossecurity/joss/pkg/server"
 
 	_ "embed"
@@ -17,9 +21,49 @@ import (
 var defaultLogo []byte
 
 func startProgram() {
-	// Start Server in Goroutine
+	// 1. Initialize Runtime and Execute `main.joss`
 	go func() {
-		server.Start(nil)
+		// Init Runtime (Embedded Mode)
+		r := core.NewRuntime()
+		r.LoadEnv(server.GlobalFileSystem) // Load from embedded VFS
+
+		// Read main.joss (from VFS or Disk)
+		var data []byte
+		var err error
+
+		if server.GlobalFileSystem != nil {
+			content, errOpen := server.GlobalFileSystem.Open("main.joss")
+			if errOpen == nil {
+				stat, _ := content.Stat()
+				data = make([]byte, stat.Size())
+				content.Read(data)
+				content.Close()
+			} else {
+				err = errOpen
+			}
+		} else {
+			data, err = os.ReadFile("main.joss")
+		}
+
+		if err == nil {
+
+			fmt.Println("[Program] Executing main.joss...")
+			l := parser.NewLexer(string(data))
+			p := parser.NewParser(l)
+			program := p.ParseProgram()
+			if len(p.Errors()) == 0 {
+				// Execute main.joss which should call System.Run("joss", ["server", "start"])
+				// Since we aliased 'joss' in system.go, it will spawn this exe with 'server start' args.
+				// This spawned process will run the server.
+				r.Execute(program)
+			} else {
+				fmt.Println("[Program] Parser Errors in main.joss:", p.Errors())
+			}
+		} else {
+			// Fallback if main.joss missing: Start server directly
+			fmt.Println("[Program] main.joss not found, starting server directly...")
+			server.Start(nil)
+		}
 	}()
 
 	// Determine port

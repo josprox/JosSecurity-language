@@ -2,6 +2,7 @@ package core
 
 import (
 	"fmt"
+	"os"
 	"os/exec"
 )
 
@@ -30,6 +31,15 @@ func (r *Runtime) executeSystemMethod(instance *Instance, method string, args []
 		if len(args) > 0 {
 			cmdName := args[0].(string)
 			cmdArgs := []string{}
+
+			// Auto-correct 'joss' to current executable
+			if cmdName == "joss" {
+				exe, err := os.Executable()
+				if err == nil {
+					cmdName = exe
+				}
+			}
+
 			if len(args) > 1 {
 				if list, ok := args[1].([]interface{}); ok {
 					for _, arg := range list {

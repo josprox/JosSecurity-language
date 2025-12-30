@@ -11,7 +11,9 @@ import (
 	"time"
 
 	"github.com/jchv/go-webview2"
+	"github.com/jossecurity/joss/pkg/core"
 	"github.com/jossecurity/joss/pkg/crypto"
+	"github.com/jossecurity/joss/pkg/parser"
 	"github.com/jossecurity/joss/pkg/server"
 	"github.com/jossecurity/joss/pkg/vfs"
 )
@@ -87,24 +89,104 @@ func main() {
 	memFS := vfs.NewMemFS()
 	memFS.Files = files
 
-	// 4. Start Server with VFS
-	go func() {
+	// 4. Handle Arguments (Support for self-spawned "server start")
+	if len(os.Args) >= 3 && os.Args[1] == "server" && os.Args[2] == "start" {
 		server.Start(memFS)
+		return
+	}
+
+	// 5. Normal Startup: Execute main.joss and Open WebView
+	go func() {
+		defer func() {
+			if r := recover(); r != nil {
+				log.Printf("Recovered from panic in runtime: %v", r)
+			}
+		}()
+
+		// Set Global FileSystem for Server::start() native calls
+		server.GlobalFileSystem = memFS
+		core.SetFileSystem(memFS)
+
+		r := core.NewRuntime()
+		r.LoadEnv(memFS)
+
+		// Execute main.joss
+		content, err := memFS.Open("main.joss")
+		if err == nil {
+			stat, _ := content.Stat()
+			data := make([]byte, stat.Size())
+			content.Read(data)
+			content.Close()
+
+			l := parser.NewLexer(string(data))
+			p := parser.NewParser(l)
+			program := p.ParseProgram()
+			if len(p.Errors()) == 0 {
+				r.Execute(program)
+			} else {
+				log.Printf("Parser Errors in main.joss: %v", p.Errors())
+			}
+		} else {
+			// Fallback: Start server directly
+			server.Start(memFS)
+		}
 	}()
 
-	// 5. Wait for Server
-	waitForServer("localhost:8000")
+	// Determine port from env (loaded from VFS or defaults)
+	port := "8000"
+	if envData, ok := files["env.joss"]; ok {
+		// Simple parse
+		lines := bytes.Split(envData, []byte("\n"))
+		for _, line := range lines {
+			s := string(bytes.TrimSpace(line))
+			if (len(s) > 5 && s[:5] == "PORT=") || (len(s) > 10 && s[:10] == "JOSS_PORT=") {
+				parts := bytes.SplitN(line, []byte("="), 2)
+				if len(parts) == 2 {
+					val := bytes.TrimSpace(parts[1])
+					val = bytes.Trim(val, "\"")
+					val = bytes.Trim(val, "'")
+					port = string(val)
+				}
+			}
+		}
+	} else if envEnc, ok := files["env.enc"]; ok {
+		if len(envEnc) > 16 {
+			salt := envEnc[:16]
+			ciphertext := envEnc[16:]
+			masterSecret := []byte("JOSSECURITY_MASTER_SECRET_2025")
+			key := crypto.DeriveKey(masterSecret, salt)
+			decrypted, err := crypto.DecryptAES(ciphertext, key)
+			if err == nil {
+				lines := bytes.Split(decrypted, []byte("\n"))
+				for _, line := range lines {
+					s := string(bytes.TrimSpace(line))
+					if (len(s) > 5 && s[:5] == "PORT=") || (len(s) > 10 && s[:10] == "JOSS_PORT=") {
+						parts := bytes.SplitN(line, []byte("="), 2)
+						if len(parts) == 2 {
+							val := bytes.TrimSpace(parts[1])
+							val = bytes.Trim(val, "\"")
+							val = bytes.Trim(val, "'")
+							port = string(val)
+						}
+					}
+				}
+			}
+		}
+	}
 
-	// 6. Launch WebView
+	// Wait for resolved port, or fallback to default
+	finalPort := waitForPortOrPort(port, "8000")
+
 	w := webview2.New(true)
 	if w == nil {
-		log.Fatal("Failed to load WebView2.")
+		log.Println("Failed to load WebView2.")
+		return
 	}
 	defer w.Destroy()
 
 	w.SetTitle("JosSecurity App")
 	w.SetSize(1024, 768, webview2.HintNone)
-	w.Navigate("http://localhost:8000")
+	w.Navigate("http://localhost:" + finalPort)
 	w.Run()
 }
 
@@ -129,13 +211,30 @@ func setupLogging() {
 	}
 }
 
-func waitForServer(address string) {
-	for i := 0; i < 30; i++ {
-		conn, err := net.DialTimeout("tcp", address, 1*time.Second)
-		if err == nil {
-			conn.Close()
-			return
+func waitForPortOrPort(p1, p2 string) string {
+	target := ""
+	for i := 0; i < 60; i++ { // 12 seconds
+		if checkPort(p1) {
+			target = p1
+			break
+		}
+		if checkPort(p2) {
+			target = p2
+			break
 		}
 		time.Sleep(200 * time.Millisecond)
 	}
+	if target == "" {
+		return p1 // Default to first
+	}
+	return target
+}
+
+func checkPort(port string) bool {
+	conn, err := net.DialTimeout("tcp", "localhost:"+port, 100*time.Millisecond)
+	if err == nil {
+		conn.Close()
+		return true
+	}
+	return false
 }

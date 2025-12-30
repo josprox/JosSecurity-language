@@ -114,7 +114,9 @@ joss build
 
 - `joss build program`: Compila un ejecutable autocontenido (Windows/Linux/Mac).
   - Genera un ejecutable único (ej. `program.exe`) con todo embebido (assets, código, entorno).
-  - **Windows**: Compilado como aplicación GUI (sin ventana de terminal).
+  - **Ejecución**: Al iniciarse, ejecuta `main.joss` utilizando el VFS embebido. `main.joss` debe llamar a `Server::start()`.
+  - **Puerto**: Desencripta `env.enc` para respetar el puerto configurado (ej. 9000), con fallback a 8000.
+  - **Windows**: Compilado como aplicación GUI.
   - **Base de Datos**: Usa `Storage/database.sqlite` junto al ejecutable.
   - **Seguridad**: Todo el contenido es encriptado dentro del ejecutable.
 
