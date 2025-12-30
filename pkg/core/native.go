@@ -138,6 +138,9 @@ func (r *Runtime) RegisterNativeClasses() {
 
 	// ChatClient (Fluent AI)
 	r.registerNative("ChatClient", []string{"user", "system", "prompt", "assistant", "call", "stream", "streamTo"}, (*Runtime).executeChatClientMethod)
+
+	// Process (Native Execution)
+	r.registerNative("Process", []string{"constructor", "start", "wait", "kill", "pid", "stdin", "stdout_chan", "stderr_chan"}, (*Runtime).executeProcessMethod)
 }
 
 func (r *Runtime) executeNativeMethod(instance *Instance, method string, args []interface{}) interface{} {

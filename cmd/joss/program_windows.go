@@ -22,8 +22,15 @@ func startProgram() {
 		server.Start(nil)
 	}()
 
+	// Determine port
+	port := getEnvPort("env.joss")
+	if port == "" {
+		port = "8000"
+	}
+	host := "localhost:" + port
+
 	// Wait for server to be ready
-	waitForServer("localhost:8000")
+	waitForServer(host)
 
 	// Create WebView2 instance
 	w := webview2.New(true)
@@ -37,7 +44,7 @@ func startProgram() {
 	w.SetSize(1024, 768, webview2.HintNone)
 
 	// Navigate to local server
-	w.Navigate("http://localhost:8000")
+	w.Navigate("http://" + host)
 
 	// Run the application
 	w.Run()

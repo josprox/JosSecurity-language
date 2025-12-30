@@ -375,13 +375,23 @@ func getEnvPort(envPath string) string {
 	lines := strings.Split(string(content), "\n")
 	for _, line := range lines {
 		line = strings.TrimSpace(line)
-		if strings.HasPrefix(line, "PORT=") || strings.HasPrefix(line, "JOSS_PORT=") {
+		// Handle "PORT=..." and "PORT = ..."
+		if strings.HasPrefix(line, "#") {
+			continue
+		}
+
+		upper := strings.ToUpper(line)
+		if strings.HasPrefix(upper, "PORT") || strings.HasPrefix(upper, "JOSS_PORT") {
 			parts := strings.SplitN(line, "=", 2)
 			if len(parts) == 2 {
-				val := strings.TrimSpace(parts[1])
-				val = strings.Trim(val, "\"")
-				val = strings.Trim(val, "'")
-				return val
+				// Verify key is exactly PORT or JOSS_PORT (ignoring case/space)
+				key := strings.TrimSpace(strings.ToUpper(parts[0]))
+				if key == "PORT" || key == "JOSS_PORT" {
+					val := strings.TrimSpace(parts[1])
+					val = strings.Trim(val, "\"")
+					val = strings.Trim(val, "'")
+					return val
+				}
 			}
 		}
 	}

@@ -1010,4 +1010,69 @@ Lee el contenido completo de un archivo.
 $contenido = file_get_contents("/etc/hosts")
 ```
 
+---
+
+## Process
+
+Módulo para ejecución y control de procesos externos.
+Requiere `ALLOW_SYSTEM_RUN=true` en `env.joss`.
+
+### Métodos
+
+#### `constructor(string $comando, array $argumentos)`
+Crea una nueva instancia de proceso (no lo inicia automáticamente).
+
+```joss
+$proc = new Process("ping", ["127.0.0.1", "-n", "3"])
+```
+
+#### `start()`
+Inicia la ejecución del proceso. Retorna `true` si inicia correctamente.
+
+```joss
+$proc->start()
+```
+
+#### `stdout_chan()`
+Retorna un canal (`Channel`) por donde se reciben las líneas de la salida estándar (stdout).
+
+```joss
+$chan = $proc->stdout_chan()
+foreach($chan as $line) {
+    print("OUTPUT: " . $line)
+}
+```
+
+#### `stderr_chan()`
+Retorna un canal (`Channel`) por donde se reciben las líneas de error estándar (stderr).
+
+#### `stdin(string $input)`
+Escribe datos en la entrada estándar (stdin) del proceso.
+
+```joss
+$proc->stdin("mi contraseña")
+```
+
+#### `wait()`
+Espera a que el proceso termine y retorna el código de salida (exit code).
+
+```joss
+$code = $proc->wait()
+print("Exit Code: " . $code)
+```
+
+#### `kill()`
+Fuerza la terminación del proceso.
+
+```joss
+$proc->kill()
+```
+
+#### `pid()`
+Retorna el ID del proceso (PID).
+
+```joss
+print("PID: " . $proc->pid())
+```
+
 
