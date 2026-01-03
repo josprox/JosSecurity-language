@@ -1,0 +1,87 @@
+{
+  "@@locale": "ja",
+  "startServerWeb": "Webサーバーを起動します",
+  "@startServerWeb": {
+    "description": ""
+  },
+  "startProgramDesktop": "アプリケーションをデスクトップモードで起動する",
+  "@startProgramDesktop": {
+    "description": ""
+  },
+  "runJossScript": "joss スクリプトを実行する",
+  "@runJossScript": {
+    "description": ""
+  },
+  "compileProjectDist": "配布用のプロジェクトをビルドする",
+  "@compileProjectDist": {
+    "description": ""
+  },
+  "CreateController": "新しいコントローラーを作成する",
+  "@CreateController": {
+    "description": ""
+  },
+  "CreateMiddleware": "新しいミドルウェアを作成する",
+  "@CreateMiddleware": {
+    "description": ""
+  },
+  "CreateModel": "新しいモデルを作成する",
+  "@CreateModel": {
+    "description": ""
+  },
+  "CreateView": "新しいビューを作成する",
+  "@CreateView": {
+    "description": ""
+  },
+  "CreateMVC": "MVCの作成",
+  "@CreateMVC": {
+    "description": ""
+  },
+  "CreateCRUD": "テーブルに基づいて完全な CRUD を作成する",
+  "@CreateCRUD": {
+    "description": ""
+  },
+  "removeCRUD": "テーブルに対して生成された CRUD を削除する",
+  "@removeCRUD": {
+    "description": ""
+  },
+  "createMigration": "新しい移行を作成する",
+  "@createMigration": {
+    "description": ""
+  },
+  "exeMigrate": "保留中の移行を実行する",
+  "@exeMigrate": {
+    "description": ""
+  },
+  "exeMigrateFresh": "すべてのテーブルを削除し、移行を再実行します",
+  "@exeMigrateFresh": {
+    "description": ""
+  },
+  "createProject": "新しいプロジェクトを作成する",
+  "@createProject": {
+    "description": ""
+  },
+  "changeDBMotor": "データベースエンジン（mysql/sqlite）を変更する",
+  "@changeDBMotor": {
+    "description": ""
+  },
+  "changeDBPrefix": "テーブルの接頭辞を変更する",
+  "@changeDBPrefix": {
+    "description": ""
+  },
+  "settingsUserStorage": "ストレージの構成 (ローカル|OCI|AWS|Azure)",
+  "@settingsUserStorage": {
+    "description": ""
+  },
+  "IaActivate": "インタラクティブなネイティブ AI をセットアップする",
+  "@IaActivate": {
+    "description": ""
+  },
+  "version": "現在のバージョンを表示します",
+  "@version": {
+    "description": ""
+  },
+  "helpPrint": "このヘルプを表示する",
+  "@helpPrint": {
+    "description": ""
+  }
+}

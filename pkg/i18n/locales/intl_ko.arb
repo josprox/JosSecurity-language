@@ -1,0 +1,87 @@
+{
+  "@@locale": "ko",
+  "startServerWeb": "웹 서버 시작",
+  "@startServerWeb": {
+    "description": ""
+  },
+  "startProgramDesktop": "데스크톱 모드에서 애플리케이션 시작",
+  "@startProgramDesktop": {
+    "description": ""
+  },
+  "runJossScript": "조스 스크립트 실행",
+  "@runJossScript": {
+    "description": ""
+  },
+  "compileProjectDist": "배포용 프로젝트 빌드",
+  "@compileProjectDist": {
+    "description": ""
+  },
+  "CreateController": "새 컨트롤러 만들기",
+  "@CreateController": {
+    "description": ""
+  },
+  "CreateMiddleware": "새로운 미들웨어 생성",
+  "@CreateMiddleware": {
+    "description": ""
+  },
+  "CreateModel": "새 모델 만들기",
+  "@CreateModel": {
+    "description": ""
+  },
+  "CreateView": "새 보기 만들기",
+  "@CreateView": {
+    "description": ""
+  },
+  "CreateMVC": "MVC 만들기",
+  "@CreateMVC": {
+    "description": ""
+  },
+  "CreateCRUD": "테이블을 기반으로 완전한 CRUD 생성",
+  "@CreateCRUD": {
+    "description": ""
+  },
+  "removeCRUD": "테이블에 대해 생성된 CRUD 제거",
+  "@removeCRUD": {
+    "description": ""
+  },
+  "createMigration": "새 마이그레이션 만들기",
+  "@createMigration": {
+    "description": ""
+  },
+  "exeMigrate": "보류 중인 마이그레이션 실행",
+  "@exeMigrate": {
+    "description": ""
+  },
+  "exeMigrateFresh": "모든 테이블을 삭제하고 마이그레이션을 다시 실행하세요.",
+  "@exeMigrateFresh": {
+    "description": ""
+  },
+  "createProject": "새 프로젝트 만들기",
+  "@createProject": {
+    "description": ""
+  },
+  "changeDBMotor": "데이터베이스 엔진 변경(mysql/sqlite)",
+  "@changeDBMotor": {
+    "description": ""
+  },
+  "changeDBPrefix": "테이블 접두사 변경",
+  "@changeDBPrefix": {
+    "description": ""
+  },
+  "settingsUserStorage": "스토리지 구성(로컬|OCI|AWS|Azure)",
+  "@settingsUserStorage": {
+    "description": ""
+  },
+  "IaActivate": "대화형 네이티브 AI 설정",
+  "@IaActivate": {
+    "description": ""
+  },
+  "version": "현재 버전을 표시합니다",
+  "@version": {
+    "description": ""
+  },
+  "helpPrint": "이 도움말 표시",
+  "@helpPrint": {
+    "description": ""
+  }
+}

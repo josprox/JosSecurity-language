@@ -1110,3 +1110,72 @@ print("PID: " . $proc->pid())
 ```
 
 
+---
+
+## Lang
+
+Sistema de Internacionalización (I18n) basado en archivos ARB (Application Resource Bundle).
+
+### Características
+- Carga automática de archivos `.arb` desde el directorio `/l10n`.
+- Detección automática del idioma del usuario (vía `Accept-Language`).
+- Soporte para placeholders dinámicos.
+- Helper `__` para uso directo en vistas.
+
+### Estructura de Archivos
+Crea una carpeta `l10n/` en la raíz de tu proyecto y añade archivos `.arb`:
+
+**l10n/intl_es.arb**
+```json
+{
+  "hello": "Hola {name}",
+  "welcome": "Bienvenido"
+}
+```
+
+**l10n/intl_en.arb**
+```json
+{
+  "hello": "Hello {name}",
+  "welcome": "Welcome"
+}
+```
+
+### Métodos
+
+#### `Lang::get(string $key, map $replacements)`
+Obtiene una traducción.
+
+```joss
+print(Lang::get("welcome")) // "Bienvenido" (si el locale es es)
+print(Lang::get("hello", {"name": "Juan"})) // "Hola Juan"
+```
+
+#### `Lang::set(string $locale)`
+Cambia el idioma actual en tiempo de ejecución.
+
+```joss
+Lang::set("en")
+```
+
+#### `Lang::locale()`
+Retorna el código del idioma actual.
+
+```joss
+$current = Lang::locale() // "es"
+```
+
+#### `Lang::locales()`
+Retorna una lista de todos los idiomas cargados disponibles.
+
+```joss
+$available = Lang::locales() // ["es", "en"]
+```
+
+### Uso en Vistas
+Puedes usar el helper global `__` en tus plantillas HTML:
+
+```html
+<h1>{{ __("welcome") }}</h1>
+<p>{{ __("hello", {"name": auth_user.name}) }}</p>
+```

@@ -1,0 +1,87 @@
+{
+  "@@locale": "it",
+  "startServerWeb": "Avviare il server web",
+  "@startServerWeb": {
+    "description": ""
+  },
+  "startProgramDesktop": "Avvia l'applicazione in modalità desktop",
+  "@startProgramDesktop": {
+    "description": ""
+  },
+  "runJossScript": "Esegui uno script joss",
+  "@runJossScript": {
+    "description": ""
+  },
+  "compileProjectDist": "Costruisci il progetto per la distribuzione",
+  "@compileProjectDist": {
+    "description": ""
+  },
+  "CreateController": "Crea un nuovo controller",
+  "@CreateController": {
+    "description": ""
+  },
+  "CreateMiddleware": "Creare un nuovo middleware",
+  "@CreateMiddleware": {
+    "description": ""
+  },
+  "CreateModel": "Crea un nuovo modello",
+  "@CreateModel": {
+    "description": ""
+  },
+  "CreateView": "Crea una nuova vista",
+  "@CreateView": {
+    "description": ""
+  },
+  "CreateMVC": "Crea MVC",
+  "@CreateMVC": {
+    "description": ""
+  },
+  "CreateCRUD": "Crea CRUD completo basato su una tabella",
+  "@CreateCRUD": {
+    "description": ""
+  },
+  "removeCRUD": "Rimuovi CRUD generato per una tabella",
+  "@removeCRUD": {
+    "description": ""
+  },
+  "createMigration": "Crea una nuova migrazione",
+  "@createMigration": {
+    "description": ""
+  },
+  "exeMigrate": "Esegui le migrazioni in sospeso",
+  "@exeMigrate": {
+    "description": ""
+  },
+  "exeMigrateFresh": "Elimina tutte le tabelle ed esegui nuovamente le migrazioni",
+  "@exeMigrateFresh": {
+    "description": ""
+  },
+  "createProject": "Crea un nuovo progetto",
+  "@createProject": {
+    "description": ""
+  },
+  "changeDBMotor": "Cambiare il motore del database (mysql/sqlite)",
+  "@changeDBMotor": {
+    "description": ""
+  },
+  "changeDBPrefix": "Cambia il prefisso della tabella",
+  "@changeDBPrefix": {
+    "description": ""
+  },
+  "settingsUserStorage": "Configurare l'archiviazione (locale|OCI|AWS|Azure)",
+  "@settingsUserStorage": {
+    "description": ""
+  },
+  "IaActivate": "Configura l'IA nativa interattiva",
+  "@IaActivate": {
+    "description": ""
+  },
+  "version": "Mostra la versione corrente",
+  "@version": {
+    "description": ""
+  },
+  "helpPrint": "Mostra questo aiuto",
+  "@helpPrint": {
+    "description": ""
+  }
+}

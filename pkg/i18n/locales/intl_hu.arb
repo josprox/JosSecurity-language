@@ -1,0 +1,87 @@
+{
+  "@@locale": "hu",
+  "startServerWeb": "Indítsa el a webszervert",
+  "@startServerWeb": {
+    "description": ""
+  },
+  "startProgramDesktop": "Indítsa el az alkalmazást asztali módban",
+  "@startProgramDesktop": {
+    "description": ""
+  },
+  "runJossScript": "Futtasson egy Joss scriptet",
+  "@runJossScript": {
+    "description": ""
+  },
+  "compileProjectDist": "Építsd fel a projektet a terjesztéshez",
+  "@compileProjectDist": {
+    "description": ""
+  },
+  "CreateController": "Hozzon létre egy új vezérlőt",
+  "@CreateController": {
+    "description": ""
+  },
+  "CreateMiddleware": "Hozzon létre új köztes szoftvert",
+  "@CreateMiddleware": {
+    "description": ""
+  },
+  "CreateModel": "Hozzon létre egy új modellt",
+  "@CreateModel": {
+    "description": ""
+  },
+  "CreateView": "Hozzon létre egy új nézetet",
+  "@CreateView": {
+    "description": ""
+  },
+  "CreateMVC": "Hozzon létre MVC-t",
+  "@CreateMVC": {
+    "description": ""
+  },
+  "CreateCRUD": "Készítsen teljes CRUD-t egy táblázat alapján",
+  "@CreateCRUD": {
+    "description": ""
+  },
+  "removeCRUD": "Távolítsa el a táblához generált CRUD-t",
+  "@removeCRUD": {
+    "description": ""
+  },
+  "createMigration": "Hozzon létre egy új migrációt",
+  "@createMigration": {
+    "description": ""
+  },
+  "exeMigrate": "Függőben lévő migrációk futtatása",
+  "@exeMigrate": {
+    "description": ""
+  },
+  "exeMigrateFresh": "Törölje az összes táblát, és futtassa újra a migrációt",
+  "@exeMigrateFresh": {
+    "description": ""
+  },
+  "createProject": "Hozzon létre egy új projektet",
+  "@createProject": {
+    "description": ""
+  },
+  "changeDBMotor": "Az adatbázismotor módosítása (mysql/sqlite)",
+  "@changeDBMotor": {
+    "description": ""
+  },
+  "changeDBPrefix": "Módosítsa a táblázat előtagját",
+  "@changeDBPrefix": {
+    "description": ""
+  },
+  "settingsUserStorage": "Tárhely konfigurálása (helyi|OCI|AWS|Azure)",
+  "@settingsUserStorage": {
+    "description": ""
+  },
+  "IaActivate": "Állítsa be az interaktív natív AI-t",
+  "@IaActivate": {
+    "description": ""
+  },
+  "version": "Az aktuális verziót mutatja",
+  "@version": {
+    "description": ""
+  },
+  "helpPrint": "Mutasd meg ezt a segítséget",
+  "@helpPrint": {
+    "description": ""
+  }
+}

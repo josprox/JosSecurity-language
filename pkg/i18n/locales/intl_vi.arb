@@ -1,0 +1,87 @@
+{
+  "@@locale": "vi",
+  "startServerWeb": "Khởi động máy chủ web",
+  "@startServerWeb": {
+    "description": ""
+  },
+  "startProgramDesktop": "Khởi động ứng dụng ở chế độ máy tính để bàn",
+  "@startProgramDesktop": {
+    "description": ""
+  },
+  "runJossScript": "Chạy một tập lệnh joss",
+  "@runJossScript": {
+    "description": ""
+  },
+  "compileProjectDist": "Xây dựng dự án phân phối",
+  "@compileProjectDist": {
+    "description": ""
+  },
+  "CreateController": "Tạo bộ điều khiển mới",
+  "@CreateController": {
+    "description": ""
+  },
+  "CreateMiddleware": "Tạo phần mềm trung gian mới",
+  "@CreateMiddleware": {
+    "description": ""
+  },
+  "CreateModel": "Tạo một mô hình mới",
+  "@CreateModel": {
+    "description": ""
+  },
+  "CreateView": "Tạo chế độ xem mới",
+  "@CreateView": {
+    "description": ""
+  },
+  "CreateMVC": "Tạo MVC",
+  "@CreateMVC": {
+    "description": ""
+  },
+  "CreateCRUD": "Tạo CRUD hoàn chỉnh dựa trên bảng",
+  "@CreateCRUD": {
+    "description": ""
+  },
+  "removeCRUD": "Xóa CRUD được tạo cho bảng",
+  "@removeCRUD": {
+    "description": ""
+  },
+  "createMigration": "Tạo một di chuyển mới",
+  "@createMigration": {
+    "description": ""
+  },
+  "exeMigrate": "Chạy di chuyển đang chờ xử lý",
+  "@exeMigrate": {
+    "description": ""
+  },
+  "exeMigrateFresh": "Xóa tất cả các bảng và chạy lại quá trình di chuyển",
+  "@exeMigrateFresh": {
+    "description": ""
+  },
+  "createProject": "Tạo một dự án mới",
+  "@createProject": {
+    "description": ""
+  },
+  "changeDBMotor": "Thay đổi công cụ cơ sở dữ liệu (mysql/sqlite)",
+  "@changeDBMotor": {
+    "description": ""
+  },
+  "changeDBPrefix": "Thay đổi tiền tố bảng",
+  "@changeDBPrefix": {
+    "description": ""
+  },
+  "settingsUserStorage": "Định cấu hình bộ nhớ (cục bộ|OCI|AWS|Azure)",
+  "@settingsUserStorage": {
+    "description": ""
+  },
+  "IaActivate": "Thiết lập AI gốc tương tác",
+  "@IaActivate": {
+    "description": ""
+  },
+  "version": "Hiển thị phiên bản hiện tại",
+  "@version": {
+    "description": ""
+  },
+  "helpPrint": "Hiển thị trợ giúp này",
+  "@helpPrint": {
+    "description": ""
+  }
+}

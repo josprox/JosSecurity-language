@@ -1,0 +1,87 @@
+{
+  "@@locale": "fi",
+  "startServerWeb": "Käynnistä verkkopalvelin",
+  "@startServerWeb": {
+    "description": ""
+  },
+  "startProgramDesktop": "Käynnistä sovellus työpöytätilassa",
+  "@startProgramDesktop": {
+    "description": ""
+  },
+  "runJossScript": "Suorita joss-skripti",
+  "@runJossScript": {
+    "description": ""
+  },
+  "compileProjectDist": "Rakenna projekti jakelua varten",
+  "@compileProjectDist": {
+    "description": ""
+  },
+  "CreateController": "Luo uusi ohjain",
+  "@CreateController": {
+    "description": ""
+  },
+  "CreateMiddleware": "Luo uusi väliohjelmisto",
+  "@CreateMiddleware": {
+    "description": ""
+  },
+  "CreateModel": "Luo uusi malli",
+  "@CreateModel": {
+    "description": ""
+  },
+  "CreateView": "Luo uusi näkymä",
+  "@CreateView": {
+    "description": ""
+  },
+  "CreateMVC": "Luo MVC",
+  "@CreateMVC": {
+    "description": ""
+  },
+  "CreateCRUD": "Luo täydellinen CRUD taulukon perusteella",
+  "@CreateCRUD": {
+    "description": ""
+  },
+  "removeCRUD": "Poista taulukolle luotu CRUD",
+  "@removeCRUD": {
+    "description": ""
+  },
+  "createMigration": "Luo uusi siirto",
+  "@createMigration": {
+    "description": ""
+  },
+  "exeMigrate": "Suorita odottavat siirrot",
+  "@exeMigrate": {
+    "description": ""
+  },
+  "exeMigrateFresh": "Poista kaikki taulukot ja suorita siirrot uudelleen",
+  "@exeMigrateFresh": {
+    "description": ""
+  },
+  "createProject": "Luo uusi projekti",
+  "@createProject": {
+    "description": ""
+  },
+  "changeDBMotor": "Vaihda tietokantamoottori (mysql/sqlite)",
+  "@changeDBMotor": {
+    "description": ""
+  },
+  "changeDBPrefix": "Vaihda taulukon etuliite",
+  "@changeDBPrefix": {
+    "description": ""
+  },
+  "settingsUserStorage": "Määritä tallennustila (paikallinen|OCI|AWS|Azure)",
+  "@settingsUserStorage": {
+    "description": ""
+  },
+  "IaActivate": "Määritä interaktiivinen natiivi AI",
+  "@IaActivate": {
+    "description": ""
+  },
+  "version": "Näyttää nykyisen version",
+  "@version": {
+    "description": ""
+  },
+  "helpPrint": "Näytä tämä ohje",
+  "@helpPrint": {
+    "description": ""
+  }
+}

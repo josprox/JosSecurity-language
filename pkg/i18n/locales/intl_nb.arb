@@ -1,0 +1,87 @@
+{
+  "@@locale": "nb",
+  "startServerWeb": "Start webserveren",
+  "@startServerWeb": {
+    "description": ""
+  },
+  "startProgramDesktop": "Start programmet i skrivebordsmodus",
+  "@startProgramDesktop": {
+    "description": ""
+  },
+  "runJossScript": "Kjør et joss-script",
+  "@runJossScript": {
+    "description": ""
+  },
+  "compileProjectDist": "Bygg prosjektet for distribusjon",
+  "@compileProjectDist": {
+    "description": ""
+  },
+  "CreateController": "Opprett en ny kontroller",
+  "@CreateController": {
+    "description": ""
+  },
+  "CreateMiddleware": "Lag ny mellomvare",
+  "@CreateMiddleware": {
+    "description": ""
+  },
+  "CreateModel": "Lag en ny modell",
+  "@CreateModel": {
+    "description": ""
+  },
+  "CreateView": "Opprett en ny visning",
+  "@CreateView": {
+    "description": ""
+  },
+  "CreateMVC": "Opprett MVC",
+  "@CreateMVC": {
+    "description": ""
+  },
+  "CreateCRUD": "Lag komplett CRUD basert på en tabell",
+  "@CreateCRUD": {
+    "description": ""
+  },
+  "removeCRUD": "Fjern CRUD generert for en tabell",
+  "@removeCRUD": {
+    "description": ""
+  },
+  "createMigration": "Opprett en ny migrering",
+  "@createMigration": {
+    "description": ""
+  },
+  "exeMigrate": "Kjør ventende migreringer",
+  "@exeMigrate": {
+    "description": ""
+  },
+  "exeMigrateFresh": "Slett alle tabeller og kjør migreringer på nytt",
+  "@exeMigrateFresh": {
+    "description": ""
+  },
+  "createProject": "Opprett et nytt prosjekt",
+  "@createProject": {
+    "description": ""
+  },
+  "changeDBMotor": "Endre databasemotoren (mysql/sqlite)",
+  "@changeDBMotor": {
+    "description": ""
+  },
+  "changeDBPrefix": "Endre tabellprefikset",
+  "@changeDBPrefix": {
+    "description": ""
+  },
+  "settingsUserStorage": "Konfigurer lagring (lokal|OCI|AWS|Azure)",
+  "@settingsUserStorage": {
+    "description": ""
+  },
+  "IaActivate": "Sett opp interaktiv Native AI",
+  "@IaActivate": {
+    "description": ""
+  },
+  "version": "Viser gjeldende versjon",
+  "@version": {
+    "description": ""
+  },
+  "helpPrint": "Vis denne hjelpen",
+  "@helpPrint": {
+    "description": ""
+  }
+}

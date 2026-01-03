@@ -17,9 +17,7 @@ func (r *Runtime) executeServerControlMethod(instance *Instance, method string, 
 		fs := GlobalFileSystem
 
 		if ServerStartCallback != nil {
-			go func() {
-				ServerStartCallback(fs)
-			}()
+			ServerStartCallback(fs)
 		} else {
 			fmt.Println("[Server::start] Error: Server callback no registrado.")
 		}

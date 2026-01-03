@@ -1,0 +1,87 @@
+{
+  "@@locale": "zh",
+  "startServerWeb": "启动网络服务器",
+  "@startServerWeb": {
+    "description": ""
+  },
+  "startProgramDesktop": "以桌面模式启动应用程序",
+  "@startProgramDesktop": {
+    "description": ""
+  },
+  "runJossScript": "运行 joss 脚本",
+  "@runJossScript": {
+    "description": ""
+  },
+  "compileProjectDist": "构建用于分发的项目",
+  "@compileProjectDist": {
+    "description": ""
+  },
+  "CreateController": "创建一个新的控制器",
+  "@CreateController": {
+    "description": ""
+  },
+  "CreateMiddleware": "创建新的中间件",
+  "@CreateMiddleware": {
+    "description": ""
+  },
+  "CreateModel": "创建一个新模型",
+  "@CreateModel": {
+    "description": ""
+  },
+  "CreateView": "创建一个新视图",
+  "@CreateView": {
+    "description": ""
+  },
+  "CreateMVC": "创建MVC",
+  "@CreateMVC": {
+    "description": ""
+  },
+  "CreateCRUD": "基于表创建完整的CRUD",
+  "@CreateCRUD": {
+    "description": ""
+  },
+  "removeCRUD": "删除为表生成的 CRUD",
+  "@removeCRUD": {
+    "description": ""
+  },
+  "createMigration": "创建新的迁移",
+  "@createMigration": {
+    "description": ""
+  },
+  "exeMigrate": "运行待处理的迁移",
+  "@exeMigrate": {
+    "description": ""
+  },
+  "exeMigrateFresh": "删除所有表并重新运行迁移",
+  "@exeMigrateFresh": {
+    "description": ""
+  },
+  "createProject": "创建一个新项目",
+  "@createProject": {
+    "description": ""
+  },
+  "changeDBMotor": "更改数据库引擎（mysql/sqlite）",
+  "@changeDBMotor": {
+    "description": ""
+  },
+  "changeDBPrefix": "更改表前缀",
+  "@changeDBPrefix": {
+    "description": ""
+  },
+  "settingsUserStorage": "配置存储（本地|OCI|AWS|Azure）",
+  "@settingsUserStorage": {
+    "description": ""
+  },
+  "IaActivate": "设置交互式原生 AI",
+  "@IaActivate": {
+    "description": ""
+  },
+  "version": "显示当前版本",
+  "@version": {
+    "description": ""
+  },
+  "helpPrint": "显示此帮助",
+  "@helpPrint": {
+    "description": ""
+  }
+}

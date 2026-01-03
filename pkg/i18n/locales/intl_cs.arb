@@ -1,0 +1,87 @@
+{
+  "@@locale": "cs",
+  "startServerWeb": "Spusťte webový server",
+  "@startServerWeb": {
+    "description": ""
+  },
+  "startProgramDesktop": "Spusťte aplikaci v režimu plochy",
+  "@startProgramDesktop": {
+    "description": ""
+  },
+  "runJossScript": "Spusťte joss skript",
+  "@runJossScript": {
+    "description": ""
+  },
+  "compileProjectDist": "Sestavte projekt pro distribuci",
+  "@compileProjectDist": {
+    "description": ""
+  },
+  "CreateController": "Vytvořte nový ovladač",
+  "@CreateController": {
+    "description": ""
+  },
+  "CreateMiddleware": "Vytvořte nový middleware",
+  "@CreateMiddleware": {
+    "description": ""
+  },
+  "CreateModel": "Vytvořte nový model",
+  "@CreateModel": {
+    "description": ""
+  },
+  "CreateView": "Vytvořte nový pohled",
+  "@CreateView": {
+    "description": ""
+  },
+  "CreateMVC": "Vytvořte MVC",
+  "@CreateMVC": {
+    "description": ""
+  },
+  "CreateCRUD": "Vytvořte kompletní CRUD na základě tabulky",
+  "@CreateCRUD": {
+    "description": ""
+  },
+  "removeCRUD": "Odstraňte CRUD generovaný pro tabulku",
+  "@removeCRUD": {
+    "description": ""
+  },
+  "createMigration": "Vytvořte novou migraci",
+  "@createMigration": {
+    "description": ""
+  },
+  "exeMigrate": "Spusťte nevyřízené migrace",
+  "@exeMigrate": {
+    "description": ""
+  },
+  "exeMigrateFresh": "Odstraňte všechny tabulky a spusťte migraci znovu",
+  "@exeMigrateFresh": {
+    "description": ""
+  },
+  "createProject": "Vytvořte nový projekt",
+  "@createProject": {
+    "description": ""
+  },
+  "changeDBMotor": "Změňte databázový stroj (mysql/sqlite)",
+  "@changeDBMotor": {
+    "description": ""
+  },
+  "changeDBPrefix": "Změňte předponu tabulky",
+  "@changeDBPrefix": {
+    "description": ""
+  },
+  "settingsUserStorage": "Konfigurace úložiště (místní|OCI|AWS|Azure)",
+  "@settingsUserStorage": {
+    "description": ""
+  },
+  "IaActivate": "Nastavte interaktivní nativní umělou inteligenci",
+  "@IaActivate": {
+    "description": ""
+  },
+  "version": "Zobrazuje aktuální verzi",
+  "@version": {
+    "description": ""
+  },
+  "helpPrint": "Ukažte tuto nápovědu",
+  "@helpPrint": {
+    "description": ""
+  }
+}

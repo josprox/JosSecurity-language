@@ -1,0 +1,87 @@
+{
+  "@@locale": "en",
+  "startServerWeb": "Start the web server",
+  "@startServerWeb": {
+    "description": ""
+  },
+  "startProgramDesktop": "Start the application in desktop mode",
+  "@startProgramDesktop": {
+    "description": ""
+  },
+  "runJossScript": "Run a joss script",
+  "@runJossScript": {
+    "description": ""
+  },
+  "compileProjectDist": "Build the project for distribution",
+  "@compileProjectDist": {
+    "description": ""
+  },
+  "CreateController": "Create a new controller",
+  "@CreateController": {
+    "description": ""
+  },
+  "CreateMiddleware": "Create new middleware",
+  "@CreateMiddleware": {
+    "description": ""
+  },
+  "CreateModel": "Create a new model",
+  "@CreateModel": {
+    "description": ""
+  },
+  "CreateView": "Create a new view",
+  "@CreateView": {
+    "description": ""
+  },
+  "CreateMVC": "Create MVC",
+  "@CreateMVC": {
+    "description": ""
+  },
+  "CreateCRUD": "Create complete CRUD based on a table",
+  "@CreateCRUD": {
+    "description": ""
+  },
+  "removeCRUD": "Remove CRUD generated for a table",
+  "@removeCRUD": {
+    "description": ""
+  },
+  "createMigration": "Create a new migration",
+  "@createMigration": {
+    "description": ""
+  },
+  "exeMigrate": "Run pending migrations",
+  "@exeMigrate": {
+    "description": ""
+  },
+  "exeMigrateFresh": "Delete all tables and re-run migrations",
+  "@exeMigrateFresh": {
+    "description": ""
+  },
+  "createProject": "Create a new project",
+  "@createProject": {
+    "description": ""
+  },
+  "changeDBMotor": "Change the database engine (mysql/sqlite)",
+  "@changeDBMotor": {
+    "description": ""
+  },
+  "changeDBPrefix": "Change the table prefix",
+  "@changeDBPrefix": {
+    "description": ""
+  },
+  "settingsUserStorage": "Configure storage (local|OCI|AWS|Azure)",
+  "@settingsUserStorage": {
+    "description": ""
+  },
+  "IaActivate": "Set up interactive Native AI",
+  "@IaActivate": {
+    "description": ""
+  },
+  "version": "Shows the current version",
+  "@version": {
+    "description": ""
+  },
+  "helpPrint": "Show this help",
+  "@helpPrint": {
+    "description": ""
+  }
+}

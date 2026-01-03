@@ -1,0 +1,87 @@
+{
+  "@@locale": "tr",
+  "startServerWeb": "Web sunucusunu başlat",
+  "@startServerWeb": {
+    "description": ""
+  },
+  "startProgramDesktop": "Uygulamayı masaüstü modunda başlatın",
+  "@startProgramDesktop": {
+    "description": ""
+  },
+  "runJossScript": "Bir joss betiği çalıştır",
+  "@runJossScript": {
+    "description": ""
+  },
+  "compileProjectDist": "Dağıtım için projeyi oluşturun",
+  "@compileProjectDist": {
+    "description": ""
+  },
+  "CreateController": "Yeni bir denetleyici oluştur",
+  "@CreateController": {
+    "description": ""
+  },
+  "CreateMiddleware": "Yeni ara katman yazılımı oluşturun",
+  "@CreateMiddleware": {
+    "description": ""
+  },
+  "CreateModel": "Yeni bir model oluştur",
+  "@CreateModel": {
+    "description": ""
+  },
+  "CreateView": "Yeni bir görünüm oluştur",
+  "@CreateView": {
+    "description": ""
+  },
+  "CreateMVC": "MVC oluştur",
+  "@CreateMVC": {
+    "description": ""
+  },
+  "CreateCRUD": "Bir tabloya dayalı tam CRUD oluşturun",
+  "@CreateCRUD": {
+    "description": ""
+  },
+  "removeCRUD": "Bir tablo için oluşturulan CRUD'u kaldırın",
+  "@removeCRUD": {
+    "description": ""
+  },
+  "createMigration": "Yeni bir taşıma oluştur",
+  "@createMigration": {
+    "description": ""
+  },
+  "exeMigrate": "Bekleyen taşıma işlemlerini çalıştır",
+  "@exeMigrate": {
+    "description": ""
+  },
+  "exeMigrateFresh": "Tüm tabloları silin ve taşıma işlemlerini yeniden çalıştırın",
+  "@exeMigrateFresh": {
+    "description": ""
+  },
+  "createProject": "Yeni bir proje oluştur",
+  "@createProject": {
+    "description": ""
+  },
+  "changeDBMotor": "Veritabanı motorunu değiştirin (mysql/sqlite)",
+  "@changeDBMotor": {
+    "description": ""
+  },
+  "changeDBPrefix": "Tablo önekini değiştirme",
+  "@changeDBPrefix": {
+    "description": ""
+  },
+  "settingsUserStorage": "Depolamayı yapılandırın (yerel|OCI|AWS|Azure)",
+  "@settingsUserStorage": {
+    "description": ""
+  },
+  "IaActivate": "Etkileşimli Yerel Yapay Zekayı ayarlayın",
+  "@IaActivate": {
+    "description": ""
+  },
+  "version": "Geçerli sürümü gösterir",
+  "@version": {
+    "description": ""
+  },
+  "helpPrint": "Bu yardımı göster",
+  "@helpPrint": {
+    "description": ""
+  }
+}

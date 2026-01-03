@@ -11,6 +11,7 @@ import (
 
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/jossecurity/joss/pkg/crypto"
+	"github.com/jossecurity/joss/pkg/i18n"
 	"github.com/jossecurity/joss/pkg/parser"
 	"github.com/jossecurity/joss/pkg/version"
 	_ "modernc.org/sqlite"
@@ -145,6 +146,9 @@ func (r *Runtime) Fork() *Runtime {
 // LoadEnv loads environment variables from env.joss
 func (r *Runtime) LoadEnv(fs http.FileSystem) {
 	fmt.Println("[Security] Cargando entorno...")
+
+	// Initialize I18n
+	i18n.GlobalManager.Load(fs)
 
 	var content []byte
 	var err error

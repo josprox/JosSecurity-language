@@ -3,7 +3,10 @@ package main
 import (
 	"fmt"
 	"io/ioutil"
+	"os"
 	"strings"
+
+	"github.com/jossecurity/joss/pkg/i18n"
 )
 
 func readEnvFile(path string) map[string]string {
@@ -42,27 +45,56 @@ func updateEnvFile(path, key, value string) {
 }
 
 func printHelp() {
+	// Try to load translations (silently fails if l10n is missing)
+	// Simple locale detection
+	locale := os.Getenv("JOSS_LANG")
+	if locale == "" {
+		// Try to detect from system LANG (Unix/Linux/Mac/GitBash)
+		// Format: en_US.UTF-8, ja_JP, etc.
+		sysLang := os.Getenv("LANG")
+		if sysLang != "" {
+			// Extract first part (e.g., "ja" from "ja_JP.UTF-8")
+			parts := strings.FieldsFunc(sysLang, func(r rune) bool {
+				return r == '_' || r == '.'
+			})
+			if len(parts) > 0 {
+				locale = parts[0]
+			}
+		}
+	}
+
+	if locale == "" {
+		locale = "en" // User requested default
+	}
+
+	// Load all available locales from disk
+	i18n.GlobalManager.Load(nil)
+
+	tr := func(key string) string {
+		return i18n.GlobalManager.Get(locale, key, nil)
+	}
+
 	fmt.Println("Uso: joss [comando] [argumentos]")
 	fmt.Println("Comandos disponibles:")
-	fmt.Println("  server start            - Inicia el servidor web")
-	fmt.Println("  program start           - Inicia la aplicación en modo escritorio")
-	fmt.Println("  run [archivo]           - Ejecuta un script .joss")
-	fmt.Println("  build [web|program]     - Compila el proyecto para distribución")
-	fmt.Println("  make:controller [Name]  - Crea un nuevo controlador")
-	fmt.Println("  make:middleware [Name]  - Crea un nuevo middleware")
-	fmt.Println("  make:model [Name]       - Crea un nuevo modelo")
-	fmt.Println("  make:view [Name]        - Crea una nueva vista (solo web)")
-	fmt.Println("  make:mvc [Name]         - Crea Modelo, Vista y Controlador")
-	fmt.Println("  make:crud [Tabla]       - Crea CRUD completo basado en tabla")
-	fmt.Println("  remove:crud [Tabla]     - Elimina el CRUD generado para una tabla")
-	fmt.Println("  make:migration [Name]   - Crea una nueva migración")
-	fmt.Println("  migrate                 - Ejecuta migraciones pendientes")
-	fmt.Println("  migrate:fresh           - Elimina todas las tablas y re-ejecuta migraciones")
-	fmt.Println("  new [web|console] [path]- Crea un nuevo proyecto")
-	fmt.Println("  change db [motor]       - Cambia el motor de base de datos (mysql/sqlite)")
-	fmt.Println("  change db prefix [pref] - Cambia el prefijo de las tablas")
-	fmt.Println("  userstorage [provider]  - Configura almacenamiento (local|OCI|AWS|Azure)")
-	fmt.Println("  ai:activate             - Configura la IA Nativa interactiva")
-	fmt.Println("  version                 - Muestra la versión actual")
-	fmt.Println("  help                    - Muestra esta ayuda")
+	fmt.Printf("  server start            - %s\n", tr("startServerWeb"))
+	fmt.Printf("  program start           - %s\n", tr("startProgramDesktop"))
+	fmt.Printf("  run [archivo]           - %s\n", tr("runJossScript"))
+	fmt.Printf("  build [web|program]     - %s\n", tr("compileProjectDist"))
+	fmt.Printf("  make:controller [Name]  - %s\n", tr("CreateController"))
+	fmt.Printf("  make:middleware [Name]  - %s\n", tr("CreateMiddleware"))
+	fmt.Printf("  make:model [Name]       - %s\n", tr("CreateModel"))
+	fmt.Printf("  make:view [Name]        - %s\n", tr("CreateView"))
+	fmt.Printf("  make:mvc [Name]         - %s\n", tr("CreateMVC"))
+	fmt.Printf("  make:crud [Tabla]       - %s\n", tr("CreateCRUD"))
+	fmt.Printf("  remove:crud [Tabla]     - %s\n", tr("removeCRUD"))
+	fmt.Printf("  make:migration [Name]   - %s\n", tr("createMigration"))
+	fmt.Printf("  migrate                 - %s\n", tr("exeMigrate"))
+	fmt.Printf("  migrate:fresh           - %s\n", tr("exeMigrateFresh"))
+	fmt.Printf("  new [web|console] [path]- %s\n", tr("createProject"))
+	fmt.Printf("  change db [motor]       - %s\n", tr("changeDBMotor"))
+	fmt.Printf("  change db prefix [pref] - %s\n", tr("changeDBPrefix"))
+	fmt.Printf("  userstorage [provider]  - %s\n", tr("settingsUserStorage"))
+	fmt.Printf("  ai:activate             - %s\n", tr("IaActivate"))
+	fmt.Printf("  version                 - %s\n", tr("version"))
+	fmt.Printf("  help                    - %s\n", tr("helpPrint"))
 }

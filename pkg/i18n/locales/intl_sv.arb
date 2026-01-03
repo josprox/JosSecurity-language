@@ -1,0 +1,87 @@
+{
+  "@@locale": "sv",
+  "startServerWeb": "Starta webbservern",
+  "@startServerWeb": {
+    "description": ""
+  },
+  "startProgramDesktop": "Starta programmet i skrivbordsläge",
+  "@startProgramDesktop": {
+    "description": ""
+  },
+  "runJossScript": "Kör ett joss-script",
+  "@runJossScript": {
+    "description": ""
+  },
+  "compileProjectDist": "Bygg projektet för distribution",
+  "@compileProjectDist": {
+    "description": ""
+  },
+  "CreateController": "Skapa en ny styrenhet",
+  "@CreateController": {
+    "description": ""
+  },
+  "CreateMiddleware": "Skapa ny mellanprogram",
+  "@CreateMiddleware": {
+    "description": ""
+  },
+  "CreateModel": "Skapa en ny modell",
+  "@CreateModel": {
+    "description": ""
+  },
+  "CreateView": "Skapa en ny vy",
+  "@CreateView": {
+    "description": ""
+  },
+  "CreateMVC": "Skapa MVC",
+  "@CreateMVC": {
+    "description": ""
+  },
+  "CreateCRUD": "Skapa komplett CRUD baserat på en tabell",
+  "@CreateCRUD": {
+    "description": ""
+  },
+  "removeCRUD": "Ta bort CRUD som genererats för en tabell",
+  "@removeCRUD": {
+    "description": ""
+  },
+  "createMigration": "Skapa en ny migrering",
+  "@createMigration": {
+    "description": ""
+  },
+  "exeMigrate": "Kör väntande migrering",
+  "@exeMigrate": {
+    "description": ""
+  },
+  "exeMigrateFresh": "Ta bort alla tabeller och kör om migreringarna",
+  "@exeMigrateFresh": {
+    "description": ""
+  },
+  "createProject": "Skapa ett nytt projekt",
+  "@createProject": {
+    "description": ""
+  },
+  "changeDBMotor": "Ändra databasmotorn (mysql/sqlite)",
+  "@changeDBMotor": {
+    "description": ""
+  },
+  "changeDBPrefix": "Ändra tabellprefixet",
+  "@changeDBPrefix": {
+    "description": ""
+  },
+  "settingsUserStorage": "Konfigurera lagring (lokal|OCI|AWS|Azure)",
+  "@settingsUserStorage": {
+    "description": ""
+  },
+  "IaActivate": "Konfigurera interaktiv Native AI",
+  "@IaActivate": {
+    "description": ""
+  },
+  "version": "Visar den aktuella versionen",
+  "@version": {
+    "description": ""
+  },
+  "helpPrint": "Visa denna hjälp",
+  "@helpPrint": {
+    "description": ""
+  }
+}

@@ -33,6 +33,9 @@ mi_proyecto/
 ├── config/
 │   ├── reglas.joss        # Constantes globales
 │   └── cron.joss          # Tareas programadas
+├── l10n/                   # Traducciones (I18n)
+│   ├── intl_es.arb
+│   └── intl_en.arb
 ├── app/
 │   ├── controllers/       # Lógica de negocio
 │   │   ├── HomeController.joss

@@ -1,0 +1,87 @@
+{
+  "@@locale": "bn",
+  "startServerWeb": "ওয়েব সার্ভার শুরু করুন",
+  "@startServerWeb": {
+    "description": ""
+  },
+  "startProgramDesktop": "ডেস্কটপ মোডে অ্যাপ্লিকেশন শুরু করুন",
+  "@startProgramDesktop": {
+    "description": ""
+  },
+  "runJossScript": "একটি জস স্ক্রিপ্ট চালান",
+  "@runJossScript": {
+    "description": ""
+  },
+  "compileProjectDist": "বিতরণের জন্য প্রকল্প তৈরি করুন",
+  "@compileProjectDist": {
+    "description": ""
+  },
+  "CreateController": "একটি নতুন নিয়ামক তৈরি করুন",
+  "@CreateController": {
+    "description": ""
+  },
+  "CreateMiddleware": "নতুন মিডলওয়্যার তৈরি করুন",
+  "@CreateMiddleware": {
+    "description": ""
+  },
+  "CreateModel": "একটি নতুন মডেল তৈরি করুন",
+  "@CreateModel": {
+    "description": ""
+  },
+  "CreateView": "একটি নতুন ভিউ তৈরি করুন",
+  "@CreateView": {
+    "description": ""
+  },
+  "CreateMVC": "MVC তৈরি করুন",
+  "@CreateMVC": {
+    "description": ""
+  },
+  "CreateCRUD": "একটি টেবিলের উপর ভিত্তি করে সম্পূর্ণ CRUD তৈরি করুন",
+  "@CreateCRUD": {
+    "description": ""
+  },
+  "removeCRUD": "একটি টেবিলের জন্য তৈরি করা CRUD সরান",
+  "@removeCRUD": {
+    "description": ""
+  },
+  "createMigration": "একটি নতুন মাইগ্রেশন তৈরি করুন",
+  "@createMigration": {
+    "description": ""
+  },
+  "exeMigrate": "মুলতুবি মাইগ্রেশন চালান",
+  "@exeMigrate": {
+    "description": ""
+  },
+  "exeMigrateFresh": "সমস্ত টেবিল মুছুন এবং পুনরায় মাইগ্রেশন চালান",
+  "@exeMigrateFresh": {
+    "description": ""
+  },
+  "createProject": "একটি নতুন প্রকল্প তৈরি করুন",
+  "@createProject": {
+    "description": ""
+  },
+  "changeDBMotor": "ডাটাবেস ইঞ্জিন পরিবর্তন করুন (mysql/sqlite)",
+  "@changeDBMotor": {
+    "description": ""
+  },
+  "changeDBPrefix": "টেবিলের উপসর্গ পরিবর্তন করুন",
+  "@changeDBPrefix": {
+    "description": ""
+  },
+  "settingsUserStorage": "স্টোরেজ কনফিগার করুন (স্থানীয়|OCI|AWS| Azure)",
+  "@settingsUserStorage": {
+    "description": ""
+  },
+  "IaActivate": "ইন্টারেক্টিভ নেটিভ এআই সেট আপ করুন",
+  "@IaActivate": {
+    "description": ""
+  },
+  "version": "বর্তমান সংস্করণ দেখায়",
+  "@version": {
+    "description": ""
+  },
+  "helpPrint": "এই সাহায্য দেখান",
+  "@helpPrint": {
+    "description": ""
+  }
+}

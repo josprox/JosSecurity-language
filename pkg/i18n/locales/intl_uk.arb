@@ -1,0 +1,87 @@
+{
+  "@@locale": "uk",
+  "startServerWeb": "Запустіть веб-сервер",
+  "@startServerWeb": {
+    "description": ""
+  },
+  "startProgramDesktop": "Запустіть програму в режимі робочого столу",
+  "@startProgramDesktop": {
+    "description": ""
+  },
+  "runJossScript": "Запустіть сценарій joss",
+  "@runJossScript": {
+    "description": ""
+  },
+  "compileProjectDist": "Створіть проект для розповсюдження",
+  "@compileProjectDist": {
+    "description": ""
+  },
+  "CreateController": "Створіть новий контролер",
+  "@CreateController": {
+    "description": ""
+  },
+  "CreateMiddleware": "Створення нового проміжного ПЗ",
+  "@CreateMiddleware": {
+    "description": ""
+  },
+  "CreateModel": "Створіть нову модель",
+  "@CreateModel": {
+    "description": ""
+  },
+  "CreateView": "Створіть новий перегляд",
+  "@CreateView": {
+    "description": ""
+  },
+  "CreateMVC": "Створіть MVC",
+  "@CreateMVC": {
+    "description": ""
+  },
+  "CreateCRUD": "Створіть повний CRUD на основі таблиці",
+  "@CreateCRUD": {
+    "description": ""
+  },
+  "removeCRUD": "Видаліть CRUD, згенерований для таблиці",
+  "@removeCRUD": {
+    "description": ""
+  },
+  "createMigration": "Створіть нову міграцію",
+  "@createMigration": {
+    "description": ""
+  },
+  "exeMigrate": "Виконати незавершені міграції",
+  "@exeMigrate": {
+    "description": ""
+  },
+  "exeMigrateFresh": "Видаліть усі таблиці та повторно запустіть міграції",
+  "@exeMigrateFresh": {
+    "description": ""
+  },
+  "createProject": "Створіть новий проект",
+  "@createProject": {
+    "description": ""
+  },
+  "changeDBMotor": "Змінити механізм бази даних (mysql/sqlite)",
+  "@changeDBMotor": {
+    "description": ""
+  },
+  "changeDBPrefix": "Змініть префікс таблиці",
+  "@changeDBPrefix": {
+    "description": ""
+  },
+  "settingsUserStorage": "Налаштувати сховище (локальний|OCI|AWS|Azure)",
+  "@settingsUserStorage": {
+    "description": ""
+  },
+  "IaActivate": "Налаштуйте інтерактивний рідний AI",
+  "@IaActivate": {
+    "description": ""
+  },
+  "version": "Показує поточну версію",
+  "@version": {
+    "description": ""
+  },
+  "helpPrint": "Покажіть цю довідку",
+  "@helpPrint": {
+    "description": ""
+  }
+}

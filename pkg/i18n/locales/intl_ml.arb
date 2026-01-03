@@ -1,0 +1,87 @@
+{
+  "@@locale": "ml",
+  "startServerWeb": "വെബ് സെർവർ ആരംഭിക്കുക",
+  "@startServerWeb": {
+    "description": ""
+  },
+  "startProgramDesktop": "ഡെസ്ക്ടോപ്പ് മോഡിൽ ആപ്ലിക്കേഷൻ ആരംഭിക്കുക",
+  "@startProgramDesktop": {
+    "description": ""
+  },
+  "runJossScript": "ഒരു ജോസ് സ്ക്രിപ്റ്റ് പ്രവർത്തിപ്പിക്കുക",
+  "@runJossScript": {
+    "description": ""
+  },
+  "compileProjectDist": "വിതരണത്തിനായി പദ്ധതി നിർമ്മിക്കുക",
+  "@compileProjectDist": {
+    "description": ""
+  },
+  "CreateController": "ഒരു പുതിയ കൺട്രോളർ സൃഷ്ടിക്കുക",
+  "@CreateController": {
+    "description": ""
+  },
+  "CreateMiddleware": "പുതിയ മിഡിൽവെയർ സൃഷ്ടിക്കുക",
+  "@CreateMiddleware": {
+    "description": ""
+  },
+  "CreateModel": "ഒരു പുതിയ മോഡൽ സൃഷ്ടിക്കുക",
+  "@CreateModel": {
+    "description": ""
+  },
+  "CreateView": "ഒരു പുതിയ കാഴ്ച സൃഷ്ടിക്കുക",
+  "@CreateView": {
+    "description": ""
+  },
+  "CreateMVC": "MVC സൃഷ്ടിക്കുക",
+  "@CreateMVC": {
+    "description": ""
+  },
+  "CreateCRUD": "ഒരു പട്ടികയെ അടിസ്ഥാനമാക്കി പൂർണ്ണമായ CRUD സൃഷ്ടിക്കുക",
+  "@CreateCRUD": {
+    "description": ""
+  },
+  "removeCRUD": "ഒരു ടേബിളിനായി സൃഷ്ടിച്ച CRUD നീക്കം ചെയ്യുക",
+  "@removeCRUD": {
+    "description": ""
+  },
+  "createMigration": "ഒരു പുതിയ മൈഗ്രേഷൻ സൃഷ്ടിക്കുക",
+  "@createMigration": {
+    "description": ""
+  },
+  "exeMigrate": "തീർപ്പാക്കാത്ത മൈഗ്രേഷനുകൾ പ്രവർത്തിപ്പിക്കുക",
+  "@exeMigrate": {
+    "description": ""
+  },
+  "exeMigrateFresh": "എല്ലാ പട്ടികകളും ഇല്ലാതാക്കി മൈഗ്രേഷനുകൾ വീണ്ടും പ്രവർത്തിപ്പിക്കുക",
+  "@exeMigrateFresh": {
+    "description": ""
+  },
+  "createProject": "ഒരു പുതിയ പ്രോജക്റ്റ് സൃഷ്ടിക്കുക",
+  "@createProject": {
+    "description": ""
+  },
+  "changeDBMotor": "ഡാറ്റാബേസ് എഞ്ചിൻ മാറ്റുക (mysql/sqlite)",
+  "@changeDBMotor": {
+    "description": ""
+  },
+  "changeDBPrefix": "പട്ടിക പ്രിഫിക്സ് മാറ്റുക",
+  "@changeDBPrefix": {
+    "description": ""
+  },
+  "settingsUserStorage": "സംഭരണം കോൺഫിഗർ ചെയ്യുക (പ്രാദേശിക|OCI|AWS|Azure)",
+  "@settingsUserStorage": {
+    "description": ""
+  },
+  "IaActivate": "ഇൻ്ററാക്ടീവ് നേറ്റീവ് AI സജ്ജീകരിക്കുക",
+  "@IaActivate": {
+    "description": ""
+  },
+  "version": "നിലവിലെ പതിപ്പ് കാണിക്കുന്നു",
+  "@version": {
+    "description": ""
+  },
+  "helpPrint": "ഈ സഹായം കാണിക്കൂ",
+  "@helpPrint": {
+    "description": ""
+  }
+}

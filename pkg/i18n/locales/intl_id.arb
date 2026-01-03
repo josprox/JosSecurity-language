@@ -1,0 +1,87 @@
+{
+  "@@locale": "id",
+  "startServerWeb": "Mulai server web",
+  "@startServerWeb": {
+    "description": ""
+  },
+  "startProgramDesktop": "Mulai aplikasi dalam mode desktop",
+  "@startProgramDesktop": {
+    "description": ""
+  },
+  "runJossScript": "Jalankan skrip joss",
+  "@runJossScript": {
+    "description": ""
+  },
+  "compileProjectDist": "Bangun proyek untuk distribusi",
+  "@compileProjectDist": {
+    "description": ""
+  },
+  "CreateController": "Buat pengontrol baru",
+  "@CreateController": {
+    "description": ""
+  },
+  "CreateMiddleware": "Buat middleware baru",
+  "@CreateMiddleware": {
+    "description": ""
+  },
+  "CreateModel": "Buat model baru",
+  "@CreateModel": {
+    "description": ""
+  },
+  "CreateView": "Buat tampilan baru",
+  "@CreateView": {
+    "description": ""
+  },
+  "CreateMVC": "Buat MVC",
+  "@CreateMVC": {
+    "description": ""
+  },
+  "CreateCRUD": "Buat CRUD lengkap berdasarkan tabel",
+  "@CreateCRUD": {
+    "description": ""
+  },
+  "removeCRUD": "Hapus CRUD yang dihasilkan untuk sebuah tabel",
+  "@removeCRUD": {
+    "description": ""
+  },
+  "createMigration": "Buat migrasi baru",
+  "@createMigration": {
+    "description": ""
+  },
+  "exeMigrate": "Jalankan migrasi yang tertunda",
+  "@exeMigrate": {
+    "description": ""
+  },
+  "exeMigrateFresh": "Hapus semua tabel dan jalankan kembali migrasi",
+  "@exeMigrateFresh": {
+    "description": ""
+  },
+  "createProject": "Buat proyek baru",
+  "@createProject": {
+    "description": ""
+  },
+  "changeDBMotor": "Mengubah mesin database (mysql/sqlite)",
+  "@changeDBMotor": {
+    "description": ""
+  },
+  "changeDBPrefix": "Ubah awalan tabel",
+  "@changeDBPrefix": {
+    "description": ""
+  },
+  "settingsUserStorage": "Konfigurasikan penyimpanan (lokal|OCI|AWS|Azure)",
+  "@settingsUserStorage": {
+    "description": ""
+  },
+  "IaActivate": "Siapkan AI Asli yang interaktif",
+  "@IaActivate": {
+    "description": ""
+  },
+  "version": "Menampilkan versi saat ini",
+  "@version": {
+    "description": ""
+  },
+  "helpPrint": "Tunjukkan bantuan ini",
+  "@helpPrint": {
+    "description": ""
+  }
+}

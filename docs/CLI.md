@@ -13,6 +13,20 @@ Guía completa de todos los comandos disponibles en la línea de comandos de Jos
 
 ## Gestión de Proyectos
 
+### Idioma del CLI
+El CLI detecta automáticamente el idioma de tu sistema (`LANG`).
+Puedes forzar un idioma específico usando la variable de entorno `JOSS_LANG`:
+
+```bash
+# Forzar inglés
+export JOSS_LANG=en
+joss help
+
+# Forzar español
+export JOSS_LANG=es
+joss help
+```
+
 ### `joss new [ruta]`
 
 Crea un nuevo proyecto web con estructura completa.

@@ -78,6 +78,21 @@ func MainHandler(w http.ResponseWriter, r *http.Request) {
 
 	// rt.LoadEnv(core.GlobalFileSystem) // Fork already has Env copied
 
+	// Detect Locale from Header
+	acceptLang := r.Header.Get("Accept-Language")
+	if acceptLang != "" {
+		// Simple parser: first entry (e.g. "es-MX,es;q=0.9,en;q=0.8") -> "es-MX"
+		parts := strings.Split(acceptLang, ",")
+		if len(parts) > 0 {
+			first := strings.TrimSpace(parts[0])
+			// Remove quality value if present (though usually quality is in subsequent parts, but better safe)
+			first = strings.Split(first, ";")[0]
+			rt.SetLocale(first)
+		}
+	} else {
+		rt.SetLocale("en") // Default
+	}
+
 	// 2. Rate Limiting (60 req/min)
 	ip := r.Header.Get("X-Forwarded-For")
 	if ip == "" {

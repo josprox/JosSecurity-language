@@ -1,0 +1,87 @@
+{
+  "@@locale": "bg",
+  "startServerWeb": "Стартирайте уеб сървъра",
+  "@startServerWeb": {
+    "description": ""
+  },
+  "startProgramDesktop": "Стартирайте приложението в десктоп режим",
+  "@startProgramDesktop": {
+    "description": ""
+  },
+  "runJossScript": "Стартирайте скрипт за joss",
+  "@runJossScript": {
+    "description": ""
+  },
+  "compileProjectDist": "Изградете проекта за разпространение",
+  "@compileProjectDist": {
+    "description": ""
+  },
+  "CreateController": "Създайте нов контролер",
+  "@CreateController": {
+    "description": ""
+  },
+  "CreateMiddleware": "Създайте нов междинен софтуер",
+  "@CreateMiddleware": {
+    "description": ""
+  },
+  "CreateModel": "Създайте нов модел",
+  "@CreateModel": {
+    "description": ""
+  },
+  "CreateView": "Създайте нов изглед",
+  "@CreateView": {
+    "description": ""
+  },
+  "CreateMVC": "Създайте MVC",
+  "@CreateMVC": {
+    "description": ""
+  },
+  "CreateCRUD": "Създайте пълен CRUD въз основа на таблица",
+  "@CreateCRUD": {
+    "description": ""
+  },
+  "removeCRUD": "Премахнете CRUD, генериран за таблица",
+  "@removeCRUD": {
+    "description": ""
+  },
+  "createMigration": "Създайте нова миграция",
+  "@createMigration": {
+    "description": ""
+  },
+  "exeMigrate": "Изпълнение на чакащи миграции",
+  "@exeMigrate": {
+    "description": ""
+  },
+  "exeMigrateFresh": "Изтрийте всички таблици и изпълнете отново миграциите",
+  "@exeMigrateFresh": {
+    "description": ""
+  },
+  "createProject": "Създайте нов проект",
+  "@createProject": {
+    "description": ""
+  },
+  "changeDBMotor": "Променете двигателя на базата данни (mysql/sqlite)",
+  "@changeDBMotor": {
+    "description": ""
+  },
+  "changeDBPrefix": "Променете префикса на таблицата",
+  "@changeDBPrefix": {
+    "description": ""
+  },
+  "settingsUserStorage": "Конфигуриране на хранилище (локално|OCI|AWS|Azure)",
+  "@settingsUserStorage": {
+    "description": ""
+  },
+  "IaActivate": "Настройте интерактивен собствен AI",
+  "@IaActivate": {
+    "description": ""
+  },
+  "version": "Показва текущата версия",
+  "@version": {
+    "description": ""
+  },
+  "helpPrint": "Покажете тази помощ",
+  "@helpPrint": {
+    "description": ""
+  }
+}

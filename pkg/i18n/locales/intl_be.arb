@@ -1,0 +1,87 @@
+{
+  "@@locale": "be",
+  "startServerWeb": "Запусціце вэб-сервер",
+  "@startServerWeb": {
+    "description": ""
+  },
+  "startProgramDesktop": "Запусціце прыкладанне ў рэжыме працоўнага стала",
+  "@startProgramDesktop": {
+    "description": ""
+  },
+  "runJossScript": "Запусціце скрыпт joss",
+  "@runJossScript": {
+    "description": ""
+  },
+  "compileProjectDist": "Стварыце праект для распаўсюджвання",
+  "@compileProjectDist": {
+    "description": ""
+  },
+  "CreateController": "Стварыце новы кантролер",
+  "@CreateController": {
+    "description": ""
+  },
+  "CreateMiddleware": "Стварыце новае прамежкавае праграмнае забеспячэнне",
+  "@CreateMiddleware": {
+    "description": ""
+  },
+  "CreateModel": "Стварыце новую мадэль",
+  "@CreateModel": {
+    "description": ""
+  },
+  "CreateView": "Стварыце новы від",
+  "@CreateView": {
+    "description": ""
+  },
+  "CreateMVC": "Стварыце MVC",
+  "@CreateMVC": {
+    "description": ""
+  },
+  "CreateCRUD": "Стварыце поўны CRUD на аснове табліцы",
+  "@CreateCRUD": {
+    "description": ""
+  },
+  "removeCRUD": "Выдаліць CRUD, створаны для табліцы",
+  "@removeCRUD": {
+    "description": ""
+  },
+  "createMigration": "Стварыце новую міграцыю",
+  "@createMigration": {
+    "description": ""
+  },
+  "exeMigrate": "Запусціць незавершаныя міграцыі",
+  "@exeMigrate": {
+    "description": ""
+  },
+  "exeMigrateFresh": "Выдаліць усе табліцы і паўторна запусціць міграцыі",
+  "@exeMigrateFresh": {
+    "description": ""
+  },
+  "createProject": "Стварыце новы праект",
+  "@createProject": {
+    "description": ""
+  },
+  "changeDBMotor": "Змяніць механізм базы дадзеных (mysql/sqlite)",
+  "@changeDBMotor": {
+    "description": ""
+  },
+  "changeDBPrefix": "Змяніць прэфікс табліцы",
+  "@changeDBPrefix": {
+    "description": ""
+  },
+  "settingsUserStorage": "Наладзьце сховішча (лакальны|OCI|AWS|Azure)",
+  "@settingsUserStorage": {
+    "description": ""
+  },
+  "IaActivate": "Наладзьце інтэрактыўны Native AI",
+  "@IaActivate": {
+    "description": ""
+  },
+  "version": "Паказвае бягучую версію",
+  "@version": {
+    "description": ""
+  },
+  "helpPrint": "Пакажыце гэтую дапамогу",
+  "@helpPrint": {
+    "description": ""
+  }
+}

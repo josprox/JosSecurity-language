@@ -1,0 +1,87 @@
+{
+  "@@locale": "ru",
+  "startServerWeb": "Запустить веб-сервер",
+  "@startServerWeb": {
+    "description": ""
+  },
+  "startProgramDesktop": "Запустите приложение в режиме рабочего стола",
+  "@startProgramDesktop": {
+    "description": ""
+  },
+  "runJossScript": "Запустить joss-скрипт",
+  "@runJossScript": {
+    "description": ""
+  },
+  "compileProjectDist": "Сборка проекта для распространения",
+  "@compileProjectDist": {
+    "description": ""
+  },
+  "CreateController": "Создать новый контроллер",
+  "@CreateController": {
+    "description": ""
+  },
+  "CreateMiddleware": "Создать новое промежуточное программное обеспечение",
+  "@CreateMiddleware": {
+    "description": ""
+  },
+  "CreateModel": "Создать новую модель",
+  "@CreateModel": {
+    "description": ""
+  },
+  "CreateView": "Создать новое представление",
+  "@CreateView": {
+    "description": ""
+  },
+  "CreateMVC": "Создать MVC",
+  "@CreateMVC": {
+    "description": ""
+  },
+  "CreateCRUD": "Создайте полный CRUD на основе таблицы",
+  "@CreateCRUD": {
+    "description": ""
+  },
+  "removeCRUD": "Удалить CRUD, созданный для таблицы",
+  "@removeCRUD": {
+    "description": ""
+  },
+  "createMigration": "Создать новую миграцию",
+  "@createMigration": {
+    "description": ""
+  },
+  "exeMigrate": "Запуск ожидающих миграций",
+  "@exeMigrate": {
+    "description": ""
+  },
+  "exeMigrateFresh": "Удалите все таблицы и повторите миграцию.",
+  "@exeMigrateFresh": {
+    "description": ""
+  },
+  "createProject": "Создать новый проект",
+  "@createProject": {
+    "description": ""
+  },
+  "changeDBMotor": "Измените ядро ​​базы данных (mysql/sqlite)",
+  "@changeDBMotor": {
+    "description": ""
+  },
+  "changeDBPrefix": "Изменить префикс таблицы",
+  "@changeDBPrefix": {
+    "description": ""
+  },
+  "settingsUserStorage": "Настроить хранилище (локальное|OCI|AWS|Azure)",
+  "@settingsUserStorage": {
+    "description": ""
+  },
+  "IaActivate": "Настройте интерактивный Native AI",
+  "@IaActivate": {
+    "description": ""
+  },
+  "version": "Показывает текущую версию",
+  "@version": {
+    "description": ""
+  },
+  "helpPrint": "Показать эту помощь",
+  "@helpPrint": {
+    "description": ""
+  }
+}

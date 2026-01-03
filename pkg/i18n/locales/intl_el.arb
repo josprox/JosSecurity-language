@@ -1,0 +1,87 @@
+{
+  "@@locale": "el",
+  "startServerWeb": "Εκκινήστε τον διακομιστή web",
+  "@startServerWeb": {
+    "description": ""
+  },
+  "startProgramDesktop": "Εκκινήστε την εφαρμογή σε λειτουργία επιφάνειας εργασίας",
+  "@startProgramDesktop": {
+    "description": ""
+  },
+  "runJossScript": "Εκτελέστε ένα σενάριο Joss",
+  "@runJossScript": {
+    "description": ""
+  },
+  "compileProjectDist": "Κατασκευάστε το έργο για διανομή",
+  "@compileProjectDist": {
+    "description": ""
+  },
+  "CreateController": "Δημιουργήστε ένα νέο χειριστήριο",
+  "@CreateController": {
+    "description": ""
+  },
+  "CreateMiddleware": "Δημιουργήστε νέο ενδιάμεσο λογισμικό",
+  "@CreateMiddleware": {
+    "description": ""
+  },
+  "CreateModel": "Δημιουργήστε ένα νέο μοντέλο",
+  "@CreateModel": {
+    "description": ""
+  },
+  "CreateView": "Δημιουργήστε μια νέα προβολή",
+  "@CreateView": {
+    "description": ""
+  },
+  "CreateMVC": "Δημιουργία MVC",
+  "@CreateMVC": {
+    "description": ""
+  },
+  "CreateCRUD": "Δημιουργήστε πλήρες CRUD με βάση έναν πίνακα",
+  "@CreateCRUD": {
+    "description": ""
+  },
+  "removeCRUD": "Καταργήστε το CRUD που δημιουργήθηκε για έναν πίνακα",
+  "@removeCRUD": {
+    "description": ""
+  },
+  "createMigration": "Δημιουργήστε μια νέα μετεγκατάσταση",
+  "@createMigration": {
+    "description": ""
+  },
+  "exeMigrate": "Εκτελέστε εκκρεμείς μετεγκαταστάσεις",
+  "@exeMigrate": {
+    "description": ""
+  },
+  "exeMigrateFresh": "Διαγράψτε όλους τους πίνακες και εκτελέστε ξανά τις μετεγκαταστάσεις",
+  "@exeMigrateFresh": {
+    "description": ""
+  },
+  "createProject": "Δημιουργήστε ένα νέο έργο",
+  "@createProject": {
+    "description": ""
+  },
+  "changeDBMotor": "Αλλαγή της μηχανής βάσης δεδομένων (mysql/sqlite)",
+  "@changeDBMotor": {
+    "description": ""
+  },
+  "changeDBPrefix": "Αλλάξτε το πρόθεμα πίνακα",
+  "@changeDBPrefix": {
+    "description": ""
+  },
+  "settingsUserStorage": "Διαμόρφωση χώρου αποθήκευσης (τοπικό|OCI|AWS|Azure)",
+  "@settingsUserStorage": {
+    "description": ""
+  },
+  "IaActivate": "Ρυθμίστε το διαδραστικό Native AI",
+  "@IaActivate": {
+    "description": ""
+  },
+  "version": "Εμφανίζει την τρέχουσα έκδοση",
+  "@version": {
+    "description": ""
+  },
+  "helpPrint": "Δείξτε αυτή τη βοήθεια",
+  "@helpPrint": {
+    "description": ""
+  }
+}

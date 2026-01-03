@@ -1,0 +1,87 @@
+{
+  "@@locale": "ar",
+  "startServerWeb": "ابدأ تشغيل خادم الويب",
+  "@startServerWeb": {
+    "description": ""
+  },
+  "startProgramDesktop": "ابدأ تشغيل التطبيق في وضع سطح المكتب",
+  "@startProgramDesktop": {
+    "description": ""
+  },
+  "runJossScript": "تشغيل البرنامج النصي جوس",
+  "@runJossScript": {
+    "description": ""
+  },
+  "compileProjectDist": "بناء المشروع للتوزيع",
+  "@compileProjectDist": {
+    "description": ""
+  },
+  "CreateController": "إنشاء وحدة تحكم جديدة",
+  "@CreateController": {
+    "description": ""
+  },
+  "CreateMiddleware": "إنشاء وسيطة جديدة",
+  "@CreateMiddleware": {
+    "description": ""
+  },
+  "CreateModel": "إنشاء نموذج جديد",
+  "@CreateModel": {
+    "description": ""
+  },
+  "CreateView": "إنشاء طريقة عرض جديدة",
+  "@CreateView": {
+    "description": ""
+  },
+  "CreateMVC": "إنشاء MVC",
+  "@CreateMVC": {
+    "description": ""
+  },
+  "CreateCRUD": "إنشاء CRUD كاملة بناءً على جدول",
+  "@CreateCRUD": {
+    "description": ""
+  },
+  "removeCRUD": "قم بإزالة CRUD الذي تم إنشاؤه لجدول",
+  "@removeCRUD": {
+    "description": ""
+  },
+  "createMigration": "إنشاء هجرة جديدة",
+  "@createMigration": {
+    "description": ""
+  },
+  "exeMigrate": "تشغيل عمليات الترحيل المعلقة",
+  "@exeMigrate": {
+    "description": ""
+  },
+  "exeMigrateFresh": "احذف كافة الجداول وأعد تشغيل عمليات الترحيل",
+  "@exeMigrateFresh": {
+    "description": ""
+  },
+  "createProject": "إنشاء مشروع جديد",
+  "@createProject": {
+    "description": ""
+  },
+  "changeDBMotor": "تغيير محرك قاعدة البيانات (mysql/sqlite)",
+  "@changeDBMotor": {
+    "description": ""
+  },
+  "changeDBPrefix": "تغيير بادئة الجدول",
+  "@changeDBPrefix": {
+    "description": ""
+  },
+  "settingsUserStorage": "تكوين التخزين (محلي|OCI|AWS|Azure)",
+  "@settingsUserStorage": {
+    "description": ""
+  },
+  "IaActivate": "قم بإعداد الذكاء الاصطناعي الأصلي التفاعلي",
+  "@IaActivate": {
+    "description": ""
+  },
+  "version": "يظهر الإصدار الحالي",
+  "@version": {
+    "description": ""
+  },
+  "helpPrint": "أظهر هذه المساعدة",
+  "@helpPrint": {
+    "description": ""
+  }
+}

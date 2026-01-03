@@ -9,6 +9,7 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/jossecurity/joss/pkg/i18n"
 	"github.com/jossecurity/joss/pkg/parser"
 )
 
@@ -415,6 +416,19 @@ func (r *Runtime) executeViewMethod(instance *Instance, method string, args []in
 					finalHtml = strings.ReplaceAll(finalHtml, "{{csrf_field()}}", field)
 				}
 			}
+
+			// Handle I18n helper: {{ __('key') }}
+			// Regex to match {{ __('key') }} or {{ __("key") }}
+			reLang := regexp.MustCompile(`\{\{\s*__\(\s*['"]([^'"]+)['"]\s*\)\s*\}\}`)
+			finalHtml = reLang.ReplaceAllStringFunc(finalHtml, func(match string) string {
+				submatch := reLang.FindStringSubmatch(match)
+				if len(submatch) > 1 {
+					key := submatch[1]
+					locale := r.GetLocale() // Use current locale
+					return i18n.GlobalManager.Get(locale, key, nil)
+				}
+				return match
+			})
 
 			// 4. Variable Replacement (Evaluator Based)
 

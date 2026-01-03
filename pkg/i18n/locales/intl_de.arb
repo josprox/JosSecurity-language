@@ -1,0 +1,87 @@
+{
+  "@@locale": "de",
+  "startServerWeb": "Starten Sie den Webserver",
+  "@startServerWeb": {
+    "description": ""
+  },
+  "startProgramDesktop": "Starten Sie die Anwendung im Desktop-Modus",
+  "@startProgramDesktop": {
+    "description": ""
+  },
+  "runJossScript": "Führen Sie ein Joss-Skript aus",
+  "@runJossScript": {
+    "description": ""
+  },
+  "compileProjectDist": "Erstellen Sie das Projekt zur Verteilung",
+  "@compileProjectDist": {
+    "description": ""
+  },
+  "CreateController": "Erstellen Sie einen neuen Controller",
+  "@CreateController": {
+    "description": ""
+  },
+  "CreateMiddleware": "Erstellen Sie neue Middleware",
+  "@CreateMiddleware": {
+    "description": ""
+  },
+  "CreateModel": "Erstellen Sie ein neues Modell",
+  "@CreateModel": {
+    "description": ""
+  },
+  "CreateView": "Erstellen Sie eine neue Ansicht",
+  "@CreateView": {
+    "description": ""
+  },
+  "CreateMVC": "Erstellen Sie MVC",
+  "@CreateMVC": {
+    "description": ""
+  },
+  "CreateCRUD": "Erstellen Sie ein vollständiges CRUD basierend auf einer Tabelle",
+  "@CreateCRUD": {
+    "description": ""
+  },
+  "removeCRUD": "Entfernen Sie das für eine Tabelle generierte CRUD",
+  "@removeCRUD": {
+    "description": ""
+  },
+  "createMigration": "Erstellen Sie eine neue Migration",
+  "@createMigration": {
+    "description": ""
+  },
+  "exeMigrate": "Führen Sie ausstehende Migrationen aus",
+  "@exeMigrate": {
+    "description": ""
+  },
+  "exeMigrateFresh": "Löschen Sie alle Tabellen und führen Sie die Migrationen erneut aus",
+  "@exeMigrateFresh": {
+    "description": ""
+  },
+  "createProject": "Erstellen Sie ein neues Projekt",
+  "@createProject": {
+    "description": ""
+  },
+  "changeDBMotor": "Ändern Sie die Datenbank-Engine (MySQL/SQLite)",
+  "@changeDBMotor": {
+    "description": ""
+  },
+  "changeDBPrefix": "Ändern Sie das Tabellenpräfix",
+  "@changeDBPrefix": {
+    "description": ""
+  },
+  "settingsUserStorage": "Speicher konfigurieren (lokal|OCI|AWS|Azure)",
+  "@settingsUserStorage": {
+    "description": ""
+  },
+  "IaActivate": "Richten Sie interaktive native KI ein",
+  "@IaActivate": {
+    "description": ""
+  },
+  "version": "Zeigt die aktuelle Version an",
+  "@version": {
+    "description": ""
+  },
+  "helpPrint": "Diese Hilfe anzeigen",
+  "@helpPrint": {
+    "description": ""
+  }
+}

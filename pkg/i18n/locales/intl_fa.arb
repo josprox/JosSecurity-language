@@ -1,0 +1,87 @@
+{
+  "@@locale": "fa",
+  "startServerWeb": "وب سرور را راه اندازی کنید",
+  "@startServerWeb": {
+    "description": ""
+  },
+  "startProgramDesktop": "برنامه را در حالت دسکتاپ راه اندازی کنید",
+  "@startProgramDesktop": {
+    "description": ""
+  },
+  "runJossScript": "یک اسکریپت joss را اجرا کنید",
+  "@runJossScript": {
+    "description": ""
+  },
+  "compileProjectDist": "پروژه را برای توزیع بسازید",
+  "@compileProjectDist": {
+    "description": ""
+  },
+  "CreateController": "یک کنترلر جدید ایجاد کنید",
+  "@CreateController": {
+    "description": ""
+  },
+  "CreateMiddleware": "میان افزار جدید ایجاد کنید",
+  "@CreateMiddleware": {
+    "description": ""
+  },
+  "CreateModel": "یک مدل جدید ایجاد کنید",
+  "@CreateModel": {
+    "description": ""
+  },
+  "CreateView": "یک نمای جدید ایجاد کنید",
+  "@CreateView": {
+    "description": ""
+  },
+  "CreateMVC": "MVC ایجاد کنید",
+  "@CreateMVC": {
+    "description": ""
+  },
+  "CreateCRUD": "CRUD کامل را بر اساس جدول ایجاد کنید",
+  "@CreateCRUD": {
+    "description": ""
+  },
+  "removeCRUD": "CRUD ایجاد شده برای جدول را حذف کنید",
+  "@removeCRUD": {
+    "description": ""
+  },
+  "createMigration": "یک مهاجرت جدید ایجاد کنید",
+  "@createMigration": {
+    "description": ""
+  },
+  "exeMigrate": "مهاجرت های معلق را اجرا کنید",
+  "@exeMigrate": {
+    "description": ""
+  },
+  "exeMigrateFresh": "تمام جداول را حذف کنید و مهاجرت ها را دوباره اجرا کنید",
+  "@exeMigrateFresh": {
+    "description": ""
+  },
+  "createProject": "یک پروژه جدید ایجاد کنید",
+  "@createProject": {
+    "description": ""
+  },
+  "changeDBMotor": "موتور پایگاه داده را تغییر دهید (mysql/sqlite)",
+  "@changeDBMotor": {
+    "description": ""
+  },
+  "changeDBPrefix": "پیشوند جدول را تغییر دهید",
+  "@changeDBPrefix": {
+    "description": ""
+  },
+  "settingsUserStorage": "پیکربندی فضای ذخیره سازی (محلی | OCI | AWS | Azure)",
+  "@settingsUserStorage": {
+    "description": ""
+  },
+  "IaActivate": "هوش مصنوعی بومی تعاملی را تنظیم کنید",
+  "@IaActivate": {
+    "description": ""
+  },
+  "version": "نسخه فعلی را نشان می دهد",
+  "@version": {
+    "description": ""
+  },
+  "helpPrint": "این کمک را نشان دهید",
+  "@helpPrint": {
+    "description": ""
+  }
+}

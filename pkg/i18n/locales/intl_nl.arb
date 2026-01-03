@@ -1,0 +1,87 @@
+{
+  "@@locale": "nl",
+  "startServerWeb": "Start de webserver",
+  "@startServerWeb": {
+    "description": ""
+  },
+  "startProgramDesktop": "Start de applicatie in desktopmodus",
+  "@startProgramDesktop": {
+    "description": ""
+  },
+  "runJossScript": "Voer een joss-script uit",
+  "@runJossScript": {
+    "description": ""
+  },
+  "compileProjectDist": "Bouw het project voor distributie",
+  "@compileProjectDist": {
+    "description": ""
+  },
+  "CreateController": "Maak een nieuwe controller",
+  "@CreateController": {
+    "description": ""
+  },
+  "CreateMiddleware": "Maak nieuwe middleware",
+  "@CreateMiddleware": {
+    "description": ""
+  },
+  "CreateModel": "Maak een nieuw model",
+  "@CreateModel": {
+    "description": ""
+  },
+  "CreateView": "Maak een nieuwe weergave",
+  "@CreateView": {
+    "description": ""
+  },
+  "CreateMVC": "MVC maken",
+  "@CreateMVC": {
+    "description": ""
+  },
+  "CreateCRUD": "Creëer volledige CRUD op basis van een tabel",
+  "@CreateCRUD": {
+    "description": ""
+  },
+  "removeCRUD": "Verwijder CRUD gegenereerd voor een tabel",
+  "@removeCRUD": {
+    "description": ""
+  },
+  "createMigration": "Maak een nieuwe migratie",
+  "@createMigration": {
+    "description": ""
+  },
+  "exeMigrate": "Voer lopende migraties uit",
+  "@exeMigrate": {
+    "description": ""
+  },
+  "exeMigrateFresh": "Verwijder alle tabellen en voer de migraties opnieuw uit",
+  "@exeMigrateFresh": {
+    "description": ""
+  },
+  "createProject": "Maak een nieuw project",
+  "@createProject": {
+    "description": ""
+  },
+  "changeDBMotor": "Wijzig de database-engine (mysql/sqlite)",
+  "@changeDBMotor": {
+    "description": ""
+  },
+  "changeDBPrefix": "Wijzig het tabelvoorvoegsel",
+  "@changeDBPrefix": {
+    "description": ""
+  },
+  "settingsUserStorage": "Opslag configureren (lokaal|OCI|AWS|Azure)",
+  "@settingsUserStorage": {
+    "description": ""
+  },
+  "IaActivate": "Zet interactieve Native AI op",
+  "@IaActivate": {
+    "description": ""
+  },
+  "version": "Toont de huidige versie",
+  "@version": {
+    "description": ""
+  },
+  "helpPrint": "Laat deze hulp zien",
+  "@helpPrint": {
+    "description": ""
+  }
+}

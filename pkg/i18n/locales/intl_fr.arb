@@ -1,0 +1,87 @@
+{
+  "@@locale": "fr",
+  "startServerWeb": "Démarrez le serveur Web",
+  "@startServerWeb": {
+    "description": ""
+  },
+  "startProgramDesktop": "Démarrez l'application en mode bureau",
+  "@startProgramDesktop": {
+    "description": ""
+  },
+  "runJossScript": "Exécuter un script Joss",
+  "@runJossScript": {
+    "description": ""
+  },
+  "compileProjectDist": "Construire le projet pour la distribution",
+  "@compileProjectDist": {
+    "description": ""
+  },
+  "CreateController": "Créer un nouveau contrôleur",
+  "@CreateController": {
+    "description": ""
+  },
+  "CreateMiddleware": "Créer un nouveau middleware",
+  "@CreateMiddleware": {
+    "description": ""
+  },
+  "CreateModel": "Créer un nouveau modèle",
+  "@CreateModel": {
+    "description": ""
+  },
+  "CreateView": "Créer une nouvelle vue",
+  "@CreateView": {
+    "description": ""
+  },
+  "CreateMVC": "Créer une MVC",
+  "@CreateMVC": {
+    "description": ""
+  },
+  "CreateCRUD": "Créer un CRUD complet basé sur une table",
+  "@CreateCRUD": {
+    "description": ""
+  },
+  "removeCRUD": "Supprimer le CRUD généré pour une table",
+  "@removeCRUD": {
+    "description": ""
+  },
+  "createMigration": "Créer une nouvelle migration",
+  "@createMigration": {
+    "description": ""
+  },
+  "exeMigrate": "Exécuter les migrations en attente",
+  "@exeMigrate": {
+    "description": ""
+  },
+  "exeMigrateFresh": "Supprimez toutes les tables et réexécutez les migrations",
+  "@exeMigrateFresh": {
+    "description": ""
+  },
+  "createProject": "Créer un nouveau projet",
+  "@createProject": {
+    "description": ""
+  },
+  "changeDBMotor": "Changer le moteur de base de données (mysql/sqlite)",
+  "@changeDBMotor": {
+    "description": ""
+  },
+  "changeDBPrefix": "Changer le préfixe du tableau",
+  "@changeDBPrefix": {
+    "description": ""
+  },
+  "settingsUserStorage": "Configurer le stockage (local | OCI | AWS | Azure)",
+  "@settingsUserStorage": {
+    "description": ""
+  },
+  "IaActivate": "Configurer une IA native interactive",
+  "@IaActivate": {
+    "description": ""
+  },
+  "version": "Affiche la version actuelle",
+  "@version": {
+    "description": ""
+  },
+  "helpPrint": "Afficher cette aide",
+  "@helpPrint": {
+    "description": ""
+  }
+}

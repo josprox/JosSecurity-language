@@ -1,0 +1,87 @@
+{
+  "@@locale": "pa",
+  "startServerWeb": "ਵੈੱਬ ਸਰਵਰ ਸ਼ੁਰੂ ਕਰੋ",
+  "@startServerWeb": {
+    "description": ""
+  },
+  "startProgramDesktop": "ਐਪਲੀਕੇਸ਼ਨ ਨੂੰ ਡੈਸਕਟਾਪ ਮੋਡ ਵਿੱਚ ਸ਼ੁਰੂ ਕਰੋ",
+  "@startProgramDesktop": {
+    "description": ""
+  },
+  "runJossScript": "ਇੱਕ ਜੌਸ ਸਕ੍ਰਿਪਟ ਚਲਾਓ",
+  "@runJossScript": {
+    "description": ""
+  },
+  "compileProjectDist": "ਵੰਡਣ ਲਈ ਪ੍ਰੋਜੈਕਟ ਬਣਾਓ",
+  "@compileProjectDist": {
+    "description": ""
+  },
+  "CreateController": "ਇੱਕ ਨਵਾਂ ਕੰਟਰੋਲਰ ਬਣਾਓ",
+  "@CreateController": {
+    "description": ""
+  },
+  "CreateMiddleware": "ਨਵਾਂ ਮਿਡਲਵੇਅਰ ਬਣਾਓ",
+  "@CreateMiddleware": {
+    "description": ""
+  },
+  "CreateModel": "ਇੱਕ ਨਵਾਂ ਮਾਡਲ ਬਣਾਓ",
+  "@CreateModel": {
+    "description": ""
+  },
+  "CreateView": "ਇੱਕ ਨਵਾਂ ਦ੍ਰਿਸ਼ ਬਣਾਓ",
+  "@CreateView": {
+    "description": ""
+  },
+  "CreateMVC": "MVC ਬਣਾਓ",
+  "@CreateMVC": {
+    "description": ""
+  },
+  "CreateCRUD": "ਇੱਕ ਸਾਰਣੀ ਦੇ ਅਧਾਰ ਤੇ ਪੂਰਾ CRUD ਬਣਾਓ",
+  "@CreateCRUD": {
+    "description": ""
+  },
+  "removeCRUD": "ਇੱਕ ਟੇਬਲ ਲਈ ਤਿਆਰ ਕੀਤੇ CRUD ਨੂੰ ਹਟਾਓ",
+  "@removeCRUD": {
+    "description": ""
+  },
+  "createMigration": "ਇੱਕ ਨਵਾਂ ਮਾਈਗ੍ਰੇਸ਼ਨ ਬਣਾਓ",
+  "@createMigration": {
+    "description": ""
+  },
+  "exeMigrate": "ਲੰਬਿਤ ਮਾਈਗ੍ਰੇਸ਼ਨ ਚਲਾਓ",
+  "@exeMigrate": {
+    "description": ""
+  },
+  "exeMigrateFresh": "ਸਾਰੀਆਂ ਟੇਬਲਾਂ ਨੂੰ ਮਿਟਾਓ ਅਤੇ ਮਾਈਗ੍ਰੇਸ਼ਨ ਨੂੰ ਮੁੜ-ਚਾਲੂ ਕਰੋ",
+  "@exeMigrateFresh": {
+    "description": ""
+  },
+  "createProject": "ਇੱਕ ਨਵਾਂ ਪ੍ਰੋਜੈਕਟ ਬਣਾਓ",
+  "@createProject": {
+    "description": ""
+  },
+  "changeDBMotor": "ਡਾਟਾਬੇਸ ਇੰਜਣ ਨੂੰ ਬਦਲੋ (mysql/sqlite)",
+  "@changeDBMotor": {
+    "description": ""
+  },
+  "changeDBPrefix": "ਟੇਬਲ ਪ੍ਰੀਫਿਕਸ ਨੂੰ ਬਦਲੋ",
+  "@changeDBPrefix": {
+    "description": ""
+  },
+  "settingsUserStorage": "ਸਟੋਰੇਜ ਕੌਂਫਿਗਰ ਕਰੋ (ਸਥਾਨਕ|OCI|AWS|Azure)",
+  "@settingsUserStorage": {
+    "description": ""
+  },
+  "IaActivate": "ਇੰਟਰਐਕਟਿਵ ਨੇਟਿਵ AI ਸੈਟ ਅਪ ਕਰੋ",
+  "@IaActivate": {
+    "description": ""
+  },
+  "version": "ਮੌਜੂਦਾ ਸੰਸਕਰਣ ਦਿਖਾਉਂਦਾ ਹੈ",
+  "@version": {
+    "description": ""
+  },
+  "helpPrint": "ਇਹ ਮਦਦ ਦਿਖਾਓ",
+  "@helpPrint": {
+    "description": ""
+  }
+}
