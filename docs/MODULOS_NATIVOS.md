@@ -1123,9 +1123,9 @@ Sistema de Internacionalización (I18n) basado en archivos ARB (Application Reso
 - Helper `__` para uso directo en vistas.
 
 ### Estructura de Archivos
-Crea una carpeta `l10n/` en la raíz de tu proyecto y añade archivos `.arb`:
+Crea una carpeta `assets/l10n/` en la raíz de tu proyecto y añade archivos `.arb`:
 
-**l10n/intl_es.arb**
+**assets/l10n/intl_es.arb**
 ```json
 {
   "hello": "Hola {name}",
@@ -1133,7 +1133,7 @@ Crea una carpeta `l10n/` en la raíz de tu proyecto y añade archivos `.arb`:
 }
 ```
 
-**l10n/intl_en.arb**
+**assets/l10n/intl_en.arb**
 ```json
 {
   "hello": "Hello {name}",

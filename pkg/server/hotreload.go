@@ -14,6 +14,7 @@ import (
 
 	"github.com/gorilla/websocket"
 	"github.com/jossecurity/joss/pkg/core"
+	"github.com/jossecurity/joss/pkg/i18n"
 	"github.com/jossecurity/joss/pkg/parser"
 )
 
@@ -92,7 +93,7 @@ func watchChanges() {
 			// The previous edit likely added `ext := ...` again.
 			// I will replace the block to be clean.
 			ext := filepath.Ext(path)
-			if ext == ".joss" || ext == ".html" || ext == ".css" || ext == ".js" || ext == ".scss" || filepath.Base(path) == "package.json" {
+			if ext == ".joss" || ext == ".html" || ext == ".css" || ext == ".js" || ext == ".scss" || ext == ".arb" || filepath.Base(path) == "package.json" {
 				fileHashes[path] = getHash(path)
 			}
 		}
@@ -134,7 +135,7 @@ func watchChanges() {
 			}
 
 			ext := filepath.Ext(path)
-			if ext == ".joss" || ext == ".html" || ext == ".css" || ext == ".js" || ext == ".scss" || filepath.Base(path) == "package.json" {
+			if ext == ".joss" || ext == ".html" || ext == ".css" || ext == ".js" || ext == ".scss" || ext == ".arb" || filepath.Base(path) == "package.json" {
 				currentHash := getHash(path)
 				if lastHash, ok := fileHashes[path]; ok {
 					if currentHash != lastHash {
@@ -193,6 +194,14 @@ func reloadApp(changedFile string) {
 	// 2. Views (HTML)
 	if strings.HasSuffix(changedFile, ".html") {
 		// Views are read from disk, so just notify
+		notifyClients()
+		return
+	}
+
+	// 2.5 I18n (.arb)
+	if strings.HasSuffix(changedFile, ".arb") {
+		fmt.Println("[HotReload] Translations changed. Reloading I18n...")
+		i18n.GlobalManager.Load(GlobalFileSystem)
 		notifyClients()
 		return
 	}

@@ -49,16 +49,17 @@ func (m *Manager) Load(externalFS http.FileSystem) error {
 	}
 
 	// 2. Load External/User Locales (if provided OR disk)
+	// 2. Load External/User Locales (if provided OR disk)
 	if externalFS != nil {
 		// VFS Mode
-		dir, err := externalFS.Open("/l10n")
+		dir, err := externalFS.Open("/assets/l10n")
 		if err == nil {
 			defer dir.Close()
 			files, err := dir.Readdir(0)
 			if err == nil {
 				for _, file := range files {
 					if !file.IsDir() && strings.HasSuffix(file.Name(), ".arb") {
-						f, err := externalFS.Open(path.Join("/l10n", file.Name()))
+						f, err := externalFS.Open(path.Join("/assets/l10n", file.Name()))
 						if err == nil {
 							m.loadFromReader(f, file.Name())
 							f.Close()
@@ -69,11 +70,11 @@ func (m *Manager) Load(externalFS http.FileSystem) error {
 		}
 	} else {
 		// Disk Mode (Local Development)
-		entries, err := os.ReadDir("l10n")
+		entries, err := os.ReadDir("assets/l10n")
 		if err == nil {
 			for _, e := range entries {
 				if !e.IsDir() && strings.HasSuffix(e.Name(), ".arb") {
-					f, err := os.Open(filepath.Join("l10n", e.Name()))
+					f, err := os.Open(filepath.Join("assets", "l10n", e.Name()))
 					if err == nil {
 						m.loadFromReaderFile(f, e.Name())
 						f.Close()
