@@ -25,7 +25,7 @@ func (r *Runtime) executeAuthMethod(instance *Instance, method string, args []in
 	fmt.Printf("[Auth Debug] Prefix: '%s', Users Table: '%s'\n", prefix, usersTable)
 
 	// Asegurar que las tablas y columnas existan (Auto-Migración)
-	r.ensureAuthTables(usersTable, rolesTable)
+	r.ensureAuthTables(usersTable, rolesTable, prefix)
 
 	switch method {
 	case "create":
@@ -35,11 +35,7 @@ func (r *Runtime) executeAuthMethod(instance *Instance, method string, args []in
 				// 1. Generar User Token Obligatorio
 				userToken := uuid.New().String()
 
-				// Definir función de tiempo según DB
-				nowFunc := "NOW()"
-				if val, ok := r.Env["DB"]; ok && val == "sqlite" {
-					nowFunc = "CURRENT_TIMESTAMP"
-				}
+				// Definir función de tiempo según DB (Removed unused nowFunc)
 
 				// Extraer campos (Sin 'name')
 				username := getString(data, "username", "")
@@ -65,18 +61,30 @@ func (r *Runtime) executeAuthMethod(instance *Instance, method string, args []in
 					return false
 				}
 
-				// Query explícito
-				query := fmt.Sprintf(`INSERT INTO %s 
-					(user_token, username, first_name, last_name, email, phone, password, role_id, created_at, updated_at, verificado) 
-					VALUES (?, ?, ?, ?, ?, ?, ?, ?, %s, %s, 0)`, usersTable, nowFunc, nowFunc)
+				// Token expira en 24 horas
+				tokenExpires := time.Now().Add(24 * time.Hour).Format("2006-01-02 15:04:05")
 
-				_, err = r.DB.Exec(query, userToken, username, firstName, lastName, email, phone, hashedPassword, roleId)
-				if err != nil {
-					fmt.Printf("[Security] Error creando usuario: %v\n", err)
-					return false
+				// Use GranDB helper for safer/cleaner insert
+				insertData := map[string]interface{}{
+					"user_token":       userToken,
+					"username":         username,
+					"first_name":       firstName,
+					"last_name":        lastName,
+					"email":            email,
+					"phone":            phone,
+					"password":         hashedPassword,
+					"role_id":          roleId,
+					"token_expires_at": tokenExpires,
+					"verificado":       0,
+					// created_at / updated_at handled automatically by insertFromMap if omitted
 				}
-				fmt.Println("[Security] Usuario registrado exitosamente.")
-				return userToken
+
+				if r.insertFromMap(usersTable, insertData) {
+					fmt.Println("[Security] Usuario registrado exitosamente.")
+					return userToken
+				}
+				fmt.Println("[Security] Error creando usuario.")
+				return false
 			}
 		}
 
@@ -172,15 +180,167 @@ func (r *Runtime) executeAuthMethod(instance *Instance, method string, args []in
 				return false
 			}
 			var id int
-			query := fmt.Sprintf("SELECT id FROM %s WHERE user_token = ? LIMIT 1", usersTable)
-			err := r.DB.QueryRow(query, token).Scan(&id)
+			var expiresAtStr sql.NullString // Changed to string for SQLite compatibility
+
+			// Verificar existencia y expiración
+			query := fmt.Sprintf("SELECT id, token_expires_at FROM %s WHERE user_token = ? AND verificado = 0 LIMIT 1", usersTable)
+			err := r.DB.QueryRow(query, token).Scan(&id, &expiresAtStr)
+
+			if err != nil {
+				return false // Token not found
+			}
+
+			// Check Expiry
+			if expiresAtStr.Valid && expiresAtStr.String != "" {
+				// Parse time from DB string
+				layout := "2006-01-02 15:04:05" // Standard SQL format
+				expiryTime, errParse := time.Parse(layout, expiresAtStr.String)
+				// If db stores with T or Z, try other formats if needed, but we save as above.
+				if errParse != nil {
+					// Try RFC3339 just in case
+					expiryTime, errParse = time.Parse(time.RFC3339, expiresAtStr.String)
+				}
+
+				if errParse == nil && time.Now().After(expiryTime) {
+					return false // Expired
+				}
+			}
+
+			update := fmt.Sprintf("UPDATE %s SET verificado = 1, user_token = '' WHERE id = ?", usersTable)
+			_, err = r.DB.Exec(update, id)
+
+			if err == nil {
+				return true
+			}
+			return false
+		}
+
+	case "forgotPassword":
+		if len(args) == 1 {
+			email := args[0].(string)
+			if r.DB == nil {
+				return false
+			}
+
+			// Verificar si existe el usuario
+			var userId int
+			queryCheck := fmt.Sprintf("SELECT id FROM %s WHERE email = ?", usersTable)
+			err := r.DB.QueryRow(queryCheck, email).Scan(&userId)
+			if err != nil {
+				return false // Usuario no existe, por seguridad retornamos falso o genérico
+			}
+
+			// Generar Token
+			token := uuid.New().String()
+			resetsTable := prefix + "password_resets"
+			expiresAt := time.Now().Add(1 * time.Hour) // 1 Hora de validez
+
+			query := fmt.Sprintf("INSERT INTO %s (email, token, expires_at) VALUES (?, ?, ?)", resetsTable)
+			_, err = r.DB.Exec(query, email, token, expiresAt)
+
+			if err == nil {
+				// Retornamos el token para que el controlador envíe el email usando SmtpClient
+				return token
+			}
+		}
+		return false
+
+	case "resetPassword":
+		if len(args) == 2 {
+			token := args[0].(string)
+			newPass := args[1].(string)
+
+			if r.DB == nil {
+				return false
+			}
+
+			resetsTable := prefix + "password_resets"
+
+			// Validar token en tabla resets
+			var email string
+			var expiresAtStr sql.NullString // Changed to string for compatibility
+			var used int
+
+			query := fmt.Sprintf("SELECT email, expires_at, used FROM %s WHERE token = ? LIMIT 1", resetsTable)
+			err := r.DB.QueryRow(query, token).Scan(&email, &expiresAtStr, &used)
+
+			if err != nil {
+				fmt.Printf("[Auth Debug] Token Scan Error: %v\n", err) // Debug log
+				return "invalid_token"
+			}
+
+			if used == 1 {
+				return "used_token"
+			}
+
+			if expiresAtStr.Valid && expiresAtStr.String != "" {
+				// Parse time from DB string
+				layout := "2006-01-02 15:04:05" // Standard SQL format
+				expiryTime, errParse := time.Parse(layout, expiresAtStr.String)
+
+				if errParse != nil {
+					// Try RFC3339 just in case
+					expiryTime, errParse = time.Parse(time.RFC3339, expiresAtStr.String)
+				}
+
+				if errParse == nil && time.Now().After(expiryTime) {
+					return "expired_token"
+				}
+			}
+
+			// Token válido, actualizar password
+			hashedBytes, err := bcrypt.GenerateFromPassword([]byte(newPass), bcrypt.DefaultCost)
 			if err != nil {
 				return false
 			}
-			update := fmt.Sprintf("UPDATE %s SET verificado = 1 WHERE id = ?", usersTable)
-			_, err = r.DB.Exec(update, id)
-			return err == nil
+			hashedPassword := string(hashedBytes)
+
+			// Actualizar contraseña usuario
+			updUser := fmt.Sprintf("UPDATE %s SET password = ? WHERE email = ?", usersTable)
+			_, err = r.DB.Exec(updUser, hashedPassword, email)
+			if err != nil {
+				return false
+			}
+
+			// Marcar token como usado
+			updToken := fmt.Sprintf("UPDATE %s SET used = 1 WHERE token = ?", resetsTable)
+			r.DB.Exec(updToken, token)
+
+			return true
 		}
+
+	case "resendVerification":
+		if len(args) == 1 {
+			email := args[0].(string)
+			if r.DB == nil {
+				return false
+			}
+
+			var id int
+			var verificado int
+			query := fmt.Sprintf("SELECT id, verificado FROM %s WHERE email = ?", usersTable)
+			err := r.DB.QueryRow(query, email).Scan(&id, &verificado)
+
+			if err != nil {
+				return false
+			}
+
+			if verificado == 1 {
+				return "already_verified"
+			}
+
+			// Generar nuevo token
+			newToken := uuid.New().String()
+			newExpiry := time.Now().Add(24 * time.Hour).Format("2006-01-02 15:04:05")
+
+			update := fmt.Sprintf("UPDATE %s SET user_token = ?, token_expires_at = ? WHERE id = ?", usersTable)
+			_, err = r.DB.Exec(update, newToken, newExpiry, id)
+
+			if err == nil {
+				return newToken
+			}
+		}
+		return false
 
 	case "user":
 		if sessVal, ok := r.Variables["$__session"]; ok {
@@ -409,7 +569,7 @@ func (r *Runtime) executeAuthMethod(instance *Instance, method string, args []in
 
 var authTablesEnsured bool
 
-func (r *Runtime) ensureAuthTables(usersTable, rolesTable string) {
+func (r *Runtime) ensureAuthTables(usersTable, rolesTable, prefix string) {
 	if r.DB == nil || authTablesEnsured {
 		return
 	}
@@ -487,9 +647,32 @@ func (r *Runtime) ensureAuthTables(usersTable, rolesTable string) {
 	patchColumn(r.DB, usersTable, "last_name", "VARCHAR(100) NOT NULL DEFAULT ''", isMySQL)
 	patchColumn(r.DB, usersTable, "phone", "VARCHAR(20) NOT NULL DEFAULT ''", isMySQL)
 	patchColumn(r.DB, usersTable, "verificado", "INTEGER DEFAULT 0", isMySQL)
+	patchColumn(r.DB, usersTable, "token_expires_at", "DATETIME", isMySQL)
 	patchColumn(r.DB, usersTable, "created_at", "DATETIME DEFAULT CURRENT_TIMESTAMP", isMySQL)
 	patchColumn(r.DB, usersTable, "updated_at", "DATETIME DEFAULT CURRENT_TIMESTAMP", isMySQL)
 	patchColumn(r.DB, usersTable, "last_login_at", "DATETIME", isMySQL)
+	// 5. Crear Tabla Recuperación Contraseñas
+	resetsTable := prefix + "password_resets"
+	createResets := fmt.Sprintf(`CREATE TABLE IF NOT EXISTS %s (
+		id INTEGER PRIMARY KEY AUTOINCREMENT,
+		email VARCHAR(100) NOT NULL,
+		token VARCHAR(255) NOT NULL,
+		created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+		expires_at DATETIME,
+		used INTEGER DEFAULT 0
+	);`, resetsTable)
+
+	if val, ok := r.Env["DB"]; ok && val == "mysql" {
+		createResets = fmt.Sprintf(`CREATE TABLE IF NOT EXISTS %s (
+			id INT AUTO_INCREMENT PRIMARY KEY,
+			email VARCHAR(100) NOT NULL,
+			token VARCHAR(255) NOT NULL,
+			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+			expires_at DATETIME,
+			used TINYINT(1) DEFAULT 0
+		);`, resetsTable)
+	}
+	r.DB.Exec(createResets)
 }
 
 func patchColumn(db *sql.DB, table, col, def string, isMySQL bool) {

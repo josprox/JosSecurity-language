@@ -143,7 +143,7 @@ func (r *Runtime) RegisterNativeClasses() {
 	r.registerNative("Process", []string{"constructor", "start", "wait", "kill", "pid", "stdin", "stdout_chan", "stderr_chan"}, (*Runtime).executeProcessMethod)
 
 	// Server Control
-	r.registerNative("Server", []string{"start"}, (*Runtime).executeServerControlMethod)
+	r.registerNative("Server", []string{"start", "spawn"}, (*Runtime).executeServerControlMethod)
 
 	// Lang (I18n)
 	r.registerNative("Lang", []string{"get", "set", "locale", "locales"}, (*Runtime).executeLangMethod)

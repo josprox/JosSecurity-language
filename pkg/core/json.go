@@ -2,6 +2,7 @@ package core
 
 import (
 	"encoding/json"
+	"strings"
 )
 
 // executeJSONMethod handles JSON methods (parse, stringify)
@@ -11,6 +12,11 @@ func (r *Runtime) executeJSONMethod(instance *Instance, method string, args []in
 		if len(args) > 0 {
 			if str, ok := args[0].(string); ok {
 				var result interface{}
+				str = strings.TrimSpace(str)
+				// Remove BOM if present
+				if strings.HasPrefix(str, "\xef\xbb\xbf") {
+					str = str[3:]
+				}
 				// Use UseNumber to preserve number precision if needed, but standard Unmarshal is usually fine for basic types
 				if err := json.Unmarshal([]byte(str), &result); err == nil {
 					return result

@@ -3,6 +3,7 @@ package core
 import (
 	"fmt"
 	"os"
+	"os/exec"
 	"strings"
 
 	"github.com/jossecurity/joss/pkg/parser"
@@ -409,6 +410,49 @@ func (r *Runtime) callBuiltin(name string, args []interface{}) (interface{}, boo
 			}
 		}
 		return nil, true
+	case "run":
+		// run "script.py", args...
+		if len(args) > 0 {
+			scriptPath, ok := args[0].(string)
+			if !ok {
+				return "", true
+			}
+
+			// Security Check
+			allow, ok := r.Env["ALLOW_SYSTEM_RUN"]
+			if !ok || (allow != "true" && allow != "1") {
+				fmt.Println("[Security] Error: Ejecución de scripts bloqueada. Configure ALLOW_SYSTEM_RUN=true en su entorno.")
+				return "", true
+			}
+
+			// Determine runner
+			runner := ""
+			if strings.HasSuffix(scriptPath, ".py") {
+				runner = "python"
+			} else if strings.HasSuffix(scriptPath, ".php") {
+				runner = "php"
+			} else {
+				fmt.Println("[Error] Tipo de archivo no soportado para 'run'. Use .py o .php")
+				return "", true
+			}
+
+			// Build args
+			cmdArgs := []string{scriptPath}
+			// Add extra args
+			if len(args) > 1 {
+				for _, arg := range args[1:] {
+					cmdArgs = append(cmdArgs, fmt.Sprintf("%v", arg))
+				}
+			}
+
+			cmd := exec.Command(runner, cmdArgs...)
+			output, err := cmd.CombinedOutput()
+			if err != nil {
+				fmt.Printf("[Run] Error ejecutando script: %v\n", err)
+			}
+			return string(output), true
+		}
+		return "", true
 	}
 	return nil, false
 }

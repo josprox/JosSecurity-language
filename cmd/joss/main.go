@@ -9,7 +9,6 @@ import (
 
 	"github.com/jossecurity/joss/pkg/core"
 	"github.com/jossecurity/joss/pkg/parser"
-	"github.com/jossecurity/joss/pkg/server"
 	"github.com/jossecurity/joss/pkg/template"
 	"github.com/jossecurity/joss/pkg/version"
 )
@@ -25,7 +24,15 @@ func main() {
 	switch command {
 	case "server":
 		if len(os.Args) >= 3 && os.Args[2] == "start" {
-			server.Start(nil)
+			// Always require main.joss
+			if _, err := os.Stat("main.joss"); err == nil {
+				fmt.Println("[CLI] Ejecutando script de inicio (main.joss)...")
+				executeScript("main.joss")
+			} else {
+				fmt.Println("Error: No se encontró 'main.joss'.")
+				fmt.Println("Todos los proyectos deben tener un punto de entrada 'main.joss' que inicie el servidor.")
+				os.Exit(1)
+			}
 		} else {
 			fmt.Println("Uso: joss server start")
 		}
@@ -41,26 +48,7 @@ func main() {
 			return
 		}
 		filename := os.Args[2]
-		data, err := os.ReadFile(filename)
-		if err != nil {
-			fmt.Printf("Error leyendo archivo: %v\n", err)
-			return
-		}
-
-		l := parser.NewLexer(string(data))
-		p := parser.NewParser(l)
-		program := p.ParseProgram()
-
-		if len(p.Errors()) != 0 {
-			fmt.Println("Errores de parseo:")
-			for _, msg := range p.Errors() {
-				fmt.Printf("\t%s\n", msg)
-			}
-			return
-		}
-
-		rt := core.NewRuntime()
-		rt.Execute(program)
+		executeScript(filename)
 
 	case "build":
 		target := "web"
@@ -184,4 +172,27 @@ func main() {
 		printHelp()
 		os.Exit(1)
 	}
+}
+
+func executeScript(filename string) {
+	data, err := os.ReadFile(filename)
+	if err != nil {
+		fmt.Printf("Error leyendo archivo: %v\n", err)
+		return
+	}
+
+	l := parser.NewLexer(string(data))
+	p := parser.NewParser(l)
+	program := p.ParseProgram()
+
+	if len(p.Errors()) != 0 {
+		fmt.Println("Errores de parseo:")
+		for _, msg := range p.Errors() {
+			fmt.Printf("\t%s\n", msg)
+		}
+		return
+	}
+
+	rt := core.NewRuntime()
+	rt.Execute(program)
 }

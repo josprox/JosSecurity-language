@@ -78,10 +78,45 @@ script:post-response {
     bru.setVar("token", res.body.token);
   }
 }`,
-		filepath.Join(path, "bruno", "4. Delete Account.bru"): `meta {
-  name: Delete Account
+		filepath.Join(path, "bruno", "4. Forgot Password.bru"): `meta {
+  name: Forgot Password
   type: http
   seq: 4
+}
+
+post {
+  url: http://localhost:8000/password/email
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "email": "bruno@example.com"
+  }
+}`,
+		filepath.Join(path, "bruno", "5. Reset Password.bru"): `meta {
+  name: Reset Password
+  type: http
+  seq: 5
+}
+
+post {
+  url: http://localhost:8000/password/reset
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "token": "TOKEN_FROM_EMAIL",
+    "password": "newpassword123"
+  }
+}`,
+		filepath.Join(path, "bruno", "6. Delete Account.bru"): `meta {
+  name: Delete Account
+  type: http
+  seq: 6
 }
 
 delete {

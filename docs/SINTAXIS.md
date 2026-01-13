@@ -104,13 +104,17 @@ $nivel = ($puntos > 1000) ? "Oro" :
          ($puntos > 100)  ? "Bronce" :
                             "Novato"
 
-// Ejecución Condicional Múltiple
+// Ejecución Condicional Múltiple (Bloques Anidados)
+// CRÍTICO: Use bloques anidados explícitamente para lógica compleja
 ($rol == "admin") ? {
     print("Acceso Total")
-} : ($rol == "editor") ? {
-    print("Edición")
+    // Puede incluir lógica compleja aquí
 } : {
-    print("Solo Lectura")
+    ($rol == "editor") ? {
+        print("Edición")
+    } : {
+        print("Solo Lectura")
+    }
 }
 ```
 

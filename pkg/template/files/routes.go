@@ -13,6 +13,12 @@ Router::middleware("guest")
 Router::match("GET|POST", "/login", "AuthController@showLogin@doLogin")
 Router::match("GET|POST", "/register", "AuthController@showRegister@doRegister")
 Router::get("/verify/{token}", "AuthController@verify")
+
+// Password Recovery
+Router::get("/password/forgot", "PasswordController@showForgot")
+Router::post("/password/email", "PasswordController@sendResetLink")
+Router::get("/password/reset", "PasswordController@showReset")
+Router::post("/password/reset", "PasswordController@resetPassword")
 Router::end()
 
 // Rutas Protegidas (Solo autenticados)
@@ -30,6 +36,8 @@ Router::api() // Enable API headers
 // Public Routes
 Router::post("/api/register", "ApiController@register")
 Router::post("/api/login", "ApiController@login")
+Router::post("/api/password/email", "ApiController@forgotPassword")
+Router::post("/api/password/reset", "ApiController@resetPassword")
 
 // Protected Routes (JWT)
 Router::middleware("auth_api")

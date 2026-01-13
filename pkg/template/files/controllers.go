@@ -23,8 +23,7 @@ func GetControllerFiles(path string) map[string]string {
         // Auth.update returns true/false
         $success = Auth.update($id, $data)
 
-        return ($success) ? Response::redirect("/profile")->with("success", "Perfil actualizado correctamente.") :
-                            Response::back()->with("error", "Error al actualizar el perfil.")
+        return ($success) ? Response::redirect("/profile")->with("success", "Perfil actualizado correctamente.") : Response::back()->with("error", "Error al actualizar el perfil.")
     }
 
     function delete() {
@@ -70,7 +69,19 @@ func GetControllerFiles(path string) map[string]string {
         ($acceso) ? {
             return Response::redirect("/dashboard")->withCookie("joss_token", $acceso)
         } : {
-            return Response::back()->with("error", "Credenciales inválidas o cuenta no verificada.")
+            // Check if unverified and resend
+            var $newToken = Auth::resendVerification($email)
+            
+            ($newToken && $newToken != "already_verified") ? {
+                 $link = Request::root() + "/verify/" + $newToken
+                 $body = "<h1>Verifica tu cuenta</h1><p>Hemos detectado un intento de inicio de sesión, pero tu cuenta no está verificada. Haz click aquí:</p><a href='" + $link + "'>Verificar Cuenta</a>"
+                 
+                 SmtpClient::send($email, "Verifica tu cuenta", $body)
+                 
+                 return Response::back()->with("error", "Cuenta no verificada. Se ha enviado un nuevo correo de verificación.")
+            } : {
+                 return Response::back()->with("error", "Credenciales inválidas o cuenta no verificada.")
+            }
         }
     }
 
@@ -211,7 +222,50 @@ func GetControllerFiles(path string) map[string]string {
             return Response::json({"error": "Unauthorized"}, 401)
         }
     }
+
+    func forgotPassword() {
+        $email = Request::input("email")
+        $token = Auth::forgotPassword($email)
+        
+        ($token) ? {
+            // Send email via SmtpClient manually if Auth::forgotPassword only returns token
+            $link = Request::root() + "/password/reset?token=" + $token
+            $body = "<h1>Recuperar Contraseña</h1><p>Has solicitado restablecer tu contraseña. Haz click aquí:</p><a href='" + $link + "'>Restablecer Contraseña</a>"
+            SmtpClient::send($email, "Recuperar Contraseña", $body)
+
+            return Response::json({
+                "status": "success",
+                "message": "Si el correo existe, recibirás un enlace de recuperación."
+            })
+        } : {
+             // Return success to prevent enumeration
+             return Response::json({
+                "status": "success",
+                "message": "Si el correo existe, recibirás un enlace de recuperación."
+            })
+        }
+    }
+
+    func resetPassword() {
+        $token = Request::input("token")
+        $password = Request::input("password")
+
+        $result = Auth::resetPassword($token, $password)
+
+        ($result == true) ? {
+            return Response::json({
+                "status": "success",
+                "message": "Contraseña restablecida correctamente"
+            })
+        } : {
+            return Response::json({
+                "status": "error",
+                "message": "Error al restablecer: " + $result
+            }, 400)
+        }
+    }
 }`,
+
 		filepath.Join(path, "app", "controllers", "DashboardController.joss"): `class DashboardController {
     func index() {
         // Protect Route
@@ -229,6 +283,55 @@ func GetControllerFiles(path string) map[string]string {
             "role": $roleName,
             "isAdmin": $isAdmin
         })
+    }
+}`,
+		filepath.Join(path, "app", "controllers", "PasswordController.joss"): `class PasswordController {
+    
+    // Mostar formulario de olvido
+    function showForgot() {
+        return View::render("auth.forgot", { "title": "Recuperar Contraseña" })
+    }
+
+    // Procesar envío de link
+    function sendResetLink() {
+        $email = Request::input("email")
+        $token = Auth::forgotPassword($email)
+        
+        ($token) ? {
+            $link = Request::root() + "/password/reset?token=" + $token
+            $body = "<h1>Recuperar Contraseña</h1><p>Has solicitado restablecer tu contraseña. Haz click aquí:</p><a href='" + $link + "'>Restablecer Contraseña</a>"
+            
+            SmtpClient::send($email, "Recuperación de Contraseña", $body)
+
+            return View::render("auth.forgot", { 
+                "success": "Se ha enviado un enlace de recuperación a tu correo."
+            })
+        } : {
+            return View::render("auth.forgot", { "error": "No se pudo generar el token. Verifica el email." })
+        }
+    }
+
+    // Mostrar formulario de reset
+    function showReset() {
+        $token = Request::input("token")
+        return View::render("auth.reset", { "token": $token, "title": "Nueva Contraseña" })
+    }
+
+    // Procesar cambio de password
+    function resetPassword() {
+        $token = Request::input("token")
+        $password = Request::input("password")
+        
+        $result = Auth::resetPassword($token, $password)
+        
+        ($result == true) ? {
+            return Response::redirect("/login")->withCookie("flash", "Contraseña restablecida correctamente")
+        } : {
+            return View::render("auth.reset", { 
+                "token": $token, 
+                "error": "Error al restablecer: " + $result 
+            })
+        }
     }
 }`,
 	}

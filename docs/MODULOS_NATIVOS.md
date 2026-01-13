@@ -19,7 +19,7 @@ Documentación completa de todos los módulos nativos disponibles en JosSecurity
 - [WebSocket](#websocket) - Comunicación en tiempo real
 - [Math](#math) - Funciones matemáticas
 - [Session](#session) - Gestión de sesiones
-- [JSON](#json) - Manipulación de JSON
+- [JSON](#json) - Manipulación de JSON (Incluye robustez anti-BOM)
 - [IA Nativa](IA_NATIVA.md) - **NUEVO**
 - [WebSockets Nativos](WEBSOCKETS.md) - **NUEVO**
 
@@ -746,6 +746,14 @@ Escribe un mensaje en la salida de registros del sistema (consola). useful para 
 ```joss
 System::log("Iniciando proceso...")
 ```
+
+#### `Server::spawn(name, command, port)`
+Genera un subproceso persistente (servicio interno).
+
+> [!WARNING]
+> **Notas Críticas para Servicios**:
+> 1. **Networking**: Para llamadas internas (curl/fetch) use `127.0.0.1` en lugar de `localhost`. Algunos sistemas resuelven `localhost` a IPv6 (`::1`) causando fallos de conexión si su servicio escucha en IPv4.
+> 2. **Permisos (Systemd)**: Si despliega como servicio (systemctl), recuerde que el proceso corre con el usuario asignado (ej: `joss`). Scripts externos (Python/Node) que intenten escribir logs o archivos deben manejar errores de permisos (Use `try-except` o de permisos a la carpeta) o fallarán silenciosamente.
 
 ---
 

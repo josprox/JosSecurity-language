@@ -171,6 +171,66 @@ func GetViewFiles(path string) map[string]string {
         </div>
     </div>
 @endsection`,
+		filepath.Join(path, "app", "views", "auth", "forgot.joss.html"): `@extends('layouts.master')
+
+@section('content')
+<div class="container mt-5">
+    <div class="row justify-content-center">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">Recuperar Contraseña</div>
+                <div class="card-body">
+                    <div class="alert alert-success" style="display: {{ $success ? 'block' : 'none' }}">
+                        {{ $success }}
+                    </div>
+                    <div class="alert alert-danger" style="display: {{ $error ? 'block' : 'none' }}">
+                        {{ $error }}
+                    </div>
+
+                    <form method="POST" action="/password/email">
+                        {{ csrf_field() }}
+                        <div class="mb-3">
+                            <label>Email</label>
+                            <input type="email" name="email" class="form-control" required>
+                        </div>
+                        <button type="submit" class="btn btn-primary">Enviar Link</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+@endsection`,
+		filepath.Join(path, "app", "views", "auth", "reset.joss.html"): `@extends('layouts.master')
+
+@section('content')
+<div class="container mt-5">
+    <div class="row justify-content-center">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">Restablecer Contraseña</div>
+                <div class="card-body">
+                    <div class="alert alert-danger" style="display: {{ $error ? 'block' : 'none' }}">
+                        {{ $error }}
+                    </div>
+
+                    <form method="POST" action="/password/reset">
+                        {{ csrf_field() }}
+                        <input type="hidden" name="token" value="{{ $token }}">
+                        
+                        <div class="mb-3">
+                            <label>Nueva Contraseña</label>
+                            <input type="password" name="password" class="form-control" required>
+                        </div>
+                        
+                        <button type="submit" class="btn btn-primary">Cambiar Contraseña</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+@endsection`,
 		filepath.Join(path, "app", "views", "dashboard", "index.joss.html"): `@extends('layouts.master')
 
 @section('content')

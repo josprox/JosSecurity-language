@@ -63,3 +63,15 @@ Este documento sirve como memoria persistente para futuros agentes que trabajen 
     - **Watchdog**: Se implementó supresión dinámica para WebSockets (`Upgrade: websocket`) y SSE.
     - **Runtime Noise**: Se parcheó `evaluator_call.go` para ignorar llamadas a funciones `nil` silenciosamente, eliminando errores causados por ambigüedad del parser en código sin `;`.
     - **Nginx Proxies**: En paneles como HestiaCP, `proxy_hide_header Upgrade;` debe ser ELIMINADO de las plantillas para permitir WebSockets.
+
+### 8. Integración de Servicios Externos y Sintaxis Estricta (Sesión 13/01/2026)
+- **Sintaxis Estricta (CRÍTICO)**:
+  - **Prohibido `if/else`**: El parser NO soporta `if` ni bloques sueltos.
+  - **Ternarios Anidados**: Para flujo complejo, usar ternarios anidados con bloques: `cond ? { ... } : { cond2 ? { ... } : { ... } }`.
+  - **No Chaining**: No usar expresiones encadenadas `(a, b, c)` dentro de los bloques.
+- **Servicios Systemd (Linux)**:
+  - **Permisos de Escritura**: Los servicios corren como usuario `joss` (u otro). Scripts en Python/Node que intenten crear logs o temporales en el directorio del proyecto FALLARÁN si no tienen permisos (Crash al inicio).
+  - **Solución**: Envolver creación de directorios/logs en `try-except` (Python) o verificar permisos. No dejar que un log falle la carga del servicio.
+  - **Networking Local**: Usar SIEMPRE `127.0.0.1` en lugar de `localhost` para llamadas `curl` internas (`System::Run`). `localhost` puede resolver a IPv6 (`::1`) y fallar si el servicio (Flask/Express) solo escucha en IPv4.
+- **JSON Parsing**:
+  - Se robusteció `JSON::parse()` en el núcleo para ignorar BOM y espacios, pero es mejor asegurar que los servicios retornen JSON limpio.
