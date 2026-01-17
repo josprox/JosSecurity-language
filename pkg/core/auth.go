@@ -206,7 +206,7 @@ func (r *Runtime) executeAuthMethod(instance *Instance, method string, args []in
 				}
 			}
 
-			update := fmt.Sprintf("UPDATE %s SET verificado = 1, user_token = '' WHERE id = ?", usersTable)
+			update := fmt.Sprintf("UPDATE %s SET verificado = 1 WHERE id = ?", usersTable)
 			_, err = r.DB.Exec(update, id)
 
 			if err == nil {
