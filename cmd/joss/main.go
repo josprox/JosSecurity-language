@@ -144,6 +144,8 @@ func main() {
 			return
 		}
 		handleUserStorage(os.Args[2])
+	case "brevo:config":
+		handleBrevoConfig()
 	case "version":
 		fmt.Printf("%s v%s (%s)\n", version.Name, version.Version, version.NameVersion)
 	case "ai:activate":

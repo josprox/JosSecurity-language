@@ -1187,3 +1187,47 @@ Puedes usar el helper global `__` en tus plantillas HTML:
 <h1>{{ __("welcome") }}</h1>
 <p>{{ __("hello", {"name": auth_user.name}) }}</p>
 ```
+
+---
+
+## SmtpClient
+
+Cliente SMTP nativo con soporte para SSL/TLS, autenticación, timeouts y API alternativa (Brevo).
+
+### Métodos
+
+#### `auth(string $user, string $pass)`
+Configura las credenciales SMTP.
+```joss
+$mail = new SmtpClient()
+$mail->auth("user@example.com", "secret")
+```
+
+#### `secure(bool $enable)`
+Habilita o deshabilita seguridad explícita (STARTTLS). Por defecto es `false` pero puertos como 587 suelen activarlo automáticamente si el servidor lo soporta.
+
+#### `timeout(int $seconds)`
+Establece el tiempo máximo de espera para la conexión y envío. Por defecto **30 segundos**.
+```joss
+$mail->timeout(10) // 10 segundos
+```
+
+#### `lastError()`
+Retorna el último error ocurrido durante el intento de envío. Útil para depuración cuando `send()` retorna `false`.
+```joss
+$error = $mail->lastError()
+```
+
+#### `send(string $to, string $subject, string $body)`
+Envía el correo electrónico. Retorna `true` si fue exitoso, `false` en caso contrario.
+
+Esta función tiene soporte dual:
+1. **SMTP Estándar**: Usa `MAIL_HOST`, `MAIL_PORT` del entorno.
+2. **Brevo API**: Si `BREVO_API` está definido en `env.joss`, enviará el correo vía HTTP, ignorando puertos SMTP bloqueados.
+
+```joss
+$ok = $mail->send("dest@mail.com", "Asunto", "<h1>Hola</h1>")
+if (!$ok) {
+    Print("Error: " . $mail->lastError())
+}
+```

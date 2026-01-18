@@ -95,6 +95,7 @@ func printHelp() {
 	fmt.Printf("  change db prefix [pref] - %s\n", tr("changeDBPrefix"))
 	fmt.Printf("  userstorage [provider]  - %s\n", tr("settingsUserStorage"))
 	fmt.Printf("  ai:activate             - %s\n", tr("IaActivate"))
+	fmt.Printf("  brevo:config            - %s\n", tr("brevoConfig"))
 	fmt.Printf("  version                 - %s\n", tr("version"))
 	fmt.Printf("  help                    - %s\n", tr("helpPrint"))
 }

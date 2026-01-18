@@ -83,5 +83,9 @@
   "helpPrint": "このヘルプを表示する",
   "@helpPrint": {
     "description": ""
+  },
+  "brevoConfig": "Configure interactive Brevo API (Email)",
+  "@brevoConfig": {
+    "description": ""
   }
 }

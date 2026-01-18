@@ -187,6 +187,19 @@ joss ai:activate
 3. Solicita la API Key.
 4. Actualiza `env.joss` (o `.env`) automáticamente.
 
+### `joss brevo:config`
+
+Configura interactivamente la integración con Brevo API para el envío de correos, ideal para entornos donde el puerto 587 (SMTP) está bloqueado.
+
+```bash
+joss brevo:config
+```
+
+**Proceso**:
+1. Pregunta si deseas activar la integración API.
+2. Solicita la **API Key** de Brevo.
+3. Actualiza `env.joss` automáticamente.
+
 ### `joss change db [motor]`
 
 Cambia el motor de base de datos y migra los datos.

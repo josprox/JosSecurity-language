@@ -83,5 +83,9 @@
   "helpPrint": "ഈ സഹായം കാണിക്കൂ",
   "@helpPrint": {
     "description": ""
+  },
+  "brevoConfig": "Configure interactive Brevo API (Email)",
+  "@brevoConfig": {
+    "description": ""
   }
 }

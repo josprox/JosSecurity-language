@@ -9,6 +9,7 @@ import (
 	"net"
 	"net/http"
 	"net/smtp"
+	"strings"
 	"time"
 )
 
@@ -208,15 +209,44 @@ func (r *Runtime) executeSmtpClientMethod(instance *Instance, method string, arg
 				return false
 			}
 
-			msg := []byte("From: " + user + "\r\n" +
-				"To: " + to + "\r\n" +
-				"Subject: " + subject + "\r\n" +
-				"MIME-Version: 1.0\r\n" +
-				"Content-Type: text/html; charset=\"UTF-8\"\r\n" +
-				"\r\n" +
-				body + "\r\n")
+			// Construct From Header
+			fromHeader := user
+			if name, ok := r.Env["MAIL_FROM_NAME"]; ok && name != "" {
+				fromHeader = fmt.Sprintf("\"%s\" <%s>", name, user)
+			}
 
-			_, err = w.Write(msg)
+			// Generate Message-ID
+			domain := "localhost"
+			if parts := strings.Split(user, "@"); len(parts) > 1 {
+				domain = parts[1]
+			}
+			msgId := fmt.Sprintf("<%d.%s@%s>", time.Now().UnixNano(), "jossecurity", domain)
+
+			cleanHeader := func(s string) string {
+				s = strings.ReplaceAll(s, "\r", "")
+				s = strings.ReplaceAll(s, "\n", "")
+				return strings.TrimSpace(s)
+			}
+
+			// Build Message
+			header := make(map[string]string)
+			header["From"] = cleanHeader(fromHeader)
+			header["To"] = cleanHeader(to)
+			header["Subject"] = cleanHeader(subject)
+			header["Date"] = time.Now().Format(time.RFC1123Z)
+			header["Message-Id"] = msgId
+			header["MIME-Version"] = "1.0"
+			header["Content-Type"] = "text/html; charset=\"UTF-8\""
+
+			var msg bytes.Buffer
+			for k, v := range header {
+				msg.WriteString(fmt.Sprintf("%s: %s\r\n", k, v))
+			}
+			msg.WriteString("\r\n")
+			msg.WriteString(body)
+			msg.WriteString("\r\n")
+
+			_, err = w.Write(msg.Bytes())
 			if err != nil {
 				setError(fmt.Sprintf("Error writing body: %v", err))
 				return false

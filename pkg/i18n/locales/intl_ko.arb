@@ -83,5 +83,9 @@
   "helpPrint": "이 도움말 표시",
   "@helpPrint": {
     "description": ""
+  },
+  "brevoConfig": "Configure interactive Brevo API (Email)",
+  "@brevoConfig": {
+    "description": ""
   }
 }
