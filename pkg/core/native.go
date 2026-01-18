@@ -47,7 +47,7 @@ func (r *Runtime) RegisterNativeClasses() {
 	r.Variables["System"] = &Instance{Class: r.Classes["System"], Fields: make(map[string]interface{})}
 
 	// SmtpClient
-	r.registerNative("SmtpClient", []string{"auth", "secure", "send"}, (*Runtime).executeSmtpClientMethod)
+	r.registerNative("SmtpClient", []string{"auth", "secure", "send", "timeout", "lastError"}, (*Runtime).executeSmtpClientMethod)
 
 	// Cron
 	r.registerNative("Cron", []string{"schedule"}, (*Runtime).executeCronMethod)
