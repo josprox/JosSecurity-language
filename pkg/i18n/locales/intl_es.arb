@@ -83,6 +83,5 @@
   "helpPrint": "Muestra esta ayuda",
   "@helpPrint": {
     "description": ""
-  },
-
+  }
 }

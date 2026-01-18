@@ -1,9 +1,13 @@
 package core
 
 import (
+	"bytes"
 	"crypto/tls"
+	"encoding/json"
 	"fmt"
+	"io"
 	"net"
+	"net/http"
 	"net/smtp"
 	"time"
 )
@@ -79,6 +83,56 @@ func (r *Runtime) executeSmtpClientMethod(instance *Instance, method string, arg
 				pass = p
 			}
 
+			// BREVO API LOGIC
+			if apiKey, ok := r.Env["BREVO_API"]; ok && apiKey != "" {
+				// Construct Payload
+				sender := map[string]string{"email": user}
+				if name, ok := r.Env["MAIL_FROM_NAME"]; ok {
+					sender["name"] = name
+				}
+
+				payload := map[string]interface{}{
+					"sender":      sender,
+					"to":          []map[string]string{{"email": to}},
+					"subject":     subject,
+					"htmlContent": body,
+				}
+
+				jsonPayload, err := json.Marshal(payload)
+				if err != nil {
+					setError(fmt.Sprintf("Brevo Payload Error: %v", err))
+					return false
+				}
+
+				req, err := http.NewRequest("POST", "https://api.brevo.com/v3/smtp/email", bytes.NewBuffer(jsonPayload))
+				if err != nil {
+					setError(fmt.Sprintf("Brevo Request Error: %v", err))
+					return false
+				}
+
+				req.Header.Set("accept", "application/json")
+				req.Header.Set("content-type", "application/json")
+				req.Header.Set("api-key", apiKey)
+
+				client := &http.Client{Timeout: 10 * time.Second}
+				resp, err := client.Do(req)
+				if err != nil {
+					setError(fmt.Sprintf("Brevo Connection Error: %v", err))
+					return false
+				}
+				defer resp.Body.Close()
+
+				if resp.StatusCode == 201 || resp.StatusCode == 200 {
+					fmt.Println("[SmtpClient] Correo enviado exitosamente vía Brevo API a " + to)
+					return true
+				}
+
+				bodyBytes, _ := io.ReadAll(resp.Body)
+				setError(fmt.Sprintf("Brevo API Error (%d): %s", resp.StatusCode, string(bodyBytes)))
+				return false
+			}
+
+			// STANDARD SMTP LOGIC
 			// Timeout logic (Default 30s)
 			timeout := 30 * time.Second
 			if t, ok := instance.Fields["timeout"]; ok {
