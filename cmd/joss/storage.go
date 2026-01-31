@@ -91,7 +91,7 @@ func configureOCI() {
 }
 
 func updateEnvVariable(key, value string) {
-	envPath := "env.joss"
+	envPath := GetEnvFile()
 	content, err := os.ReadFile(envPath)
 	if err != nil {
 		fmt.Printf("Error leyendo env.joss: %v\n", err)
@@ -292,7 +292,7 @@ func migrateFromOCI() {
 
 func loadEnvMap() map[string]string {
 	m := make(map[string]string)
-	content, err := os.ReadFile("env.joss")
+	content, err := os.ReadFile(GetEnvFile())
 	if err == nil {
 		lines := strings.Split(string(content), "\n")
 		for _, line := range lines {

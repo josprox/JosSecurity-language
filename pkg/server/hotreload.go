@@ -93,7 +93,7 @@ func watchChanges() {
 			// The previous edit likely added `ext := ...` again.
 			// I will replace the block to be clean.
 			ext := filepath.Ext(path)
-			if ext == ".joss" || ext == ".html" || ext == ".css" || ext == ".js" || ext == ".scss" || ext == ".arb" || filepath.Base(path) == "package.json" {
+			if ext == ".joss" || ext == ".html" || ext == ".css" || ext == ".js" || ext == ".scss" || ext == ".arb" || filepath.Base(path) == "package.json" || filepath.Base(path) == ".env" || filepath.Base(path) == "env.joss" {
 				fileHashes[path] = getHash(path)
 			}
 		}
@@ -148,6 +148,19 @@ func watchChanges() {
 					fileHashes[path] = currentHash
 					changedPaths = append(changedPaths, path)
 					fmt.Printf("[HotReload] Nuevo archivo detectado: %s\n", path)
+				}
+			} else if filepath.Base(path) == ".env" || filepath.Base(path) == "env.joss" {
+				currentHash := getHash(path)
+				if lastHash, ok := fileHashes[path]; ok {
+					if currentHash != lastHash {
+						fileHashes[path] = currentHash
+						changedPaths = append(changedPaths, path)
+						fmt.Printf("[HotReload] Cambio detectado en entorno: %s\n", path)
+					}
+				} else {
+					fileHashes[path] = currentHash
+					changedPaths = append(changedPaths, path)
+					fmt.Printf("[HotReload] Nuevo archivo entorno detectado: %s\n", path)
 				}
 			}
 			return nil
@@ -246,7 +259,7 @@ func reloadApp(changedFile string) {
 		}
 	}
 
-	if changedFile != "" && strings.HasSuffix(changedFile, "env.joss") {
+	if changedFile != "" && (strings.HasSuffix(changedFile, "env.joss") || strings.HasSuffix(changedFile, ".env")) {
 		fmt.Println("Recargando entorno...")
 		if currentRuntime != nil {
 			currentRuntime.LoadEnv(GlobalFileSystem)

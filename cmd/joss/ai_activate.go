@@ -67,12 +67,12 @@ func activateAI() {
 		fmt.Println("⚠️  Advertencia: No ingresaste API Key. Deberás ponerla manualmente en .env")
 	}
 
-	// 4. Guardar en .env
-	envFile := "env.joss"
-	if _, err := os.Stat("env.joss"); os.IsNotExist(err) {
-		if _, err := os.Stat(".env"); err == nil {
-			envFile = ".env"
-		}
+	// 4. Guardar en .env o env.joss
+	envFile := ".env"
+	if _, err := os.Stat("env.joss"); err == nil {
+		envFile = "env.joss"
+	} else if _, err := os.Stat(".env"); err == nil {
+		envFile = ".env"
 	}
 
 	fmt.Printf("\nGuardando configuración en %s...\n", envFile)

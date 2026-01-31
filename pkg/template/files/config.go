@@ -16,7 +16,7 @@ func GetConfigFiles(path string) map[string]string {
     }
 }`,
 		filepath.Join(path, "env.joss"): `APP_ENV="development"
-PORT="8000"
+PORT="80"
 
 # Database Configuration (sqlite or mysql)
 DB="sqlite"

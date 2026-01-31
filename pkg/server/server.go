@@ -34,7 +34,7 @@ func Start(fileSystem http.FileSystem) {
 	// Start File Watcher
 	go watchChanges()
 
-	port := "8000"
+	port := "80"
 	if val, ok := currentRuntime.Env["PORT"]; ok && val != "" {
 		port = val
 	}

@@ -9,6 +9,16 @@ import (
 	"github.com/jossecurity/joss/pkg/i18n"
 )
 
+func GetEnvFile() string {
+	if _, err := os.Stat("env.joss"); err == nil {
+		return "env.joss"
+	}
+	if _, err := os.Stat(".env"); err == nil {
+		return ".env"
+	}
+	return "env.joss"
+}
+
 func readEnvFile(path string) map[string]string {
 	m := make(map[string]string)
 	content, _ := ioutil.ReadFile(path)

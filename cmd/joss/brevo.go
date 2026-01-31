@@ -16,10 +16,14 @@ func handleBrevoConfig() {
 	response = strings.TrimSpace(strings.ToLower(response))
 
 	envPath := "env.joss"
-	// Check if env.joss exists
+	// Check if env.joss exists, if not check .env
 	if _, err := os.Stat(envPath); os.IsNotExist(err) {
-		fmt.Println("Error: No se encontró el archivo env.joss en el directorio actual.")
-		return
+		if _, err := os.Stat(".env"); err == nil {
+			envPath = ".env"
+		} else {
+			fmt.Println("Error: No se encontró el archivo env.joss ni .env en el directorio actual.")
+			return
+		}
 	}
 
 	if response == "y" || response == "yes" || response == "s" || response == "si" {

@@ -199,6 +199,25 @@ func (r *Runtime) LoadEnv(fs http.FileSystem) {
 		}
 	}
 
+	// 3. Last resort: Try .env (Standard Dotenv)
+	if len(content) == 0 {
+		if fs != nil {
+			f, err := fs.Open(".env")
+			if err == nil {
+				defer f.Close()
+				stat, _ := f.Stat()
+				content = make([]byte, stat.Size())
+				f.Read(content)
+				fmt.Println("[Security] Cargando configuración desde .env")
+			}
+		} else {
+			content, err = os.ReadFile(".env")
+			if err == nil {
+				fmt.Println("[Security] Cargando configuración desde .env")
+			}
+		}
+	}
+
 	if len(content) == 0 {
 		// Try looking in parent directories (Dev fallback)
 		if fs == nil {

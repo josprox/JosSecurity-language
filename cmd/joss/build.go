@@ -27,7 +27,7 @@ func buildWeb() {
 	// 1. Validate Structure (Strict Topology)
 	required := []string{
 		"main.joss",
-		"env.joss",
+		// "env.joss", // Handled dynamically
 		"app",
 		"config",
 		"api.joss",
@@ -37,6 +37,14 @@ func buildWeb() {
 		if _, err := os.Stat(f); os.IsNotExist(err) {
 			fmt.Printf("Error de Arquitectura: Falta archivo/directorio requerido '%s'\n", f)
 			fmt.Println("La Biblia de JosSecurity requiere una estructura estricta.")
+			return
+		}
+	}
+
+	// Check for environment file (env.joss OR .env)
+	if _, err := os.Stat("env.joss"); os.IsNotExist(err) {
+		if _, err := os.Stat(".env"); os.IsNotExist(err) {
+			fmt.Println("Error de Arquitectura: Falta archivo de entorno ('env.joss' o '.env')")
 			return
 		}
 	}
@@ -127,9 +135,16 @@ func buildWeb() {
 	}
 
 	// 4. Create nginx_port.conf
-	port := getEnvPort("env.joss")
+	envFile := "env.joss"
+	if _, err := os.Stat(envFile); os.IsNotExist(err) {
+		if _, err := os.Stat(".env"); err == nil {
+			envFile = ".env"
+		}
+	}
+
+	port := getEnvPort(envFile)
 	if port == "" {
-		port = "8000" // Default default
+		port = "80" // Default default (changed to 80)
 	}
 
 	nginxContent := fmt.Sprintf("set $joss_port %s;", port)
@@ -230,8 +245,15 @@ func buildProgram() {
 		return nil
 	})
 
-	// Handle env.joss separately (Encrypt it)
-	if data, err := ioutil.ReadFile("env.joss"); err == nil {
+	// Handle env.joss/.env separately (Encrypt it)
+	envPath := "env.joss"
+	if _, err := os.Stat(envPath); os.IsNotExist(err) {
+		if _, err := os.Stat(".env"); err == nil {
+			envPath = ".env"
+		}
+	}
+
+	if data, err := ioutil.ReadFile(envPath); err == nil {
 		if _, err := os.Stat("database.sqlite"); err == nil {
 			override := "\nDB_PATH=\"Storage/database.sqlite\""
 			data = append(data, []byte(override)...)
@@ -374,9 +396,19 @@ func copyDir(src string, dst string) error {
 }
 
 func encryptEnvTo(destPath string) {
-	data, err := ioutil.ReadFile("env.joss")
+	envPath := "env.joss"
+	if _, err := os.Stat(envPath); os.IsNotExist(err) {
+		if _, err := os.Stat(".env"); err == nil {
+			envPath = ".env"
+		} else {
+			fmt.Printf("Error: No se encontró env.joss ni .env para encriptar.\n")
+			return
+		}
+	}
+
+	data, err := ioutil.ReadFile(envPath)
 	if err != nil {
-		fmt.Printf("Error leyendo env.joss: %v\n", err)
+		fmt.Printf("Error leyendo %s: %v\n", envPath, err)
 		return
 	}
 

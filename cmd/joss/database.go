@@ -17,7 +17,7 @@ func changeDatabaseEngine(target string) {
 	fmt.Printf("Cambiando motor de base de datos a: %s\n", target)
 
 	// 1. Read current env
-	envMap := readEnvFile("env.joss")
+	envMap := readEnvFile(GetEnvFile())
 	currentDB := envMap["DB"]
 	if currentDB == "" {
 		currentDB = "mysql" // Default
@@ -148,8 +148,8 @@ func changeDatabaseEngine(target string) {
 	}
 
 	// 6. Update env.joss
-	updateEnvFile("env.joss", "DB", target)
-	fmt.Println("Migración completada. Archivo env.joss actualizado.")
+	updateEnvFile(GetEnvFile(), "DB", target)
+	fmt.Printf("Migración completada. Archivo %s actualizado.\n", GetEnvFile())
 }
 
 func connectToDB(driver string, env map[string]string) (*sql.DB, error) {
@@ -195,7 +195,7 @@ func changeDatabasePrefix(newPrefix string) {
 	fmt.Printf("Cambiando prefijo de base de datos a: %s\n", newPrefix)
 
 	// 1. Read current env
-	envMap := readEnvFile("env.joss")
+	envMap := readEnvFile(GetEnvFile())
 	currentPrefix := envMap["PREFIX"]
 	if currentPrefix == "" {
 		currentPrefix = "js_" // Default
@@ -255,7 +255,7 @@ func changeDatabasePrefix(newPrefix string) {
 	updateSourceCodePrefix(currentPrefix, newPrefix)
 
 	// 6. Update env.joss
-	updateEnvFile("env.joss", "PREFIX", newPrefix)
+	updateEnvFile(GetEnvFile(), "PREFIX", newPrefix)
 	fmt.Printf("Prefijo actualizado. %d tablas renombradas.\n", count)
 }
 
