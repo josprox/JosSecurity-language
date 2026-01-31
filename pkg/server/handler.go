@@ -132,6 +132,19 @@ func MainHandler(w http.ResponseWriter, r *http.Request) {
 	}()
 
 	// Handle Favicon
+	// CORS Headers
+	if origin := r.Header.Get("Origin"); origin != "" {
+		w.Header().Set("Access-Control-Allow-Origin", origin)
+		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Requested-With, X-CSRF-TOKEN")
+		w.Header().Set("Access-Control-Allow-Credentials", "true")
+
+		if r.Method == "OPTIONS" {
+			w.WriteHeader(http.StatusOK)
+			return
+		}
+	}
+
 	if r.URL.Path == "/favicon.ico" {
 		if _, err := os.Stat("assets/logo.png"); err == nil {
 			http.ServeFile(w, r, "assets/logo.png")
