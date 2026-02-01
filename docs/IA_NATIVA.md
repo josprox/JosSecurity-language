@@ -2,7 +2,17 @@
 
 JosSecurity incluye ahora soporte nativo para Inteligencia Artificial ("Spring AI Style"), permitiendo interactuar con LLMs (Groq, OpenAI, Gemini) directamente desde el lenguaje sin dependencias externas.
 
-## Configuración (.env)
+## Configuración Rápida (CLI) 🚀
+
+Puedes configurar tu proveedor de IA interactivamente con un solo comando:
+
+```bash
+joss ai:activate
+```
+
+Este asistente te guiará para elegir el proveedor (Groq, OpenAI, Gemini) y guardar tu API Key automáticamente.
+
+## Configuración Manual (.env)
 
 Debes configurar tus claves de API en el archivo `.env`:
 

@@ -86,12 +86,6 @@ func watchChanges() {
 	// Initial scan
 	filepath.Walk(".", func(path string, info os.FileInfo, err error) error {
 		if err == nil && !info.IsDir() {
-			// ext is already declared above if checking duplicate lines, but based on error it seems I added it twice.
-			// Checking context:
-			// output from view might be needed but I'll trust the error.
-			// better to match exact content.
-			// The previous edit likely added `ext := ...` again.
-			// I will replace the block to be clean.
 			ext := filepath.Ext(path)
 			if ext == ".joss" || ext == ".html" || ext == ".css" || ext == ".js" || ext == ".scss" || ext == ".arb" || filepath.Base(path) == "package.json" || filepath.Base(path) == ".env" || filepath.Base(path) == "env.joss" {
 				fileHashes[path] = getHash(path)

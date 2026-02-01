@@ -545,6 +545,11 @@ MAIL_USER="tu_email@gmail.com"
 MAIL_PASS="tu_password"
 ```
 
+> [!TIP]
+> **Integración Brevo (Sendinblue)**: Si tienes problemas con el puerto 587 o prefieres usar API, usa el comando:
+> `joss brevo:config`
+> Esto configurará automáticamente el entorno para enviar correos vía HTTP API.
+
 ---
 
 ## Response
@@ -786,6 +791,7 @@ Queue::push("enviar_email", {"to": "user@example.com"})
 
 Comunicación en tiempo real.
 
+```joss
 WebSocket::broadcast("mensaje", {"texto": "Hola a todos"})
 ```
 

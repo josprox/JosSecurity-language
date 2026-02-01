@@ -79,7 +79,7 @@ joss server start
 ```
 
 **Características**:
-- Hot reload automático
+- Hot reload automático (Código, Vistas y Variables de Entorno)
 - Compilación de SCSS a CSS
 - WebSocket para live reload
 - Servidor de archivos estáticos

@@ -246,8 +246,17 @@ func (r *Runtime) LoadEnv(fs http.FileSystem) {
 			val := strings.TrimSpace(parts[1])
 			// Remove quotes if present
 			val = strings.Trim(val, "\"")
-			val = strings.Trim(val, "'")
 			r.Env[key] = val
+		}
+	}
+
+	// 4. Override with System Environment Variables (Docker/System Priority)
+	for _, env := range os.Environ() {
+		parts := strings.SplitN(env, "=", 2)
+		if len(parts) == 2 {
+			k := parts[0]
+			v := parts[1]
+			r.Env[k] = v
 		}
 	}
 

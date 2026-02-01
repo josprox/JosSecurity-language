@@ -6,6 +6,17 @@ Guía completa de configuración de proyectos JosSecurity.
 
 Archivo principal de configuración con variables de entorno.
 
+### Precedencia de Carga
+
+JosSecurity carga las variables de entorno en el siguiente orden de prioridad (de mayor a menor):
+
+1.  **Variables del Sistema**: (Ej. Docker, Kubernetes, `export VAR=VAL`). Tienen la máxima prioridad y sobrescriben cualquier archivo.
+2.  **`env.joss`**: Archivo de configuración estándar para desarrollo.
+3.  **`env.enc`**: Archivo encriptado (solo producción).
+4.  **`.env`**: Compatibilidad con librerías estándar.
+
+Esto permite configurar secretos en plataformas como Dokploy o Kubernetes sin tocar el código.
+
 ### Estructura Básica
 
 ```bash
