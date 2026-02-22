@@ -2,6 +2,6 @@ package version
 
 const Name = "JosSecurity"
 
-const Version = "3.1.2"
+const Version = "3.1.3"
 
-const NameVersion = "NewYearVersion"
+const NameVersion = "StarPhotoVersion"
