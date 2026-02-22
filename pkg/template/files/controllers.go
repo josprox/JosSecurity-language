@@ -6,12 +6,12 @@ func GetControllerFiles(path string) map[string]string {
 	return map[string]string{
 		filepath.Join(path, "app", "controllers", "ProfileController.joss"): `class ProfileController {
     function index() {
-        $user = Auth.user()
-        return View.render("profile/index", {"user": $user, "title": "Mi Perfil"})
+        $user = Auth::user()
+        return View::render("profile/index", {"user": $user, "title": "Mi Perfil"})
     }
 
     function update() {
-        $id = Auth.user().id
+        $id = Auth::user()->id
         
         $data = {
             "first_name": Request::input("first_name"),
@@ -20,17 +20,17 @@ func GetControllerFiles(path string) map[string]string {
             "password":   Request::input("password")
         }
 
-        // Auth.update returns true/false
-        $success = Auth.update($id, $data)
+        // Auth::update returns true/false
+        $success = Auth::update($id, $data)
 
         return ($success) ? Response::redirect("/profile")->with("success", "Perfil actualizado correctamente.") : Response::back()->with("error", "Error al actualizar el perfil.")
     }
 
     function delete() {
-        $id = Auth.user().id
+        $id = Auth::user()->id
         
         // Remove account
-        $success = Auth.delete($id)
+        $success = Auth::delete($id)
 
         return ($success) ? {
             Auth::logout()
@@ -63,14 +63,14 @@ func GetControllerFiles(path string) map[string]string {
         $email = Request::input("email")
         $password = Request::input("password")
         
-        // Auth::attempt now checks for verification
-        var $acceso = Auth::attempt($email, $password)
+        // Auth::attempt checks credentials and verification
+        $acceso = Auth::attempt($email, $password)
         
         ($acceso) ? {
             return Response::redirect("/dashboard")->withCookie("joss_token", $acceso)
         } : {
             // Check if unverified and resend
-            var $newToken = Auth::resendVerification($email)
+            $newToken = Auth::resendVerification($email)
             
             ($newToken && $newToken != "already_verified") ? {
                  $link = Request::root() . "/verify/" . $newToken
@@ -96,11 +96,10 @@ func GetControllerFiles(path string) map[string]string {
         }
         
         // Create user - returns token on success, false on failure
-        var $token = Auth::create($data)
+        $token = Auth::create($data)
         
         ($token) ? {
             // Send Verification Email
-            // $link = env("APP_URL") . "/verify/" . $token
             $link = Request::root() . "/verify/" . $token
             $body = "<h1>Bienvenido a JosSecurity</h1><p>Por favor verifica tu cuenta haciendo click en el siguiente enlace:</p><a href='" . $link . "'>Verificar Cuenta</a>"
             
@@ -131,7 +130,7 @@ func GetControllerFiles(path string) map[string]string {
         $email = Request::input("email")
         $password = Request::input("password")
         
-        var $token = Auth::attempt($email, $password)
+        $token = Auth::attempt($email, $password)
         
         ($token) ? {
             return Response::json({
@@ -158,7 +157,7 @@ func GetControllerFiles(path string) map[string]string {
             "phone": Request::input("phone")
         }
         
-        var $token = Auth::create($data)
+        $token = Auth::create($data)
         
         ($token) ? {
             // Send verification email logic could go here too
@@ -179,7 +178,7 @@ func GetControllerFiles(path string) map[string]string {
         $email = Request::input("email")
         $password = Request::input("password")
         
-        var $token = Auth::attempt($email, $password)
+        $token = Auth::attempt($email, $password)
         
         ($token) ? {
             return Response::json({
@@ -196,10 +195,9 @@ func GetControllerFiles(path string) map[string]string {
     }
 
     func refresh() {
-        
         $user = Auth::user()
         ($user) ? {
-            $newToken = Auth::refresh($user.id)
+            $newToken = Auth::refresh($user->id)
             return Response::json({
                 "status": "success",
                 "token": $newToken
@@ -212,7 +210,7 @@ func GetControllerFiles(path string) map[string]string {
     func delete() {
         $user = Auth::user()
         ($user) ? {
-            $deleted = Auth::delete($user.id)
+            $deleted = Auth::delete($user->id)
             ($deleted) ? {
                  return Response::json({"status": "success", "message": "User deleted"})
             } : {
@@ -228,7 +226,6 @@ func GetControllerFiles(path string) map[string]string {
         $token = Auth::forgotPassword($email)
         
         ($token) ? {
-            // Send email via SmtpClient manually if Auth::forgotPassword only returns token
             $link = Request::root() . "/password/reset?token=" . $token
             $body = "<h1>Recuperar Contraseña</h1><p>Has solicitado restablecer tu contraseña. Haz click aquí:</p><a href='" . $link . "'>Restablecer Contraseña</a>"
             SmtpClient::send($email, "Recuperar Contraseña", $body)
@@ -269,7 +266,7 @@ func GetControllerFiles(path string) map[string]string {
 		filepath.Join(path, "app", "controllers", "DashboardController.joss"): `class DashboardController {
     func index() {
         // Protect Route
-        var $check = Auth::check()
+        $check = Auth::check()
         (!$check) ? {
             return Response::redirect("/login")->with("error", "Debes iniciar sesión para ver esta página.")
         } : {}
@@ -287,7 +284,7 @@ func GetControllerFiles(path string) map[string]string {
 }`,
 		filepath.Join(path, "app", "controllers", "PasswordController.joss"): `class PasswordController {
     
-    // Mostar formulario de olvido
+    // Mostrar formulario de olvido
     function showForgot() {
         return View::render("auth.forgot", { "title": "Recuperar Contraseña" })
     }

@@ -88,3 +88,69 @@ Este documento sirve como memoria persistente para futuros agentes que trabajen 
 - **Tipado en Ejecución**:
   - Se soporta type hinting en parámetros de funciones: `function suma(int $a, int $b)`.
   - El operador `let` valida tipos estrictamente: `let int $x = 10`.
+
+### 10. Motor de Vistas (view.go) — Arquitectura y Reglas (Sesión 22/02/2026)
+
+**⚠️ CRÍTICO: Orden de procesamiento de plantillas**
+
+El motor de vistas en `pkg/core/view.go` procesa el HTML en este orden **secuencial**:
+
+1. `@extends` / `@yield` (herencia de layout)
+2. `@include` (inclusión de sub-vistas)
+3. **Block Ternaries**: `{{ ($cond) ? { ... } : { ... } }}`  ← **ANTES** de @foreach
+4. **`@foreach($list as $item) ... @endforeach`**
+5. Helpers: `{{ csrf_field() }}`, `{{ __('key') }}`
+6. Simple expressions: `{{ $var }}`, `{{ $expr }}`
+
+**Consecuencia directa**: Cualquier `{{ ($item["key"]) ? {...} : {...} }}` dentro de un bloque `@foreach` **FALLARÁ** porque los Block Ternaries se evalúan **antes** de que el loop inyecte `$item`.
+
+**Solución correcta**: Precomputar campos condicionales en el **controller** y pasarlos como campos del item:
+```joss
+// En el controller, ANTES de pasarlos a la vista:
+foreach ($items as $item) {
+    $item["is_online_label"] = ($item["is_online"]) ? "<span class=\"...\">Online</span>" : "<span class=\"...\">Offline</span>"
+}
+```
+Y en la vista usar `{{ $item.is_online_label }}` (dot notation, no bracket dentro de @foreach).
+
+**Notación de acceso en @foreach**: Dentro de @foreach, el motor soporta 3 estilos:
+1. `{{ $item.key }}` — dot notation ✅
+2. `{{ $item['key'] }}` — bracket single quote ✅
+3. `{{ $item["key"] }}` — bracket double quote ✅
+
+**FUERA de @foreach** (en `{{ expr }}`), se usa el evaluador JOSS completo.
+
+### 11. Auth::user() — Tipo de Retorno (Sesión 22/02/2026)
+
+- `Auth::user()` retorna `&Instance{Fields: map[string]interface{}}` — **NO un mapa**.
+- **Acceso correcto**: `$u->id`, `$u->username`, `$u->email`, `$u->role`, `$u->user_token`, `$u->name`, etc.
+- **Acceso INCORRECTO** (causa panic "No se puede indexar"): `$u["id"]`, `$u["username"]`, etc.
+- **Campos disponibles**: `id`, `username`, `first_name`, `last_name`, `full_name`, `email`, `phone`, `role_id`, `role`, `user_token`, `created_at`, `name`.
+- **Para el ID**: preferir `Auth::id()` que es directo y seguro.
+- **En vistas (templates)**: el motor reemplaza `{{ $auth_user }}`, `{{ $auth_role }}`, `{{ $auth_email }}` automáticamente desde la sesión.
+
+### 12. Declaración de Variables en JOSS (Sesión 22/02/2026)
+
+- `var $x = expr` — **EVITAR**: Es una declaración de tipo con validación estricta. Causa panic si el valor asignado es incompatible o nil.
+- `$x = expr` — **USAR SIEMPRE** para asignación simple sin type checking.
+- `let tipo $x = expr` — Para type hinting explícito (e.g., `let int $x = 5`).
+
+### 13. Clases Estáticas — Sintaxis (Sesión 22/02/2026)
+
+Todas las llamadas a clases nativas usan `::` nunca `.`:
+- `View::render()`, `Math::ceil()`, `Str::length()`, `JSON::parse()`, `JSON::encode()`, `JSON::stringify()`
+- `UUID::v4()`, `System::env()`, `System::Run()`, `System::log()`
+- `Response::redirect()`, `Response::json()`, `Response::error()`, `Response::raw()`
+- `Auth::user()`, `Auth::id()`, `Auth::check()`, `Auth::guest()`, `Auth::attempt()`
+- `Router::get()`, `Router::post()`, `Router::ws()`, `Router::group()`, `Router::middleware()`
+- `Request::input()`, `Request::file()`, `Request::root()`
+
+Instancias en cambio usan `->`: `$model->where()->get()`, `$req->input()`, etc.
+
+### 14. Sintaxis de Control de Flujo (Sesión 22/02/2026)
+
+- **NO usar `if/else`**: JOSS usa **ternarios** para control de flujo: `(cond) ? { ... } : { ... }`
+- **`return` dentro de ternarios** funciona correctamente (bubble-up implementado).
+- **`foreach`** para bucles: `foreach ($list as $item) { ... }`
+- **`empty($x)`** e **`isset($x)`** son funciones builtin válidas en JOSS.
+- **Operador `??`** (null-coalesce) soportado: `$x ?? "default"`.
