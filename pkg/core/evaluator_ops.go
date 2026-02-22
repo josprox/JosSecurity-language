@@ -390,10 +390,21 @@ func (r *Runtime) evaluateInfix(ie *parser.InfixExpression) interface{} {
 		}
 	}
 
-	lStr := fmt.Sprintf("%v", left)
-	rStr := fmt.Sprintf("%v", right)
-	if ie.Operator == "+" {
+	lStr := ""
+	rStr := ""
+	if left != nil {
+		lStr = fmt.Sprintf("%v", left)
+	}
+	if right != nil {
+		rStr = fmt.Sprintf("%v", right)
+	}
+
+	if ie.Operator == "." {
 		return lStr + rStr
+	}
+	if ie.Operator == "+" {
+		fmt.Println("Error: El operador '+' es solo para números. Use '.' para concatenar cadenas.")
+		return nil
 	}
 	if ie.Operator == "==" {
 		return lStr == rStr

@@ -88,15 +88,7 @@ func (r *Runtime) executeBlock(block *parser.BlockStatement) interface{} {
 	var result interface{}
 	for _, stmt := range block.Statements {
 		result = r.executeStatement(stmt)
-		// Early exit if it is a ReturnStatement
-		if _, ok := stmt.(*parser.ReturnStatement); ok {
-			// Debug Block Return (Explicit)
-			// fmt.Printf("[DEBUG] executeBlock explicitly returning: %v\n", result)
-			return result
-		}
 	}
-	// Debug Block Return
-	// fmt.Printf("[DEBUG] executeBlock result: %v\n", result)
 	return result
 }
 
@@ -141,12 +133,11 @@ func (r *Runtime) executeStatement(stmt parser.Statement) interface{} {
 }
 
 func (r *Runtime) executeReturn(rs *parser.ReturnStatement) interface{} {
+	var val interface{}
 	if rs.ReturnValue != nil {
-		val := r.evaluateExpression(rs.ReturnValue)
-		// fmt.Printf("[DEBUG] executeReturn: %v\n", val)
-		return val
+		val = r.evaluateExpression(rs.ReturnValue)
 	}
-	return nil
+	panic(&ReturnPanic{Value: val})
 }
 
 func (r *Runtime) executeImport(stmt *parser.ImportStatement) interface{} {
@@ -243,6 +234,11 @@ func (r *Runtime) executeDoWhile(dws *parser.DoWhileStatement) interface{} {
 func (r *Runtime) executeTryCatch(tcs *parser.TryCatchStatement) (result interface{}) {
 	defer func() {
 		if err := recover(); err != nil {
+			// Do NOT catch internal ReturnPanic
+			if rp, ok := err.(*ReturnPanic); ok {
+				panic(rp) // Let it bubble up
+			}
+
 			// Catch the error
 			// If err is a string (from throw "msg"), use it.
 			// If it's a runtime panic, convert to string.

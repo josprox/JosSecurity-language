@@ -73,8 +73,8 @@ func GetControllerFiles(path string) map[string]string {
             var $newToken = Auth::resendVerification($email)
             
             ($newToken && $newToken != "already_verified") ? {
-                 $link = Request::root() + "/verify/" + $newToken
-                 $body = "<h1>Verifica tu cuenta</h1><p>Hemos detectado un intento de inicio de sesión, pero tu cuenta no está verificada. Haz click aquí:</p><a href='" + $link + "'>Verificar Cuenta</a>"
+                 $link = Request::root() . "/verify/" . $newToken
+                 $body = "<h1>Verifica tu cuenta</h1><p>Hemos detectado un intento de inicio de sesión, pero tu cuenta no está verificada. Haz click aquí:</p><a href='" . $link . "'>Verificar Cuenta</a>"
                  
                  SmtpClient::send($email, "Verifica tu cuenta", $body)
                  
@@ -100,9 +100,9 @@ func GetControllerFiles(path string) map[string]string {
         
         ($token) ? {
             // Send Verification Email
-            // $link = env("APP_URL") + "/verify/" + $token
-            $link = Request::root() + "/verify/" + $token
-            $body = "<h1>Bienvenido a JosSecurity</h1><p>Por favor verifica tu cuenta haciendo click en el siguiente enlace:</p><a href='" + $link + "'>Verificar Cuenta</a>"
+            // $link = env("APP_URL") . "/verify/" . $token
+            $link = Request::root() . "/verify/" . $token
+            $body = "<h1>Bienvenido a JosSecurity</h1><p>Por favor verifica tu cuenta haciendo click en el siguiente enlace:</p><a href='" . $link . "'>Verificar Cuenta</a>"
             
             SmtpClient::send($data["email"], "Verifica tu cuenta", $body)
             
@@ -229,8 +229,8 @@ func GetControllerFiles(path string) map[string]string {
         
         ($token) ? {
             // Send email via SmtpClient manually if Auth::forgotPassword only returns token
-            $link = Request::root() + "/password/reset?token=" + $token
-            $body = "<h1>Recuperar Contraseña</h1><p>Has solicitado restablecer tu contraseña. Haz click aquí:</p><a href='" + $link + "'>Restablecer Contraseña</a>"
+            $link = Request::root() . "/password/reset?token=" . $token
+            $body = "<h1>Recuperar Contraseña</h1><p>Has solicitado restablecer tu contraseña. Haz click aquí:</p><a href='" . $link . "'>Restablecer Contraseña</a>"
             SmtpClient::send($email, "Recuperar Contraseña", $body)
 
             return Response::json({
@@ -260,7 +260,7 @@ func GetControllerFiles(path string) map[string]string {
         } : {
             return Response::json({
                 "status": "error",
-                "message": "Error al restablecer: " + $result
+                "message": "Error al restablecer: " . $result
             }, 400)
         }
     }
@@ -298,8 +298,8 @@ func GetControllerFiles(path string) map[string]string {
         $token = Auth::forgotPassword($email)
         
         ($token) ? {
-            $link = Request::root() + "/password/reset?token=" + $token
-            $body = "<h1>Recuperar Contraseña</h1><p>Has solicitado restablecer tu contraseña. Haz click aquí:</p><a href='" + $link + "'>Restablecer Contraseña</a>"
+            $link = Request::root() . "/password/reset?token=" . $token
+            $body = "<h1>Recuperar Contraseña</h1><p>Has solicitado restablecer tu contraseña. Haz click aquí:</p><a href='" . $link . "'>Restablecer Contraseña</a>"
             
             SmtpClient::send($email, "Recuperación de Contraseña", $body)
 
@@ -329,7 +329,7 @@ func GetControllerFiles(path string) map[string]string {
         } : {
             return View::render("auth.reset", { 
                 "token": $token, 
-                "error": "Error al restablecer: " + $result 
+                "error": "Error al restablecer: " . $result 
             })
         }
     }

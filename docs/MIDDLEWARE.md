@@ -31,7 +31,7 @@ class MiddlewareLoader {
             // se tomará el valor de la última iteración del loop.
             // Siempre use $mwName para buscar la configuración específica.
             
-            System::log("Ejecutando Middleware: " + $mwName)
+            System::log("Ejecutando Middleware: " . $mwName)
             
             // 2. Lógica del Middleware
             $token = Request::header("Authorization")

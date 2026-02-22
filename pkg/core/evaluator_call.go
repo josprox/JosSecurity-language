@@ -9,7 +9,7 @@ import (
 	"github.com/jossecurity/joss/pkg/parser"
 )
 
-func (r *Runtime) CallMethod(method *parser.MethodStatement, instance *Instance, args []parser.Expression) interface{} {
+func (r *Runtime) CallMethod(method *parser.MethodStatement, instance *Instance, args []parser.Expression) (res interface{}) {
 	// Native Method Support
 	if method.Body == nil {
 		evalArgs := []interface{}{}
@@ -19,22 +19,6 @@ func (r *Runtime) CallMethod(method *parser.MethodStatement, instance *Instance,
 
 		// Check for Static Class Call
 		if instance == nil {
-			// We need to pass the class name somehow.
-			// But executeNativeMethod expects *Instance.
-			// Let's modify executeNativeMethod or handle it here.
-			// For now, let's pass a dummy instance with the class name if possible,
-			// OR check if we can access the static class name from somewhere.
-			// Wait, CallMethod doesn't know the static class name unless we pass it.
-			// But we are calling this from applyFunction which has the BoundMethod.
-			// BoundMethod has StaticClass!
-			// But CallMethod signature is (method, instance, args).
-			// We should update CallMethod signature or handle nil instance in executeNativeMethod.
-			// But executeNativeMethod needs the class name.
-			// If instance is nil, we can't get class name.
-
-			// Alternative: Pass a synthetic instance for static calls.
-			// In evaluateMember, we returned instance=nil.
-			// Let's change evaluateMember to return a synthetic instance.
 			return nil
 		}
 
@@ -53,20 +37,28 @@ func (r *Runtime) CallMethod(method *parser.MethodStatement, instance *Instance,
 		}
 	}
 
-	// Execute body
-	res := r.executeBlock(method.Body)
+	defer func() {
+		if prevThis != nil {
+			r.Variables["this"] = prevThis
+		} else {
+			delete(r.Variables, "this")
+		}
+	}()
 
-	// Restore "this"
-	if prevThis != nil {
-		r.Variables["this"] = prevThis
-	} else {
-		delete(r.Variables, "this")
-	}
+	defer func() {
+		if p := recover(); p != nil {
+			if rp, ok := p.(*ReturnPanic); ok {
+				res = rp.Value
+			} else {
+				panic(p)
+			}
+		}
+	}()
 
-	return res
+	return r.executeBlock(method.Body)
 }
 
-func (r *Runtime) CallMethodEvaluated(method *parser.MethodStatement, instance *Instance, args []interface{}) interface{} {
+func (r *Runtime) CallMethodEvaluated(method *parser.MethodStatement, instance *Instance, args []interface{}) (res interface{}) {
 	// Native Method Support
 	if method.Body == nil {
 		return r.executeNativeMethod(instance, method.Name.Value, args)
@@ -83,17 +75,25 @@ func (r *Runtime) CallMethodEvaluated(method *parser.MethodStatement, instance *
 		}
 	}
 
-	// Execute body
-	res := r.executeBlock(method.Body)
+	defer func() {
+		if prevThis != nil {
+			r.Variables["this"] = prevThis
+		} else {
+			delete(r.Variables, "this")
+		}
+	}()
 
-	// Restore "this"
-	if prevThis != nil {
-		r.Variables["this"] = prevThis
-	} else {
-		delete(r.Variables, "this")
-	}
+	defer func() {
+		if p := recover(); p != nil {
+			if rp, ok := p.(*ReturnPanic); ok {
+				res = rp.Value
+			} else {
+				panic(p)
+			}
+		}
+	}()
 
-	return res
+	return r.executeBlock(method.Body)
 }
 
 func (r *Runtime) executeCall(call *parser.CallExpression) interface{} {
@@ -245,33 +245,22 @@ func (r *Runtime) callBuiltin(name string, args []interface{}) (interface{}, boo
 			future := &Future{
 				done: make(chan bool),
 			}
+			argVal := args[0]
 			go func() {
 				defer func() {
-					if r := recover(); r != nil {
-						future.err = fmt.Errorf("%v", r)
+					if p := recover(); p != nil {
+						if rp, ok := p.(*ReturnPanic); ok {
+							future.result = rp.Value
+						} else {
+							future.err = fmt.Errorf("%v", p)
+						}
 					}
 					close(future.done)
 				}()
-				// We need to execute the function body.
-				// But args[0] is already evaluated?
-				// Wait, async expects a function literal or call?
-				// If args[0] is a FunctionLiteral node (not evaluated), we can execute it.
-				// But evaluateExpression evaluates FunctionLiteral to... itself (it's an expression).
-				// Wait, parser.FunctionLiteral is an Expression. evaluateExpression returns *parser.FunctionLiteral?
-				// Let's check evaluateExpression for FunctionLiteral.
-				// It seems it returns the node itself (or we should wrap it).
-				// In my previous edit I added `evaluateExpression` for `FunctionLiteral`.
-				// Let's assume it returns the node.
 
-				argVal := args[0]
 				if fn, ok := argVal.(*parser.FunctionLiteral); ok {
-					// We need a Runtime instance here. 'r' is available via closure.
-					// But 'r' is not thread-safe if we modify variables.
-					// We should probably clone runtime or scope?
-					// For now, let's use 'r' but be careful.
-					// Actually, async usually implies new stack/scope.
-					// JosSecurity runtime is simple.
-					future.result = r.executeBlock(fn.Body)
+					newR := r.Fork() // Thread-safety clone
+					future.result = newR.executeBlock(fn.Body)
 				} else {
 					future.result = argVal
 				}

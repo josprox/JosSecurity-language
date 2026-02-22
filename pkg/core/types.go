@@ -51,6 +51,11 @@ type Channel struct {
 
 func (c *Channel) String() string { return "channel" }
 
+// ReturnPanic is used to bubble up ReturnStatements through the AST
+type ReturnPanic struct {
+	Value interface{}
+}
+
 // Wait blocks until the Future completes and returns the result
 func (f *Future) Wait() interface{} {
 	<-f.done

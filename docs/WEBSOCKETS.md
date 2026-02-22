@@ -24,10 +24,10 @@ class ChatController {
 
         // Evento: Al recibir mensaje
         $ws.onMessage(func($msg) {
-            print("Mensaje recibido: " + $msg)
+            print("Mensaje recibido: " . $msg)
             
             // Responder
-            $ws.send("Eco: " + $msg)
+            $ws.send("Eco: " . $msg)
         })
     }
 }
