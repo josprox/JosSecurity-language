@@ -7,6 +7,13 @@ import (
 
 // GranMySQL Implementation
 func (r *Runtime) executeGranMySQLMethod(instance *Instance, method string, args []interface{}) interface{} {
+	if instance == nil {
+		panic("Internal Error: Native method called with nil instance")
+	}
+	if instance.Fields == nil {
+		instance.Fields = make(map[string]interface{})
+	}
+
 	// Initialize internal state if needed
 	if _, ok := instance.Fields["_wheres"]; !ok {
 		instance.Fields["_wheres"] = []string{}
@@ -18,7 +25,10 @@ func (r *Runtime) executeGranMySQLMethod(instance *Instance, method string, args
 	switch method {
 	case "table":
 		if len(args) > 0 {
-			tableName := args[0].(string)
+			tableName, ok := args[0].(string)
+			if !ok {
+				panic(fmt.Sprintf("GranMySQL Error: table() expects string, got %T", args[0]))
+			}
 			instance.Fields["_table"] = quoteIdentifier(r.applyTablePrefix(tableName))
 		}
 		return instance // Return this for chaining
@@ -67,12 +77,12 @@ func (r *Runtime) executeGranMySQLMethod(instance *Instance, method string, args
 			col := instance.Fields["comparar"]
 			val := instance.Fields["comparable"]
 
-			if r.DB == nil {
+			if r.GetDB() == nil {
 				return "[]"
 			}
 
 			query := fmt.Sprintf("SELECT * FROM %v WHERE %v = ?", table, col)
-			rows, err := r.DB.Query(query, val)
+			rows, err := r.GetDB().Query(query, val)
 			if err != nil {
 				fmt.Printf("[GranMySQL] Error en where: %v\n", err)
 				return "[]"
@@ -211,14 +221,14 @@ func (r *Runtime) executeGranMySQLMethod(instance *Instance, method string, args
 	case "query":
 		if len(args) > 0 {
 			if sqlStr, ok := args[0].(string); ok {
-				if r.DB == nil {
+				if r.GetDB() == nil {
 					return nil
 				}
 
 				// Check if it is a SELECT query
 				trimmed := strings.ToUpper(strings.TrimSpace(sqlStr))
 				if strings.HasPrefix(trimmed, "SELECT") || strings.HasPrefix(trimmed, "SHOW") || strings.HasPrefix(trimmed, "DESCRIBE") {
-					rows, err := r.DB.Query(sqlStr)
+					rows, err := r.GetDB().Query(sqlStr)
 					if err != nil {
 						fmt.Printf("[GranMySQL] Error query SELECT: %v\n", err)
 						return nil
@@ -234,7 +244,7 @@ func (r *Runtime) executeGranMySQLMethod(instance *Instance, method string, args
 				}
 
 				// Otherwise Exec (INSERT, UPDATE, DELETE, ALTER...)
-				_, err := r.DB.Exec(sqlStr)
+				_, err := r.GetDB().Exec(sqlStr)
 				if err != nil {
 					fmt.Printf("[GranMySQL] Error query EXEC: %v\n", err)
 					return false

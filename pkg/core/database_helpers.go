@@ -85,6 +85,9 @@ func quoteIdentifier(name string) string {
 
 // applyTablePrefix adds prefix to table names
 func (r *Runtime) applyTablePrefix(name string) string {
+	if r.Env == nil {
+		return name
+	}
 	prefix := "js_"
 	if val, ok := r.Env["PREFIX"]; ok {
 		prefix = val
@@ -100,6 +103,9 @@ func (r *Runtime) applyTablePrefix(name string) string {
 
 // applyColumnPrefix adds prefix to table part of column name
 func (r *Runtime) applyColumnPrefix(name string) string {
+	if r.Env == nil {
+		return name
+	}
 	prefix := "js_"
 	if val, ok := r.Env["PREFIX"]; ok {
 		prefix = val

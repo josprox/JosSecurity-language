@@ -37,3 +37,17 @@ func (p *Program) String() string {
 	}
 	return out.String()
 }
+
+type Parameter struct {
+	Type Token // Optional: string, int, etc.
+	Name *Identifier
+}
+
+func (p *Parameter) String() string {
+	res := ""
+	if p.Type.Literal != "" && p.Type.Type != VAR { // VAR means $ which is not a type itself here
+		res += p.Type.Literal + " "
+	}
+	res += p.Name.String()
+	return res
+}

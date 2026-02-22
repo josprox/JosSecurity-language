@@ -8,8 +8,8 @@ import (
 // executeDeleteMethod handles delete operations for GranMySQL/GranDB
 // Usage: $model.where("id", 1).delete()
 func (r *Runtime) executeDeleteMethod(instance *Instance) interface{} {
-	if r.DB == nil {
-		return false
+	if r.GetDB() == nil {
+		panic("GranMySQL Error: No hay conexión a la base de datos configurada")
 	}
 
 	// Get table and where conditions
@@ -37,10 +37,9 @@ func (r *Runtime) executeDeleteMethod(instance *Instance) interface{} {
 	instance.Fields["_bindings"] = []interface{}{}
 
 	// Execute query
-	result, err := r.DB.Exec(query, bindings...)
+	result, err := r.GetDB().Exec(query, bindings...)
 	if err != nil {
-		fmt.Printf("[GranDB] Error delete: %v\n", err)
-		return false
+		panic(fmt.Sprintf("GranMySQL Error en delete: %v", err))
 	}
 
 	// Get affected rows
@@ -53,8 +52,8 @@ func (r *Runtime) executeDeleteMethod(instance *Instance) interface{} {
 // executeDeleteAllMethod handles delete all operations (without WHERE clause)
 // Usage: $model.deleteAll()
 func (r *Runtime) executeDeleteAllMethod(instance *Instance) interface{} {
-	if r.DB == nil {
-		return false
+	if r.GetDB() == nil {
+		panic("GranMySQL Error: No hay conexión a la base de datos configurada")
 	}
 
 	table := r.getTable(instance)
@@ -68,10 +67,9 @@ func (r *Runtime) executeDeleteAllMethod(instance *Instance) interface{} {
 	instance.Fields["_bindings"] = []interface{}{}
 
 	// Execute query
-	result, err := r.DB.Exec(query)
+	result, err := r.GetDB().Exec(query)
 	if err != nil {
-		fmt.Printf("[GranDB] Error deleteAll: %v\n", err)
-		return false
+		panic(fmt.Sprintf("GranMySQL Error en deleteAll: %v", err))
 	}
 
 	// Get affected rows
@@ -85,7 +83,7 @@ func (r *Runtime) executeDeleteAllMethod(instance *Instance) interface{} {
 // Usage: $model.truncate()
 // Note: TRUNCATE is faster but cannot be rolled back and resets auto-increment
 func (r *Runtime) executeTruncateMethod(instance *Instance) interface{} {
-	if r.DB == nil {
+	if r.GetDB() == nil {
 		return false
 	}
 
@@ -103,20 +101,20 @@ func (r *Runtime) executeTruncateMethod(instance *Instance) interface{} {
 		query = fmt.Sprintf("DELETE FROM %s", table)
 		fmt.Printf("[GranDB] Truncate Query (SQLite): %s\n", query)
 
-		_, err := r.DB.Exec(query)
+		_, err := r.GetDB().Exec(query)
 		if err != nil {
 			fmt.Printf("[GranDB] Error truncate: %v\n", err)
 			return false
 		}
 
 		// Reset auto-increment sequence
-		r.DB.Exec(fmt.Sprintf("DELETE FROM sqlite_sequence WHERE name='%s'", strings.TrimPrefix(table, "`")))
+		r.GetDB().Exec(fmt.Sprintf("DELETE FROM sqlite_sequence WHERE name='%s'", strings.TrimPrefix(table, "`")))
 	} else {
 		// MySQL has native TRUNCATE
 		query = fmt.Sprintf("TRUNCATE TABLE %s", table)
 		fmt.Printf("[GranDB] Truncate Query (MySQL): %s\n", query)
 
-		_, err := r.DB.Exec(query)
+		_, err := r.GetDB().Exec(query)
 		if err != nil {
 			fmt.Printf("[GranDB] Error truncate: %v\n", err)
 			return false

@@ -19,6 +19,9 @@ func (r *Runtime) Execute(program *parser.Program) {
 		if classStmt, ok := stmt.(*parser.ClassStatement); ok {
 			r.registerClass(classStmt)
 		}
+		if methodStmt, ok := stmt.(*parser.MethodStatement); ok {
+			r.Functions[methodStmt.Name.Value] = methodStmt
+		}
 	}
 
 	// Find and execute Main class Init main
@@ -125,6 +128,10 @@ func (r *Runtime) executeStatement(stmt parser.Statement) interface{} {
 		return r.executeThrow(s)
 	case *parser.ReturnStatement:
 		return r.executeReturn(s)
+	case *parser.BreakStatement:
+		return r.executeBreak(s)
+	case *parser.ContinueStatement:
+		return r.executeContinue(s)
 	case *parser.MethodStatement:
 		r.Functions[s.Name.Value] = s
 
@@ -138,6 +145,14 @@ func (r *Runtime) executeReturn(rs *parser.ReturnStatement) interface{} {
 		val = r.evaluateExpression(rs.ReturnValue)
 	}
 	panic(&ReturnPanic{Value: val})
+}
+
+func (r *Runtime) executeBreak(bs *parser.BreakStatement) interface{} {
+	panic(&BreakPanic{})
+}
+
+func (r *Runtime) executeContinue(cs *parser.ContinueStatement) interface{} {
+	panic(&ContinuePanic{})
 }
 
 func (r *Runtime) executeImport(stmt *parser.ImportStatement) interface{} {
@@ -188,20 +203,41 @@ func (r *Runtime) executeImport(stmt *parser.ImportStatement) interface{} {
 func (r *Runtime) executeForeach(fs *parser.ForeachStatement) interface{} {
 	iterable := r.evaluateExpression(fs.Iterable)
 
+	executeIter := func(item interface{}) (shouldBreak bool) {
+		defer func() {
+			if err := recover(); err != nil {
+				switch err.(type) {
+				case *BreakPanic:
+					shouldBreak = true
+				case *ContinuePanic:
+					// Just return from this closure, which continues the loop
+				default:
+					panic(err) // Bubble up Returns and others
+				}
+			}
+		}()
+		r.Variables[fs.Value] = item
+		r.executeBlock(fs.Body)
+		return false
+	}
+
 	if list, ok := iterable.([]interface{}); ok {
 		for _, item := range list {
-			r.Variables[fs.Value] = item
-			r.executeBlock(fs.Body)
+			if executeIter(item) {
+				break
+			}
 		}
 	} else if list, ok := iterable.([]map[string]interface{}); ok {
 		for _, item := range list {
-			r.Variables[fs.Value] = item
-			r.executeBlock(fs.Body)
+			if executeIter(item) {
+				break
+			}
 		}
 	} else if ch, ok := iterable.(*Channel); ok {
 		for item := range ch.Ch {
-			r.Variables[fs.Value] = item
-			r.executeBlock(fs.Body)
+			if executeIter(item) {
+				break
+			}
 		}
 	} else {
 		fmt.Printf("Error: Foreach espera un array o canal, se obtuvo: %T\n", iterable)
@@ -215,14 +251,54 @@ func (r *Runtime) executeWhile(ws *parser.WhileStatement) interface{} {
 		if !isTruthy(cond) {
 			break
 		}
-		r.executeBlock(ws.Body)
+
+		shouldBreak := false
+		func() {
+			defer func() {
+				if err := recover(); err != nil {
+					switch err.(type) {
+					case *BreakPanic:
+						shouldBreak = true
+					case *ContinuePanic:
+						// Skip
+					default:
+						panic(err)
+					}
+				}
+			}()
+			r.executeBlock(ws.Body)
+		}()
+
+		if shouldBreak {
+			break
+		}
 	}
 	return nil
 }
 
 func (r *Runtime) executeDoWhile(dws *parser.DoWhileStatement) interface{} {
 	for {
-		r.executeBlock(dws.Body)
+		shouldBreak := false
+		func() {
+			defer func() {
+				if err := recover(); err != nil {
+					switch err.(type) {
+					case *BreakPanic:
+						shouldBreak = true
+					case *ContinuePanic:
+						// Skip
+					default:
+						panic(err)
+					}
+				}
+			}()
+			r.executeBlock(dws.Body)
+		}()
+
+		if shouldBreak {
+			break
+		}
+
 		cond := r.evaluateExpression(dws.Condition)
 		if !isTruthy(cond) {
 			break
@@ -234,9 +310,10 @@ func (r *Runtime) executeDoWhile(dws *parser.DoWhileStatement) interface{} {
 func (r *Runtime) executeTryCatch(tcs *parser.TryCatchStatement) (result interface{}) {
 	defer func() {
 		if err := recover(); err != nil {
-			// Do NOT catch internal ReturnPanic
-			if rp, ok := err.(*ReturnPanic); ok {
-				panic(rp) // Let it bubble up
+			// Do NOT catch internal control flow panics
+			switch err.(type) {
+			case *ReturnPanic, *BreakPanic, *ContinuePanic:
+				panic(err) // Let it bubble up
 			}
 
 			// Catch the error

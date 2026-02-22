@@ -96,7 +96,7 @@ func (es *EchoStatement) String() string {
 type InitStatement struct {
 	Token      Token       // INIT
 	Name       *Identifier // main
-	Parameters []*Identifier
+	Parameters []*Parameter
 	Body       *BlockStatement
 }
 
@@ -155,7 +155,7 @@ func (is *ImportStatement) String() string {
 type MethodStatement struct {
 	Token      Token // FUNCTION
 	Name       *Identifier
-	Parameters []*Identifier
+	Parameters []*Parameter
 	Body       *BlockStatement
 }
 
@@ -265,3 +265,21 @@ func (rs *ReturnStatement) String() string {
 	out.WriteString(";")
 	return out.String()
 }
+
+// Control Flow: Break
+type BreakStatement struct {
+	Token Token // 'break'
+}
+
+func (bs *BreakStatement) statementNode()       {}
+func (bs *BreakStatement) TokenLiteral() string { return bs.Token.Literal }
+func (bs *BreakStatement) String() string       { return bs.Token.Literal + ";" }
+
+// Control Flow: Continue
+type ContinueStatement struct {
+	Token Token // 'continue'
+}
+
+func (cs *ContinueStatement) statementNode()       {}
+func (cs *ContinueStatement) TokenLiteral() string { return cs.Token.Literal }
+func (cs *ContinueStatement) String() string       { return cs.Token.Literal + ";" }

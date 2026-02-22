@@ -5,11 +5,10 @@ Este documento sirve como memoria persistente para futuros agentes que trabajen 
 ## Lecciones Aprendidas (Sesión 21/12/2025)
 
 ### 1. Intérprete JosSecurity - Comportamientos Clave
-- **Retornos Estrictos**: El intérprete detiene la ejecución de un bloque inmediatamente al encontrar un `ReturnStatement`.
+- **Retornos Estrictos**: El intérprete detiene la ejecución inmediatamente al encontrar un `ReturnStatement`, incluso dentro de bloques anidados, ternarios o bucles. Esto permite el uso de *Guard Clauses*.
 - **JSON Parsing**: `JSON::parse()` requiere estrictamente un `string`. Si pasas un objeto (como una lista de BD), retornará `nil` o fallará.
 - **Base de Datos**: `GranMySQL::get()` retorna un `[]map[string]interface{}` (Lista Nativa), NO un string JSON. No es necesario parsearlo.
-- **Foreach**: Soporta iteración sobre `[]interface{}` y `[]map[string]interface{}`.
-- **Prefix Expressions**: Operadores como `!` y `-` funcionan correctamente en el evaluador (`evaluatePrefix`).
+- **Concurrencia Aislada**: Las operaciones `async` y WebSockets usan `r.Fork()`, lo que garantiza que tengan su propia copia del mapa de variables, evitando condiciones de carrera.
 
 ### 2. Manejo de Archivos y Descargas
 - **Uploads**: Los archivos subidos se encuentran en `$file["content"]`, no en `tmp_name`. El servidor lee el contenido en memoria.
@@ -75,3 +74,17 @@ Este documento sirve como memoria persistente para futuros agentes que trabajen 
   - **Networking Local**: Usar SIEMPRE `127.0.0.1` en lugar de `localhost` para llamadas `curl` internas (`System::Run`). `localhost` puede resolver a IPv6 (`::1`) y fallar si el servicio (Flask/Express) solo escucha en IPv4.
 - **JSON Parsing**:
   - Se robusteció `JSON::parse()` en el núcleo para ignorar BOM y espacios, pero es mejor asegurar que los servicios retornen JSON limpio.
+
+### 9. Arquitectura Robusta y Control de Flujo (Sesión 22/02/2026)
+- **Thread-Safety (Crítico)**:
+  - Se implementó `Runtime.Fork()` con copia profunda de variables e instancias.
+  - El motor ahora es seguro para ejecuciones concurrentes masivas en WebSockets, Cron, Task y `async`.
+- **Propagación de Return (Bubble-Up)**:
+  - El comando `return` ahora burbujea correctamente a través de ternarios anidados y bloques.
+  - No es necesario usar "escaleras de envoltorio" para evitar ejecuciones posteriores; el early exit es confiable.
+- **Async/Await**:
+  - `async` ahora realiza el fork antes de la goroutine, eliminando condiciones de carrera con el hilo padre.
+  - La sintaxis recomendada es `await($future)` (con paréntesis) para asegurar el parsing como CallExpression.
+- **Tipado en Ejecución**:
+  - Se soporta type hinting en parámetros de funciones: `function suma(int $a, int $b)`.
+  - El operador `let` valida tipos estrictamente: `let int $x = 10`.

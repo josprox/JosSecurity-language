@@ -94,7 +94,7 @@ func (r *Runtime) Free() {
 
 // Fork creates a lightweight copy of the runtime for request isolation
 func (r *Runtime) Fork() *Runtime {
-	// fmt.Println("[RUNTIME] Forking...")
+	// fmt.Printf("[RUNTIME] Forking from %p\n", r)
 	newR := &Runtime{
 		Env:               make(map[string]string),
 		Classes:           r.Classes,   // Share Classes (Read-Only)
@@ -107,6 +107,7 @@ func (r *Runtime) Fork() *Runtime {
 		VarTypes:          make(map[string]string),
 		NativeHandlers:    r.NativeHandlers, // Share Dispatch Table
 	}
+	// fmt.Println("[RUNTIME] Fork: Maps initialized")
 
 	// Copy Env
 	for k, v := range r.Env {
@@ -131,13 +132,36 @@ func (r *Runtime) Fork() *Runtime {
 	newR.Variables["cin"] = &Cin{}
 	newR.Variables["JOSS_VERSION"] = version.Version
 
-	// Deep Copy Global Variables (Native Instances)
+	// Deep Copy Global Variables
 	for k, v := range r.Variables {
 		if inst, ok := v.(*Instance); ok {
 			newR.Variables[k] = inst.Clone()
+		} else if m, ok := v.(map[string]interface{}); ok {
+			// Deep copy maps
+			newMap := make(map[string]interface{})
+			for mk, mv := range m {
+				newMap[mk] = mv
+			}
+			newR.Variables[k] = newMap
+		} else if l, ok := v.([]interface{}); ok {
+			// Deep copy slices
+			newList := make([]interface{}, len(l))
+			copy(newList, l)
+			newR.Variables[k] = newList
 		} else {
 			newR.Variables[k] = v
 		}
+	}
+
+	// Copy Functions and Classes
+	for k, v := range r.Functions {
+		newR.Functions[k] = v
+	}
+	for k, v := range r.Classes {
+		newR.Classes[k] = v
+	}
+	for k, v := range r.VarTypes {
+		newR.VarTypes[k] = v
 	}
 
 	return newR
@@ -259,8 +283,16 @@ func (r *Runtime) LoadEnv(fs http.FileSystem) {
 			r.Env[k] = v
 		}
 	}
+}
 
-	// Connect to DB
+// GetDB ensures the database connection is initialized and returns it.
+func (r *Runtime) GetDB() *sql.DB {
+	// If already connected, return it
+	if r.DB != nil {
+		return r.DB
+	}
+
+	// Connect to DB lazily
 	dbDriver := "mysql"
 	if val, ok := r.Env["DB"]; ok {
 		dbDriver = val
@@ -275,7 +307,6 @@ func (r *Runtime) LoadEnv(fs http.FileSystem) {
 		}
 		dsn = dbPath
 		fmt.Printf("[Security] Conectando a SQLite: %s\n", dbPath)
-		// Ensure sqlite3 driver is imported
 	} else {
 		// Default to MySQL
 		if host, ok := r.Env["DB_HOST"]; ok {
@@ -283,13 +314,12 @@ func (r *Runtime) LoadEnv(fs http.FileSystem) {
 			fmt.Printf("[Security] Conectando a MySQL: %s\n", host)
 		} else {
 			// No DB config found
-			return
+			return nil
 		}
 	}
 
 	db, err := sql.Open(dbDriver, dsn)
 	if err == nil {
-		// db.Ping() // Optional: don't block if DB is down
 		r.DB = db
 
 		// Optimize SQLite for Concurrency
@@ -297,18 +327,13 @@ func (r *Runtime) LoadEnv(fs http.FileSystem) {
 			_, err := db.Exec("PRAGMA journal_mode=WAL;")
 			if err != nil {
 				fmt.Printf("[Security] Error activando WAL: %v\n", err)
-			} else {
-				fmt.Println("[Security] SQLite WAL mode activado")
 			}
-			// Set busy timeout to avoid "database is locked" errors
 			_, err = db.Exec("PRAGMA busy_timeout = 5000;")
 			if err != nil {
 				fmt.Printf("[Security] Error setting busy_timeout: %v\n", err)
 			}
 		}
 
-		r.EnsureCronTable()
-		r.EnsureMigrationTable()
 		r.EnsureCronTable()
 		r.EnsureMigrationTable()
 		r.EnsureAuthTables()
@@ -318,9 +343,13 @@ func (r *Runtime) LoadEnv(fs http.FileSystem) {
 		db.SetMaxIdleConns(25)
 		db.SetConnMaxLifetime(5 * time.Minute)
 	} else {
-		fmt.Printf("[Security] Error conectando a DB: %v\n", err)
+		fmt.Printf("[Security] Error fatal de conexión SQL: %v\n", err)
 	}
+
+	return r.DB
 }
+
+// Server connection is now handled lazily via r.GetDB()
 
 // NewInstance creates a new instance of a class
 func NewInstance(class *parser.ClassStatement) *Instance {
@@ -332,6 +361,9 @@ func NewInstance(class *parser.ClassStatement) *Instance {
 
 // Clone creates a deep copy of the instance (for runtime forking)
 func (i *Instance) Clone() *Instance {
+	if i == nil {
+		return nil
+	}
 	newI := &Instance{
 		Class:  i.Class,
 		Fields: make(map[string]interface{}),

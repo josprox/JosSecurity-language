@@ -7,7 +7,7 @@ import (
 
 // EnsureMigrationTable creates the migration table if it doesn't exist
 func (r *Runtime) EnsureMigrationTable() {
-	if r.DB == nil {
+	if r.GetDB() == nil {
 		return
 	}
 
@@ -42,7 +42,7 @@ func (r *Runtime) EnsureMigrationTable() {
 		`, tableName)
 	}
 
-	_, err := r.DB.Exec(query)
+	_, err := r.GetDB().Exec(query)
 	if err != nil {
 		fmt.Printf("[Migration] Error creando tabla %s: %v\n", tableName, err)
 	}
@@ -51,7 +51,7 @@ func (r *Runtime) EnsureMigrationTable() {
 // GetExecutedMigrations returns a map of executed migration filenames
 func (r *Runtime) GetExecutedMigrations() map[string]bool {
 	executed := make(map[string]bool)
-	if r.DB == nil {
+	if r.GetDB() == nil {
 		return executed
 	}
 
@@ -61,7 +61,7 @@ func (r *Runtime) GetExecutedMigrations() map[string]bool {
 	}
 	tableName := prefix + "migration"
 
-	rows, err := r.DB.Query(fmt.Sprintf("SELECT migration FROM %s", tableName))
+	rows, err := r.GetDB().Query(fmt.Sprintf("SELECT migration FROM %s", tableName))
 	if err != nil {
 		return executed
 	}
@@ -78,7 +78,7 @@ func (r *Runtime) GetExecutedMigrations() map[string]bool {
 
 // GetNextBatch returns the next batch number
 func (r *Runtime) GetNextBatch() int {
-	if r.DB == nil {
+	if r.GetDB() == nil {
 		return 1
 	}
 
@@ -89,7 +89,7 @@ func (r *Runtime) GetNextBatch() int {
 	tableName := prefix + "migration"
 
 	var maxBatch sql.NullInt64
-	err := r.DB.QueryRow(fmt.Sprintf("SELECT MAX(batch) FROM %s", tableName)).Scan(&maxBatch)
+	err := r.GetDB().QueryRow(fmt.Sprintf("SELECT MAX(batch) FROM %s", tableName)).Scan(&maxBatch)
 	if err != nil {
 		return 1
 	}
@@ -101,7 +101,7 @@ func (r *Runtime) GetNextBatch() int {
 
 // LogMigration logs a successful migration
 func (r *Runtime) LogMigration(migration string, batch int) {
-	if r.DB == nil {
+	if r.GetDB() == nil {
 		return
 	}
 
@@ -111,7 +111,7 @@ func (r *Runtime) LogMigration(migration string, batch int) {
 	}
 	tableName := prefix + "migration"
 
-	_, err := r.DB.Exec(fmt.Sprintf("INSERT INTO %s (migration, batch) VALUES (?, ?)", tableName), migration, batch)
+	_, err := r.GetDB().Exec(fmt.Sprintf("INSERT INTO %s (migration, batch) VALUES (?, ?)", tableName), migration, batch)
 	if err != nil {
 		fmt.Printf("[Migration] Error registrando migración %s: %v\n", migration, err)
 	}
@@ -119,7 +119,7 @@ func (r *Runtime) LogMigration(migration string, batch int) {
 
 // DropAllTables drops all user tables from the database
 func (r *Runtime) DropAllTables() {
-	if r.DB == nil {
+	if r.GetDB() == nil {
 		return
 	}
 
@@ -132,7 +132,7 @@ func (r *Runtime) DropAllTables() {
 
 	if dbDriver == "sqlite" {
 		// SQLite: Get all tables except sqlite_* system tables
-		rows, err := r.DB.Query("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'")
+		rows, err := r.GetDB().Query("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'")
 		if err != nil {
 			fmt.Printf("[Migration] Error obteniendo tablas: %v\n", err)
 			return
@@ -148,7 +148,7 @@ func (r *Runtime) DropAllTables() {
 
 		// Drop each table
 		for _, table := range tables {
-			_, err := r.DB.Exec(fmt.Sprintf("DROP TABLE IF EXISTS %s", table))
+			_, err := r.GetDB().Exec(fmt.Sprintf("DROP TABLE IF EXISTS %s", table))
 			if err != nil {
 				fmt.Printf("[Migration] Error eliminando tabla %s: %v\n", table, err)
 			} else {
@@ -163,7 +163,7 @@ func (r *Runtime) DropAllTables() {
 			return
 		}
 
-		rows, err := r.DB.Query("SELECT table_name FROM information_schema.tables WHERE table_schema = ?", dbName)
+		rows, err := r.GetDB().Query("SELECT table_name FROM information_schema.tables WHERE table_schema = ?", dbName)
 		if err != nil {
 			fmt.Printf("[Migration] Error obteniendo tablas: %v\n", err)
 			return
@@ -178,11 +178,11 @@ func (r *Runtime) DropAllTables() {
 		}
 
 		// Disable foreign key checks for MySQL
-		r.DB.Exec("SET FOREIGN_KEY_CHECKS = 0")
+		r.GetDB().Exec("SET FOREIGN_KEY_CHECKS = 0")
 
 		// Drop each table
 		for _, table := range tables {
-			_, err := r.DB.Exec(fmt.Sprintf("DROP TABLE IF EXISTS `%s`", table))
+			_, err := r.GetDB().Exec(fmt.Sprintf("DROP TABLE IF EXISTS `%s`", table))
 			if err != nil {
 				fmt.Printf("[Migration] Error eliminando tabla %s: %v\n", table, err)
 			} else {
@@ -191,6 +191,6 @@ func (r *Runtime) DropAllTables() {
 		}
 
 		// Re-enable foreign key checks
-		r.DB.Exec("SET FOREIGN_KEY_CHECKS = 1")
+		r.GetDB().Exec("SET FOREIGN_KEY_CHECKS = 1")
 	}
 }

@@ -56,6 +56,12 @@ type ReturnPanic struct {
 	Value interface{}
 }
 
+// BreakPanic is used to exit a loop
+type BreakPanic struct{}
+
+// ContinuePanic is used to skip to the next loop iteration
+type ContinuePanic struct{}
+
 // Wait blocks until the Future completes and returns the result
 func (f *Future) Wait() interface{} {
 	<-f.done

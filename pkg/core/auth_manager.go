@@ -6,7 +6,7 @@ import (
 
 // EnsureAuthTables creates js_roles and js_users if they don't exist
 func (r *Runtime) EnsureAuthTables() {
-	if r.DB == nil {
+	if r.GetDB() == nil {
 		return
 	}
 
@@ -35,7 +35,7 @@ func (r *Runtime) EnsureAuthTables() {
 			name VARCHAR(50) UNIQUE
 		)`, rolesTable)
 	}
-	r.DB.Exec(queryRoles)
+	r.GetDB().Exec(queryRoles)
 
 	// Seed Roles
 	// SQLite doesn't support INSERT IGNORE. Use INSERT OR IGNORE.
@@ -45,8 +45,8 @@ func (r *Runtime) EnsureAuthTables() {
 	} else {
 		insertRole = "INSERT IGNORE INTO"
 	}
-	r.DB.Exec(fmt.Sprintf("%s %s (id, name) VALUES (1, 'admin')", insertRole, rolesTable))
-	r.DB.Exec(fmt.Sprintf("%s %s (id, name) VALUES (2, 'client')", insertRole, rolesTable))
+	r.GetDB().Exec(fmt.Sprintf("%s %s (id, name) VALUES (1, 'admin')", insertRole, rolesTable))
+	r.GetDB().Exec(fmt.Sprintf("%s %s (id, name) VALUES (2, 'client')", insertRole, rolesTable))
 
 	// 2. Create Users Table
 	var queryUsers string
@@ -73,5 +73,5 @@ func (r *Runtime) EnsureAuthTables() {
 			FOREIGN KEY (role_id) REFERENCES %s(id)
 		)`, usersTable, rolesTable)
 	}
-	r.DB.Exec(queryUsers)
+	r.GetDB().Exec(queryUsers)
 }

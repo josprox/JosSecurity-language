@@ -6,7 +6,7 @@ import (
 
 // EnsureCronTable creates the cron table if it doesn't exist
 func (r *Runtime) EnsureCronTable() {
-	if r.DB == nil {
+	if r.GetDB() == nil {
 		return
 	}
 
@@ -54,7 +54,7 @@ func (r *Runtime) EnsureCronTable() {
 		`, tableName)
 	}
 
-	_, err := r.DB.Exec(query)
+	_, err := r.GetDB().Exec(query)
 	if err != nil {
 		fmt.Printf("[Cron] Error creando tabla %s: %v\n", tableName, err)
 	}

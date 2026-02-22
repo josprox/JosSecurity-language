@@ -53,12 +53,12 @@ func (r *Runtime) executeAuthMethod(instance *Instance, method string, args []in
 
 				hashedBytes, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
 				if err != nil {
-					return false
+					panic(fmt.Sprintf("Auth Error: Fallo al encriptar contraseña: %v", err))
 				}
 				hashedPassword := string(hashedBytes)
 
-				if r.DB == nil {
-					return false
+				if r.GetDB() == nil {
+					panic("Auth Error: No hay conexión a la base de datos configurada")
 				}
 
 				// Token expira en 24 horas
@@ -97,9 +97,8 @@ func (r *Runtime) executeAuthMethod(instance *Instance, method string, args []in
 			email := strings.TrimSpace(args[0].(string)) // Trim Email
 			password := args[1].(string)
 
-			if r.DB == nil {
-				LogError("[Auth] Attempt failed: Database connection is nil")
-				return false
+			if r.GetDB() == nil {
+				panic("Auth Error: No hay conexión a la base de datos configurada")
 			}
 
 			// Variables para Scan
@@ -117,7 +116,7 @@ func (r *Runtime) executeAuthMethod(instance *Instance, method string, args []in
 				LEFT JOIN %s r ON u.role_id = r.id 
 				WHERE u.email = ?`, usersTable, rolesTable)
 
-			err := r.DB.QueryRow(query, email).Scan(&userId, &userToken, &userName, &storedHash, &verificado, &roleName)
+			err := r.GetDB().QueryRow(query, email).Scan(&userId, &userToken, &userName, &storedHash, &verificado, &roleName)
 			if err != nil {
 				if err == sql.ErrNoRows {
 					LogError("[Auth] User not found for email: '%s'", email)
@@ -157,7 +156,7 @@ func (r *Runtime) executeAuthMethod(instance *Instance, method string, args []in
 			if val, ok := r.Env["DB"]; ok && val == "mysql" {
 				updateQuery = fmt.Sprintf("UPDATE %s SET last_login_at = NOW() WHERE id = ?", usersTable)
 			}
-			r.DB.Exec(updateQuery, userId)
+			r.GetDB().Exec(updateQuery, userId)
 
 			// Retornar JWT Token
 			return r.generateJWT(userId, email, userName.String, roleName.String, false)
@@ -176,7 +175,7 @@ func (r *Runtime) executeAuthMethod(instance *Instance, method string, args []in
 	case "verify":
 		if len(args) == 1 {
 			token := args[0].(string)
-			if r.DB == nil {
+			if r.GetDB() == nil {
 				return false
 			}
 			var id int
@@ -184,7 +183,7 @@ func (r *Runtime) executeAuthMethod(instance *Instance, method string, args []in
 
 			// Verificar existencia y expiración
 			query := fmt.Sprintf("SELECT id, token_expires_at FROM %s WHERE user_token = ? AND verificado = 0 LIMIT 1", usersTable)
-			err := r.DB.QueryRow(query, token).Scan(&id, &expiresAtStr)
+			err := r.GetDB().QueryRow(query, token).Scan(&id, &expiresAtStr)
 
 			if err != nil {
 				return false // Token not found
@@ -207,7 +206,7 @@ func (r *Runtime) executeAuthMethod(instance *Instance, method string, args []in
 			}
 
 			update := fmt.Sprintf("UPDATE %s SET verificado = 1 WHERE id = ?", usersTable)
-			_, err = r.DB.Exec(update, id)
+			_, err = r.GetDB().Exec(update, id)
 
 			if err == nil {
 				return true
@@ -218,14 +217,14 @@ func (r *Runtime) executeAuthMethod(instance *Instance, method string, args []in
 	case "forgotPassword":
 		if len(args) == 1 {
 			email := args[0].(string)
-			if r.DB == nil {
+			if r.GetDB() == nil {
 				return false
 			}
 
 			// Verificar si existe el usuario
 			var userId int
 			queryCheck := fmt.Sprintf("SELECT id FROM %s WHERE email = ?", usersTable)
-			err := r.DB.QueryRow(queryCheck, email).Scan(&userId)
+			err := r.GetDB().QueryRow(queryCheck, email).Scan(&userId)
 			if err != nil {
 				return false // Usuario no existe, por seguridad retornamos falso o genérico
 			}
@@ -236,7 +235,7 @@ func (r *Runtime) executeAuthMethod(instance *Instance, method string, args []in
 			expiresAt := time.Now().Add(1 * time.Hour) // 1 Hora de validez
 
 			query := fmt.Sprintf("INSERT INTO %s (email, token, expires_at) VALUES (?, ?, ?)", resetsTable)
-			_, err = r.DB.Exec(query, email, token, expiresAt)
+			_, err = r.GetDB().Exec(query, email, token, expiresAt)
 
 			if err == nil {
 				// Retornamos el token para que el controlador envíe el email usando SmtpClient
@@ -250,7 +249,7 @@ func (r *Runtime) executeAuthMethod(instance *Instance, method string, args []in
 			token := args[0].(string)
 			newPass := args[1].(string)
 
-			if r.DB == nil {
+			if r.GetDB() == nil {
 				return false
 			}
 
@@ -262,7 +261,7 @@ func (r *Runtime) executeAuthMethod(instance *Instance, method string, args []in
 			var used int
 
 			query := fmt.Sprintf("SELECT email, expires_at, used FROM %s WHERE token = ? LIMIT 1", resetsTable)
-			err := r.DB.QueryRow(query, token).Scan(&email, &expiresAtStr, &used)
+			err := r.GetDB().QueryRow(query, token).Scan(&email, &expiresAtStr, &used)
 
 			if err != nil {
 				fmt.Printf("[Auth Debug] Token Scan Error: %v\n", err) // Debug log
@@ -297,14 +296,14 @@ func (r *Runtime) executeAuthMethod(instance *Instance, method string, args []in
 
 			// Actualizar contraseña usuario
 			updUser := fmt.Sprintf("UPDATE %s SET password = ? WHERE email = ?", usersTable)
-			_, err = r.DB.Exec(updUser, hashedPassword, email)
+			_, err = r.GetDB().Exec(updUser, hashedPassword, email)
 			if err != nil {
 				return false
 			}
 
 			// Marcar token como usado
 			updToken := fmt.Sprintf("UPDATE %s SET used = 1 WHERE token = ?", resetsTable)
-			r.DB.Exec(updToken, token)
+			r.GetDB().Exec(updToken, token)
 
 			return true
 		}
@@ -312,14 +311,14 @@ func (r *Runtime) executeAuthMethod(instance *Instance, method string, args []in
 	case "resendVerification":
 		if len(args) == 1 {
 			email := args[0].(string)
-			if r.DB == nil {
+			if r.GetDB() == nil {
 				return false
 			}
 
 			var id int
 			var verificado int
 			query := fmt.Sprintf("SELECT id, verificado FROM %s WHERE email = ?", usersTable)
-			err := r.DB.QueryRow(query, email).Scan(&id, &verificado)
+			err := r.GetDB().QueryRow(query, email).Scan(&id, &verificado)
 
 			if err != nil {
 				return false
@@ -334,7 +333,7 @@ func (r *Runtime) executeAuthMethod(instance *Instance, method string, args []in
 			newExpiry := time.Now().Add(24 * time.Hour).Format("2006-01-02 15:04:05")
 
 			update := fmt.Sprintf("UPDATE %s SET user_token = ?, token_expires_at = ? WHERE id = ?", usersTable)
-			_, err = r.DB.Exec(update, newToken, newExpiry, id)
+			_, err = r.GetDB().Exec(update, newToken, newExpiry, id)
 
 			if err == nil {
 				return newToken
@@ -346,7 +345,7 @@ func (r *Runtime) executeAuthMethod(instance *Instance, method string, args []in
 		if sessVal, ok := r.Variables["$__session"]; ok {
 			if sessInst, ok := sessVal.(*Instance); ok {
 				if uid, ok := sessInst.Fields["user_id"]; ok {
-					if r.DB == nil {
+					if r.GetDB() == nil {
 						return nil
 					}
 
@@ -363,7 +362,7 @@ func (r *Runtime) executeAuthMethod(instance *Instance, method string, args []in
 						LEFT JOIN %s r ON u.role_id = r.id 
 						WHERE u.id = ?`, usersTable, rolesTable)
 
-					err := r.DB.QueryRow(query, uid).Scan(&id, &username, &firstName, &lastName, &email, &pPhone, &roleId, &roleName, &userToken, &createdAt)
+					err := r.GetDB().QueryRow(query, uid).Scan(&id, &username, &firstName, &lastName, &email, &pPhone, &roleId, &roleName, &userToken, &createdAt)
 					if err != nil {
 						fmt.Printf("[Auth Error] User Query Failed for ID %v: %v\n", uid, err)
 					}
@@ -453,7 +452,7 @@ func (r *Runtime) executeAuthMethod(instance *Instance, method string, args []in
 					LEFT JOIN %s r ON u.role_id = r.id 
 					WHERE u.id = ?`, usersTable, rolesTable)
 
-				err := r.DB.QueryRow(query, id).Scan(&email, &username, &roleName)
+				err := r.GetDB().QueryRow(query, id).Scan(&email, &username, &roleName)
 				if err != nil {
 					return false
 				}
@@ -467,7 +466,7 @@ func (r *Runtime) executeAuthMethod(instance *Instance, method string, args []in
 			data, ok2 := args[1].(map[string]interface{})
 
 			if ok1 && ok2 {
-				if r.DB == nil {
+				if r.GetDB() == nil {
 					return false
 				}
 
@@ -510,7 +509,7 @@ func (r *Runtime) executeAuthMethod(instance *Instance, method string, args []in
 				}
 
 				query := fmt.Sprintf("UPDATE %s SET %s WHERE id = ?", usersTable, strings.Join(sets, ", "))
-				_, err := r.DB.Exec(query, vals...)
+				_, err := r.GetDB().Exec(query, vals...)
 				return err == nil
 			}
 		}
@@ -518,11 +517,11 @@ func (r *Runtime) executeAuthMethod(instance *Instance, method string, args []in
 	case "delete":
 		if len(args) == 1 {
 			if id, ok := args[0].(int); ok {
-				if r.DB == nil {
+				if r.GetDB() == nil {
 					return false
 				}
 				query := fmt.Sprintf("DELETE FROM %s WHERE id = ?", usersTable)
-				_, err := r.DB.Exec(query, id)
+				_, err := r.GetDB().Exec(query, id)
 				return err == nil
 			}
 		}
@@ -570,7 +569,7 @@ func (r *Runtime) executeAuthMethod(instance *Instance, method string, args []in
 var authTablesEnsured bool
 
 func (r *Runtime) ensureAuthTables(usersTable, rolesTable, prefix string) {
-	if r.DB == nil || authTablesEnsured {
+	if r.GetDB() == nil || authTablesEnsured {
 		return
 	}
 
@@ -586,7 +585,7 @@ func (r *Runtime) ensureAuthTables(usersTable, rolesTable, prefix string) {
 			name VARCHAR(50) NOT NULL UNIQUE
 		);`, rolesTable)
 	}
-	r.DB.Exec(createRoles)
+	r.GetDB().Exec(createRoles)
 
 	// 2. Crear Tabla Users (Sin columna 'name')
 	createUsers := fmt.Sprintf(`CREATE TABLE IF NOT EXISTS %s (
@@ -624,12 +623,12 @@ func (r *Runtime) ensureAuthTables(usersTable, rolesTable, prefix string) {
 			FOREIGN KEY(role_id) REFERENCES %s(id)
 		);`, usersTable, rolesTable)
 	}
-	r.DB.Exec(createUsers)
+	r.GetDB().Exec(createUsers)
 
 	// 3. Insertar Roles por defecto
-	r.DB.Exec(fmt.Sprintf("INSERT OR IGNORE INTO %s (name) VALUES ('admin'), ('client')", rolesTable))
+	r.GetDB().Exec(fmt.Sprintf("INSERT OR IGNORE INTO %s (name) VALUES ('admin'), ('client')", rolesTable))
 	if val, ok := r.Env["DB"]; ok && val == "mysql" {
-		r.DB.Exec(fmt.Sprintf("INSERT INTO %s (name) VALUES ('admin'), ('client') ON DUPLICATE KEY UPDATE name=name", rolesTable))
+		r.GetDB().Exec(fmt.Sprintf("INSERT INTO %s (name) VALUES ('admin'), ('client') ON DUPLICATE KEY UPDATE name=name", rolesTable))
 	}
 
 	authTablesEnsured = true
@@ -641,16 +640,16 @@ func (r *Runtime) ensureAuthTables(usersTable, rolesTable, prefix string) {
 	}
 
 	// Agregamos columnas si no existen (Patching)
-	patchColumn(r.DB, usersTable, "username", "VARCHAR(50) NOT NULL DEFAULT ''", isMySQL)
-	patchColumn(r.DB, usersTable, "user_token", "VARCHAR(128) NOT NULL DEFAULT ''", isMySQL)
-	patchColumn(r.DB, usersTable, "first_name", "VARCHAR(100) NOT NULL DEFAULT ''", isMySQL)
-	patchColumn(r.DB, usersTable, "last_name", "VARCHAR(100) NOT NULL DEFAULT ''", isMySQL)
-	patchColumn(r.DB, usersTable, "phone", "VARCHAR(20) NOT NULL DEFAULT ''", isMySQL)
-	patchColumn(r.DB, usersTable, "verificado", "INTEGER DEFAULT 0", isMySQL)
-	patchColumn(r.DB, usersTable, "token_expires_at", "DATETIME", isMySQL)
-	patchColumn(r.DB, usersTable, "created_at", "DATETIME DEFAULT CURRENT_TIMESTAMP", isMySQL)
-	patchColumn(r.DB, usersTable, "updated_at", "DATETIME DEFAULT CURRENT_TIMESTAMP", isMySQL)
-	patchColumn(r.DB, usersTable, "last_login_at", "DATETIME", isMySQL)
+	patchColumn(r.GetDB(), usersTable, "username", "VARCHAR(50) NOT NULL DEFAULT ''", isMySQL)
+	patchColumn(r.GetDB(), usersTable, "user_token", "VARCHAR(128) NOT NULL DEFAULT ''", isMySQL)
+	patchColumn(r.GetDB(), usersTable, "first_name", "VARCHAR(100) NOT NULL DEFAULT ''", isMySQL)
+	patchColumn(r.GetDB(), usersTable, "last_name", "VARCHAR(100) NOT NULL DEFAULT ''", isMySQL)
+	patchColumn(r.GetDB(), usersTable, "phone", "VARCHAR(20) NOT NULL DEFAULT ''", isMySQL)
+	patchColumn(r.GetDB(), usersTable, "verificado", "INTEGER DEFAULT 0", isMySQL)
+	patchColumn(r.GetDB(), usersTable, "token_expires_at", "DATETIME", isMySQL)
+	patchColumn(r.GetDB(), usersTable, "created_at", "DATETIME DEFAULT CURRENT_TIMESTAMP", isMySQL)
+	patchColumn(r.GetDB(), usersTable, "updated_at", "DATETIME DEFAULT CURRENT_TIMESTAMP", isMySQL)
+	patchColumn(r.GetDB(), usersTable, "last_login_at", "DATETIME", isMySQL)
 	// 5. Crear Tabla Recuperación Contraseñas
 	resetsTable := prefix + "password_resets"
 	createResets := fmt.Sprintf(`CREATE TABLE IF NOT EXISTS %s (
@@ -672,7 +671,7 @@ func (r *Runtime) ensureAuthTables(usersTable, rolesTable, prefix string) {
 			used TINYINT(1) DEFAULT 0
 		);`, resetsTable)
 	}
-	r.DB.Exec(createResets)
+	r.GetDB().Exec(createResets)
 }
 
 func patchColumn(db *sql.DB, table, col, def string, isMySQL bool) {

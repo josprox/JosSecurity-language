@@ -70,6 +70,8 @@ const (
 	THIS      = "THIS"
 	ISSET     = "ISSET"
 	EMPTY     = "EMPTY"
+	BREAK     = "BREAK"
+	CONTINUE  = "CONTINUE"
 	// Control Structures
 	WHILE   = "WHILE"
 	DO      = "DO"
@@ -77,6 +79,8 @@ const (
 	CATCH   = "CATCH"
 	THROW   = "THROW"
 	EXTENDS = "EXTENDS"
+	IF      = "IF"
+	ELSE    = "ELSE"
 )
 
 type Token struct {
@@ -104,6 +108,8 @@ var keywords = map[string]TokenType{
 	"print":     PRINT,
 	"isset":     ISSET,
 	"empty":     EMPTY,
+	"break":     BREAK,
+	"continue":  CONTINUE,
 	"while":     WHILE,
 	"do":        DO,
 	"try":       TRY,

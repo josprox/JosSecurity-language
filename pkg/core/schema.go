@@ -9,7 +9,7 @@ import (
 
 // Schema Implementation
 func (r *Runtime) executeSchemaMethod(instance *Instance, method string, args []interface{}) interface{} {
-	if r.DB == nil {
+	if r.GetDB() == nil {
 		return nil
 	}
 
@@ -55,8 +55,8 @@ func (r *Runtime) executeSchemaMethod(instance *Instance, method string, args []
 				// Call the function with the blueprint
 				r.Variables["$table"] = blueprint
 				if len(fnLit.Parameters) > 0 {
-					r.Variables[fnLit.Parameters[0].Value] = blueprint
-					fmt.Printf("[Schema] Set parameter %s to Blueprint instance\n", fnLit.Parameters[0].Value)
+					r.Variables[fnLit.Parameters[0].Name.Value] = blueprint
+					fmt.Printf("[Schema] Set parameter %s to Blueprint instance\n", fnLit.Parameters[0].Name.Value)
 				}
 				r.executeBlock(fnLit.Body)
 
@@ -85,7 +85,7 @@ func (r *Runtime) executeSchemaMethod(instance *Instance, method string, args []
 			query := fmt.Sprintf("CREATE TABLE IF NOT EXISTS %s (%s)", tableName, strings.Join(definitions, ", "))
 
 			fmt.Printf("[Schema] Ejecutando: %s\n", query)
-			_, err := r.DB.Exec(query)
+			_, err := r.GetDB().Exec(query)
 			if err != nil {
 				fmt.Printf("[Schema] Error creando tabla %s: %v\n", tableName, err)
 			}
@@ -113,7 +113,7 @@ func (r *Runtime) executeSchemaMethod(instance *Instance, method string, args []
 
 				r.Variables["$table"] = blueprint
 				if len(fnLit.Parameters) > 0 {
-					r.Variables[fnLit.Parameters[0].Value] = blueprint
+					r.Variables[fnLit.Parameters[0].Name.Value] = blueprint
 				}
 				r.executeBlock(fnLit.Body)
 
@@ -123,7 +123,7 @@ func (r *Runtime) executeSchemaMethod(instance *Instance, method string, args []
 						def := r.buildColumnDefinition(col["name"], col["type"], dbDriver)
 						query := fmt.Sprintf("ALTER TABLE %s ADD COLUMN %s", tableName, def)
 						fmt.Printf("[Schema] Ejecutando: %s\n", query)
-						r.DB.Exec(query)
+						r.GetDB().Exec(query)
 					}
 				}
 
@@ -150,7 +150,7 @@ func (r *Runtime) executeSchemaMethod(instance *Instance, method string, args []
 			if dbDriver == "mysql" {
 				query = fmt.Sprintf("RENAME TABLE %s TO %s", from, to)
 			}
-			r.DB.Exec(query)
+			r.GetDB().Exec(query)
 		}
 
 	case "drop", "dropIfExists":
@@ -164,7 +164,7 @@ func (r *Runtime) executeSchemaMethod(instance *Instance, method string, args []
 				tableName = prefix + tableName
 			}
 			query := fmt.Sprintf("DROP TABLE IF EXISTS %s", tableName)
-			r.DB.Exec(query)
+			r.GetDB().Exec(query)
 		}
 
 	case "hasTable":
@@ -181,10 +181,10 @@ func (r *Runtime) executeSchemaMethod(instance *Instance, method string, args []
 			var exists bool
 			if dbDriver == "sqlite" {
 				query := "SELECT count(*) FROM sqlite_master WHERE type='table' AND name=?"
-				r.DB.QueryRow(query, tableName).Scan(&exists)
+				r.GetDB().QueryRow(query, tableName).Scan(&exists)
 			} else {
 				query := "SELECT count(*) FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = ?"
-				r.DB.QueryRow(query, tableName).Scan(&exists)
+				r.GetDB().QueryRow(query, tableName).Scan(&exists)
 			}
 			return exists
 		}
@@ -203,7 +203,7 @@ func (r *Runtime) executeSchemaMethod(instance *Instance, method string, args []
 
 			if dbDriver == "sqlite" {
 				// SQLite doesn't have a simple exists check for columns, need to parse PRAGMA
-				rows, err := r.DB.Query(fmt.Sprintf("PRAGMA table_info(%s)", tableName))
+				rows, err := r.GetDB().Query(fmt.Sprintf("PRAGMA table_info(%s)", tableName))
 				if err == nil {
 					defer rows.Close()
 					for rows.Next() {
@@ -223,7 +223,7 @@ func (r *Runtime) executeSchemaMethod(instance *Instance, method string, args []
 			} else {
 				var count int
 				query := "SELECT count(*) FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = ? AND column_name = ?"
-				r.DB.QueryRow(query, tableName, columnName).Scan(&count)
+				r.GetDB().QueryRow(query, tableName, columnName).Scan(&count)
 				return count > 0
 			}
 		}

@@ -8,8 +8,8 @@ import (
 // executeInsertMethod handles insert operations for GranMySQL/GranDB
 // Supports both array-based and map-based inserts
 func (r *Runtime) executeInsertMethod(instance *Instance, args []interface{}) interface{} {
-	if r.DB == nil {
-		return false
+	if r.GetDB() == nil {
+		panic("GranMySQL Error: No hay conexión a la base de datos configurada")
 	}
 
 	table := r.getTable(instance)
@@ -81,10 +81,9 @@ func (r *Runtime) insertFromMap(table string, data map[string]interface{}) bool 
 	fmt.Printf("[GranDB] Insert Query: %s\n", query)
 	fmt.Printf("[GranDB] Bindings: %v\n", bindings)
 
-	_, err := r.DB.Exec(query, bindings...)
+	_, err := r.GetDB().Exec(query, bindings...)
 	if err != nil {
-		fmt.Printf("[GranDB] Error insert: %v\n", err)
-		return false
+		panic(fmt.Sprintf("GranMySQL Error en insert: %v", err))
 	}
 
 	return true
@@ -115,10 +114,9 @@ func (r *Runtime) insertFromArrays(table string, cols []interface{}, vals []inte
 		strings.Join(colNames, ", "),
 		strings.Join(placeholders, ", "))
 
-	_, err := r.DB.Exec(query, bindings...)
+	_, err := r.GetDB().Exec(query, bindings...)
 	if err != nil {
-		fmt.Printf("[GranDB] Error insert: %v\n", err)
-		return false
+		panic(fmt.Sprintf("GranMySQL Error en insert from arrays: %v", err))
 	}
 
 	return true

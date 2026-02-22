@@ -202,7 +202,7 @@ func (ie *IndexExpression) String() string {
 
 type FunctionLiteral struct {
 	Token      Token // FUNCTION
-	Parameters []*Identifier
+	Parameters []*Parameter
 	Body       *BlockStatement
 }
 

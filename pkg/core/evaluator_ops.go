@@ -164,9 +164,9 @@ func (r *Runtime) evaluateTernary(te *parser.TernaryExpression) interface{} {
 		}
 	}
 
-	// If the result is a BlockStatement (e.g. from { ... }), execute it!
-	if block, ok := result.(*parser.BlockStatement); ok {
-		return r.executeBlock(block)
+	// If the result is a block statement (from { ... }), execute it now
+	if blk, ok := result.(*parser.BlockStatement); ok {
+		return r.executeBlock(blk)
 	}
 
 	return result
@@ -475,13 +475,13 @@ func (r *Runtime) evaluateNew(ne *parser.NewExpression) interface{} {
 	// Call constructor if exists
 	for _, stmt := range classStmt.Body.Statements {
 		if method, ok := stmt.(*parser.MethodStatement); ok {
-			if method.Name.Value == "constructor" {
+			if method.Name.Value == "constructor" || method.Name.Value == "main" {
 				r.CallMethod(method, instance, ne.Arguments)
 				break
 			}
 		}
 		if initStmt, ok := stmt.(*parser.InitStatement); ok {
-			if initStmt.Name.Value == "constructor" {
+			if initStmt.Name.Value == "constructor" || initStmt.Name.Value == "main" {
 				// Convert to MethodStatement
 				method := &parser.MethodStatement{
 					Token:      initStmt.Token,
@@ -539,6 +539,10 @@ func (r *Runtime) evaluateMember(me *parser.MemberExpression) interface{} {
 	propName := me.Property.Value
 
 	// Check fields
+	if instance.Fields == nil {
+		instance.Fields = make(map[string]interface{})
+	}
+
 	if val, ok := instance.Fields[propName]; ok {
 		return val
 	}

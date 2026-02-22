@@ -1,6 +1,14 @@
 # Changelog
 
-## [3.0.7] - 2025-12-21
+## [3.3.0] - 2026-02-22
+### Added
+- **Core Architecture Sync**: Support for JOSS v3.3.0.
+- **Thread-Safety Analysis**: Improved workspace indexing to recognize isolated runtime patterns.
+- **Type Hinting**: Highlighting and validation support for explicit types (`int`, `string`, `bool`, etc.) in functions and `let`.
+- **Async/Await Stabilization**: Full support for `await($future)` syntax.
+- **Return Bubble-Up**: Updated diagnostics to no longer warn about `return` in ternaries (now fully supported).
+
+## [3.2.10] - Previous
 ### Added
 - **Node Version Support**: Integrated with JOSS v3.0.4.
 - **Node.js Asset Detection**: Improved intelligence for NPM dependency highlighting.

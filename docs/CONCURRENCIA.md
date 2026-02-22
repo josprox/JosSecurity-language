@@ -25,11 +25,15 @@ $future = async(func() {
 
 ### Await
 La función `await` detiene la ejecución actual hasta que el `Future` se complete y retorna su resultado.
+La sintaxis recomendada es usar paréntesis `await($future)` para asegurar un parsing correcto.
 
 ```joss
 $resultado = await($future)
 print($resultado) // "Resultado procesado"
 ```
+
+> [!IMPORTANT]
+> **Aislamiento de Memoria (Thread-Safety)**: Cada llamada a `async` crea un "Fork" del runtime actual. Esto significa que las variables del hilo padre son copiadas al nuevo hilo. Los cambios realizados en las variables dentro de un bloque `async` **NO** afectarán al hilo padre, garantizando seguridad total contra condiciones de carrera y crashes de memoria concurrentes.
 
 ---
 

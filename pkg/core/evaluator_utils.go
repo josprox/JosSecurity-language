@@ -1,24 +1,39 @@
 package core
 
 import (
+	"strings"
+
 	"github.com/jossecurity/joss/pkg/parser"
 )
 
 func (r *Runtime) checkType(val interface{}, typeName string) bool {
-	if val == nil {
+	if typeName == "" || typeName == "mixed" {
 		return true
-	} // Allow nil?
-	switch typeName {
-	case "int":
-		_, ok := val.(int64)
-		return ok
-	case "float":
-		_, ok := val.(float64)
-		return ok
+	}
+
+	if val == nil {
+		return false // Or allow null? For now, strict.
+	}
+
+	switch strings.ToLower(typeName) {
+	case "int", "integer":
+		switch v := val.(type) {
+		case int, int32, int64:
+			return true
+		case float64:
+			return v == float64(int64(v))
+		}
+		return false
+	case "float", "double":
+		switch val.(type) {
+		case float64, float32, int, int64:
+			return true
+		}
+		return false
 	case "string":
 		_, ok := val.(string)
 		return ok
-	case "bool":
+	case "bool", "boolean":
 		_, ok := val.(bool)
 		return ok
 	case "array":
@@ -30,8 +45,30 @@ func (r *Runtime) checkType(val interface{}, typeName string) bool {
 	case "channel":
 		_, ok := val.(*Channel)
 		return ok
+	case "object":
+		_, ok := val.(*Instance)
+		return ok
+	default:
+		// Check for specific class instance
+		if inst, ok := val.(*Instance); ok {
+			curr := inst.Class
+			for curr != nil {
+				if curr.Name.Value == typeName {
+					return true
+				}
+				if curr.SuperClass != nil {
+					if super, ok := r.Classes[curr.SuperClass.Value]; ok {
+						curr = super
+					} else {
+						break
+					}
+				} else {
+					break
+				}
+			}
+		}
 	}
-	return true // Unknown types (classes) not strictly checked yet
+	return false
 }
 
 func (r *Runtime) checkExistence(exp parser.Expression) bool {

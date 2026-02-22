@@ -7,9 +7,8 @@ import (
 
 // executeGetMethod handles .get()
 func (r *Runtime) executeGetMethod(instance *Instance, args []interface{}) interface{} {
-	if r.DB == nil {
-		fmt.Println("[GranMySQL] Error: No DB connection")
-		return []map[string]interface{}{}
+	if r.GetDB() == nil {
+		panic("GranMySQL Error: No hay conexión a la base de datos configurada")
 	}
 
 	table := r.getTable(instance)
@@ -53,10 +52,9 @@ func (r *Runtime) executeGetMethod(instance *Instance, args []interface{}) inter
 	delete(instance.Fields, "_limit")
 	delete(instance.Fields, "_offset")
 
-	rows, err := r.DB.Query(query, bindings...)
+	rows, err := r.GetDB().Query(query, bindings...)
 	if err != nil {
-		fmt.Printf("[GranMySQL] Error en get: %v\n", err)
-		return []map[string]interface{}{}
+		panic(fmt.Sprintf("GranMySQL Error en get: %v", err))
 	}
 	defer rows.Close()
 
@@ -65,8 +63,8 @@ func (r *Runtime) executeGetMethod(instance *Instance, args []interface{}) inter
 
 // executeFirstMethod handles .first()
 func (r *Runtime) executeFirstMethod(instance *Instance, args []interface{}) interface{} {
-	if r.DB == nil {
-		return nil
+	if r.GetDB() == nil {
+		panic("GranMySQL Error: No hay conexión a la base de datos configurada")
 	}
 
 	table := r.getTable(instance)
@@ -98,9 +96,9 @@ func (r *Runtime) executeFirstMethod(instance *Instance, args []interface{}) int
 	instance.Fields["_joins"] = []string{}
 	delete(instance.Fields, "_order")
 
-	rows, err := r.DB.Query(query, bindings...)
+	rows, err := r.GetDB().Query(query, bindings...)
 	if err != nil {
-		return nil
+		panic(fmt.Sprintf("GranMySQL Error en first: %v", err))
 	}
 	defer rows.Close()
 
@@ -113,8 +111,8 @@ func (r *Runtime) executeFirstMethod(instance *Instance, args []interface{}) int
 
 // executeCountMethod handles .count()
 func (r *Runtime) executeCountMethod(instance *Instance, args []interface{}) interface{} {
-	if r.DB == nil {
-		return 0
+	if r.GetDB() == nil {
+		panic("GranMySQL Error: No hay conexión a la base de datos configurada")
 	}
 	table := r.getTable(instance)
 	wheres := instance.Fields["_wheres"].([]string)
@@ -137,9 +135,9 @@ func (r *Runtime) executeCountMethod(instance *Instance, args []interface{}) int
 	instance.Fields["_joins"] = []string{}
 
 	var count int
-	err := r.DB.QueryRow(query, bindings...).Scan(&count)
+	err := r.GetDB().QueryRow(query, bindings...).Scan(&count)
 	if err != nil {
-		return 0
+		panic(fmt.Sprintf("GranMySQL Error en count: %v", err))
 	}
 	return count
 }

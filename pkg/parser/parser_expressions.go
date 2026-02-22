@@ -436,34 +436,27 @@ func (p *Parser) parseCallArguments() []Expression {
 	return args
 }
 
-func (p *Parser) parseFunctionParameters() []*Identifier {
-	identifiers := []*Identifier{}
+func (p *Parser) parseFunctionParameters() []*Parameter {
+	parameters := []*Parameter{}
 
 	if p.peekToken.Type == RPAREN {
 		p.nextToken()
-		return identifiers
+		return parameters
 	}
 
 	p.nextToken()
 
-	// Expect variable: $param
-	if p.curToken.Type == VAR {
-		if !p.expectPeek(IDENT) {
-			return nil
-		}
-		ident := &Identifier{Token: p.curToken, Value: p.curToken.Literal}
-		identifiers = append(identifiers, ident)
+	param := p.parseParameter()
+	if param != nil {
+		parameters = append(parameters, param)
 	}
 
 	for p.peekToken.Type == COMMA {
 		p.nextToken()
 		p.nextToken()
-		if p.curToken.Type == VAR {
-			if !p.expectPeek(IDENT) {
-				return nil
-			}
-			ident := &Identifier{Token: p.curToken, Value: p.curToken.Literal}
-			identifiers = append(identifiers, ident)
+		param := p.parseParameter()
+		if param != nil {
+			parameters = append(parameters, param)
 		}
 	}
 
@@ -471,7 +464,29 @@ func (p *Parser) parseFunctionParameters() []*Identifier {
 		return nil
 	}
 
-	return identifiers
+	return parameters
+}
+
+func (p *Parser) parseParameter() *Parameter {
+	param := &Parameter{}
+
+	// Optional type: IDENT VAR ($)
+	if p.curToken.Type == IDENT && p.peekToken.Type == VAR {
+		param.Type = p.curToken
+		p.nextToken() // Move to VAR
+	}
+
+	if p.curToken.Type == VAR {
+		if !p.expectPeek(IDENT) {
+			return nil
+		}
+		param.Name = &Identifier{Token: p.curToken, Value: p.curToken.Literal}
+	} else {
+		// Fallback for syntax errors, we expect VAR
+		return nil
+	}
+
+	return param
 }
 
 func (p *Parser) parseNewExpression() Expression {

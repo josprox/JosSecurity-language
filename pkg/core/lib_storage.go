@@ -46,13 +46,13 @@ func (r *Runtime) executeUserStorageMethod(instance *Instance, method string, ar
 		content := fmt.Sprintf("%v", args[2])
 
 		// DB Registry Logic (Common for both)
-		if r.DB != nil {
+		if r.GetDB() != nil {
 			userId := r.getUserIdFromToken(usersTable, userToken)
 			if userId > 0 {
 				// Check if exists
 				var existingId int
 				check := fmt.Sprintf("SELECT id FROM %s WHERE user_id = ? AND path = ?", storageTable)
-				err := r.DB.QueryRow(check, userId, fileName).Scan(&existingId)
+				err := r.GetDB().QueryRow(check, userId, fileName).Scan(&existingId)
 
 				if err == sql.ErrNoRows {
 					// Insert
@@ -60,14 +60,14 @@ func (r *Runtime) executeUserStorageMethod(instance *Instance, method string, ar
 					if val, ok := r.Env["DB"]; ok && val == "mysql" {
 						insert = fmt.Sprintf("INSERT INTO %s (user_id, path, created_at, updated_at) VALUES (?, ?, NOW(), NOW())", storageTable)
 					}
-					r.DB.Exec(insert, userId, fileName)
+					r.GetDB().Exec(insert, userId, fileName)
 				} else {
 					// Update timestamp
 					update := fmt.Sprintf("UPDATE %s SET updated_at = CURRENT_TIMESTAMP WHERE id = ?", storageTable)
 					if val, ok := r.Env["DB"]; ok && val == "mysql" {
 						update = fmt.Sprintf("UPDATE %s SET updated_at = NOW() WHERE id = ?", storageTable)
 					}
-					r.DB.Exec(update, existingId)
+					r.GetDB().Exec(update, existingId)
 				}
 			}
 		}
@@ -116,11 +116,11 @@ func (r *Runtime) executeUserStorageMethod(instance *Instance, method string, ar
 		fileName := fmt.Sprintf("%v", args[1])
 
 		// DB Registry Delete
-		if r.DB != nil {
+		if r.GetDB() != nil {
 			userId := r.getUserIdFromToken(usersTable, userToken)
 			if userId > 0 {
 				query := fmt.Sprintf("DELETE FROM %s WHERE user_id = ? AND path = ?", storageTable)
-				r.DB.Exec(query, userId, fileName)
+				r.GetDB().Exec(query, userId, fileName)
 			}
 		}
 
@@ -245,12 +245,12 @@ func (r *Runtime) ociDelete(userToken, fileName string) bool {
 
 // Helper to get User ID
 func (r *Runtime) getUserIdFromToken(usersTable, token string) int {
-	if r.DB == nil {
+	if r.GetDB() == nil {
 		return 0
 	}
 	var id int
 	query := fmt.Sprintf("SELECT id FROM %s WHERE user_token = ? LIMIT 1", usersTable)
-	err := r.DB.QueryRow(query, token).Scan(&id)
+	err := r.GetDB().QueryRow(query, token).Scan(&id)
 	if err != nil {
 		return 0
 	}
@@ -260,7 +260,7 @@ func (r *Runtime) getUserIdFromToken(usersTable, token string) int {
 var storageTableEnsured bool
 
 func (r *Runtime) ensureStorageTable(tableName string) {
-	if r.DB == nil || storageTableEnsured {
+	if r.GetDB() == nil || storageTableEnsured {
 		return
 	}
 
@@ -282,6 +282,6 @@ func (r *Runtime) ensureStorageTable(tableName string) {
 		);`, tableName)
 	}
 
-	r.DB.Exec(createCtx)
+	r.GetDB().Exec(createCtx)
 	storageTableEnsured = true
 }

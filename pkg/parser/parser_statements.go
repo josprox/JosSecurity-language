@@ -35,6 +35,12 @@ func (p *Parser) parseStatement() Statement {
 	if p.curToken.Type == RETURN {
 		return p.parseReturnStatement()
 	}
+	if p.curToken.Type == BREAK {
+		return p.parseBreakStatement()
+	}
+	if p.curToken.Type == CONTINUE {
+		return p.parseContinueStatement()
+	}
 	// Check for variable declaration: type $name = value
 	if p.curToken.Type == IDENT && p.peekToken.Type == VAR {
 		return p.parseLetStatement()
@@ -83,6 +89,26 @@ func (p *Parser) parseReturnStatement() *ReturnStatement {
 	}
 
 	stmt.ReturnValue = p.parseExpression(LOWEST)
+
+	if p.peekToken.Type == SEMICOLON {
+		p.nextToken()
+	}
+
+	return stmt
+}
+
+func (p *Parser) parseBreakStatement() *BreakStatement {
+	stmt := &BreakStatement{Token: p.curToken}
+
+	if p.peekToken.Type == SEMICOLON {
+		p.nextToken()
+	}
+
+	return stmt
+}
+
+func (p *Parser) parseContinueStatement() *ContinueStatement {
+	stmt := &ContinueStatement{Token: p.curToken}
 
 	if p.peekToken.Type == SEMICOLON {
 		p.nextToken()

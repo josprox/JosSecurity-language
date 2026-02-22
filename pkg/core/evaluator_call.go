@@ -33,7 +33,12 @@ func (r *Runtime) CallMethod(method *parser.MethodStatement, instance *Instance,
 	for i, param := range method.Parameters {
 		if i < len(args) {
 			val := r.evaluateExpression(args[i])
-			r.Variables[param.Value] = val
+			if param.Type.Literal != "" {
+				if !r.checkType(val, param.Type.Literal) {
+					panic(fmt.Sprintf("Type Error: El argumento %d (%s) debe ser de tipo %s, se recibió %T", i+1, param.Name.Value, param.Type.Literal, val))
+				}
+			}
+			r.Variables[param.Name.Value] = val
 		}
 	}
 
@@ -71,7 +76,13 @@ func (r *Runtime) CallMethodEvaluated(method *parser.MethodStatement, instance *
 	// Bind arguments
 	for i, param := range method.Parameters {
 		if i < len(args) {
-			r.Variables[param.Value] = args[i]
+			val := args[i]
+			if param.Type.Literal != "" {
+				if !r.checkType(val, param.Type.Literal) {
+					panic(fmt.Sprintf("Type Error: El argumento %d (%s) debe ser de tipo %s, se recibió %T", i+1, param.Name.Value, param.Type.Literal, val))
+				}
+			}
+			r.Variables[param.Name.Value] = val
 		}
 	}
 
@@ -103,7 +114,7 @@ func (r *Runtime) executeCall(call *parser.CallExpression) interface{} {
 		args = append(args, r.evaluateExpression(arg))
 	}
 
-	// 2. Check Identifier for Builtins
+	// 2. Try Builtin
 	if ident, ok := call.Function.(*parser.Identifier); ok {
 		if res, ok := r.callBuiltin(ident.Value, args); ok {
 			return res
@@ -112,6 +123,21 @@ func (r *Runtime) executeCall(call *parser.CallExpression) interface{} {
 
 	// 3. Evaluate Function
 	fn := r.evaluateExpression(call.Function)
+	if fn == nil {
+		if ident, ok := call.Function.(*parser.Identifier); ok {
+			if f, ok := r.Functions[ident.Value]; ok {
+				fn = f
+			}
+		}
+	}
+
+	if fn == nil {
+		if ident, ok := call.Function.(*parser.Identifier); ok {
+			panic(fmt.Sprintf("Error: Función '%s' no encontrada", ident.Value))
+		}
+		return nil
+	}
+
 	return r.applyFunction(fn, args)
 }
 
@@ -119,21 +145,21 @@ func (r *Runtime) applyFunction(fn interface{}, args []interface{}) interface{} 
 	if bound, ok := fn.(*BoundMethod); ok {
 		if bound.Instance == nil && bound.StaticClass != "" {
 			// Static Call
-			// Evaluate arguments
 			evalArgs := []interface{}{}
 			for _, arg := range args {
-				evalArgs = append(evalArgs, arg) // args are already evaluated in executeCall
+				evalArgs = append(evalArgs, arg)
 			}
-			// We need to call executeNativeMethod with a way to identify the class.
-			// executeNativeMethod expects *Instance.
-			// Let's create a temporary instance for the static call.
-			// Or better, update executeNativeMethod to accept className string.
-			// But that requires changing signature in native.go and all calls.
-			// Easier: Create a dummy instance.
-			dummyInstance := &Instance{
-				Class: &parser.ClassStatement{
+			classStmt := r.Classes[bound.StaticClass]
+			if classStmt == nil {
+				// Fallback to synthetic if not registered (should not happen for native)
+				classStmt = &parser.ClassStatement{
 					Name: &parser.Identifier{Value: bound.StaticClass},
-				},
+					Body: &parser.BlockStatement{Statements: []parser.Statement{}},
+				}
+			}
+			dummyInstance := &Instance{
+				Class:  classStmt,
+				Fields: make(map[string]interface{}),
 			}
 			return r.executeNativeMethod(dummyInstance, bound.Method.Name.Value, evalArgs)
 		}
@@ -246,12 +272,14 @@ func (r *Runtime) callBuiltin(name string, args []interface{}) (interface{}, boo
 				done: make(chan bool),
 			}
 			argVal := args[0]
+			newR := r.Fork() // Fork BEFORE starting the goroutine to avoid race
 			go func() {
 				defer func() {
 					if p := recover(); p != nil {
 						if rp, ok := p.(*ReturnPanic); ok {
 							future.result = rp.Value
 						} else {
+							fmt.Printf("[ASYNC PANIC] %v\n", p)
 							future.err = fmt.Errorf("%v", p)
 						}
 					}
@@ -259,8 +287,9 @@ func (r *Runtime) callBuiltin(name string, args []interface{}) (interface{}, boo
 				}()
 
 				if fn, ok := argVal.(*parser.FunctionLiteral); ok {
-					newR := r.Fork() // Thread-safety clone
 					future.result = newR.executeBlock(fn.Body)
+				} else if blk, ok := argVal.(*parser.BlockStatement); ok {
+					future.result = newR.executeBlock(blk)
 				} else {
 					future.result = argVal
 				}
@@ -273,7 +302,6 @@ func (r *Runtime) callBuiltin(name string, args []interface{}) (interface{}, boo
 			if future, ok := args[0].(*Future); ok {
 				return future.Wait(), true
 			}
-			fmt.Println("Error: await expects a Future")
 		}
 		return nil, true
 	case "make_chan":

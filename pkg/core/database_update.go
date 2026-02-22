@@ -8,8 +8,8 @@ import (
 // executeUpdateMethod handles update operations for GranMySQL/GranDB
 // Usage: $model.where("id", 1).update({"name": "Jane", "email": "jane@example.com"})
 func (r *Runtime) executeUpdateMethod(instance *Instance, args []interface{}) interface{} {
-	if r.DB == nil {
-		return false
+	if r.GetDB() == nil {
+		panic("GranMySQL Error: No hay conexión a la base de datos configurada")
 	}
 
 	// Get table and where conditions
@@ -74,10 +74,9 @@ func (r *Runtime) executeUpdateMethod(instance *Instance, args []interface{}) in
 	instance.Fields["_bindings"] = []interface{}{}
 
 	// Execute query
-	result, err := r.DB.Exec(query, updateBindings...)
+	result, err := r.GetDB().Exec(query, updateBindings...)
 	if err != nil {
-		fmt.Printf("[GranDB] Error update: %v\n", err)
-		return false
+		panic(fmt.Sprintf("GranMySQL Error en update: %v", err))
 	}
 
 	// Get affected rows
