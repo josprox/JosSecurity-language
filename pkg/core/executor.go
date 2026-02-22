@@ -102,13 +102,36 @@ func (r *Runtime) registerClass(stmt *parser.ClassStatement) {
 func (r *Runtime) executeStatement(stmt parser.Statement) interface{} {
 	switch s := stmt.(type) {
 	case *parser.LetStatement:
-		val := r.evaluateExpression(s.Value)
+		var val interface{}
+		if s.Value != nil {
+			val = r.evaluateExpression(s.Value)
+			val = r.coerceToTypedValue(val, s.Token.Literal)
+		} else {
+			val = r.getZeroValue(s.Token.Literal)
+		}
+
 		// Strict Typing: Store type
 		r.VarTypes[s.Name.Value] = s.Token.Literal
 		if !r.checkType(val, s.Token.Literal) {
 			panic(fmt.Sprintf("Error de Tipado: Variable '%s' definida como '%s' pero asignada valor incompatible", s.Name.Value, s.Token.Literal))
 		}
 		r.Variables[s.Name.Value] = val
+	case *parser.MultiLetStatement:
+		// int $a,$b  or  int $a=1,$b=2
+		for _, decl := range s.Declarations {
+			var val interface{}
+			if decl.Value != nil {
+				val = r.evaluateExpression(decl.Value)
+				val = r.coerceToTypedValue(val, s.TypeToken.Literal)
+			} else {
+				val = r.getZeroValue(s.TypeToken.Literal)
+			}
+			r.VarTypes[decl.Name.Value] = s.TypeToken.Literal
+			if !r.checkType(val, s.TypeToken.Literal) {
+				panic(fmt.Sprintf("Error de Tipado: Variable '%s' definida como '%s' pero asignada valor incompatible", decl.Name.Value, s.TypeToken.Literal))
+			}
+			r.Variables[decl.Name.Value] = val
+		}
 	case *parser.ExpressionStatement:
 		return r.evaluateExpression(s.Expression)
 	case *parser.ForeachStatement:

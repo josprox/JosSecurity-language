@@ -12,6 +12,7 @@ func (r *Runtime) evaluateAssign(ae *parser.AssignExpression) interface{} {
 	if ident, ok := ae.Left.(*parser.Identifier); ok {
 		// Strict Typing Check
 		if expectedType, exists := r.VarTypes[ident.Value]; exists {
+			val = r.coerceToTypedValue(val, expectedType)
 			if !r.checkType(val, expectedType) {
 				fmt.Printf("Error de Tipado: No se puede asignar valor a '%s' (se espera %s)\n", ident.Value, expectedType)
 				return nil
@@ -206,7 +207,18 @@ func (r *Runtime) evaluateInfix(ie *parser.InfixExpression) interface{} {
 			if ident, ok := ie.Right.(*parser.Identifier); ok {
 				var input string
 				fmt.Scanln(&input)
-				r.Variables[ident.Value] = input
+
+				var val interface{} = input
+				// Strict Typing Check and Coercion
+				if expectedType, exists := r.VarTypes[ident.Value]; exists {
+					val = r.coerceToTypedValue(val, expectedType)
+					if !r.checkType(val, expectedType) {
+						fmt.Printf("Error de Tipado: No se puede asignar valor a '%s' (se espera %s)\n", ident.Value, expectedType)
+						return nil
+					}
+				}
+
+				r.Variables[ident.Value] = val
 				return left // Return cin for chaining?
 			}
 			fmt.Println("Error: cin >> requiere una variable")

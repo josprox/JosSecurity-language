@@ -128,12 +128,28 @@ Y en la vista usar `{{ $item.is_online_label }}` (dot notation, no bracket dentr
 - **Campos disponibles**: `id`, `username`, `first_name`, `last_name`, `full_name`, `email`, `phone`, `role_id`, `role`, `user_token`, `created_at`, `name`.
 - **Para el ID**: preferir `Auth::id()` que es directo y seguro.
 - **En vistas (templates)**: el motor reemplaza `{{ $auth_user }}`, `{{ $auth_role }}`, `{{ $auth_email }}` automáticamente desde la sesión.
+- **⚠️ NUNCA pasar `Auth::user()` directamente a `View::render()`**: el evaluador de plantillas no puede acceder a campos de un `*Instance` con `{{ $user.name }}` — renderiza el puntero Go completo (`&{<nil> map[...]}`). En su lugar, extraer los campos antes:
+
+```joss
+// ❌ MAL — $user es *Instance, {{ $user.name }} falla
+return View::render("dashboard.index", {"user": Auth::user()})
+
+// ✅ CORRECTO — extraer campos individuales
+$u = Auth::user()
+return View::render("dashboard.index", {
+    "user_name":  $u->name,
+    "user_email": $u->email,
+    "role":       $u->role
+})
+```
 
 ### 12. Declaración de Variables en JOSS (Sesión 22/02/2026)
 
-- `var $x = expr` — **EVITAR**: Es una declaración de tipo con validación estricta. Causa panic si el valor asignado es incompatible o nil.
-- `$x = expr` — **USAR SIEMPRE** para asignación simple sin type checking.
-- `let tipo $x = expr` — Para type hinting explícito (e.g., `let int $x = 5`).
+- `$x = expr` — **USAR SIEMPRE** para asignación simple (dinámica sin comprobación estricta de tipo).
+- `tipo $x [= expr]` — Declaración tipada (e.g., `int $x = 5`, `string $nom`). Omitir el `=` asigna el valor cero (e.g. `0` para `int`).
+- Multi-declaración separada por comas: `int $a, $b = 5, $c` o `string $x="hola", $y="mundo"`. 
+- **Auto-conversión de Strings:** Si una variable está fuertemente tipada como `int` o `float` y se le asigna un `string` que contiene un número (ej. valores de `Console::input()`), el runtime intentará auto-convertirlo al tipo correcto antes de fallar con un *Error de Tipado*.
+- `var $x = expr` — **EVITAR**: Equivale a tipado estricto pero intenta inferir el tipo y puede causar problemas. No usar en plantillas generadas.
 
 ### 13. Clases Estáticas — Sintaxis (Sesión 22/02/2026)
 

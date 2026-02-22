@@ -1,6 +1,7 @@
 package core
 
 import (
+	"fmt"
 	"strings"
 
 	"github.com/jossecurity/joss/pkg/parser"
@@ -120,4 +121,67 @@ func isFalsy(val interface{}) bool {
 
 func isTruthy(val interface{}) bool {
 	return !isFalsy(val)
+}
+
+// coerceToTypedValue attempts to cast val to the declared type when val is a string.
+// This allows Console::input() (which returns string) to work with int/float declarations.
+func (r *Runtime) coerceToTypedValue(val interface{}, typeName string) interface{} {
+	if val == nil {
+		return val
+	}
+	str, isString := val.(string)
+	if !isString {
+		return val // Already a non-string, no coercion needed
+	}
+	switch strings.ToLower(typeName) {
+	case "int", "integer":
+		// Try to parse as int
+		var i int64
+		_, err := fmt.Sscanf(strings.TrimSpace(str), "%d", &i)
+		if err == nil {
+			return i
+		}
+		// Try float then truncate
+		var f float64
+		_, err = fmt.Sscanf(strings.TrimSpace(str), "%f", &f)
+		if err == nil {
+			return int64(f)
+		}
+	case "float", "double":
+		var f float64
+		_, err := fmt.Sscanf(strings.TrimSpace(str), "%f", &f)
+		if err == nil {
+			return f
+		}
+	case "bool", "boolean":
+		s := strings.ToLower(strings.TrimSpace(str))
+		if s == "true" || s == "1" || s == "yes" {
+			return true
+		}
+		if s == "false" || s == "0" || s == "no" || s == "" {
+			return false
+		}
+	}
+	return val // Return original if no coercion possible
+}
+
+// getZeroValue returns the zero/default value for a given type name.
+// Used when a variable is declared without an initializer (e.g., int $x).
+func (r *Runtime) getZeroValue(typeName string) interface{} {
+	switch strings.ToLower(typeName) {
+	case "int", "integer":
+		return int64(0)
+	case "float", "double":
+		return float64(0.0)
+	case "string":
+		return ""
+	case "bool", "boolean":
+		return false
+	case "array":
+		return []interface{}{}
+	case "map":
+		return map[string]interface{}{}
+	default:
+		return nil
+	}
 }

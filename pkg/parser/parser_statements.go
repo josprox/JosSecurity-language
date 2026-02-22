@@ -220,8 +220,8 @@ func (p *Parser) parseBlockStatement() *BlockStatement {
 	return block
 }
 
-func (p *Parser) parseLetStatement() *LetStatement {
-	stmt := &LetStatement{Token: p.curToken} // Type (string, int)
+func (p *Parser) parseLetStatement() Statement {
+	typeToken := p.curToken
 
 	if !p.expectPeek(VAR) {
 		return nil
@@ -231,12 +231,53 @@ func (p *Parser) parseLetStatement() *LetStatement {
 		return nil
 	}
 
-	stmt.Name = &Identifier{Token: p.curToken, Value: p.curToken.Literal}
+	name := &Identifier{Token: p.curToken, Value: p.curToken.Literal}
+	var value Expression
 
 	if p.peekToken.Type == ASSIGN {
 		p.nextToken()
 		p.nextToken()
-		stmt.Value = p.parseExpression(LOWEST)
+		value = p.parseExpression(LOWEST)
+	}
+
+	if p.peekToken.Type == COMMA {
+		return p.parseMultiLetStatement(typeToken, name, value)
+	}
+
+	stmt := &LetStatement{Token: typeToken, Name: name, Value: value}
+
+	if p.peekToken.Type == SEMICOLON || p.peekToken.Type == NEWLINE {
+		p.nextToken()
+	}
+
+	return stmt
+}
+
+// parseMultiLetStatement parses: type $a[=val],$b[=val],...
+// Call only when a COMMA is detected after the first var in a LetStatement.
+func (p *Parser) parseMultiLetStatement(typeToken Token, firstName *Identifier, firstValue Expression) *MultiLetStatement {
+	stmt := &MultiLetStatement{TypeToken: typeToken}
+
+	// Add first declaration
+	stmt.Declarations = append(stmt.Declarations, SingleDecl{Name: firstName, Value: firstValue})
+
+	// Consume each comma-separated declaration
+	for p.peekToken.Type == COMMA {
+		p.nextToken() // consume COMMA
+		if !p.expectPeek(VAR) {
+			break
+		}
+		if !p.expectPeek(IDENT) {
+			break
+		}
+		name := &Identifier{Token: p.curToken, Value: p.curToken.Literal}
+		var value Expression
+		if p.peekToken.Type == ASSIGN {
+			p.nextToken() // consume =
+			p.nextToken() // move to value
+			value = p.parseExpression(LOWEST)
+		}
+		stmt.Declarations = append(stmt.Declarations, SingleDecl{Name: name, Value: value})
 	}
 
 	if p.peekToken.Type == SEMICOLON || p.peekToken.Type == NEWLINE {

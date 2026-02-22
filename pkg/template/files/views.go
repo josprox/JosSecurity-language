@@ -14,13 +14,13 @@ func GetViewFiles(path string) map[string]string {
         <div class="card-body">
             <div class="row">
                 <div class="col-md-4 text-center">
-                    <img src="https://ui-avatars.com/api/?name={{ $user.name }}&background=2563eb&color=fff&size=128" alt="Avatar" class="rounded-circle mb-3">
-                    <h4>{{ $user.name }}</h4>
-                    <p class="text-muted">{{ $user.email }}</p>
-                    <span class="badge badge-primary">{{ $user.role_id == 1 ? 'Administrador' : 'Usuario' }}</span>
+                    <img src="https://ui-avatars.com/api/?name={{ $auth_user }}&background=2563eb&color=fff&size=128" alt="Avatar" class="rounded-circle mb-3">
+                    <h4>{{ $first_name }} {{ $last_name }}</h4>
+                    <p class="text-muted">{{ $email }}</p>
+                    <span class="badge badge-primary">{{ $auth_role }}</span>
                 </div>
                 <div class="col-md-8">
-                    <h3>Información de la Cuenta</h3>
+                    <h3>Informaci&oacute;n de la Cuenta</h3>
                     <hr>
                     <form action="/profile/update" method="POST">
                         {{ csrf_field() }}
@@ -28,31 +28,31 @@ func GetViewFiles(path string) map[string]string {
                         <div class="row">
                             <div class="col-md-6 form-group">
                                 <label>Nombre</label>
-                                <input type="text" name="first_name" class="form-control" value="{{ $user.first_name }}" required>
+                                <input type="text" name="first_name" class="form-control" value="{{ $first_name }}" required>
                             </div>
                             <div class="col-md-6 form-group">
                                 <label>Apellido</label>
-                                <input type="text" name="last_name" class="form-control" value="{{ $user.last_name }}" required>
+                                <input type="text" name="last_name" class="form-control" value="{{ $last_name }}" required>
                             </div>
                         </div>
 
                         <div class="form-group">
-                            <label>Teléfono</label>
-                            <input type="text" name="phone" class="form-control" value="{{ $user.phone }}">
+                            <label>Tel&eacute;fono</label>
+                            <input type="text" name="phone" class="form-control" value="{{ $phone }}">
                         </div>
 
                         <div class="form-group">
-                            <label>Correo Electrónico</label>
-                            <input type="email" class="form-control" value="{{ $user.email }}" readonly disabled>
+                            <label>Correo Electr&oacute;nico</label>
+                            <input type="email" class="form-control" value="{{ $email }}" readonly disabled>
                             <small class="text-muted">El correo no se puede cambiar.</small>
                         </div>
 
                         <hr>
-                        <h5>Cambiar Contraseña</h5>
+                        <h5>Cambiar Contrase&ntilde;a</h5>
                         <p class="text-muted small">Deja en blanco para mantener la actual.</p>
                         
                         <div class="form-group">
-                            <label>Nueva Contraseña</label>
+                            <label>Nueva Contrase&ntilde;a</label>
                             <input type="password" name="password" class="form-control" placeholder="********">
                         </div>
 
@@ -63,9 +63,9 @@ func GetViewFiles(path string) map[string]string {
 
                     <div class="alert alert-danger">
                         <h4>Zona de Peligro</h4>
-                        <p>Una vez que elimines tu cuenta, no hay vuelta atrás. Por favor, asegúrate.</p>
+                        <p>Una vez que elimines tu cuenta, no hay vuelta atr&aacute;s. Por favor, as&eacute;g&uacute;rate.</p>
                         
-                        <form action="/profile/delete" method="POST" onsubmit="return confirm('¿Estás SEGURO de que deseas eliminar tu cuenta permanentemente?');">
+                        <form action="/profile/delete" method="POST" onsubmit="return confirm('&iquest;Est&aacute;s SEGURO de que deseas eliminar tu cuenta permanentemente?');">
                              {{ csrf_field() }}
                              <button type="submit" class="btn btn-danger">Eliminar Cuenta</button>
                         </form>
@@ -239,12 +239,12 @@ func GetViewFiles(path string) map[string]string {
             <h2>Dashboard</h2>
             <div class="d-flex align-items-center gap-3">
                 <span class="badge badge-info">{{ $role }}</span>
-                <a href="/logout" class="btn btn-outline-danger btn-sm">Cerrar Sesión</a>
+                <a href="/logout" class="btn btn-outline-danger btn-sm">Cerrar Sesi&oacute;n</a>
             </div>
         </div>
         <div class="card-body">
-            <h3>Bienvenido, {{ $user.name }}</h3>
-            <p>Has iniciado sesión correctamente en el sistema JosSecurity Enterprise.</p>
+            <h3>Bienvenido, {{ $user_name }}</h3>
+            <p>Has iniciado sesi&oacute;n correctamente en el sistema JosSecurity Enterprise.</p>
             
             <div class="alert alert-info" style="display: {{ $isAdmin ? 'block' : 'none' }}">
                 <strong>Panel de Administrador:</strong> Tienes acceso total al sistema.

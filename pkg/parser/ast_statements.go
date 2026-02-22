@@ -26,6 +26,32 @@ func (ls *LetStatement) String() string {
 	return out.String()
 }
 
+// SingleDecl is one element in a multi-declaration: $name [= value]
+type SingleDecl struct {
+	Name  *Identifier
+	Value Expression // nil if no initializer (zero-value will be used)
+}
+
+// MultiLetStatement: int $a,$b  or  string $x="hi",$y
+type MultiLetStatement struct {
+	TypeToken    Token        // the type keyword token (e.g. "int")
+	Declarations []SingleDecl // one per variable
+}
+
+func (mls *MultiLetStatement) statementNode()       {}
+func (mls *MultiLetStatement) TokenLiteral() string { return mls.TypeToken.Literal }
+func (mls *MultiLetStatement) String() string {
+	var parts []string
+	for _, d := range mls.Declarations {
+		s := d.Name.String()
+		if d.Value != nil {
+			s += " = " + d.Value.String()
+		}
+		parts = append(parts, s)
+	}
+	return mls.TypeToken.Literal + " " + strings.Join(parts, ", ") + ";"
+}
+
 type ExpressionStatement struct {
 	Token      Token // The first token of the expression
 	Expression Expression

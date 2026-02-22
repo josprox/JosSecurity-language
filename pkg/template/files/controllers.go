@@ -6,8 +6,16 @@ func GetControllerFiles(path string) map[string]string {
 	return map[string]string{
 		filepath.Join(path, "app", "controllers", "ProfileController.joss"): `class ProfileController {
     function index() {
-        $user = Auth::user()
-        return View::render("profile/index", {"user": $user, "title": "Mi Perfil"})
+        $u = Auth::user()
+        return View::render("profile/index", {
+            "title":      "Mi Perfil",
+            "first_name": $u->first_name,
+            "last_name":  $u->last_name,
+            "email":      $u->email,
+            "phone":      $u->phone,
+            "role_id":    $u->role_id,
+            "username":   $u->username
+        })
     }
 
     function update() {
@@ -40,6 +48,7 @@ func GetControllerFiles(path string) map[string]string {
         }
     }
 }`,
+
 		filepath.Join(path, "app", "controllers", "HomeController.joss"): `class HomeController {
     func index() {
         return View::render("welcome", {
@@ -273,15 +282,18 @@ func GetControllerFiles(path string) map[string]string {
 
         $isAdmin = Auth::hasRole("admin")
         $roleName = ($isAdmin) ? "Administrador" : "Cliente"
+        $u = Auth::user()
 
         return View::render("dashboard.index", {
-            "title": "Dashboard",
-            "user": Auth::user(),
-            "role": $roleName,
-            "isAdmin": $isAdmin
+            "title":      "Dashboard",
+            "user_name":  $u->name,
+            "user_email": $u->email,
+            "role":       $roleName,
+            "isAdmin":    $isAdmin
         })
     }
 }`,
+
 		filepath.Join(path, "app", "controllers", "PasswordController.joss"): `class PasswordController {
     
     // Mostrar formulario de olvido
