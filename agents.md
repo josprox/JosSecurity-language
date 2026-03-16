@@ -170,3 +170,21 @@ Instancias en cambio usan `->`: `$model->where()->get()`, `$req->input()`, etc.
 - **`foreach`** para bucles: `foreach ($list as $item) { ... }`
 - **`empty($x)`** e **`isset($x)`** son funciones builtin válidas en JOSS.
 - **Operador `??`** (null-coalesce) soportado: `$x ?? "default"`.
+
+### 15. Rutas con Closures y CORS (Sesión 16/03/2026)
+
+- **Closures como handlers de ruta**: El dispatcher (`pkg/core/dispatcher.go`) ahora soporta `*parser.FunctionLiteral` como handler de ruta. Los parámetros dinámicos `{id}` se extraen y se pasan como argumentos a la función.
+  ```joss
+  Router::get("/sound/{id}", function ($id) {
+      return Redirect::to("https://music.youtube.com/watch?v=" . $id, 302)
+  })
+  ```
+- **Clase nativa `Redirect`**: Registrada en `native.go` / `response.go`. Alias PHP-style para `Response::redirect()` que acepta status code explícito.
+  - `Redirect::to($url)` → redirect 302
+  - `Redirect::to($url, 301)` → redirect permanente
+- **CORS_WEB**: Variable de entorno en `env.joss` que controla la política CORS en `handler.go`.
+  - `CORS_WEB=*` → permite cualquier origen (sin `Allow-Credentials` por compatibilidad de browsers).
+  - `CORS_WEB=https://a.com,https://b.com` → whitelist, permite `Allow-Credentials`.
+  - **Sin definir** → CORS completamente deshabilitado (no se envían headers).
+- **Redirect status_code**: El `handler.go` ahora respeta el `status_code` del `WebResponse` en redirects (usa helper `resolveRedirectStatus`), no siempre 302.
+

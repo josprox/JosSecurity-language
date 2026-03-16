@@ -131,17 +131,42 @@ func MainHandler(w http.ResponseWriter, r *http.Request) {
 		rt.Free() // Return to pool
 	}()
 
-	// Handle Favicon
-	// CORS Headers
-	if origin := r.Header.Get("Origin"); origin != "" {
-		w.Header().Set("Access-Control-Allow-Origin", origin)
-		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
-		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Requested-With, X-CSRF-TOKEN")
-		w.Header().Set("Access-Control-Allow-Credentials", "true")
+	// CORS Headers — controlled by CORS_WEB in env.joss
+	// CORS_WEB=*                     → allow any origin (no Allow-Credentials for browser compat)
+	// CORS_WEB=https://a.com,https://b.com → allow listed origins only (with Allow-Credentials)
+	// CORS_WEB not set               → no CORS headers
+	corsPolicy := rt.Env["CORS_WEB"]
+	if corsPolicy != "" {
+		origin := r.Header.Get("Origin")
+		if origin != "" {
+			allowOrigin := ""
+			if corsPolicy == "*" {
+				// Wildcard: allow any origin — must NOT send Allow-Credentials with * (browser rejects it)
+				allowOrigin = "*"
+			} else {
+				// Whitelist: check if the request origin is in the allowed list
+				allowed := strings.Split(corsPolicy, ",")
+				for _, a := range allowed {
+					if strings.TrimSpace(a) == origin {
+						allowOrigin = origin
+						break
+					}
+				}
+			}
 
-		if r.Method == "OPTIONS" {
-			w.WriteHeader(http.StatusOK)
-			return
+			if allowOrigin != "" {
+				w.Header().Set("Access-Control-Allow-Origin", allowOrigin)
+				w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
+				w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Requested-With, X-CSRF-TOKEN")
+				if corsPolicy != "*" {
+					// Only send Allow-Credentials when origin is an explicit match (not wildcard)
+					w.Header().Set("Access-Control-Allow-Credentials", "true")
+				}
+				if r.Method == "OPTIONS" {
+					w.WriteHeader(http.StatusOK)
+					return
+				}
+			}
 		}
 	}
 
@@ -672,7 +697,7 @@ func MainHandler(w http.ResponseWriter, r *http.Request) {
 					}
 				}
 
-				http.Redirect(w, r, resInst.Fields["url"].(string), http.StatusFound)
+				http.Redirect(w, r, resInst.Fields["url"].(string), resolveRedirectStatus(resInst))
 				return
 			}
 		}
@@ -735,4 +760,20 @@ func generateSessionID() string {
 	b := make([]byte, 16)
 	rand.Read(b)
 	return hex.EncodeToString(b)
+}
+
+// resolveRedirectStatus returns the HTTP status code from a WebResponse instance,
+// falling back to 302 (Found) if not explicitly set.
+func resolveRedirectStatus(inst *core.Instance) int {
+	if code, ok := inst.Fields["status_code"]; ok {
+		switch v := code.(type) {
+		case int:
+			return v
+		case int64:
+			return int(v)
+		case float64:
+			return int(v)
+		}
+	}
+	return http.StatusFound
 }

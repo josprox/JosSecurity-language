@@ -1,6 +1,10 @@
 package core
 
-import "github.com/jossecurity/joss/pkg/parser"
+import (
+	"fmt"
+
+	"github.com/jossecurity/joss/pkg/parser"
+)
 
 // executeResponseMethod handles Response methods
 func (r *Runtime) executeResponseMethod(instance *Instance, method string, args []interface{}) interface{} {
@@ -143,6 +147,21 @@ func (r *Runtime) executeWebResponseMethod(instance *Instance, method string, ar
 		}
 	}
 	return instance
+}
+
+// executeRedirectMethod handles Redirect::to($url, $status) — PHP-style redirect helper
+func (r *Runtime) executeRedirectMethod(instance *Instance, method string, args []interface{}) interface{} {
+	if method == "to" && len(args) >= 1 {
+		url := fmt.Sprintf("%v", args[0])
+		status := 302
+		if len(args) >= 2 {
+			status = toInt(args[1])
+		}
+		res := r.createWebResponse("REDIRECT", url, nil, status)
+		res.Fields["status_code"] = status
+		return res
+	}
+	return nil
 }
 
 func toInt(val interface{}) int {

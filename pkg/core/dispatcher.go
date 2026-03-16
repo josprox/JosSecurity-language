@@ -52,9 +52,6 @@ func (r *Runtime) Dispatch(method, path string, reqData, sessData map[string]int
 					} else {
 						handler = routeVal
 					}
-
-					// Extract params (simplified)
-					// In a real implementation, we would map param names to values here
 					break
 				}
 			}
@@ -281,7 +278,45 @@ func (r *Runtime) Dispatch(method, path string, reqData, sessData map[string]int
 		}
 	}
 
+	// Handle FunctionLiteral closures as route handlers
+	// e.g. Router::get("/sound/{id}", function ($id) { return Redirect::to(...) })
+	if fn, ok := handler.(*parser.FunctionLiteral); ok {
+		args := r.extractRouteParams(method, path)
+		synth := &parser.MethodStatement{
+			Token:      fn.Token,
+			Name:       &parser.Identifier{Value: "anonymous"},
+			Parameters: fn.Parameters,
+			Body:       fn.Body,
+		}
+		fmt.Printf("[DEBUG] Executing closure handler for %s %s\n", method, path)
+		return r.CallMethodEvaluated(synth, nil, args), nil
+	}
+
 	return nil, nil
+}
+
+// extractRouteParams finds the dynamic URL parameters for the given method+path
+// by matching against registered {param} routes and returning the captured values.
+func (r *Runtime) extractRouteParams(method, path string) []interface{} {
+	args := []interface{}{}
+	if r.Routes[method] == nil {
+		return args
+	}
+	for routePath := range r.Routes[method] {
+		if !strings.Contains(routePath, "{") {
+			continue
+		}
+		regexPath := "^" + regexp.MustCompile(`\{[a-zA-Z0-9_]+\}`).ReplaceAllString(routePath, "([^/]+)") + "$"
+		re := regexp.MustCompile(regexPath)
+		matches := re.FindStringSubmatch(path)
+		if len(matches) > 1 {
+			for _, param := range matches[1:] {
+				args = append(args, param)
+			}
+			return args
+		}
+	}
+	return args
 }
 
 // DispatchWebSocket handles WebSocket upgrades
