@@ -230,7 +230,32 @@ function Uninstall-Extension {
 # 3. Actualización
 function Test-Update {
     Write-Log "Checking for updates..." "INFO"
-    Write-Log "Current version: $JossVersion" "INFO"
+    
+    $LocalVersion = "0.0.0"
+    $InstalledBinary = "$InstallDir\joss.exe"
+    
+    if (Test-Path $InstalledBinary) {
+        try {
+            $versionOutput = & $InstalledBinary version 2>&1
+            if ($versionOutput -match "v(\d+\.\d+\.\d+)") {
+                $LocalVersion = $Matches[1]
+            }
+        } catch {
+            $LocalVersion = $JossVersion
+        }
+    } else {
+        $cmdJoss = Get-Command joss -ErrorAction SilentlyContinue
+        if ($cmdJoss) {
+            try {
+                $versionOutput = & joss version 2>&1
+                if ($versionOutput -match "v(\d+\.\d+\.\d+)") {
+                    $LocalVersion = $Matches[1]
+                }
+            } catch {}
+        }
+    }
+    
+    Write-Log "Current version: $LocalVersion" "INFO"
     
     try {
         $release = Invoke-RestMethod -Uri $RepoUrl -UseBasicParsing
@@ -238,7 +263,7 @@ function Test-Update {
         
         Write-Log "Latest version: $latestVersion" "INFO"
         
-        if ([version]$latestVersion -gt [version]$JossVersion) {
+        if ([version]$latestVersion -gt [version]$LocalVersion) {
             Write-Log "[!] Update available: $latestVersion" "WARNING"
             return @{ Available = $true; Version = $latestVersion }
         } else {
@@ -250,6 +275,7 @@ function Test-Update {
         return @{ Available = $false }
     }
 }
+
 
 function Run-Update {
     Write-Log "Running update: Download and reinstalling."

@@ -160,15 +160,28 @@ uninstall_extension() {
 # 3. Actualización
 check_update() {
     log INFO "Checking for updates..."
+    
+    LOCAL_VERSION="0.0.0"
+    if command -v joss &> /dev/null; then
+        VERSION_OUT=$(joss version 2>&1 || true)
+        if [[ $VERSION_OUT =~ v([0-9]+\.[0-9]+\.[0-9]+) ]]; then
+            LOCAL_VERSION="${BASH_REMATCH[1]}"
+        fi
+    fi
+    
+    log INFO "Current version: $LOCAL_VERSION"
+    
     RELEASE_INFO=$(curl -s "$REPO_URL")
     LATEST_VERSION=$(echo "$RELEASE_INFO" | grep '"tag_name"' | sed -E 's/.*"v?([^"]+)".*/\1/' || echo "0.0.0")
     
-    if [ "$LATEST_VERSION" != "0.0.0" ] && [ "$(printf '%s\n' "$LATEST_VERSION" "$JOSS_VERSION" | sort -V | head -n1)" != "$LATEST_VERSION" ]; then
+    log INFO "Latest version: $LATEST_VERSION"
+    
+    if [ "$LATEST_VERSION" != "0.0.0" ] && [ "$(printf '%s\n' "$LATEST_VERSION" "$LOCAL_VERSION" | sort -V | head -n1)" != "$LATEST_VERSION" ]; then
         log WARNING "[!] Update available: $LATEST_VERSION"
         echo "$LATEST_VERSION" # Devuelve la versión para el menú
         return 0 # Update available
     fi
-    log SUCCESS "[OK] You have the latest version ($JOSS_VERSION)."
+    log SUCCESS "[OK] You have the latest version ($LOCAL_VERSION)."
     return 1 # No update
 }
 
