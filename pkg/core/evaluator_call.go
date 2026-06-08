@@ -429,6 +429,34 @@ func (r *Runtime) callBuiltin(name string, args []interface{}) (interface{}, boo
 			}
 		}
 		return nil, true
+	case "file_put_contents":
+		if len(args) == 2 {
+			path, ok1 := args[0].(string)
+			content, ok2 := args[1].(string)
+			if ok1 && ok2 {
+				err := os.WriteFile(path, []byte(content), 0644)
+				if err != nil {
+					return false, true
+				}
+				return true, true
+			}
+		}
+		return false, true
+	case "hive_read_box":
+		if len(args) < 1 {
+			return nil, true
+		}
+		filePath := fmt.Sprintf("%v", args[0])
+		entries, err := ReadHiveBox(filePath)
+		if err != nil {
+			fmt.Printf("[hive_read_box Error] %v\n", err)
+			return nil, true
+		}
+		result := make([]interface{}, len(entries))
+		for i, entry := range entries {
+			result[i] = entry
+		}
+		return result, true
 	case "append":
 		if len(args) == 2 {
 			if list, ok := args[0].([]interface{}); ok {

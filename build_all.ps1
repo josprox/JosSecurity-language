@@ -23,6 +23,12 @@ try {
     # Remove old vsix
     Get-ChildItem -Filter "*.vsix" | Remove-Item -Force -ErrorAction SilentlyContinue
     
+    # Install node modules if missing
+    if (-not (Test-Path "node_modules")) {
+        Write-Host "node_modules not found. Installing dependencies..." -ForegroundColor Yellow
+        cmd /c "npm install"
+    }
+    
     # Build
     Write-Host "Running 'npm run package'..."
     cmd /c "npm run package"

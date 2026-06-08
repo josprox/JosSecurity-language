@@ -116,6 +116,7 @@ export function getCompletionItemProvider() {
                         createSnippet('@elseif', ': (${1:condition}) ? { ${2} } : ', 'Inserts an else-if ternary chain.'),
                         createSnippet('@foreach', '@foreach(${1:$items} as ${2:$item})\n\t${3}\n@endforeach', 'Iterates over arrays/maps.'),
                         createSnippet('@endforeach', '@endforeach', 'Ends a foreach loop.'),
+                        createSnippet('match', 'match (${1:\$var}) {\n\t${2:value} => ${3:result},\n\tdefault => ${4:fallback}\n}', 'Inserts a PHP-style match expression.'),
 
                         createKeyword('class', 'Defines a new class.'),
                         createKeyword('func', 'Defines a new function.'),
@@ -127,6 +128,8 @@ export function getCompletionItemProvider() {
                         createKeyword('else', 'Else statement.'),
                         createKeyword('for', 'Loop statement.'),
                         createKeyword('foreach', 'Iterates over arrays/maps.'),
+                        createKeyword('match', 'PHP-style match expression for strict branching.'),
+                        createKeyword('default', 'Fallback match arm.'),
                         createKeyword('async', 'Starts an asynchronous operation.'),
                         createKeyword('await', 'Waits for an asynchronous operation.'),
                         createKeyword('try', 'Try block.'),

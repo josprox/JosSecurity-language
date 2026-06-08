@@ -20,6 +20,8 @@ Documentación completa de todos los módulos nativos disponibles en JosSecurity
 - [Math](#math) - Funciones matemáticas
 - [Session](#session) - Gestión de sesiones
 - [JSON](#json) - Manipulación de JSON (Incluye robustez anti-BOM)
+- [SQLite](#sqlite) - Acceso a bases de datos SQLite locales (**NUEVO**)
+- [Zip](#zip) - Descompresión de archivos ZIP (**NUEVO**)
 - [IA Nativa](IA_NATIVA.md) - **NUEVO**
 - [WebSockets Nativos](WEBSOCKETS.md) - **NUEVO**
 
@@ -1237,3 +1239,59 @@ if (!$ok) {
     Print("Error: " . $mail->lastError())
 }
 ```
+
+---
+
+## SQLite
+
+Módulo nativo para abrir y realizar consultas en bases de datos SQLite locales.
+
+### Métodos
+
+#### `open(string $path)`
+Abre una conexión con el archivo de base de datos SQLite especificado. Retorna `true` si es exitoso.
+```joss
+$sqlite = new SQLite()
+$ok = $sqlite->open("db/song.db")
+```
+
+#### `query(string $sql, array $bindings = [])`
+Ejecuta una consulta SQL en la base de datos abierta y retorna un array de mapas con los resultados.
+```joss
+$songs = $sqlite->query("SELECT * FROM song WHERE liked = ?", [1])
+foreach ($songs as $song) {
+    print($song["title"])
+}
+```
+
+#### `close()`
+Cierra la conexión con la base de datos.
+```joss
+$sqlite->close()
+```
+
+---
+
+## Zip
+
+Módulo nativo para descompresión de archivos ZIP de forma segura.
+
+### Métodos
+
+#### `extract(string $zipPath, string $destPath)`
+Descomprime el archivo ZIP en la ruta destino especificada. Previene vulnerabilidades tipo Zip Slip de forma automática. Retorna `true` si es exitoso.
+```joss
+$zip = new Zip()
+$zip->extract("backup.zip", "extracted_data/")
+```
+
+---
+
+## Utilidades Globales de Archivos
+
+#### `file_put_contents(string $path, string $content)`
+Escribe contenido (texto o binario) en el archivo especificado. Retorna `true` si es exitoso.
+```joss
+file_put_contents("archivos/nota.txt", "Hola mundo")
+```
+

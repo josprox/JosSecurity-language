@@ -118,8 +118,16 @@ func (r *Runtime) RegisterNativeClasses() {
 	r.Variables["Str"] = &Instance{Class: r.Classes["Str"], Fields: make(map[string]interface{})}
 
 	// UserStorage
-	r.registerNative("UserStorage", []string{"put", "get", "update", "path", "exists", "delete"}, (*Runtime).executeUserStorageMethod)
+	r.registerNative("UserStorage", []string{"put", "get", "getToFile", "update", "path", "exists", "delete"}, (*Runtime).executeUserStorageMethod)
 	r.Variables["UserStorage"] = &Instance{Class: r.Classes["UserStorage"], Fields: make(map[string]interface{})}
+
+	// SQLite (Native)
+	r.registerNative("SQLite", []string{"open", "query", "close"}, (*Runtime).executeSQLiteMethod)
+	r.Variables["SQLite"] = &Instance{Class: r.Classes["SQLite"], Fields: make(map[string]interface{})}
+
+	// Zip (Native)
+	r.registerNative("Zip", []string{"extract"}, (*Runtime).executeZipMethod)
+	r.Variables["Zip"] = &Instance{Class: r.Classes["Zip"], Fields: make(map[string]interface{})}
 
 	// JSON
 	r.registerNative("JSON", []string{"parse", "stringify", "decode", "encode"}, (*Runtime).executeJSONMethod)

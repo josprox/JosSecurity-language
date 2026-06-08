@@ -32,7 +32,7 @@
       "patterns": [
         {
           "name": "keyword.control.joss",
-          "match": "\\b(foreach|as|return|break|continue|new|this|try|catch|throw|extends|async|await)\\b"
+          "match": "\\b(foreach|as|return|break|continue|new|this|try|catch|throw|extends|async|await|match|default)\\b"
         },
         {
           "name": "keyword.other.joss",
@@ -102,7 +102,7 @@
         },
         {
           "name": "keyword.operator.assignment.joss",
-          "match": "="
+          "match": "(=>|=)"
         },
         {
           "name": "keyword.operator.ternary.joss",

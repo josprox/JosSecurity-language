@@ -36,12 +36,27 @@ func (r *Runtime) executeUserStorageMethod(instance *Instance, method string, ar
 	// Ensure DB tables exist
 	r.ensureStorageTable(storageTable)
 
+	// extractToken: JOSS may pass the full user Instance instead of a plain token string.
+	// If args[0] is an *Instance, extract the "user_token" field from its Fields map.
+	extractToken := func(arg interface{}) string {
+		if inst, ok := arg.(*Instance); ok {
+			if tok, exists := inst.Fields["user_token"]; exists {
+				return fmt.Sprintf("%v", tok)
+			}
+			// Fallback: try "token" field
+			if tok, exists := inst.Fields["token"]; exists {
+				return fmt.Sprintf("%v", tok)
+			}
+		}
+		return fmt.Sprintf("%v", arg)
+	}
+
 	switch method {
 	case "put":
 		if len(args) < 3 {
 			return false
 		}
-		userToken := fmt.Sprintf("%v", args[0])
+		userToken := extractToken(args[0])
 		fileName := fmt.Sprintf("%v", args[1]) // Can be "photos/my_pic.jpg"
 		content := fmt.Sprintf("%v", args[2])
 
@@ -94,7 +109,7 @@ func (r *Runtime) executeUserStorageMethod(instance *Instance, method string, ar
 		if len(args) < 2 {
 			return nil
 		}
-		userToken := fmt.Sprintf("%v", args[0])
+		userToken := extractToken(args[0])
 		fileName := fmt.Sprintf("%v", args[1])
 
 		if storageType == "OCI" {
@@ -108,11 +123,34 @@ func (r *Runtime) executeUserStorageMethod(instance *Instance, method string, ar
 			return string(content)
 		}
 
+	case "getToFile":
+		if len(args) < 3 {
+			return false
+		}
+		userToken := extractToken(args[0])
+		fileName := fmt.Sprintf("%v", args[1])
+		destPath := fmt.Sprintf("%v", args[2])
+
+		if storageType == "OCI" {
+			return r.ociGetToFile(userToken, fileName, destPath)
+		} else {
+			// Local: just copy the file
+			srcPath := filepath.Join(basePath, userToken, fileName)
+			content, err := os.ReadFile(srcPath)
+			if err != nil {
+				return false
+			}
+			if err := os.MkdirAll(filepath.Dir(destPath), 0755); err != nil {
+				return false
+			}
+			return os.WriteFile(destPath, content, 0644) == nil
+		}
+
 	case "delete":
 		if len(args) < 2 {
 			return false
 		}
-		userToken := fmt.Sprintf("%v", args[0])
+		userToken := extractToken(args[0])
 		fileName := fmt.Sprintf("%v", args[1])
 
 		// DB Registry Delete
@@ -195,14 +233,20 @@ func (r *Runtime) ociPut(userToken, fileName, content string) bool {
 }
 
 func (r *Runtime) ociGet(userToken, fileName string) interface{} {
+	fmt.Printf("[OCI Debug] Getting object: userToken=%s, file=%s\n", userToken, fileName)
 	client, ctx, err := r.getOCIClient()
 	if err != nil {
+		fmt.Printf("[OCI Error] Client init failed: %v\n", err)
 		return nil
 	}
+
+	ctx, cancel := context.WithTimeout(ctx, 60*time.Second)
+	defer cancel()
 
 	namespace := r.Env["OCI_NAMESPACE"]
 	bucketName := r.Env["OCI_BUCKET_NAME"]
 	objectName := userToken + "/" + fileName
+	fmt.Printf("[OCI Debug] Fetching from bucket=%s, object=%s\n", bucketName, objectName)
 
 	req := objectstorage.GetObjectRequest{
 		NamespaceName: &namespace,
@@ -212,15 +256,71 @@ func (r *Runtime) ociGet(userToken, fileName string) interface{} {
 
 	resp, err := client.GetObject(ctx, req)
 	if err != nil {
+		fmt.Printf("[OCI Error] GetObject failed: %v\n", err)
 		return nil
 	}
 	defer resp.Content.Close()
 
 	content, err := io.ReadAll(resp.Content)
 	if err != nil {
+		fmt.Printf("[OCI Error] ReadAll failed: %v\n", err)
 		return nil
 	}
+	fmt.Printf("[OCI Debug] Downloaded %d bytes\n", len(content))
 	return string(content)
+}
+
+// ociGetToFile downloads an OCI object directly to a local file path (binary-safe)
+func (r *Runtime) ociGetToFile(userToken, fileName, destPath string) bool {
+	fmt.Printf("[OCI Debug] GetToFile: userToken=%s, file=%s -> %s\n", userToken, fileName, destPath)
+	client, ctx, err := r.getOCIClient()
+	if err != nil {
+		fmt.Printf("[OCI Error] Client init failed: %v\n", err)
+		return false
+	}
+
+	ctx, cancel := context.WithTimeout(ctx, 120*time.Second)
+	defer cancel()
+
+	namespace := r.Env["OCI_NAMESPACE"]
+	bucketName := r.Env["OCI_BUCKET_NAME"]
+	objectName := userToken + "/" + fileName
+	fmt.Printf("[OCI Debug] Fetching from bucket=%s, object=%s\n", bucketName, objectName)
+
+	req := objectstorage.GetObjectRequest{
+		NamespaceName: &namespace,
+		BucketName:    &bucketName,
+		ObjectName:    &objectName,
+	}
+
+	resp, err := client.GetObject(ctx, req)
+	if err != nil {
+		fmt.Printf("[OCI Error] GetObject failed: %v\n", err)
+		return false
+	}
+	defer resp.Content.Close()
+
+	// Ensure destination directory exists
+	if err := os.MkdirAll(filepath.Dir(destPath), 0755); err != nil {
+		fmt.Printf("[OCI Error] MkdirAll failed: %v\n", err)
+		return false
+	}
+
+	// Write directly to file in binary mode
+	out, err := os.Create(destPath)
+	if err != nil {
+		fmt.Printf("[OCI Error] File create failed: %v\n", err)
+		return false
+	}
+	defer out.Close()
+
+	written, err := io.Copy(out, resp.Content)
+	if err != nil {
+		fmt.Printf("[OCI Error] File write failed: %v\n", err)
+		return false
+	}
+	fmt.Printf("[OCI Debug] Wrote %d bytes to %s\n", written, destPath)
+	return true
 }
 
 func (r *Runtime) ociDelete(userToken, fileName string) bool {
