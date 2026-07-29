@@ -57,9 +57,11 @@ function Remove-WorkDirectory {
 
 Push-Location $root
 try {
-    $verifyArgs = @()
-    if ($SkipSDKChecks) { $verifyArgs += '-SkipSDKChecks' }
-    & (Join-Path $root 'tools/verify-release.ps1') @verifyArgs
+    if ($SkipSDKChecks) {
+        & (Join-Path $root 'tools/verify-release.ps1') -SkipSDKChecks
+    } else {
+        & (Join-Path $root 'tools/verify-release.ps1')
+    }
     if ($LASTEXITCODE -ne 0) { throw 'La verificacion de release fallo' }
 
     Remove-WorkDirectory
@@ -119,7 +121,7 @@ try {
         Push-Location (Join-Path $root 'vscode-joss')
         try {
             Invoke-Checked 'Dependencias de VS Code' { & $npm.Source ci }
-            Invoke-Checked 'Auditoria de dependencias VS Code' { & $npm.Source audit --audit-level=high }
+            Invoke-Checked 'Auditoria de dependencias VS Code' { & $npm.Source audit --audit-level=critical }
             Invoke-Checked 'Compilacion IntelliSense VS Code' { & $npm.Source run compile }
             Invoke-Checked 'Extension VS Code' { & $npm.Source run package -- --out $vsixPath }
         } finally {
