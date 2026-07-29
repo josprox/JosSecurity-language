@@ -1,6 +1,6 @@
 # Changelog
 
-## [3.6.3] - 2026-07-28
+## [3.6.2] - 2026-07-28
 
 ### Fixed
 
@@ -13,6 +13,7 @@
 
 - Verified accounts no longer produce a truthy fake verification token.
 - Password reset table initialization is only cached after successful creation.
+- API and web 2FA challenges now expire after five minutes, cannot authorize protected routes, and can only be exchanged once for an access token.
 
 ## [3.6.0] - 2026-07-14
 

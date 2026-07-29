@@ -70,9 +70,44 @@ func (r *Runtime) executeAuthMethod(instance *Instance, method string, args []in
 		}
 		return nil
 
+	case "verify2FAChallenge":
+		if len(args) >= 2 {
+			tokenString := strings.TrimSpace(fmt.Sprintf("%v", args[0]))
+			code := strings.TrimSpace(fmt.Sprintf("%v", args[1]))
+			if strings.HasPrefix(tokenString, "Bearer ") {
+				tokenString = strings.TrimSpace(strings.TrimPrefix(tokenString, "Bearer "))
+			}
+			if tokenString == "" || code == "" {
+				return false
+			}
+
+			claims, valid := r.parseJWT(tokenString)
+			if !valid || fmt.Sprintf("%v", claims["token_type"]) != "mfa_challenge" {
+				return false
+			}
+
+			userId := claimUserID(claims["user_id"])
+			if userId <= 0 {
+				return false
+			}
+			verified := r.executeTwoFactorMethod(nil, "verify", []interface{}{userId, code})
+			if verified != true {
+				return false
+			}
+			challengeID := strings.TrimSpace(fmt.Sprintf("%v", claims["jti"]))
+			if challengeID == "" {
+				return false
+			}
+			if _, alreadyUsed := usedMFAChallenges.LoadOrStore(challengeID, time.Now()); alreadyUsed {
+				return false
+			}
+			return r.executeAuthMethod(instance, "complete2FA", []interface{}{userId})
+		}
+		return false
+
 	case "login":
 		if len(args) >= 2 {
-			email := strings.TrimSpace(fmt.Sprintf("%v", args[0]))
+			email := normalizeAuthEmail(fmt.Sprintf("%v", args[0]))
 			password := fmt.Sprintf("%v", args[1])
 
 			resultFields := make(map[string]interface{})
@@ -696,6 +731,7 @@ func (r *Runtime) executeAuthMethod(instance *Instance, method string, args []in
 // --- HELPERS Y CONFIGURACIÓN DE TABLAS ---
 
 var authTablesEnsured sync.Map
+var usedMFAChallenges sync.Map
 
 func (r *Runtime) ensureAuthTables(usersTable, rolesTable, prefix string) {
 	db := r.GetDB()
@@ -898,8 +934,10 @@ func getString(data map[string]interface{}, key, def string) string {
 
 func (r *Runtime) generateJWT(userId int, email string, userName string, roleName string, isRefresh bool) interface{} {
 	expirationTime := time.Now().Add(24 * 30 * time.Hour)
+	tokenType := "access"
 	if isRefresh {
 		expirationTime = time.Now().Add(24 * 180 * time.Hour)
+		tokenType = "refresh"
 	}
 
 	jwtSecret := os.Getenv("JWT_SECRET")
@@ -908,11 +946,12 @@ func (r *Runtime) generateJWT(userId int, email string, userName string, roleNam
 	}
 
 	claims := jwt.MapClaims{
-		"user_id": userId,
-		"email":   email,
-		"name":    userName,
-		"role":    roleName,
-		"exp":     expirationTime.Unix(),
+		"user_id":    userId,
+		"email":      email,
+		"name":       userName,
+		"role":       roleName,
+		"token_type": tokenType,
+		"exp":        expirationTime.Unix(),
 	}
 
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
@@ -925,7 +964,54 @@ func (r *Runtime) generateJWT(userId int, email string, userName string, roleNam
 	return tokenString
 }
 
-func (r *Runtime) ValidateJWT(tokenString string) (map[string]interface{}, bool) {
+func (r *Runtime) generateMFAChallengeJWT(userId int, email string) interface{} {
+	usedMFAChallenges.Range(func(key, value interface{}) bool {
+		if usedAt, ok := value.(time.Time); ok && time.Since(usedAt) > 10*time.Minute {
+			usedMFAChallenges.Delete(key)
+		}
+		return true
+	})
+
+	jwtSecret := os.Getenv("JWT_SECRET")
+	if jwtSecret == "" {
+		jwtSecret = "joss_default_secret_change_in_production"
+	}
+
+	claims := jwt.MapClaims{
+		"user_id":    userId,
+		"email":      email,
+		"name":       "MFA_Pending",
+		"role":       "guest",
+		"token_type": "mfa_challenge",
+		"jti":        uuid.New().String(),
+		"iat":        time.Now().Unix(),
+		"exp":        time.Now().Add(5 * time.Minute).Unix(),
+	}
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+	tokenString, err := token.SignedString([]byte(jwtSecret))
+	if err != nil {
+		LogError("[Security] Error generating MFA challenge: %v", err)
+		return false
+	}
+	return tokenString
+}
+
+func claimUserID(value interface{}) int {
+	switch typed := value.(type) {
+	case float64:
+		return int(typed)
+	case int:
+		return typed
+	case int64:
+		return int(typed)
+	default:
+		var userId int
+		fmt.Sscanf(fmt.Sprintf("%v", typed), "%d", &userId)
+		return userId
+	}
+}
+
+func (r *Runtime) parseJWT(tokenString string) (map[string]interface{}, bool) {
 	jwtSecret := os.Getenv("JWT_SECRET")
 	if jwtSecret == "" {
 		jwtSecret = "joss_default_secret_change_in_production"
@@ -948,4 +1034,15 @@ func (r *Runtime) ValidateJWT(tokenString string) (map[string]interface{}, bool)
 	}
 
 	return nil, false
+}
+
+func (r *Runtime) ValidateJWT(tokenString string) (map[string]interface{}, bool) {
+	claims, valid := r.parseJWT(tokenString)
+	if !valid {
+		return nil, false
+	}
+	if fmt.Sprintf("%v", claims["token_type"]) == "mfa_challenge" {
+		return nil, false
+	}
+	return claims, true
 }

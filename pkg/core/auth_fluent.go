@@ -94,10 +94,7 @@ func (r *Runtime) executeAuthLoginResultMethod(instance *Instance, method string
 
 // generateTemporaryChallengeJWT creates a short-lived token for 2FA validation
 func (r *Runtime) generateTemporaryChallengeJWT(userId int, email string) string {
-	// Reuses generateJWT logic but adds a special claim or flag
-	jwtToken := r.generateJWT(userId, email, "MFA_Pending", "guest", false)
-	// We can wrap it or sign a specific temporary token. For simplicity, we sign a standard JWT
-	// but the claims indicate it is pending 2FA.
+	jwtToken := r.generateMFAChallengeJWT(userId, email)
 	return fmt.Sprintf("%v", jwtToken)
 }
 

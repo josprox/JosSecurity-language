@@ -45,7 +45,7 @@ func (r *Runtime) RegisterNativeClasses() {
 	r.registerNative("GranDB", granDBMethods, (*Runtime).executeGranDBMethod)
 
 	// Auth
-	r.registerNative("Auth", []string{"hash", "complete2FA", "login", "create", "attempt", "check", "verify", "forgotPassword", "resetPassword", "resendVerification", "user", "guest", "hasRole", "id", "refresh", "update", "delete", "logout", "validateToken"}, (*Runtime).executeAuthMethod)
+	r.registerNative("Auth", []string{"hash", "complete2FA", "verify2FAChallenge", "login", "create", "attempt", "check", "verify", "forgotPassword", "resetPassword", "resendVerification", "verificationStatus", "user", "guest", "hasRole", "id", "refresh", "update", "delete", "logout", "validateToken"}, (*Runtime).executeAuthMethod)
 	r.Variables["Auth"] = &Instance{Class: r.Classes["Auth"], Fields: make(map[string]interface{})}
 
 	// AuthLoginResult

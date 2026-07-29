@@ -2,11 +2,9 @@ package core
 
 import (
 	"fmt"
-	"os"
 	"regexp"
 	"strings"
 
-	"github.com/golang-jwt/jwt/v5"
 	"github.com/jossecurity/joss/pkg/parser"
 )
 
@@ -187,19 +185,9 @@ func (r *Runtime) Dispatch(method, path string, reqData, sessData map[string]int
 				}}, nil
 			}
 
-			// Verify JWT
-			token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
-				if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
-					return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
-				}
-				secret := os.Getenv("JWT_SECRET")
-				if secret == "" {
-					secret = "joss_default_secret_change_in_production"
-				}
-				return []byte(secret), nil
-			})
-
-			if err != nil || !token.Valid {
+			// MFA challenge tokens are intentionally rejected by normal API auth.
+			claims, valid := r.ValidateJWT(tokenString)
+			if !valid {
 				return &Instance{Fields: map[string]interface{}{
 					"_type":  "JSON",
 					"status": 401,
@@ -208,7 +196,7 @@ func (r *Runtime) Dispatch(method, path string, reqData, sessData map[string]int
 			}
 
 			// Success: Inject user info into request?
-			if claims, ok := token.Claims.(jwt.MapClaims); ok {
+			if claims != nil {
 				// Inject into $__user or similar if needed. For now, pass.
 				// Maybe populate $__session with user info for this request context?
 				if sessInst, ok := r.Variables["$__session"].(*Instance); ok {
