@@ -1,5 +1,13 @@
 # Changelog
 
+## [3.6.3] - 2026-07-28
+
+### Fixed
+
+- WebSocket `onMessage` callbacks now retain `$ws`, route parameters, and local variables after the handler returns.
+- Captured callbacks created in the same scope share state across messages and `onClose`, and their invocations are serialized per connection.
+- WebSockets now support `onClose`, local channel subscriptions/publication, automatic subscription cleanup, write-error reporting, message limits, ping/pong keepalive, and safe callback panic isolation.
+
 ## [3.6.2] - 2026-07-28
 
 ### Fixed

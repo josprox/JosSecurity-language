@@ -12,6 +12,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/gorilla/websocket"
 	"github.com/jossecurity/joss/pkg/core"
 
 	_ "embed"
@@ -125,12 +126,16 @@ func MainHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	rateLimitMu.Unlock()
 
+	webSocketUpgraded := false
+
 	// Panic Recovery
 	defer func() {
-		if r := recover(); r != nil {
-			fmt.Printf("[SERVER PANIC] Recovered from: %v\n", r)
-			w.WriteHeader(http.StatusInternalServerError)
-			fmt.Fprintf(w, "<h1>500 Internal Server Error</h1><p>Something went wrong.</p><pre>%v</pre>", r)
+		if recovered := recover(); recovered != nil {
+			fmt.Printf("[SERVER PANIC] Recovered from: %v\n", recovered)
+			if !webSocketUpgraded {
+				w.WriteHeader(http.StatusInternalServerError)
+				fmt.Fprintf(w, "<h1>500 Internal Server Error</h1><p>Something went wrong.</p><pre>%v</pre>", recovered)
+			}
 		}
 		rt.Free() // Return to pool
 	}()
@@ -241,6 +246,49 @@ func MainHandler(w http.ResponseWriter, r *http.Request) {
 			fmt.Printf("[WS] Upgrade failed: %v\n", err)
 			return
 		}
+		webSocketUpgraded = true
+
+		maxMessageBytes := int64(envPositiveInt(rt.Env, "WS_MAX_MESSAGE_BYTES", 8*1024*1024))
+		idleTimeout := time.Duration(envPositiveInt(rt.Env, "WS_IDLE_TIMEOUT_SECONDS", 120)) * time.Second
+		pingInterval := time.Duration(envPositiveInt(rt.Env, "WS_PING_INTERVAL_SECONDS", 30)) * time.Second
+		if pingInterval >= idleTimeout {
+			pingInterval = idleTimeout / 2
+		}
+		if pingInterval < time.Second {
+			pingInterval = time.Second
+		}
+
+		conn.SetReadLimit(maxMessageBytes)
+		refreshReadDeadline := func() error {
+			return conn.SetReadDeadline(time.Now().Add(idleTimeout))
+		}
+		_ = refreshReadDeadline()
+		conn.SetPongHandler(func(string) error {
+			return refreshReadDeadline()
+		})
+
+		var writeMu sync.Mutex
+		pingDone := make(chan struct{})
+		defer close(pingDone)
+		defer conn.Close()
+		go func() {
+			ticker := time.NewTicker(pingInterval)
+			defer ticker.Stop()
+			for {
+				select {
+				case <-ticker.C:
+					writeMu.Lock()
+					err := conn.WriteControl(websocket.PingMessage, nil, time.Now().Add(10*time.Second))
+					writeMu.Unlock()
+					if err != nil {
+						_ = conn.Close()
+						return
+					}
+				case <-pingDone:
+					return
+				}
+			}
+		}()
 
 		// Create Reader Closure to avoid importing websocket in core
 		reader := func() (int, []byte, error) {
@@ -248,7 +296,6 @@ func MainHandler(w http.ResponseWriter, r *http.Request) {
 		}
 
 		// Create Sender Closure
-		var writeMu sync.Mutex
 		sender := func(v interface{}) error {
 			writeMu.Lock()
 			defer writeMu.Unlock()

@@ -30,7 +30,12 @@ func (r *Runtime) CallMethod(method *parser.MethodStatement, instance *Instance,
 
 	// Save previous "this" if exists (for nested calls)
 	prevThis := r.Variables["this"]
-	r.Variables["this"] = instance
+	_, previousThisExists := r.Variables["this"]
+	if instance != nil {
+		r.Variables["this"] = instance
+	}
+	previousCaptureEnvironment := r.captureEnvironment
+	r.captureEnvironment = nil
 
 	// Bind arguments
 	previousParams := make(map[string]interface{}, len(method.Parameters))
@@ -51,10 +56,13 @@ func (r *Runtime) CallMethod(method *parser.MethodStatement, instance *Instance,
 	}
 
 	defer func() {
-		if prevThis != nil {
-			r.Variables["this"] = prevThis
-		} else {
-			delete(r.Variables, "this")
+		r.captureEnvironment = previousCaptureEnvironment
+		if instance != nil {
+			if previousThisExists {
+				r.Variables["this"] = prevThis
+			} else {
+				delete(r.Variables, "this")
+			}
 		}
 		for _, param := range method.Parameters {
 			if previousParamExists[param.Name.Value] {
@@ -86,7 +94,12 @@ func (r *Runtime) CallMethodEvaluated(method *parser.MethodStatement, instance *
 
 	// Save previous "this" if exists (for nested calls)
 	prevThis := r.Variables["this"]
-	r.Variables["this"] = instance
+	_, previousThisExists := r.Variables["this"]
+	if instance != nil {
+		r.Variables["this"] = instance
+	}
+	previousCaptureEnvironment := r.captureEnvironment
+	r.captureEnvironment = nil
 
 	// Bind arguments
 	previousParams := make(map[string]interface{}, len(method.Parameters))
@@ -107,10 +120,13 @@ func (r *Runtime) CallMethodEvaluated(method *parser.MethodStatement, instance *
 	}
 
 	defer func() {
-		if prevThis != nil {
-			r.Variables["this"] = prevThis
-		} else {
-			delete(r.Variables, "this")
+		r.captureEnvironment = previousCaptureEnvironment
+		if instance != nil {
+			if previousThisExists {
+				r.Variables["this"] = prevThis
+			} else {
+				delete(r.Variables, "this")
+			}
 		}
 		for _, param := range method.Parameters {
 			if previousParamExists[param.Name.Value] {
@@ -169,6 +185,10 @@ func (r *Runtime) executeCall(call *parser.CallExpression) interface{} {
 }
 
 func (r *Runtime) applyFunction(fn interface{}, args []interface{}) interface{} {
+	if closure, ok := fn.(*CapturedFunction); ok {
+		return r.callCapturedFunction(closure, args)
+	}
+
 	if bound, ok := fn.(*BoundMethod); ok {
 		if bound.Instance == nil && bound.StaticClass != "" {
 			// Static Call

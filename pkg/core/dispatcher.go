@@ -395,6 +395,15 @@ func (r *Runtime) DispatchWebSocket(path string, conn interface{}, reader func()
 			"_closer": closer,
 		},
 	}
+	defer func() {
+		if callback, ok := wsInstance.Fields["_on_close"]; ok {
+			r.callWebSocketCallback("onClose", callback, nil)
+		}
+		unsubscribeWebSocketFromAllChannels(wsInstance)
+		if closer != nil {
+			_ = closer()
+		}
+	}()
 
 	// Execute Handler (Controller@Method)
 	// This sets up the callbacks (onMessage, etc.)
@@ -444,11 +453,23 @@ func (r *Runtime) DispatchWebSocket(path string, conn interface{}, reader func()
 
 		// Trigger onMessage
 		if cb, ok := wsInstance.Fields["_on_message"]; ok {
-			// cb should be a Joss Function/Closure
-			// Use CallFunction
-			r.CallFunction(cb, []interface{}{string(msg)})
+			if !r.callWebSocketCallback("onMessage", cb, []interface{}{string(msg)}) {
+				break
+			}
 		}
 	}
+}
+
+func (r *Runtime) callWebSocketCallback(event string, callback interface{}, args []interface{}) (completed bool) {
+	completed = true
+	defer func() {
+		if recovered := recover(); recovered != nil {
+			fmt.Printf("[WS] %s callback panic: %v\n", event, recovered)
+			completed = false
+		}
+	}()
+	r.CallFunction(callback, args)
+	return completed
 }
 
 func matchRoutePattern(pattern, path string) ([]interface{}, bool) {

@@ -2,7 +2,7 @@
 # -----------------------------------------------------------
 # JosSecurity Docker Installer (Non-Interactive)
 # Uso en Dockerfile:
-#   RUN curl -fsSL https://raw.githubusercontent.com/josprox/JosSecurity-language/main/install/docker-install.sh | bash
+#   RUN curl -fsSL https://raw.githubusercontent.com/josprox/Joss-language/main/install/docker-install.sh | bash
 #
 # Diferencias con remote-install.sh:
 #   - Sin menú interactivo (no necesita TTY)
@@ -13,7 +13,8 @@
 set -e
 
 REPO_OWNER="josprox"
-REPO_NAME="JosSecurity-language"
+REPO_NAME="Joss-language"
+JOSS_VERSION="${JOSS_VERSION:-latest}"
 INSTALL_DIR="/usr/local/bin"
 TEMP_DIR="/tmp/jossecurity-docker-install"
 
@@ -39,7 +40,11 @@ mkdir -p "$TEMP_DIR"
 
 BINARY_FILE=$(get_binary_name)
 ZIP_FILE="jossecurity-linux.zip"
-DOWNLOAD_URL="https://github.com/$REPO_OWNER/$REPO_NAME/releases/latest/download/$ZIP_FILE"
+if [ "$JOSS_VERSION" = "latest" ]; then
+    DOWNLOAD_URL="https://github.com/$REPO_OWNER/$REPO_NAME/releases/latest/download/$ZIP_FILE"
+else
+    DOWNLOAD_URL="https://github.com/$REPO_OWNER/$REPO_NAME/releases/download/V$JOSS_VERSION/$ZIP_FILE"
+fi
 
 echo "[docker-install] Descargando $ZIP_FILE..."
 curl -fsSL "$DOWNLOAD_URL" -o "$TEMP_DIR/$ZIP_FILE"

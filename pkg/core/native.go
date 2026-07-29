@@ -99,7 +99,7 @@ func (r *Runtime) RegisterNativeClasses() {
 	r.registerNative("WebResponse", []string{"with", "withCookie", "withHeader", "status"}, (*Runtime).executeWebResponseMethod)
 
 	// WebSocket
-	r.registerNative("WebSocket", []string{"broadcast", "send", "onMessage", "close"}, (*Runtime).executeWebSocketMethod)
+	r.registerNative("WebSocket", []string{"broadcast", "send", "subscribe", "unsubscribe", "publish", "subscriberCount", "onMessage", "onClose", "close"}, (*Runtime).executeWebSocketMethod)
 	r.Variables["WebSocket"] = &Instance{Class: r.Classes["WebSocket"], Fields: make(map[string]interface{})}
 
 	// Schema

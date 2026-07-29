@@ -147,6 +147,7 @@ func (r *Runtime) Free() {
 	r.ProjectRoot = ""
 	r.importBaseDir = ""
 	r.usePluginVFS = false
+	r.captureEnvironment = nil
 
 	runtimePool.Put(r)
 }

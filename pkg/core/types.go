@@ -56,6 +56,27 @@ type Runtime struct {
 	SEO            *SEOData
 	SitemapEntries []SitemapEntry
 	CurrentSource  string // "routes", "api", "app", etc.
+
+	captureEnvironment *ClosureEnvironment
+}
+
+// ClosureEnvironment is the shared lexical state of callbacks captured during
+// the same function or method invocation.
+type ClosureEnvironment struct {
+	Variables map[string]interface{}
+	VarTypes  map[string]string
+	mu        sync.Mutex
+}
+
+// CapturedFunction is a function literal paired with the lexical environment
+// that existed when a long-lived callback was registered.
+//
+// Function literals remain parser nodes for backwards compatibility with
+// immediate consumers such as Router and Schema. Native APIs that retain a
+// callback beyond the current call should wrap it with Runtime.captureFunction.
+type CapturedFunction struct {
+	Function    *parser.FunctionLiteral
+	Environment *ClosureEnvironment
 }
 
 // NativePluginDefinition describes a self-contained JP v2 sidecar payload.
