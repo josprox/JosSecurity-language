@@ -1,5 +1,18 @@
 # Changelog
 
+## [3.6.3] - 2026-07-28
+
+### Fixed
+
+- Verification resends reuse an unexpired token instead of invalidating links already delivered by email.
+- Password resets are atomic, reject weak or expired credentials, consume each token once, and verify the account after proving access to its email.
+- Authentication emails and expiry timestamps are normalized consistently across SQLite, MySQL, and PostgreSQL.
+
+### Security
+
+- Verified accounts no longer produce a truthy fake verification token.
+- Password reset table initialization is only cached after successful creation.
+
 ## [3.6.0] - 2026-07-14
 
 ### Added
