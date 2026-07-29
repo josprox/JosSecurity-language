@@ -5,6 +5,7 @@
 ### Fixed
 
 - Verification resends reuse an unexpired token instead of invalidating links already delivered by email.
+- Login failures distinguish an unverified account from an incorrect password without relying on token generation.
 - Password resets are atomic, reject weak or expired credentials, consume each token once, and verify the account after proving access to its email.
 - Authentication emails and expiry timestamps are normalized consistently across SQLite, MySQL, and PostgreSQL.
 

@@ -453,6 +453,26 @@ func (r *Runtime) executeAuthMethod(instance *Instance, method string, args []in
 		}
 		return false
 
+	case "verificationStatus":
+		if len(args) == 1 {
+			email := normalizeAuthEmail(fmt.Sprintf("%v", args[0]))
+			if email == "" || r.GetDB() == nil {
+				return "not_found"
+			}
+
+			var verified int
+			query := fmt.Sprintf("SELECT verificado FROM %s WHERE LOWER(email) = ? LIMIT 1", usersTable)
+			err := r.GetDB().QueryRow(query, email).Scan(&verified)
+			if err != nil {
+				return "not_found"
+			}
+			if verified == 1 {
+				return "verified"
+			}
+			return "unverified"
+		}
+		return "not_found"
+
 	case "user":
 		if sessVal, ok := r.Variables["$__session"]; ok {
 			if sessInst, ok := sessVal.(*Instance); ok {
