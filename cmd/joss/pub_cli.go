@@ -820,18 +820,35 @@ func installTransitiveDependencies(rootDeps map[string]string, offline bool) err
 	return nil
 }
 
-func resolvePackageDownload(name, version string) (string, string, error) {
-	officialFallbacks := map[string]string{
-		"joss_ai":      "https://github.com/josprox/joss_ai/releases/download/v1.0.0/joss_ai.jp",
-		"joss_backup":  "https://github.com/josprox/joss_backup/releases/download/v1.0.0/joss_backup.jp",
-		"joss_notify":  "https://github.com/josprox/joss_notify/releases/download/v1.0.0/joss_notify.jp",
-		"joss_smtp":    "https://github.com/josprox/joss_smtp/releases/download/v1.0.0/joss_smtp.jp",
+func getOfficialGitHubFallback(name, version string) (string, bool) {
+	officialPackages := map[string]string{
+		"joss_ai":     "joss-language/joss_ai",
+		"joss_backup": "joss-language/joss_backup",
+		"joss_notify": "joss-language/joss_notify",
+		"joss_smtp":   "joss-language/joss_smtp",
 	}
 
+	repo, ok := officialPackages[name]
+	if !ok {
+		return "", false
+	}
+
+	verClean := strings.TrimPrefix(strings.TrimSpace(version), "v")
+	verClean = strings.TrimPrefix(verClean, "^")
+	verClean = strings.TrimPrefix(verClean, "~")
+
+	if verClean == "" {
+		return fmt.Sprintf("https://github.com/%s/releases/latest/download/%s.jp", repo, name), true
+	}
+
+	return fmt.Sprintf("https://github.com/%s/releases/download/v%s/%s.jp", repo, verClean, name), true
+}
+
+func resolvePackageDownload(name, version string) (string, string, error) {
 	url := fmt.Sprintf("%s/api/v1/pub/packages/%s", getRegistryURL(), name)
 	resp, err := http.Get(url)
 	if err != nil {
-		if fbURL, ok := officialFallbacks[name]; ok {
+		if fbURL, ok := getOfficialGitHubFallback(name, version); ok {
 			fmt.Printf("[Fallback] Registro no disponible (%v). Descargando '%s %s' desde GitHub...\n", err, name, version)
 			return fbURL, "", nil
 		}
@@ -839,7 +856,7 @@ func resolvePackageDownload(name, version string) (string, string, error) {
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
-		if fbURL, ok := officialFallbacks[name]; ok {
+		if fbURL, ok := getOfficialGitHubFallback(name, version); ok {
 			fmt.Printf("[Fallback] Paquete no encontrado en el registro (HTTP %d). Descargando '%s %s' desde GitHub...\n", resp.StatusCode, name, version)
 			return fbURL, "", nil
 		}
@@ -864,7 +881,7 @@ func resolvePackageDownload(name, version string) (string, string, error) {
 		}
 	}
 	// If version is not found in the registry versions list but it's an official package, check fallback
-	if fbURL, ok := officialFallbacks[name]; ok {
+	if fbURL, ok := getOfficialGitHubFallback(name, version); ok {
 		fmt.Printf("[Fallback] Version %s no encontrada en el registro para %s. Descargando desde GitHub...\n", version, name)
 		return fbURL, "", nil
 	}
