@@ -5,7 +5,9 @@ Este documento describe capacidades comprobables del código actual. No mezcla p
 ## Implementado
 
 - Intérprete Joss, tipos opcionales, clases, herencia, funciones `func`, closures, ternarios, `match`, ciclos, excepciones, `async`/`await` y canales.
-- Aplicaciones web y de consola, rutas HTTP y WebSocket dinámicas, respuestas JSON/raw/stream, sesiones persistentes, CSRF, CORS, rate limit configurable y TLS integrado.
+- Aplicaciones web y de consola, rutas HTTP y WebSocket dinámicas (`Router::any`, `Router::query`, `Router::match`), respuestas JSON/raw/stream, sesiones persistentes, CSRF, CORS, rate limit configurable y TLS integrado.
+- Cliente HTTP nativo universal (`Http::get`, `Http::post`, `Http::put`, `Http::patch`, `Http::delete`, `Http::head`, `Http::options`, `Http::query`, `Http::json`, `Http::request`).
+- Registro Pub con resolución dinámica de repositorios en tiempo real y fallback automático a GitHub Releases.
 - SQLite, MySQL y PostgreSQL mediante GranDB, migraciones y Schema Builder.
 - Alteración de columnas, índices simples/compuestos/únicos y claves foráneas simples o compuestas.
 - Paquetes JP v2 con bytecode, carga automática, lockfile, símbolos para IntelliSense, firma Ed25519 y validación de dependencias nativas.

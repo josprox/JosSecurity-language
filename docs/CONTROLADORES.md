@@ -24,14 +24,56 @@ class ProductController {
 ## Rutas
 
 ```joss
+// Verbos individuales
 Router::get("/products", "ProductController@index")
 Router::post("/products", "ProductController@store")
+Router::put("/products/{id}", "ProductController@update")
+Router::patch("/products/{id}", "ProductController@patch")
+Router::delete("/products/{id}", "ProductController@destroy")
+Router::query("/search", "SearchController@query")
+
+// Captura de todos los verbos HTTP (estilo Laravel)
+Router::any("/login", "AuthController@showLogin@doLogin")
+
+// Match explícito para múltiples verbos
+Router::match("GET|POST", "/contact", "ContactController@show@submit")
+
+// Closures
 Router::get("/sound/{id}", func($id) {
     return Redirect::to("https://example.com/" . $id, 302)
 })
 ```
 
-Los parámetros `{name}` se inyectan en handlers HTTP. Las rutas WebSocket también los soportan; allí `$ws` es el primer argumento y los parámetros siguen en orden.
+Los parámetros `{name}` se inyectan en handlers HTTP. Las rutas WebSocket también los soportan (`Router::ws`); allí `$ws` es el primer argumento y los parámetros siguen en orden.
+
+## Cliente HTTP Nativo (`Http`)
+
+El lenguaje incluye la clase nativa `Http` de propósito general para realizar peticiones externas:
+
+```joss
+// 1. Peticiones directas (GET, POST, PUT, PATCH, DELETE, QUERY, HEAD, OPTIONS)
+$body = Http::get("https://api.github.com/zen")
+$res = Http::post("https://api.ejemplo.com/item", JSON::stringify({"name": "nuevo"}), {"Authorization": "Bearer TOKEN"})
+$queryResult = Http::query("https://api.ejemplo.com/search", JSON::stringify({"filter": "active"}))
+
+// 2. Cliente JSON inteligente (serializa y deserializa datos automáticamente)
+$data = Http::json("GET", "https://api.github.com/users/octocat")
+$nombre = $data["name"]
+
+// 3. Petición universal hiper-configurable (Http::request)
+$response = Http::request("POST", "https://api.ejemplo.com/v1/resource", {
+    "query": { "page": "1" },
+    "headers": { "Accept": "application/json" },
+    "json": { "status": "active" },
+    "timeout": 10,
+    "follow_redirects": true
+})
+
+if ($response["success"]) {
+    $code = $response["status"]
+    $json = $response["json"]
+}
+```
 
 ## Request
 

@@ -7,7 +7,8 @@ La tabla enumera la superficie registrada por el runtime. Una llamada estática 
 | `GranDB` | `table`, `select`, filtros `where*`, joins, `get`, `first`, `find`, `value`, `pluck`, `exists`, agregados, `insert`, `insertGetId`, `update`, `delete`, `deleteAll`, `truncate`, orden, límite y offset |
 | `Auth` | `hash`, `create`, `attempt`, `login`, `complete2FA`, `check`, `guest`, `user`, `id`, `hasRole`, `verify`, `forgotPassword`, `resetPassword`, `resendVerification`, `refresh`, `update`, `delete`, `logout`, `validateToken` |
 | `MFA` / `TwoFactor` | generación y verificación TOTP, códigos de recuperación, consulta de requisito y verificación del segundo factor |
-| `Router` | `get`, `post`, `put`, `delete`, `match`, `api`, `ws`, `group`, `middleware`, `registerMiddleware`, `end` |
+| `Router` | `get`, `post`, `put`, `patch`, `delete`, `head`, `options`, `query`, `any`, `match`, `api`, `ws`, `group`, `middleware`, `registerMiddleware`, `end` |
+| `Http` | `get`, `post`, `put`, `patch`, `delete`, `head`, `options`, `query`, `json`, `request` *(Cliente HTTP universal de alto rendimiento)* |
 | `Request` | `input`, `post`, `all`, `except`, `file`, `cookie`, `header`, `root` |
 | `Response` | `json`, `error`, `redirect`, `back`, `raw`, `stream` |
 | `WebResponse` | `with`, `withCookie`, `withHeader`, `status` |
@@ -15,7 +16,8 @@ La tabla enumera la superficie registrada por el runtime. Una llamada estática 
 | `Session` | `get`, `put`, `has`, `forget`, `all` |
 | `System` | `env`, `Run`, `load_driver`, `driver_call`, `log`, `sleep`, `now` |
 | `Plugin` | `call`, `stream`, `path`, `platform` |
-| Utilidades | `Math`, `Str`, `UUID`, `JSON`, `Markdown`, `Cache`, `Zip`, `Stack`, `Queue` |
+| `SEO` | `title`, `description`, `keywords`, `canonical`, `og`, `twitter`, `meta` |
+| Utilidades | `Math`, `Str` (`length`, `random`, `startsWith`, `substring`, `indexOf`, `contains`, `trim`, `replace`), `UUID`, `JSON`, `Markdown`, `Cache`, `Zip`, `Stack`, `Queue` |
 | Procesos | `Process`, `Server`, `Stream` |
 | Aplicación | `View`, `Cron`, `Task`, `Lang`, `SEO`, `Sitemap`, `UserStorage`, `SQLite`, `Redis`, `WebSocket` |
 
