@@ -47,7 +47,7 @@ type Credentials struct {
 	Email string `json:"email"`
 }
 
-// Get standard registry URL (default localhost:9000 for Joss Red)
+// Get standard registry URL (default https://joss.red for Joss Red)
 func getRegistryURL() string {
 	url := os.Getenv("PUB_REGISTRY_URL")
 	if url != "" {
@@ -71,7 +71,7 @@ func getRegistryURL() string {
 		}
 	}
 
-	return "http://localhost:9000"
+	return "https://joss.red"
 }
 
 func getCredentialsPath() string {

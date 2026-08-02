@@ -67,7 +67,7 @@ joss pub cache verify
 joss package inspect paquete.jp
 ```
 
-Si no se define `PUB_REGISTRY_URL`, Pub intenta usar `APP_URL` del `env.joss`; si tampoco existe, usa `http://localhost:9000`. Para el registro público configura la URL correspondiente.
+Si no se define `PUB_REGISTRY_URL`, Pub intenta usar `APP_URL` del `env.joss`; si tampoco existe, usa `https://joss.red`.
 
 ## Configuradores
 
