@@ -107,6 +107,78 @@ func (r *Runtime) executeRouterMethod(instance *Instance, method string, args []
 		}
 		return nil
 
+	case "patch":
+		if len(args) >= 2 {
+			path := args[0].(string)
+			handler := args[1]
+			addRoute("PATCH", path, handler)
+			fmt.Printf("[DEBUG] executeRouterMethod called: patch (%s)\n", path)
+		}
+		return nil
+
+	case "options":
+		if len(args) >= 2 {
+			path := args[0].(string)
+			handler := args[1]
+			addRoute("OPTIONS", path, handler)
+			fmt.Printf("[DEBUG] executeRouterMethod called: options (%s)\n", path)
+		}
+		return nil
+
+	case "head":
+		if len(args) >= 2 {
+			path := args[0].(string)
+			handler := args[1]
+			addRoute("HEAD", path, handler)
+			fmt.Printf("[DEBUG] executeRouterMethod called: head (%s)\n", path)
+		}
+		return nil
+
+	case "query":
+		if len(args) >= 2 {
+			path := args[0].(string)
+			handler := args[1]
+			addRoute("QUERY", path, handler)
+			fmt.Printf("[DEBUG] executeRouterMethod called: query (%s)\n", path)
+		}
+		return nil
+
+	case "any":
+		// Router::any("/path", handler)
+		// Registers route for ALL HTTP verbs: GET, POST, PUT, PATCH, DELETE, OPTIONS, HEAD, QUERY
+		if len(args) >= 2 {
+			path := args[0].(string)
+			handler := args[1]
+			methods := []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS", "HEAD", "QUERY"}
+
+			if handlerStr, ok := handler.(string); ok {
+				handlerParts := strings.Split(handlerStr, "@")
+				if len(handlerParts) > 2 {
+					controller := handlerParts[0]
+					methodHandlers := handlerParts[1:]
+					for i, m := range methods {
+						if i < len(methodHandlers) {
+							fullHandler := controller + "@" + methodHandlers[i]
+							addRoute(m, path, fullHandler)
+						} else {
+							fullHandler := controller + "@" + methodHandlers[len(methodHandlers)-1]
+							addRoute(m, path, fullHandler)
+						}
+					}
+				} else {
+					for _, m := range methods {
+						addRoute(m, path, handlerStr)
+					}
+				}
+			} else {
+				for _, m := range methods {
+					addRoute(m, path, handler)
+				}
+			}
+			fmt.Printf("[DEBUG] executeRouterMethod called: any (%s)\n", path)
+		}
+		return nil
+
 	case "match":
 		// Router::match("GET|POST", "/path", "Controller@method1@method2")
 		if len(args) >= 3 {

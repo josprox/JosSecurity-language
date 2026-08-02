@@ -80,7 +80,7 @@ func (r *Runtime) RegisterNativeClasses() {
 	r.Variables["View"] = &Instance{Class: r.Classes["View"], Fields: make(map[string]interface{})}
 
 	// Router
-	r.registerNative("Router", []string{"get", "post", "put", "delete", "match", "api", "ws", "group", "middleware", "registerMiddleware", "end"}, (*Runtime).executeRouterMethod)
+	r.registerNative("Router", []string{"get", "post", "put", "patch", "delete", "head", "options", "query", "any", "match", "api", "ws", "group", "middleware", "registerMiddleware", "end"}, (*Runtime).executeRouterMethod)
 	r.Variables["Router"] = &Instance{Class: r.Classes["Router"], Fields: make(map[string]interface{})}
 
 	// Redirect (PHP-style convenience helper: Redirect::to("url", 302))
@@ -133,7 +133,7 @@ func (r *Runtime) RegisterNativeClasses() {
 	r.Variables["UUID"] = &Instance{Class: r.Classes["UUID"], Fields: make(map[string]interface{})}
 
 	// Str
-	r.registerNative("Str", []string{"length", "random", "startsWith", "substring", "indexOf", "contains", "trim"}, (*Runtime).executeStrMethod)
+	r.registerNative("Str", []string{"length", "random", "startsWith", "substring", "indexOf", "contains", "trim", "replace"}, (*Runtime).executeStrMethod)
 	r.Variables["Str"] = &Instance{Class: r.Classes["Str"], Fields: make(map[string]interface{})}
 
 	// UserStorage
@@ -159,6 +159,10 @@ func (r *Runtime) RegisterNativeClasses() {
 	// Cache (Native)
 	r.registerNative("Cache", []string{"put", "get", "has", "forget"}, (*Runtime).executeCacheMethod)
 	r.Variables["Cache"] = &Instance{Class: r.Classes["Cache"], Fields: make(map[string]interface{})}
+
+	// Http (General-purpose HTTP client)
+	r.registerNative("Http", []string{"get", "post", "put", "patch", "delete", "head", "options", "json", "request"}, (*Runtime).executeHttpMethod)
+	r.Variables["Http"] = &Instance{Class: r.Classes["Http"], Fields: make(map[string]interface{})}
 
 	// Stream (Native - Instantiated by Server)
 	r.registerNative("Stream", []string{"send", "close"}, (*Runtime).executeStreamMethod)

@@ -238,11 +238,22 @@ func (r *Runtime) executeStrMethod(instance *Instance, method string, args []int
 		if len(args) != 1 {
 			return ""
 		}
-		s, ok := args[0].(string)
-		if !ok {
+		if s, ok := args[0].(string); ok {
+			return strings.TrimSpace(s)
+		}
+		return ""
+	case "replace":
+		if len(args) != 3 {
 			return ""
 		}
-		return strings.TrimSpace(s)
+		s, ok1 := args[0].(string)
+		oldStr, ok2 := args[1].(string)
+		newStr, ok3 := args[2].(string)
+		if !ok1 || !ok2 || !ok3 {
+			return ""
+		}
+		return strings.ReplaceAll(s, oldStr, newStr)
 	}
+
 	return nil
 }
