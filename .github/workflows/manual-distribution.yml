@@ -108,4 +108,11 @@ jobs:
           RELEASE_TAG: ${{ inputs.release_tag }}
         run: |
           $files = Get-ChildItem -LiteralPath dist -File | ForEach-Object FullName
-          gh release create $env:RELEASE_TAG $files --title "Joss $env:RELEASE_TAG" --generate-notes
+          gh release view $env:RELEASE_TAG 2>$null
+          if ($LASTEXITCODE -eq 0) {
+            Write-Host "La release $env:RELEASE_TAG ya existe. Actualizando y reemplazando archivos..."
+            gh release upload $env:RELEASE_TAG $files --clobber
+          } else {
+            Write-Host "Creando nueva release $env:RELEASE_TAG..."
+            gh release create $env:RELEASE_TAG $files --title "Joss $env:RELEASE_TAG" --generate-notes
+          }
