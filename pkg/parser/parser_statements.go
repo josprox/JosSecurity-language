@@ -1,5 +1,7 @@
 package parser
 
+import "fmt"
+
 func (p *Parser) parseStatement() Statement {
 	if p.curToken.Type == CLASS {
 		return p.parseClassStatement()
@@ -338,20 +340,14 @@ func (p *Parser) parseForeachStatement() *ForeachStatement {
 	return stmt
 }
 
-func (p *Parser) parseImportStatement() *ImportStatement {
-	stmt := &ImportStatement{Token: p.curToken}
+func (p *Parser) parseImportStatement() Statement {
+	msg := fmt.Sprintf("Error de sintaxis (Línea %d): La instrucción '%s' es obsoleta y fue eliminada en Joss. Los paquetes y plugins declarados en joss.yaml se cargan automáticamente.", p.curToken.Line, p.curToken.Literal)
+	p.errors = append(p.errors, msg)
 
-	if !p.expectPeek(STRING) {
-		return nil
-	}
-
-	stmt.Path = p.curToken.Literal
-
-	if p.peekToken.Type == SEMICOLON || p.peekToken.Type == NEWLINE {
+	for p.curToken.Type != SEMICOLON && p.curToken.Type != NEWLINE && p.curToken.Type != EOF {
 		p.nextToken()
 	}
-
-	return stmt
+	return nil
 }
 
 func (p *Parser) parseEchoStatement() *EchoStatement {
@@ -507,18 +503,12 @@ func (p *Parser) parseMethodStatement() *MethodStatement {
 	return stmt
 }
 
-func (p *Parser) parseUseStatement() *ImportStatement {
-	stmt := &ImportStatement{Token: p.curToken}
+func (p *Parser) parseUseStatement() Statement {
+	msg := fmt.Sprintf("Error de sintaxis (Línea %d): La instrucción '%s' es obsoleta y fue eliminada en Joss. Los paquetes y plugins declarados en joss.yaml se cargan automáticamente.", p.curToken.Line, p.curToken.Literal)
+	p.errors = append(p.errors, msg)
 
-	if !p.expectPeek(IDENT) {
-		return nil
-	}
-
-	stmt.Path = "package:" + p.curToken.Literal
-
-	if p.peekToken.Type == SEMICOLON || p.peekToken.Type == NEWLINE {
+	for p.curToken.Type != SEMICOLON && p.curToken.Type != NEWLINE && p.curToken.Type != EOF {
 		p.nextToken()
 	}
-
-	return stmt
+	return nil
 }

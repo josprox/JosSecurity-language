@@ -51,13 +51,6 @@ func (r *Runtime) Execute(program *parser.Program) {
 }
 
 func (r *Runtime) executeMain(program *parser.Program) {
-	// Execute imports first if they are at top level (outside class)
-	for _, stmt := range program.Statements {
-		if importStmt, ok := stmt.(*parser.ImportStatement); ok {
-			r.executeImport(importStmt)
-		}
-	}
-
 	// Find Class Main
 	var mainClass *parser.ClassStatement
 	for _, stmt := range program.Statements {

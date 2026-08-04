@@ -71,9 +71,14 @@ func main() {
 		os.Exit(1)
 	}
 
+	// Trigger non-blocking background update check
+	checkUpdateBackground()
+
 	command := os.Args[1]
 
 	switch command {
+	case "update":
+		handleUpdateCommand(os.Args[2:])
 	case "server":
 		if len(os.Args) >= 3 && os.Args[2] == "start" {
 			// Always require main.joss
@@ -107,8 +112,30 @@ func main() {
 		if len(os.Args) >= 3 {
 			target = os.Args[2]
 		}
-		if target == "program" {
-			buildProgram()
+		if target == "native" {
+			targetOS := ""
+			targetArch := ""
+			if len(os.Args) >= 4 {
+				targetOS = os.Args[3]
+			}
+			if len(os.Args) >= 5 {
+				targetArch = os.Args[4]
+			}
+			buildNative(targetOS, targetArch)
+		} else if target == "program" {
+			targetOS := ""
+			targetArch := ""
+			if len(os.Args) >= 4 {
+				targetOS = os.Args[3]
+			}
+			if len(os.Args) >= 5 {
+				targetArch = os.Args[4]
+			}
+			if targetOS != "" {
+				buildNative(targetOS, targetArch)
+			} else {
+				buildProgram()
+			}
 		} else if target == "package" {
 			if len(os.Args) < 4 {
 				fmt.Println("Uso: joss build package [ruta_del_paquete]")

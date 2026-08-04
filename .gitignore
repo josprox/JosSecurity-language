@@ -1,8 +1,11 @@
 # Binaries
 *.exe
+*.exe.old
 *.dll
 *.so
 *.dylib
+/build/
+/runner
 /dist/
 /.joss-release-work/
 
@@ -33,3 +36,6 @@ jossecurity-*.zip
 translation_history.json
 translation_log.xlsx
 log.txt
+hardcoded_strings_list.json
+hardcoded_strings.arb
+hardcoded_strings.json

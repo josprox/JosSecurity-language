@@ -90,7 +90,8 @@ func printHelp() {
 	fmt.Printf("  server start            - %s\n", tr("startServerWeb"))
 	fmt.Printf("  program start           - %s\n", tr("startProgramDesktop"))
 	fmt.Printf("  run [archivo]           - %s\n", tr("runJossScript"))
-	fmt.Printf("  build [web|program]     - %s\n", tr("compileProjectDist"))
+	fmt.Printf("  build [web|program|native]- %s\n", tr("compileProjectDist"))
+	fmt.Printf("  build native [os] [arch]  - Compila a ejecutable nativo autoejecutable (windows, linux, darwin)\n")
 	fmt.Printf("  make:controller [Name]  - %s\n", tr("CreateController"))
 	fmt.Printf("  make:middleware [Name]  - %s\n", tr("CreateMiddleware"))
 	fmt.Printf("  make:model [Name]       - %s\n", tr("CreateModel"))
@@ -113,6 +114,7 @@ func printHelp() {
 	fmt.Printf("    --enable --api-key / --disable\n")
 	fmt.Printf("  pub [subcomando]        - Gestionar paquetes y dependencias (add, remove, install, update, publish, login)\n")
 	fmt.Printf("  package inspect [jp]    - Inspeccionar bytecode y payloads nativos de un JP v2\n")
+	fmt.Printf("  update [--canary|--stable]- Actualiza la versión de Joss, SDK y plugins (canales canary/stable)\n")
 	fmt.Printf("  version                 - %s\n", tr("version"))
 	fmt.Printf("  help                    - %s\n", tr("helpPrint"))
 }

@@ -2,12 +2,9 @@ package main
 
 import (
 	"bufio"
-	"bytes"
 	"crypto/ed25519"
 	"crypto/rand"
 	"encoding/base64"
-	"encoding/binary"
-	"encoding/gob"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -16,6 +13,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"runtime"
 	"sort"
 	"strings"
 
@@ -173,198 +171,34 @@ func buildWeb() {
 }
 
 func buildProgram() {
-	fmt.Println("Iniciando compilación PROGRAM de Joss (SECURE MODE)...")
+	fmt.Println("Iniciando compilación PROGRAM de Joss (NATIVE STANDALONE MODE)...")
 
-	// 1. Ask for Target OS
 	fmt.Println("Seleccione el sistema operativo destino:")
-	fmt.Println("1. Windows")
-	fmt.Print("Opción: ")
+	fmt.Println("1. Windows (x64)")
+	fmt.Println("2. Linux (x64)")
+	fmt.Println("3. macOS Apple Silicon (arm64)")
+	fmt.Println("4. macOS Intel (amd64)")
+	fmt.Println("5. Sistema Operativo Actual (" + runtime.GOOS + "/" + runtime.GOARCH + ")")
+	fmt.Print("Opción [1-5]: ")
 
 	reader := bufio.NewReader(os.Stdin)
 	option, _ := reader.ReadString('\n')
 	option = strings.TrimSpace(option)
 
-	if option != "1" && option != "windows" {
-		fmt.Println("Solo Windows es soportado en esta versión pre-compilada.")
-		return
+	switch option {
+	case "1", "windows":
+		buildNative("windows", "amd64")
+	case "2", "linux":
+		buildNative("linux", "amd64")
+	case "3", "mac", "macos", "darwin-arm64":
+		buildNative("darwin", "arm64")
+	case "4", "darwin-amd64":
+		buildNative("darwin", "amd64")
+	case "5", "current", "":
+		buildNative(runtime.GOOS, runtime.GOARCH)
+	default:
+		fmt.Println("Opción no válida. Cancelando compilación.")
 	}
-
-	fmt.Println("Compilando para Windows...")
-
-	// 2. Prepare Build Directory
-	buildDir := "build"
-	os.RemoveAll(buildDir)
-	os.MkdirAll(filepath.Join(buildDir, "data"), 0755)
-	os.MkdirAll(filepath.Join(buildDir, "Storage"), 0755)
-
-	// 3. Encrypt Assets
-	fmt.Println("Encriptando y empaquetando assets...")
-
-	buildKey := make([]byte, 32)
-	if _, err := rand.Read(buildKey); err != nil {
-		fmt.Printf("Error generando key: %v\n", err)
-		return
-	}
-
-	files := make(map[string][]byte)
-
-	// Dynamic Walk
-	ignoredDirs := map[string]bool{
-		".git":         true,
-		".vscode":      true,
-		".idea":        true,
-		"build":        true,
-		"vendor":       true,
-		"node_modules": true, // Usually too big for embedded exe
-		".gemini":      true,
-	}
-
-	filepath.Walk(".", func(path string, info os.FileInfo, err error) error {
-		if err != nil {
-			return nil
-		}
-
-		// Skip root directory itself
-		if path == "." {
-			return nil
-		}
-
-		// Check ignore list for top-level directories
-		parts := strings.Split(path, string(os.PathSeparator))
-		if len(parts) > 0 && ignoredDirs[parts[0]] {
-			if info.IsDir() {
-				return filepath.SkipDir // Skip entire ignored directory
-			}
-			return nil
-		}
-
-		if info.IsDir() {
-			return nil
-		}
-
-		// Filter files
-		if info.Name() == "joss.exe" || strings.HasSuffix(info.Name(), ".log") || strings.HasSuffix(info.Name(), ".enc") {
-			return nil
-		}
-
-		data, err := ioutil.ReadFile(path)
-		if err == nil {
-			relPath := filepath.ToSlash(path)
-			files[relPath] = data
-		}
-		return nil
-	})
-
-	// Handle env.joss/.env separately (Encrypt it)
-	envPath := "env.joss"
-	if _, err := os.Stat(envPath); os.IsNotExist(err) {
-		if _, err := os.Stat(".env"); err == nil {
-			envPath = ".env"
-		}
-	}
-
-	if data, err := ioutil.ReadFile(envPath); err == nil {
-		if _, err := os.Stat("database.sqlite"); err == nil {
-			override := "\nDB_PATH=\"Storage/database.sqlite\""
-			data = append(data, []byte(override)...)
-			fmt.Println("Inyectando configuración DB_PATH=\"Storage/database.sqlite\" en env.joss embebido...")
-		}
-
-		// Encrypt to env.enc format
-		salt := make([]byte, 16)
-		rand.Read(salt)
-		masterSecret := []byte("JOSSECURITY_MASTER_SECRET_2025")
-		key := crypto.DeriveKey(masterSecret, salt)
-		encrypted, err := crypto.EncryptAES(data, key)
-		if err == nil {
-			finalData := append(salt, encrypted...)
-			files["env.enc"] = finalData
-			fmt.Println("Entorno encriptado y embebido como env.enc")
-		} else {
-			fmt.Printf("Error encriptando env para program: %v\n", err)
-		}
-	}
-
-	var buf bytes.Buffer
-	enc := gob.NewEncoder(&buf)
-	if err := enc.Encode(files); err != nil {
-		fmt.Printf("Error encoding assets: %v\n", err)
-		return
-	}
-
-	encryptedAssets, err := crypto.EncryptAES(buf.Bytes(), buildKey)
-	if err != nil {
-		fmt.Printf("Error encrypting assets: %v\n", err)
-		return
-	}
-
-	// 4. Create Final Executable
-	// Layout: [Runner] [Encrypted Assets] [Key 32] [Len 8] [Magic 16]
-
-	outPath := filepath.Join(buildDir, "program.exe")
-	f, err := os.Create(outPath)
-	if err != nil {
-		fmt.Printf("Error creando ejecutable: %v\n", err)
-		return
-	}
-	defer f.Close()
-
-	// Write Runner
-	if _, err := f.Write(runnerWindows); err != nil {
-		fmt.Printf("Error escribiendo runner: %v\n", err)
-		return
-	}
-
-	// Write Encrypted Assets
-	if _, err := f.Write(encryptedAssets); err != nil {
-		fmt.Printf("Error escribiendo assets: %v\n", err)
-		return
-	}
-
-	// Write Key (32 bytes)
-	if _, err := f.Write(buildKey); err != nil {
-		fmt.Printf("Error escribiendo key: %v\n", err)
-		return
-	}
-
-	// Write Assets Length (8 bytes)
-	lenBuf := make([]byte, 8)
-	binary.LittleEndian.PutUint64(lenBuf, uint64(len(encryptedAssets)))
-	if _, err := f.Write(lenBuf); err != nil {
-		fmt.Printf("Error escribiendo longitud: %v\n", err)
-		return
-	}
-
-	// Write Magic Marker (16 bytes)
-	magic := []byte("JOSS_RUNNER_DATA") // Must match runner
-	if _, err := f.Write(magic); err != nil {
-		fmt.Printf("Error escribiendo magic marker: %v\n", err)
-		return
-	}
-
-	// 5. Copy Database and WAL files
-	if _, err := os.Stat("database.sqlite"); err == nil {
-		copyFile("database.sqlite", filepath.Join(buildDir, "Storage", "database.sqlite"))
-		fmt.Println("Base de datos copiada a build/Storage/")
-
-		// Copy WAL files if they exist
-		if _, err := os.Stat("database.sqlite-shm"); err == nil {
-			copyFile("database.sqlite-shm", filepath.Join(buildDir, "Storage", "database.sqlite-shm"))
-		}
-		if _, err := os.Stat("database.sqlite-wal"); err == nil {
-			copyFile("database.sqlite-wal", filepath.Join(buildDir, "Storage", "database.sqlite-wal"))
-		}
-	}
-
-	// 6. Create error.log
-	ioutil.WriteFile(filepath.Join(buildDir, "error.log"), []byte(""), 0666)
-
-	fmt.Println("Build PROGRAM completado exitosamente en carpeta 'build/'.")
-	fmt.Println("Estructura:")
-	fmt.Printf("  %s\n", outPath)
-	fmt.Println("  build/error.log")
-	fmt.Println("  build/Storage/database.sqlite")
-	fmt.Println("  build/data/ (vacío por ahora)")
 }
 
 func runCmd(dir, name string, args ...string) {
@@ -727,29 +561,7 @@ func inspectPackage(filename string) {
 		return
 	}
 	if !pluginpkg.IsV2(data) {
-		if len(data) > pluginpkg.MaxArchiveSize {
-			fmt.Printf("JP legado inválido: excede %d MiB\n", pluginpkg.MaxArchiveSize>>20)
-			return
-		}
-		var files map[string][]byte
-		if err := gob.NewDecoder(bytes.NewReader(data)).Decode(&files); err != nil {
-			fmt.Printf("JP legado inválido: %v\n", err)
-			return
-		}
-		manifest := string(files["joss.yaml"])
-		fmt.Printf("JP legado v1 %s %s (type=%s)\n",
-			packageManifestValue(manifest, "name", ""),
-			packageManifestValue(manifest, "version", ""),
-			packageManifestValue(manifest, "type", ""))
-		fmt.Println("Bytecode: ninguno; este contenedor no es una librería compilada JP v2.")
-		fmt.Println("Archivos internos:")
-		for _, name := range sortedByteFileKeys(files) {
-			label := "asset"
-			if isPluginSourceExtension(strings.ToLower(filepath.Ext(name))) {
-				label = "fuente"
-			}
-			fmt.Printf("  %s (%s, %d bytes)\n", name, label, len(files[name]))
-		}
+		fmt.Println("Error: El formato de paquete JP v1 fue eliminado. Joss requiere el formato estructurado y firmado JP v2.")
 		return
 	}
 	archive, err := pluginpkg.Read(data)

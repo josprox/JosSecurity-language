@@ -3,6 +3,7 @@ package pluginpkg
 import (
 	"archive/zip"
 	"bytes"
+	"compress/flate"
 	"crypto/ed25519"
 	"crypto/sha256"
 	"encoding/base64"
@@ -106,6 +107,9 @@ func build(metadata Metadata, files map[string][]byte) ([]byte, error) {
 	sort.Strings(names)
 	var buffer bytes.Buffer
 	zw := zip.NewWriter(&buffer)
+	zw.RegisterCompressor(zip.Deflate, func(out io.Writer) (io.WriteCloser, error) {
+		return flate.NewWriter(out, flate.BestCompression)
+	})
 	fixedTime := time.Date(2000, 1, 1, 0, 0, 0, 0, time.UTC)
 	for _, name := range names {
 		content := all[name]

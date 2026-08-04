@@ -89,10 +89,6 @@ try {
 
 `break` y `continue` funcionan en ciclos. El postfix implementado es `++`; `--` no existe todavía, por lo que un decremento se escribe como asignación. `isset()` y `empty()` son expresiones del lenguaje.
 
-## Imports
+## Carga de Módulos y Plugins
 
-```joss
-import "app/models/User.joss"
-```
-
-`@import` también se reconoce. `use paquete;` solo existe para compatibilidad con plugins antiguos; las dependencias de `joss.yaml` se cargan automáticamente.
+No se requieren sentencias `import` o `use`. Todas las dependencias y paquetes declarados en `joss.yaml`, así como los controladores, modelos y componentes del proyecto, son cargados e indexados automáticamente por el entorno de ejecución de Joss. Las instrucciones `import` y `use` han sido eliminadas del lenguaje.

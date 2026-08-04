@@ -2,6 +2,6 @@ package version
 
 const Name = "Joss"
 
-const Version = "3.6.4"
+const Version = "3.6.5"
 
-const NameVersion = "PUB version 2"
+const NameVersion = "PUB version 3"

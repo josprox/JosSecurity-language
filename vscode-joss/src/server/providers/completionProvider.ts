@@ -72,13 +72,14 @@ function symbolCompletion(symbol: JossSymbol): CompletionItem {
     const kind = symbol.kind === 'class' ? CompletionItemKind.Class
         : symbol.kind === 'property' ? CompletionItemKind.Property
             : symbol.kind === 'function' ? CompletionItemKind.Function : CompletionItemKind.Method;
+    const detailPrefix = symbol.origin === 'plugin' && symbol.packageName ? `[Plugin: ${symbol.packageName}] ` : '';
     return {
         label: symbol.name,
         kind,
-        detail: symbol.signature,
-        documentation: symbol.docstring || (symbol.origin === 'plugin'
-            ? `Exportado por ${symbol.packageName} ${symbol.packageVersion}.`
-            : `${symbol.kind} de ${symbol.containerName || 'este proyecto'}`),
+        detail: `${detailPrefix}${symbol.signature || symbol.name}`,
+        documentation: symbol.origin === 'plugin' && symbol.packageName
+            ? `📦 Exportado por el plugin ${symbol.packageName} (v${symbol.packageVersion || '1.0.0'}).\n${symbol.docstring || ''}`
+            : (symbol.docstring || `${symbol.kind} de ${symbol.containerName || 'este proyecto'}`),
         insertTextFormat: symbol.kind === 'method' || symbol.kind === 'function' ? InsertTextFormat.Snippet : InsertTextFormat.PlainText,
         insertText: symbol.kind === 'method' || symbol.kind === 'function'
             ? snippet(symbol.name, symbol.parameters.map(parameter => parameter.name))

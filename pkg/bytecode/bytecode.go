@@ -2,8 +2,10 @@ package bytecode
 
 import (
 	"bytes"
+	"compress/flate"
 	"encoding/gob"
 	"fmt"
+	"io"
 	"sync"
 
 	"github.com/jossecurity/joss/pkg/parser"
@@ -12,17 +14,19 @@ import (
 const MaxProgramSize = 32 << 20
 
 var (
-	magic        = []byte{'J', 'O', 'S', 'S', 'B', 'C', '2', 0}
-	registerOnce sync.Once
+	magicLegacy     = []byte{'J', 'O', 'S', 'S', 'B', 'C', '2', 0}
+	magicCompressed = []byte{'J', 'O', 'S', 'S', 'B', 'C', '2', 'Z'}
+	registerOnce    sync.Once
 )
 
-// Encode compiles a parsed Joss program into the stable JP v2 bytecode payload.
-// It stores the AST, not the original source text.
+// Encode compiles a parsed Joss program into an optimized, compressed JP v2 bytecode payload.
+// It stores the AST, compressed using flate.BestCompression for minimal size on disk and in memory.
 func Encode(program *parser.Program) ([]byte, error) {
 	if program == nil {
 		return nil, fmt.Errorf("bytecode: programa nil")
 	}
 	registerAST()
+
 	var body bytes.Buffer
 	if err := gob.NewEncoder(&body).Encode(program); err != nil {
 		return nil, fmt.Errorf("bytecode: no se pudo codificar: %w", err)
@@ -30,30 +34,55 @@ func Encode(program *parser.Program) ([]byte, error) {
 	if body.Len() > MaxProgramSize {
 		return nil, fmt.Errorf("bytecode: el programa excede %d MiB", MaxProgramSize>>20)
 	}
-	result := make([]byte, 0, len(magic)+body.Len())
-	result = append(result, magic...)
-	result = append(result, body.Bytes()...)
+
+	// Compress gob payload for maximum size optimization
+	var compressed bytes.Buffer
+	fw, err := flate.NewWriter(&compressed, flate.BestCompression)
+	if err != nil {
+		return nil, fmt.Errorf("bytecode: error inicializando compresor: %w", err)
+	}
+	if _, err := fw.Write(body.Bytes()); err != nil {
+		_ = fw.Close()
+		return nil, fmt.Errorf("bytecode: error comprimiendo payload: %w", err)
+	}
+	if err := fw.Close(); err != nil {
+		return nil, fmt.Errorf("bytecode: error cerrando compresor: %w", err)
+	}
+
+	result := make([]byte, 0, len(magicCompressed)+compressed.Len())
+	result = append(result, magicCompressed...)
+	result = append(result, compressed.Bytes()...)
 	return result, nil
 }
 
-// Decode restores a precompiled Joss program from a JP v2 payload.
+// Decode restores a precompiled Joss program from a JP v2 payload (supports both compressed and legacy formats).
 func Decode(data []byte) (*parser.Program, error) {
-	if len(data) < len(magic) || !bytes.Equal(data[:len(magic)], magic) {
-		return nil, fmt.Errorf("bytecode: cabecera JP v2 invalida")
+	if len(data) < 8 {
+		return nil, fmt.Errorf("bytecode: payload demasiado corto")
 	}
-	if len(data)-len(magic) > MaxProgramSize {
-		return nil, fmt.Errorf("bytecode: el programa excede %d MiB", MaxProgramSize>>20)
-	}
+
 	registerAST()
 	var program parser.Program
-	if err := gob.NewDecoder(bytes.NewReader(data[len(magic):])).Decode(&program); err != nil {
+	var reader io.Reader
+
+	if bytes.Equal(data[:8], magicCompressed) {
+		fr := flate.NewReader(bytes.NewReader(data[8:]))
+		defer fr.Close()
+		reader = fr
+	} else if bytes.Equal(data[:8], magicLegacy) {
+		reader = bytes.NewReader(data[8:])
+	} else {
+		return nil, fmt.Errorf("bytecode: cabecera JP v2 invalida")
+	}
+
+	if err := gob.NewDecoder(reader).Decode(&program); err != nil {
 		return nil, fmt.Errorf("bytecode: payload invalido: %w", err)
 	}
 	return &program, nil
 }
 
 func IsBytecode(data []byte) bool {
-	return len(data) >= len(magic) && bytes.Equal(data[:len(magic)], magic)
+	return len(data) >= 8 && (bytes.Equal(data[:8], magicCompressed) || bytes.Equal(data[:8], magicLegacy))
 }
 
 func registerAST() {

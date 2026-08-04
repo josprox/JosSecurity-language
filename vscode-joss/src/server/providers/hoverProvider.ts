@@ -9,6 +9,10 @@ export function setupHoverProvider() {
         if (!document) return null;
         const reference = referenceAtPosition(document, params.position);
 
+        if (['use', 'import', '@import'].includes(reference.toLowerCase())) {
+            return markdown(`⚠️ **Sintaxis Obsoleta en Joss**\n\nLas instrucciones \`use\` e \`import\` fueron eliminadas del lenguaje. Los plugins y paquetes declarados en \`joss.yaml\` se cargan e indexan automáticamente en el espacio de nombres global.`);
+        }
+
         const native = findNativeCallable(reference);
         if (native) {
             return markdown(`\`\`\`joss\n${nativeSignature(native)}\n\`\`\`\n\n${native.documentation}${parameterDocs(native.parameters)}`);
@@ -24,7 +28,15 @@ export function setupHoverProvider() {
         if (!symbol) return null;
         const location = symbol.location.uri.replace('file:///', '');
         const signature = symbol.signature || symbol.qualifiedName;
-        return markdown(`\`\`\`joss\n${signature}\n\`\`\`\n\n${symbol.docstring || `Símbolo ${symbol.kind} del proyecto.`}${parameterDocs(symbol.parameters)}\n\n_${location}:${symbol.location.range.start.line + 1}_`);
+
+        let originBadge = '';
+        if (symbol.origin === 'plugin' || symbol.packageName) {
+            const pkgName = symbol.packageName || 'plugin';
+            const verStr = symbol.packageVersion ? ` (v${symbol.packageVersion})` : '';
+            originBadge = `\n\n📦 **Plugin Originario**: \`${pkgName}\`${verStr}\n*Origen: Paquete autocontenido \`${pkgName}.jp\`*`;
+        }
+
+        return markdown(`\`\`\`joss\n${signature}\n\`\`\`${originBadge}\n\n${symbol.docstring || `Símbolo ${symbol.kind} del proyecto.`}${parameterDocs(symbol.parameters)}\n\n_${location}:${symbol.location.range.start.line + 1}_`);
     });
 }
 

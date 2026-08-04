@@ -7,10 +7,11 @@ import (
 	"log"
 	"net"
 	"os"
+	"os/signal"
 	"path/filepath"
+	"syscall"
 	"time"
 
-	"github.com/jchv/go-webview2"
 	"github.com/jossecurity/joss/pkg/core"
 	"github.com/jossecurity/joss/pkg/crypto"
 	"github.com/jossecurity/joss/pkg/parser"
@@ -176,18 +177,14 @@ func main() {
 
 	// Wait for resolved port, or fallback to default
 	finalPort := waitForPortOrPort(port, "8000")
+	runGUIOrWait(finalPort)
+}
 
-	w := webview2.New(true)
-	if w == nil {
-		log.Println("Failed to load WebView2.")
-		return
-	}
-	defer w.Destroy()
-
-	w.SetTitle("JosSecurity App")
-	w.SetSize(1024, 768, webview2.HintNone)
-	w.Navigate("http://localhost:" + finalPort)
-	w.Run()
+func waitForSignal() {
+	sigChan := make(chan os.Signal, 1)
+	signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM)
+	<-sigChan
+	log.Println("[Joss Runner] Finalizando proceso...")
 }
 
 func setupLogging() {

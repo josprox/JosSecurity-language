@@ -186,6 +186,9 @@ También pueden integrarse componentes compilados de otras plataformas, como MAT
 joss new mi_aplicacion
 joss run main.joss
 joss server start
+joss build native                 # Binario autoejecutable nativo (SO actual)
+joss build native linux amd64     # Binario nativo para Linux x64
+joss build native darwin arm64    # Binario nativo para macOS Apple Silicon
 
 # Generadores
 joss make:controller UsuarioController

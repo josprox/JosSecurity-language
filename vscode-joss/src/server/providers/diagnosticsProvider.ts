@@ -14,6 +14,26 @@ async function validateTextDocument(textDocument: TextDocument): Promise<void> {
     const text = textDocument.getText();
     const diagnostics: Diagnostic[] = [];
 
+    // Validar sintaxis obsoleta (use, import, @import)
+    const lines = text.split('\n');
+    for (let i = 0; i < lines.length; i++) {
+        const line = lines[i];
+        const match = line.match(/^\s*(use|import|@import)\b/);
+        if (match) {
+            const keyword = match[1];
+            const startCol = line.indexOf(keyword);
+            diagnostics.push({
+                severity: DiagnosticSeverity.Error,
+                range: {
+                    start: { line: i, character: startCol },
+                    end: { line: i, character: line.length }
+                },
+                message: `La instrucción '${keyword}' es obsoleta y fue eliminada en Joss. Los paquetes y plugins declarados en joss.yaml se cargan automáticamente.`,
+                source: 'joss-compiler'
+            });
+        }
+    }
+
     // Parse routes and validate
     const routes = routeParser.parseDocument(text);
 
