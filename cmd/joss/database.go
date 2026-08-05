@@ -472,9 +472,6 @@ func mysqlServerDSN(user, pass, host string) string {
 	return fmt.Sprintf("%s:%s@tcp(%s)/?parseTime=true&multiStatements=true", user, pass, normalizeMySQLHost(host))
 }
 
-func mysqlDatabaseDSN(user, pass, host, dbName string) string {
-	return fmt.Sprintf("%s:%s@tcp(%s)/%s?parseTime=true&multiStatements=true", user, pass, normalizeMySQLHost(host), dbName)
-}
 
 func ensureMySQLDatabase(db *sql.DB, dbName string) error {
 	var existing string
@@ -853,7 +850,7 @@ func mapTypeToSQL(ct *sql.ColumnType, driver string) string {
 	return "VARCHAR(255)"
 }
 
-func getColumnNames(db *sql.DB, driver string, table string) ([]string, error) {
+func getColumnNames(db *sql.DB, _ string, table string) ([]string, error) {
 	rows, err := db.Query(fmt.Sprintf("SELECT * FROM %s LIMIT 0", table))
 	if err != nil {
 		return nil, err

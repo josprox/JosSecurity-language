@@ -17,6 +17,12 @@ import (
 	"github.com/jossecurity/joss/pkg/parser"
 )
 
+const (
+	sqliteDbFile  = "database.sqlite"
+	sqliteShmFile = "database.sqlite-shm"
+	sqliteWalFile = "database.sqlite-wal"
+)
+
 // Supported OS and Architecture targets
 var supportedTargets = map[string][]string{
 	"windows": {"amd64", "arm64", "386"},
@@ -24,52 +30,26 @@ var supportedTargets = map[string][]string{
 	"darwin":  {"amd64", "arm64"},
 }
 
-// buildNative builds a fully-optimized, standalone native executable binary for the specified OS and Architecture.
+// buildNative builds a standalone native executable binary.
 func buildNative(targetOS, targetArch string) {
-	if targetOS == "" {
-		targetOS = runtime.GOOS
-	}
-	if targetArch == "" {
-		targetArch = runtime.GOARCH
-	}
-
-	targetOS = strings.ToLower(targetOS)
-	targetArch = strings.ToLower(targetArch)
-
-	// Validate target
-	archs, osValid := supportedTargets[targetOS]
-	if !osValid {
-		fmt.Printf("Error: Sistema operativo '%s' no soportado. Opciones: windows, linux, darwin.\n", targetOS)
-		return
-	}
-	archValid := false
-	for _, a := range archs {
-		if a == targetArch {
-			archValid = true
-			break
-		}
-	}
-	if !archValid {
-		fmt.Printf("Error: Arquitectura '%s' no soportada para %s. Opciones: %s\n", targetArch, targetOS, strings.Join(archs, ", "))
+	tOS, tArch, valid := validateBuildTarget(targetOS, targetArch)
+	if !valid {
 		return
 	}
 
 	fmt.Printf("\n=======================================================\n")
 	fmt.Printf("🚀 COMPILADOR NATIVO DE JOSS (AOT & Standalone Mode)\n")
-	fmt.Printf(" Target OS   : %s\n", strings.ToUpper(targetOS))
-	fmt.Printf(" Target Arch : %s\n", strings.ToUpper(targetArch))
+	fmt.Printf(" Target OS   : %s\n", strings.ToUpper(tOS))
+	fmt.Printf(" Target Arch : %s\n", strings.ToUpper(tArch))
 	fmt.Printf(" Stripped    : -ldflags=\"-s -w\"\n")
 	fmt.Printf(" CGO Enabled : 0 (Enlazado Estático Puro)\n")
 	fmt.Printf("=======================================================\n\n")
 
-	// 1. Verify Go toolchain
 	if _, err := exec.LookPath("go"); err != nil {
 		fmt.Println("Error: No se encontró la herramienta 'go' instalada en el sistema.")
-		fmt.Println("Para compilar binarios nativos multiplataforma se requiere Go instalada.")
 		return
 	}
 
-	// 2. Prepare build directory
 	buildDir := "build"
 	os.RemoveAll(buildDir)
 	if err := os.MkdirAll(filepath.Join(buildDir, "Storage"), 0755); err != nil {
@@ -77,28 +57,75 @@ func buildNative(targetOS, targetArch string) {
 		return
 	}
 
-	// 3. Package & Encrypt Assets (AOT Bytecode compilation)
 	fmt.Println("📦 Empaquetando y precompilando assets (AOT Bytecode AST)...")
+	encryptedAssets, buildKey, err := collectAndEncryptAssets()
+	if err != nil {
+		fmt.Printf("Error procesando assets del proyecto: %v\n", err)
+		return
+	}
 
+	fmt.Println("🔨 Compilando ejecutable nativo con la toolchain de Go...")
+	runnerBytes, err := compileRunnerBinary(tOS, tArch)
+	if err != nil {
+		fmt.Printf("Error compilando runner nativo: %v\n", err)
+		return
+	}
+
+	outPath, err := assembleFinalExecutable(buildDir, tOS, runnerBytes, encryptedAssets, buildKey)
+	if err != nil {
+		fmt.Printf("Error ensamblando ejecutable final: %v\n", err)
+		return
+	}
+
+	copyDatabaseFiles(buildDir)
+
+	stat, _ := os.Stat(outPath)
+	sizeMB := float64(stat.Size()) / (1024 * 1024)
+
+	fmt.Printf("\n✨ ¡COMPILACIÓN NATIVA EXITOSA!\n")
+	fmt.Printf(" Archivo de Salida : %s\n", outPath)
+	fmt.Printf(" Tamaño Binario   : %.2f MB\n", sizeMB)
+	fmt.Printf(" Destino           : %s/%s\n", tOS, tArch)
+	fmt.Printf(" Instrucciones    : Copia '%s' a cualquier PC con %s y ejecútalo directamente.\n\n", outPath, strings.ToUpper(tOS))
+}
+
+func validateBuildTarget(targetOS, targetArch string) (string, string, bool) {
+	if targetOS == "" {
+		targetOS = runtime.GOOS
+	}
+	if targetArch == "" {
+		targetArch = runtime.GOARCH
+	}
+
+	tOS := strings.ToLower(targetOS)
+	tArch := strings.ToLower(targetArch)
+
+	archs, osValid := supportedTargets[tOS]
+	if !osValid {
+		fmt.Printf("Error: Sistema operativo '%s' no soportado. Opciones: windows, linux, darwin.\n", targetOS)
+		return tOS, tArch, false
+	}
+
+	for _, a := range archs {
+		if a == tArch {
+			return tOS, tArch, true
+		}
+	}
+
+	fmt.Printf("Error: Arquitectura '%s' no soportada para %s. Opciones: %s\n", targetArch, targetOS, strings.Join(archs, ", "))
+	return tOS, tArch, false
+}
+
+func collectAndEncryptAssets() ([]byte, []byte, error) {
 	buildKey := make([]byte, 32)
 	if _, err := rand.Read(buildKey); err != nil {
-		fmt.Printf("Error generando clave criptográfica: %v\n", err)
-		return
+		return nil, nil, err
 	}
 
 	files := make(map[string][]byte)
 	ignoredDirs := map[string]bool{
-		".git":         true,
-		".vscode":      true,
-		".idea":        true,
-		"build":        true,
-		"vendor":       true,
-		"node_modules": true,
-		".gemini":      true,
-		".codex":       true,
-		".agents":      true,
-		".github":      true,
-		"dist":         true,
+		".git": true, ".vscode": true, ".idea": true, "build": true, "vendor": true,
+		"node_modules": true, ".gemini": true, ".codex": true, ".agents": true, ".github": true,
 	}
 
 	compiledCount := 0
@@ -106,7 +133,6 @@ func buildNative(targetOS, targetArch string) {
 		if err != nil || path == "." {
 			return nil
 		}
-
 		parts := strings.Split(path, string(os.PathSeparator))
 		if len(parts) > 0 && ignoredDirs[parts[0]] {
 			if info.IsDir() {
@@ -114,17 +140,15 @@ func buildNative(targetOS, targetArch string) {
 			}
 			return nil
 		}
-
 		if info.IsDir() {
 			return nil
 		}
 
 		name := strings.ToLower(info.Name())
-		if strings.HasSuffix(name, ".exe") || strings.HasSuffix(name, ".exe~") || strings.HasSuffix(name, ".log") || strings.HasSuffix(name, ".enc") || strings.HasSuffix(name, ".dll") || strings.HasSuffix(name, ".tmp") || strings.HasSuffix(name, ".so") || strings.HasSuffix(name, ".dylib") || name == "runner" || name == "joss" {
+		if strings.HasSuffix(name, ".exe") || strings.HasSuffix(name, ".log") || strings.HasSuffix(name, ".enc") || strings.HasSuffix(name, ".dll") || strings.HasSuffix(name, ".so") || strings.HasSuffix(name, ".dylib") || name == "runner" || name == "joss" {
 			return nil
 		}
 
-		// Skip large binary files (> 5MB)
 		if info.Size() > 5<<20 {
 			return nil
 		}
@@ -135,8 +159,6 @@ func buildNative(targetOS, targetArch string) {
 		}
 
 		relPath := filepath.ToSlash(path)
-
-		// Pre-compile .joss files into Bytecode JP v2 if valid
 		if strings.HasSuffix(relPath, ".joss") {
 			l := parser.NewLexer(string(data))
 			p := parser.NewParser(l)
@@ -154,21 +176,17 @@ func buildNative(targetOS, targetArch string) {
 	})
 
 	if err != nil {
-		fmt.Printf("Error leyendo archivos del proyecto: %v\n", err)
-		return
+		return nil, nil, err
 	}
 
 	fmt.Printf("⚡ Pre-compilados %d archivos Joss a bytecode nativo.\n", compiledCount)
 
-	// Handle environment file (.env / env.joss)
 	envPath := GetEnvFile()
-
 	if data, err := os.ReadFile(envPath); err == nil {
-		if _, err := os.Stat("database.sqlite"); err == nil {
-			override := "\nDB_PATH=\"Storage/database.sqlite\""
+		if _, err := os.Stat(sqliteDbFile); err == nil {
+			override := "\nDB_PATH=\"Storage/" + sqliteDbFile + "\""
 			data = append(data, []byte(override)...)
 		}
-
 		salt := make([]byte, 16)
 		rand.Read(salt)
 		masterSecret := []byte("JOSSECURITY_MASTER_SECRET_2025")
@@ -182,54 +200,42 @@ func buildNative(targetOS, targetArch string) {
 	var buf bytes.Buffer
 	enc := gob.NewEncoder(&buf)
 	if err := enc.Encode(files); err != nil {
-		fmt.Printf("Error codificando VFS: %v\n", err)
-		return
+		return nil, nil, err
 	}
 
 	encryptedAssets, err := crypto.EncryptAES(buf.Bytes(), buildKey)
-	if err != nil {
-		fmt.Printf("Error encriptando VFS payload: %v\n", err)
-		return
-	}
+	return encryptedAssets, buildKey, err
+}
 
-	// 4. Cross-compile runner binary via Go toolchain
-	fmt.Println("🔨 Compilando ejecutable nativo con la toolchain de Go...")
+func compileRunnerBinary(targetOS, targetArch string) ([]byte, error) {
 	tempRunnerDir, err := os.MkdirTemp("", "joss-build-*")
 	if err != nil {
-		fmt.Printf("Error creando directorio temporal: %v\n", err)
-		return
+		return nil, err
 	}
 	defer os.RemoveAll(tempRunnerDir)
 
-	tempRunnerBin := filepath.Join(tempRunnerDir, "runner.tmp")
+	tempRunnerBin := filepath.Join(tempRunnerDir, "runner")
+	if targetOS == "windows" {
+		tempRunnerBin += ".exe"
+	}
 
-	// Determine runner package path
 	runnerPkg := "github.com/jossecurity/joss/cmd/runner"
 	if _, err := os.Stat("cmd/runner"); err == nil {
 		runnerPkg = "./cmd/runner"
 	}
 
 	cmd := exec.Command("go", "build", "-ldflags=-s -w", "-o", tempRunnerBin, runnerPkg)
-	cmd.Env = append(os.Environ(),
-		"CGO_ENABLED=0",
-		"GOOS="+targetOS,
-		"GOARCH="+targetArch,
-	)
+	cmd.Env = append(os.Environ(), "CGO_ENABLED=0", "GOOS="+targetOS, "GOARCH="+targetArch)
 
 	out, err := cmd.CombinedOutput()
 	if err != nil {
-		fmt.Printf("Error durante compilación Go: %v\nSalida: %s\n", err, string(out))
-		return
+		return nil, fmt.Errorf("%v: %s", err, string(out))
 	}
 
-	runnerBytes, err := os.ReadFile(tempRunnerBin)
-	if err != nil {
-		fmt.Printf("Error leyendo binario base: %v\n", err)
-		return
-	}
+	return os.ReadFile(tempRunnerBin)
+}
 
-	// 5. Construct Final Native Executable
-	// Layout: [Runner Executable Binary] [Encrypted Assets Payload] [Key 32] [Len 8] [Magic 16]
+func assembleFinalExecutable(buildDir, targetOS string, runnerBytes, encryptedAssets, buildKey []byte) (string, error) {
 	projectName := filepath.Base(getWorkingDir())
 	if projectName == "." || projectName == "/" || projectName == "" {
 		projectName = "app"
@@ -243,69 +249,49 @@ func buildNative(targetOS, targetArch string) {
 	outPath := filepath.Join(buildDir, exeName)
 	outFile, err := os.Create(outPath)
 	if err != nil {
-		fmt.Printf("Error creando ejecutable final: %v\n", err)
-		return
+		return "", err
 	}
 	defer outFile.Close()
 
-	// Write base runner binary
 	if _, err := outFile.Write(runnerBytes); err != nil {
-		fmt.Printf("Error escribiendo base runner: %v\n", err)
-		return
+		return "", err
 	}
-
-	// Write encrypted assets
 	if _, err := outFile.Write(encryptedAssets); err != nil {
-		fmt.Printf("Error escribiendo assets: %v\n", err)
-		return
+		return "", err
 	}
-
-	// Write key (32 bytes)
 	if _, err := outFile.Write(buildKey); err != nil {
-		fmt.Printf("Error escribiendo clave: %v\n", err)
-		return
+		return "", err
 	}
 
-	// Write assets length (8 bytes uint64 little endian)
 	lenBuf := make([]byte, 8)
 	binary.LittleEndian.PutUint64(lenBuf, uint64(len(encryptedAssets)))
 	if _, err := outFile.Write(lenBuf); err != nil {
-		fmt.Printf("Error escribiendo longitud payload: %v\n", err)
-		return
+		return "", err
 	}
 
-	// Write magic marker (16 bytes)
 	magic := []byte("JOSS_RUNNER_DATA")
 	if _, err := outFile.Write(magic); err != nil {
-		fmt.Printf("Error escribiendo marca mágica: %v\n", err)
-		return
+		return "", err
 	}
 
-	// 6. Copy Database if exists
-	if _, err := os.Stat("database.sqlite"); err == nil {
-		copyFile("database.sqlite", filepath.Join(buildDir, "Storage", "database.sqlite"))
-		if _, err := os.Stat("database.sqlite-shm"); err == nil {
-			copyFile("database.sqlite-shm", filepath.Join(buildDir, "Storage", "database.sqlite-shm"))
-		}
-		if _, err := os.Stat("database.sqlite-wal"); err == nil {
-			copyFile("database.sqlite-wal", filepath.Join(buildDir, "Storage", "database.sqlite-wal"))
-		}
-		fmt.Println("🗄️  Base de datos copiada a build/Storage/")
-	}
-
-	// Make binary executable on unix
 	if targetOS != "windows" {
 		os.Chmod(outPath, 0755)
 	}
 
-	stat, _ := os.Stat(outPath)
-	sizeMB := float64(stat.Size()) / (1024 * 1024)
+	return outPath, nil
+}
 
-	fmt.Printf("\n✨ ¡COMPILACIÓN NATIVA EXITOSA!\n")
-	fmt.Printf(" Archivo de Salida : %s\n", outPath)
-	fmt.Printf(" Tamaño Binario   : %.2f MB\n", sizeMB)
-	fmt.Printf(" Destino           : %s/%s\n", targetOS, targetArch)
-	fmt.Printf(" Instrucciones    : Copia '%s' a cualquier PC con %s y ejecútalo directamente (¡no requiere Joss instalado!).\n\n", outPath, strings.ToUpper(targetOS))
+func copyDatabaseFiles(buildDir string) {
+	if _, err := os.Stat(sqliteDbFile); err == nil {
+		copyFile(sqliteDbFile, filepath.Join(buildDir, "Storage", sqliteDbFile))
+		if _, err := os.Stat(sqliteShmFile); err == nil {
+			copyFile(sqliteShmFile, filepath.Join(buildDir, "Storage", sqliteShmFile))
+		}
+		if _, err := os.Stat(sqliteWalFile); err == nil {
+			copyFile(sqliteWalFile, filepath.Join(buildDir, "Storage", sqliteWalFile))
+		}
+		fmt.Println("🗄️  Base de datos copiada a build/Storage/")
+	}
 }
 
 func getWorkingDir() string {

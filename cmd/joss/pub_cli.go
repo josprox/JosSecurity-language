@@ -57,15 +57,13 @@ func getRegistryURL() string {
 	// Try reading environment file
 	envPath := GetEnvFile()
 	if data, err := os.ReadFile(envPath); err == nil {
-		if err == nil {
-			lines := strings.Split(string(data), "\n")
-			for _, line := range lines {
-				line = strings.TrimSpace(line)
-				if strings.HasPrefix(line, "APP_URL=") {
-					val := strings.Trim(strings.TrimPrefix(line, "APP_URL="), "\"'")
-					if val != "" {
-						return strings.TrimSuffix(val, "/")
-					}
+		lines := strings.Split(string(data), "\n")
+		for _, line := range lines {
+			line = strings.TrimSpace(line)
+			if strings.HasPrefix(line, "APP_URL=") {
+				val := strings.Trim(strings.TrimPrefix(line, "APP_URL="), "\"'")
+				if val != "" {
+					return strings.TrimSuffix(val, "/")
 				}
 			}
 		}
@@ -532,7 +530,7 @@ func verifyFileSHA256(path, expected string) bool {
 	}
 
 	actual := hex.EncodeToString(h.Sum(nil))
-	return strings.ToLower(actual) == strings.ToLower(expected)
+	return strings.EqualFold(actual, expected)
 }
 
 func extractZipSecurely(zipPath, name, ver string) error {

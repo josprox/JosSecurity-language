@@ -110,7 +110,7 @@ func createCRUD(tableName string) {
 	}
 }
 
-func createCRUDController(modelName, tableName string, cols []ColumnSchema, relations []Relation) {
+func createCRUDController(modelName, tableName string, _ []ColumnSchema, relations []Relation) {
 	path := filepath.Join("app", "controllers", modelName+"Controller.joss")
 	os.MkdirAll(filepath.Dir(path), 0755)
 

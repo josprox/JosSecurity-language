@@ -13,60 +13,11 @@ import (
 	"github.com/jossecurity/joss/pkg/core"
 	"github.com/jossecurity/joss/pkg/parser"
 	"github.com/jossecurity/joss/pkg/server"
-
-	_ "embed"
 )
 
-//go:embed default_logo.png
-var defaultLogo []byte
-
 func startProgram() {
-	// 1. Initialize Runtime and Execute `main.joss`
-	go func() {
-		// Init Runtime (Embedded Mode)
-		r := core.NewRuntime()
-		r.LoadEnv(server.GlobalFileSystem) // Load from embedded VFS
+	go launchProgramRuntime()
 
-		// Read main.joss (from VFS or Disk)
-		var data []byte
-		var err error
-
-		if server.GlobalFileSystem != nil {
-			content, errOpen := server.GlobalFileSystem.Open("main.joss")
-			if errOpen == nil {
-				stat, _ := content.Stat()
-				data = make([]byte, stat.Size())
-				content.Read(data)
-				content.Close()
-			} else {
-				err = errOpen
-			}
-		} else {
-			data, err = os.ReadFile("main.joss")
-		}
-
-		if err == nil {
-
-			fmt.Println("[Program] Executing main.joss...")
-			l := parser.NewLexer(string(data))
-			p := parser.NewParser(l)
-			program := p.ParseProgram()
-			if len(p.Errors()) == 0 {
-				// Execute main.joss which should call System.Run("joss", ["server", "start"])
-				// Since we aliased 'joss' in system.go, it will spawn this exe with 'server start' args.
-				// This spawned process will run the server.
-				r.Execute(program)
-			} else {
-				fmt.Println("[Program] Parser Errors in main.joss:", p.Errors())
-			}
-		} else {
-			// Fallback if main.joss missing: Start server directly
-			fmt.Println("[Program] main.joss not found, starting server directly...")
-			server.Start(nil)
-		}
-	}()
-
-	// Determine port
 	port := os.Getenv("PORT")
 	if port == "" {
 		port = getEnvPort(GetEnvFile())
@@ -76,24 +27,58 @@ func startProgram() {
 	}
 	host := "localhost:" + port
 
-	// Wait for server to be ready
 	waitForServer(host)
+	launchGUIWindow(host)
+}
 
-	// Create WebView2 instance
+func launchProgramRuntime() {
+	r := core.NewRuntime()
+	r.LoadEnv(server.GlobalFileSystem)
+
+	data, err := readMainJossData()
+	if err != nil {
+		fmt.Println("[Program] main.joss no encontrado, iniciando servidor directamente...")
+		server.Start(nil)
+		return
+	}
+
+	fmt.Println("[Program] Ejecutando main.joss...")
+	l := parser.NewLexer(string(data))
+	p := parser.NewParser(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) == 0 {
+		r.Execute(program)
+	} else {
+		fmt.Println("[Program] Errores en main.joss:", p.Errors())
+	}
+}
+
+func readMainJossData() ([]byte, error) {
+	if server.GlobalFileSystem != nil {
+		content, errOpen := server.GlobalFileSystem.Open("main.joss")
+		if errOpen == nil {
+			defer content.Close()
+			stat, _ := content.Stat()
+			data := make([]byte, stat.Size())
+			_, errRead := content.Read(data)
+			return data, errRead
+		}
+		return nil, errOpen
+	}
+	return os.ReadFile("main.joss")
+}
+
+func launchGUIWindow(host string) {
 	w := webview2.New(true)
 	if w == nil {
-		log.Println("Failed to load WebView2. Is Edge installed?")
+		log.Println("No se pudo cargar WebView2. ¿Está Microsoft Edge instalado?")
 		return
 	}
 	defer w.Destroy()
 
 	w.SetTitle("Joss App")
 	w.SetSize(1024, 768, webview2.HintNone)
-
-	// Navigate to local server
 	w.Navigate("http://" + host)
-
-	// Run the application
 	w.Run()
 }
 

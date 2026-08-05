@@ -9,7 +9,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"regexp"
 	"runtime"
@@ -24,8 +23,6 @@ import (
 	"github.com/jossecurity/joss/pkg/pluginpkg"
 )
 
-//go:embed runner_windows.exe
-var runnerWindows []byte
 
 func buildWeb() {
 	fmt.Println("Iniciando compilación WEB de Joss...")
@@ -192,11 +189,6 @@ func buildProgram() {
 	}
 }
 
-func runCmd(dir, name string, args ...string) {
-	cmd := exec.Command(name, args...)
-	cmd.Dir = dir
-	cmd.CombinedOutput()
-}
 
 func copyFile(src, dst string) error {
 	in, err := os.Open(src)
@@ -593,14 +585,6 @@ func inspectPackage(filename string) {
 	fmt.Printf("Archivos internos: %d\n", len(archive.Files))
 }
 
-func sortedByteFileKeys(values map[string][]byte) []string {
-	keys := make([]string, 0, len(values))
-	for key := range values {
-		keys = append(keys, key)
-	}
-	sort.Strings(keys)
-	return keys
-}
 
 func sortedManifestKeys(values map[string]string) []string {
 	keys := make([]string, 0, len(values))

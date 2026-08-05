@@ -9,11 +9,7 @@
     "vscode": "^1.82.0"
   },
   "main": "./out/extension.js",
-  "activationEvents": [
-    "onLanguage:joss",
-    "onLanguage:joss-html",
-    "onCommand:joss.newProject"
-  ],
+  "activationEvents": [],
   "categories": [
     "Programming Languages",
     "Snippets",
