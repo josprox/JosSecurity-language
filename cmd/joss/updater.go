@@ -141,11 +141,13 @@ func printUpdateNotification(remoteVer, channel string) {
 // handleUpdateCommand executes the 'joss update' CLI command.
 func handleUpdateCommand(args []string) {
 	cfg := loadUpdateConfig()
-
-	// Parse flags for channel override (--canary / --stable)
+	force := false
+	// Parse flags for channel override (--canary / --stable) and force flag (-f / --force)
 	for _, arg := range args {
 		argLower := strings.ToLower(arg)
-		if strings.Contains(argLower, "canary") {
+		if argLower == "-f" || argLower == "--force" || argLower == "-force" {
+			force = true
+		} else if strings.Contains(argLower, "canary") {
 			cfg.Channel = "canary"
 		} else if strings.Contains(argLower, "stable") {
 			cfg.Channel = "stable"
@@ -158,6 +160,9 @@ func handleUpdateCommand(args []string) {
 	fmt.Printf("🔄 ACTUALIZADOR DE JOSS (Joss Auto-Updater)\n")
 	fmt.Printf(" Versión Actual : v%s\n", version.Version)
 	fmt.Printf(" Canal Elegido  : %s\n", strings.ToUpper(cfg.Channel))
+	if force {
+		fmt.Printf(" Modo Forzado   : ACTIVO (-f)\n")
+	}
 	fmt.Printf("=======================================================\n\n")
 
 	fmt.Println("🌐 Consultando la API de GitHub Releases...")
@@ -197,9 +202,15 @@ func handleUpdateCommand(args []string) {
 	remoteVer := cleanVersionTag(targetRelease.TagName)
 	fmt.Printf("📦 Release seleccionado : %s (%s)\n", targetRelease.Name, targetRelease.TagName)
 
-	if !isVersionNewer(remoteVer, version.Version) && remoteVer == version.Version {
-		fmt.Printf("✨ Joss ya se encuentra actualizado en la última versión v%s para el canal %s.\n\n", version.Version, strings.ToUpper(cfg.Channel))
+	if !force && compareVersions(remoteVer, version.Version) == 0 {
+		fmt.Printf("✨ Joss ya se encuentra actualizado en la versión v%s para el canal %s.\n", version.Version, strings.ToUpper(cfg.Channel))
+		fmt.Println("💡 Tip: Usa 'joss update -f' para forzar la re-descarga e instalación del binario.")
+		fmt.Println()
 		return
+	}
+
+	if force {
+		fmt.Println("⚠️  Re-descargando y re-instalando la versión del release por modo forzado (-f)...")
 	}
 
 	assetURL := findMatchingAsset(targetRelease.Assets, runtime.GOOS, runtime.GOARCH)
@@ -404,8 +415,49 @@ func cleanVersionTag(v string) string {
 	return v
 }
 
+func parseVersionParts(v string) []int {
+	v = cleanVersionTag(v)
+	if idx := strings.IndexAny(v, "-+"); idx != -1 {
+		v = v[:idx]
+	}
+	parts := strings.Split(v, ".")
+	nums := make([]int, 0, len(parts))
+	for _, p := range parts {
+		n := 0
+		fmt.Sscanf(p, "%d", &n)
+		nums = append(nums, n)
+	}
+	return nums
+}
+
+func compareVersions(v1, v2 string) int {
+	nums1 := parseVersionParts(v1)
+	nums2 := parseVersionParts(v2)
+
+	maxLen := len(nums1)
+	if len(nums2) > maxLen {
+		maxLen = len(nums2)
+	}
+
+	for i := 0; i < maxLen; i++ {
+		n1 := 0
+		if i < len(nums1) {
+			n1 = nums1[i]
+		}
+		n2 := 0
+		if i < len(nums2) {
+			n2 = nums2[i]
+		}
+		if n1 > n2 {
+			return 1
+		}
+		if n1 < n2 {
+			return -1
+		}
+	}
+	return 0
+}
+
 func isVersionNewer(remote, current string) bool {
-	r := cleanVersionTag(remote)
-	c := cleanVersionTag(current)
-	return r != "" && r != c
+	return compareVersions(remote, current) > 0
 }
