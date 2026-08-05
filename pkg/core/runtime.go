@@ -12,7 +12,6 @@ import (
 	"time"
 
 	_ "github.com/go-sql-driver/mysql"
-	"github.com/jossecurity/joss/pkg/crypto"
 	"github.com/jossecurity/joss/pkg/i18n"
 	"github.com/jossecurity/joss/pkg/parser"
 	"github.com/jossecurity/joss/pkg/version"
@@ -289,104 +288,20 @@ func (r *Runtime) LoadEnv(fs http.FileSystem) {
 	// Initialize I18n
 	i18n.GlobalManager.Load(fs)
 
-	var content []byte
-	var err error
-
-	// 1. Try reading env.joss (Dev Mode)
-	if fs != nil {
-		f, err := fs.Open("env.joss")
-		if err == nil {
-			defer f.Close()
-			stat, _ := f.Stat()
-			content = make([]byte, stat.Size())
-			f.Read(content)
-		}
-	} else {
-		content, err = os.ReadFile("env.joss")
+	detect := DetectAndLoadEnv(fs)
+	if detect.FilePath != "" {
+		fmt.Printf("[Security] Entorno cargado desde '%s'\n", detect.FilePath)
 	}
 
-	// 2. If not found, try reading env.enc (Production/Build Mode)
-	if len(content) == 0 {
-		var encData []byte
-		if fs != nil {
-			f, err := fs.Open("env.enc")
-			if err == nil {
-				defer f.Close()
-				stat, _ := f.Stat()
-				encData = make([]byte, stat.Size())
-				f.Read(encData)
-			}
-		} else {
-			encData, err = os.ReadFile("env.enc")
-		}
-
-		if len(encData) > 16 {
-			fmt.Println("[Security] Detectado entorno encriptado (env.enc). Desencriptando...")
-			salt := encData[:16]
-			ciphertext := encData[16:]
-
-			// Derive key using the same internal secret
-			masterSecret := []byte("JOSSECURITY_MASTER_SECRET_2025")
-			key := crypto.DeriveKey(masterSecret, salt)
-
-			decrypted, err := crypto.DecryptAES(ciphertext, key)
-			if err != nil {
-				fmt.Printf("[Security] Error fatal desencriptando entorno: %v\n", err)
-				return
-			}
-			content = decrypted
-		}
+	for k, v := range detect.EnvMap {
+		r.Env[k] = v
 	}
 
-	// 3. Last resort: Try .env (Standard Dotenv)
-	if len(content) == 0 {
-		if fs != nil {
-			f, err := fs.Open(".env")
-			if err == nil {
-				defer f.Close()
-				stat, _ := f.Stat()
-				content = make([]byte, stat.Size())
-				f.Read(content)
-				fmt.Println("[Security] Cargando configuración desde .env")
-			}
-		} else {
-			content, err = os.ReadFile(".env")
-			if err == nil {
-				fmt.Println("[Security] Cargando configuración desde .env")
-			}
-		}
-	}
-
-	if len(content) == 0 {
-		// Try looking in parent directories (Dev fallback)
-		if fs == nil {
-			content, err = os.ReadFile("../env.joss")
-			if err != nil {
-				content, err = os.ReadFile("../../env.joss")
-			}
-		}
-	}
-
-	if len(content) == 0 {
-		fmt.Println("[Security] Advertencia: No se encontró env.joss")
-		return
-	}
-
-	lines := strings.Split(string(content), "\n")
-	for _, line := range lines {
-		line = strings.TrimSpace(line)
-		if line == "" || strings.HasPrefix(line, "#") {
-			continue
-		}
-
-		parts := strings.SplitN(line, "=", 2)
-		if len(parts) == 2 {
-			key := strings.TrimSpace(parts[0])
-			val := strings.TrimSpace(parts[1])
-			// Remove quotes if present
-			val = strings.Trim(val, "\"")
-			r.Env[key] = val
-		}
+	// Ensure APP_KEY exists
+	if _, hasKey := r.Env["APP_KEY"]; !hasKey || r.Env["APP_KEY"] == "" {
+		newKey := generateSecureKey()
+		r.Env["APP_KEY"] = newKey
+		r.writeEnvJoss()
 	}
 
 	// 4. Override with System Environment Variables (Docker/System Priority)
