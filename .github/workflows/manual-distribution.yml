@@ -4,12 +4,21 @@ on:
   workflow_dispatch:
     inputs:
       create_release:
-        description: Publish the generated files in a GitHub Release
+        description: Publicar o actualizar los archivos generados en GitHub Release
         required: true
-        default: false
+        default: true
         type: boolean
+      release_type:
+        description: Tipo de release a crear (draft, prerelease, published)
+        required: true
+        default: draft
+        type: choice
+        options:
+          - draft
+          - prerelease
+          - published
       release_tag:
-        description: Release tag (required only when create_release is enabled)
+        description: Etiqueta de versión (ej. v3.6.5). Si se omite, se lee de pkg/version/version.go
         required: false
         type: string
 
@@ -17,7 +26,7 @@ permissions:
   contents: write
 
 concurrency:
-  group: manual-distribution
+  group: manual-distribution-${{ github.ref }}
   cancel-in-progress: false
 
 jobs:
@@ -92,27 +101,62 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
-      - name: Validate release input
+      - name: Resolve release tag and parameters
         if: ${{ inputs.create_release }}
+        id: release_meta
         shell: pwsh
         run: |
-          if ([string]::IsNullOrWhiteSpace('${{ inputs.release_tag }}')) {
-            throw 'release_tag es obligatorio cuando create_release esta habilitado'
+          $tag = '${{ inputs.release_tag }}'
+          if ([string]::IsNullOrWhiteSpace($tag)) {
+            $versionSource = Get-Content 'pkg/version/version.go' -Raw
+            if ($versionSource -match 'const Version = "([^"]+)"') {
+              $ver = $Matches[1]
+              if (-not $ver.StartsWith("v") -and -not $ver.StartsWith("V")) {
+                $tag = "v$ver"
+              } else {
+                $tag = $ver
+              }
+            } else {
+              throw 'No se pudo obtener la versión desde pkg/version/version.go'
+            }
           }
+          Write-Host "Etiqueta seleccionada para la release: $tag"
+          "tag=$tag" >> $env:GITHUB_OUTPUT
 
-      - name: Publish GitHub Release
+      - name: Publish or update GitHub Release
         if: ${{ inputs.create_release }}
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
-          RELEASE_TAG: ${{ inputs.release_tag }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_TAG: ${{ steps.release_meta.outputs.tag }}
+          RELEASE_TYPE: ${{ inputs.release_type }}
         run: |
-          $files = Get-ChildItem -LiteralPath dist -File | ForEach-Object FullName
-          gh release view $env:RELEASE_TAG 2>$null
+          $files = Get-ChildItem -LiteralPath dist -File | Sort-Object Name | ForEach-Object FullName
+          if (-not $files) {
+            throw 'No se encontraron archivos en la carpeta dist.'
+          }
+
+          $existingDraft = gh release view $env:RELEASE_TAG --repo $env:GH_REPO --json isDraft --jq .isDraft 2>$null
           if ($LASTEXITCODE -eq 0) {
-            Write-Host "La release $env:RELEASE_TAG ya existe. Actualizando y reemplazando archivos..."
-            gh release upload $env:RELEASE_TAG $files --clobber
+            Write-Host "La release $env:RELEASE_TAG ya existe. Reemplazando y actualizando archivos (--clobber)..."
+            gh release upload $env:RELEASE_TAG $files --repo $env:GH_REPO --clobber
+            if ($LASTEXITCODE -ne 0) {
+              throw "No se pudieron actualizar los archivos de la release $env:RELEASE_TAG"
+            }
+            $stateStr = if ($existingDraft -eq 'true') { 'borrador (draft)' } else { 'publicada' }
+            Write-Host "✨ Archivos reemplazados exitosamente en la release ($stateStr): $env:RELEASE_TAG"
           } else {
-            Write-Host "Creando nueva release $env:RELEASE_TAG..."
-            gh release create $env:RELEASE_TAG $files --title "Joss $env:RELEASE_TAG" --generate-notes
+            Write-Host "Creando nueva release $env:RELEASE_TAG (tipo: $env:RELEASE_TYPE)..."
+            $flags = @($env:RELEASE_TAG, $files, '--repo', $env:GH_REPO, '--title', "Joss $env:RELEASE_TAG", '--generate-notes')
+            if ($env:RELEASE_TYPE -eq 'draft') {
+              $flags += '--draft'
+            } elseif ($env:RELEASE_TYPE -eq 'prerelease') {
+              $flags += '--prerelease'
+            }
+            gh release create @flags
+            if ($LASTEXITCODE -ne 0) {
+              throw "Error creando la release $env:RELEASE_TAG"
+            }
+            Write-Host "✨ Release creada exitosamente: $env:RELEASE_TAG ($env:RELEASE_TYPE)"
           }
