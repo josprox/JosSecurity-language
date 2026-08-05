@@ -137,26 +137,51 @@ jobs:
             throw 'No se encontraron archivos en la carpeta dist.'
           }
 
-          $existingDraft = gh release view $env:RELEASE_TAG --repo $env:GH_REPO --json isDraft --jq .isDraft 2>$null
-          if ($LASTEXITCODE -eq 0) {
-            Write-Host "La release $env:RELEASE_TAG ya existe. Reemplazando y actualizando archivos (--clobber)..."
-            gh release upload $env:RELEASE_TAG $files --repo $env:GH_REPO --clobber
+          # Buscar si ya existe una release con este tag (draft, prerelease o published)
+          $releaseJson = gh release view $env:RELEASE_TAG --repo $env:GH_REPO --json tagName,isDraft,isPrerelease 2>$null
+          $releaseExists = $LASTEXITCODE -eq 0
+
+          if ($releaseExists) {
+            Write-Host "La release '$env:RELEASE_TAG' ya existe. Actualizando archivos y estado..."
+
+            # Actualizar archivos con --clobber (reemplaza los existentes)
+            gh release upload $env:RELEASE_TAG @files --repo $env:GH_REPO --clobber
             if ($LASTEXITCODE -ne 0) {
-              throw "No se pudieron actualizar los archivos de la release $env:RELEASE_TAG"
+              throw "No se pudieron actualizar los archivos de la release '$env:RELEASE_TAG'"
             }
-            $stateStr = if ($existingDraft -eq 'true') { 'borrador (draft)' } else { 'publicada' }
-            Write-Host "✨ Archivos reemplazados exitosamente en la release ($stateStr): $env:RELEASE_TAG"
-          } else {
-            Write-Host "Creando nueva release $env:RELEASE_TAG (tipo: $env:RELEASE_TYPE)..."
-            $flags = @($env:RELEASE_TAG, $files, '--repo', $env:GH_REPO, '--title', "Joss $env:RELEASE_TAG", '--generate-notes')
+
+            # Actualizar el tipo de release (draft/prerelease/published) segun el input
+            $editFlags = @('release', 'edit', $env:RELEASE_TAG, '--repo', $env:GH_REPO)
             if ($env:RELEASE_TYPE -eq 'draft') {
-              $flags += '--draft'
+              $editFlags += '--draft=true'
+              $editFlags += '--prerelease=false'
             } elseif ($env:RELEASE_TYPE -eq 'prerelease') {
-              $flags += '--prerelease'
+              $editFlags += '--draft=false'
+              $editFlags += '--prerelease=true'
+            } else {
+              # published
+              $editFlags += '--draft=false'
+              $editFlags += '--prerelease=false'
             }
-            gh release create @flags
+            gh @editFlags
             if ($LASTEXITCODE -ne 0) {
-              throw "Error creando la release $env:RELEASE_TAG"
+              Write-Warning "No se pudo actualizar el estado de la release, pero los archivos si fueron actualizados."
             }
-            Write-Host "✨ Release creada exitosamente: $env:RELEASE_TAG ($env:RELEASE_TYPE)"
+
+            Write-Host "✨ Release '$env:RELEASE_TAG' actualizada correctamente ($env:RELEASE_TYPE)."
+          } else {
+            Write-Host "Creando nueva release '$env:RELEASE_TAG' (tipo: $env:RELEASE_TYPE)..."
+            $createFlags = @($env:RELEASE_TAG, '--repo', $env:GH_REPO, '--title', "Joss $env:RELEASE_TAG", '--generate-notes')
+            if ($env:RELEASE_TYPE -eq 'draft') {
+              $createFlags += '--draft'
+            } elseif ($env:RELEASE_TYPE -eq 'prerelease') {
+              $createFlags += '--prerelease'
+            }
+            # Adjuntar archivos al final
+            $createFlags += $files
+            gh release create @createFlags
+            if ($LASTEXITCODE -ne 0) {
+              throw "Error creando la release '$env:RELEASE_TAG'"
+            }
+            Write-Host "✨ Release '$env:RELEASE_TAG' creada exitosamente ($env:RELEASE_TYPE)."
           }
