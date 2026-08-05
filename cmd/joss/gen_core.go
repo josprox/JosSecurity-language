@@ -55,8 +55,8 @@ func snakeToCamel(s string) string {
 }
 
 func loadEnvConfig() (string, string, string, string, string, string, string) {
-	// Simple parser for env.joss
-	content, _ := ioutil.ReadFile("env.joss")
+	// Simple parser for environment config
+	content, _ := ioutil.ReadFile(GetEnvFile())
 	lines := strings.Split(string(content), "\n")
 
 	config := make(map[string]string)

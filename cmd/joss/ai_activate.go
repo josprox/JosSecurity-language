@@ -2,8 +2,8 @@ package main
 
 import (
 	"fmt"
-	"os"
 	"strings"
+
 	"github.com/jossecurity/joss/pkg/i18n"
 )
 
@@ -63,13 +63,8 @@ func activateAI() {
 		fmt.Println(i18n.Tr("aiNoApiKeyWarning"))
 	}
 
-	// 4. Guardar en .env o env.joss
-	envFile := ".env"
-	if _, err := os.Stat("env.joss"); err == nil {
-		envFile = "env.joss"
-	} else if _, err := os.Stat(".env"); err == nil {
-		envFile = ".env"
-	}
+	// 4. Guardar en archivo de entorno dinámico (.env / env.joss)
+	envFile := GetEnvFile()
 
 	fmt.Println("\n" + i18n.Tr("aiSavingConfig", map[string]interface{}{"file": envFile}))
 

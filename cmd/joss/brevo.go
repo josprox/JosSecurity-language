@@ -11,14 +11,10 @@ import (
 func handleBrevoConfig() {
 	fmt.Println(i18n.Tr("brevoTitle"))
 
-	envPath := "env.joss"
+	envPath := GetEnvFile()
 	if _, err := os.Stat(envPath); os.IsNotExist(err) {
-		if _, err := os.Stat(".env"); err == nil {
-			envPath = ".env"
-		} else {
-			fmt.Println(i18n.Tr("brevoNoEnvError"))
-			return
-		}
+		fmt.Println(i18n.Tr("brevoNoEnvError"))
+		return
 	}
 
 	if hasArg("--enable") {

@@ -67,7 +67,10 @@ func startProgram() {
 	}()
 
 	// Determine port
-	port := getEnvPort("env.joss")
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = getEnvPort(GetEnvFile())
+	}
 	if port == "" {
 		port = "8000"
 	}

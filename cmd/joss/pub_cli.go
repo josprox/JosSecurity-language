@@ -54,9 +54,9 @@ func getRegistryURL() string {
 		return strings.TrimSuffix(url, "/")
 	}
 
-	// Try reading env.joss
-	if _, err := os.Stat("env.joss"); err == nil {
-		data, err := os.ReadFile("env.joss")
+	// Try reading environment file
+	envPath := GetEnvFile()
+	if data, err := os.ReadFile(envPath); err == nil {
 		if err == nil {
 			lines := strings.Split(string(data), "\n")
 			for _, line := range lines {

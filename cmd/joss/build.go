@@ -49,11 +49,9 @@ func buildWeb() {
 	}
 
 	// Check for environment file (env.joss OR .env)
-	if _, err := os.Stat("env.joss"); os.IsNotExist(err) {
-		if _, err := os.Stat(".env"); os.IsNotExist(err) {
-			fmt.Println("Error de Arquitectura: Falta archivo de entorno ('env.joss' o '.env')")
-			return
-		}
+	if _, err := os.Stat(GetEnvFile()); os.IsNotExist(err) {
+		fmt.Println("Error de Arquitectura: Falta archivo de entorno ('env.joss' o '.env')")
+		return
 	}
 
 	// 2. Prepare Build Directory
@@ -142,16 +140,10 @@ func buildWeb() {
 	}
 
 	// 4. Create nginx_port.conf
-	envFile := "env.joss"
-	if _, err := os.Stat(envFile); os.IsNotExist(err) {
-		if _, err := os.Stat(".env"); err == nil {
-			envFile = ".env"
-		}
-	}
-
+	envFile := GetEnvFile()
 	port := getEnvPort(envFile)
 	if port == "" {
-		port = "80" // Default default (changed to 80)
+		port = "8000"
 	}
 
 	nginxContent := fmt.Sprintf("set $joss_port %s;", port)
@@ -240,14 +232,10 @@ func copyDir(src string, dst string) error {
 }
 
 func encryptEnvTo(destPath string) {
-	envPath := "env.joss"
+	envPath := GetEnvFile()
 	if _, err := os.Stat(envPath); os.IsNotExist(err) {
-		if _, err := os.Stat(".env"); err == nil {
-			envPath = ".env"
-		} else {
-			fmt.Printf("Error: No se encontró env.joss ni .env para encriptar.\n")
-			return
-		}
+		fmt.Printf("Error: No se encontró archivo de entorno ('env.joss' o '.env') para encriptar.\n")
+		return
 	}
 
 	data, err := ioutil.ReadFile(envPath)

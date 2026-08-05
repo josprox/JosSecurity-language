@@ -161,13 +161,8 @@ func buildNative(targetOS, targetArch string) {
 
 	fmt.Printf("⚡ Pre-compilados %d archivos Joss a bytecode nativo.\n", compiledCount)
 
-	// Handle env.joss or .env
-	envPath := "env.joss"
-	if _, err := os.Stat(envPath); os.IsNotExist(err) {
-		if _, err := os.Stat(".env"); err == nil {
-			envPath = ".env"
-		}
-	}
+	// Handle environment file (.env / env.joss)
+	envPath := GetEnvFile()
 
 	if data, err := ioutil.ReadFile(envPath); err == nil {
 		if _, err := os.Stat("database.sqlite"); err == nil {
