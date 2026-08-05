@@ -51,9 +51,13 @@ func Start(fileSystem http.FileSystem) {
 		fmt.Println("[Server] File watcher (Hot Reload) deshabilitado.")
 	}
 
-	port := "80"
+	port := "8000"
 	if val, ok := currentRuntime.Env["PORT"]; ok && val != "" {
 		port = val
+	} else if val, ok := currentRuntime.Env["JOSS_PORT"]; ok && val != "" {
+		port = val
+	} else if envPort := os.Getenv("PORT"); envPort != "" {
+		port = envPort
 	}
 
 	// Static Files

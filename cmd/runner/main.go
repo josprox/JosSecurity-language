@@ -134,22 +134,16 @@ func main() {
 	}()
 
 	// Determine port from env (loaded from VFS or defaults)
-	port := "8000"
-	if envData, ok := files["env.joss"]; ok {
-		// Simple parse
-		lines := bytes.Split(envData, []byte("\n"))
-		for _, line := range lines {
-			s := string(bytes.TrimSpace(line))
-			if (len(s) > 5 && s[:5] == "PORT=") || (len(s) > 10 && s[:10] == "JOSS_PORT=") {
-				parts := bytes.SplitN(line, []byte("="), 2)
-				if len(parts) == 2 {
-					val := bytes.TrimSpace(parts[1])
-					val = bytes.Trim(val, "\"")
-					val = bytes.Trim(val, "'")
-					port = string(val)
-				}
-			}
-		}
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = os.Getenv("JOSS_PORT")
+	}
+
+	var envData []byte
+	if data, ok := files["env.joss"]; ok {
+		envData = data
+	} else if data, ok := files[".env"]; ok {
+		envData = data
 	} else if envEnc, ok := files["env.enc"]; ok {
 		if len(envEnc) > 16 {
 			salt := envEnc[:16]
@@ -158,21 +152,34 @@ func main() {
 			key := crypto.DeriveKey(masterSecret, salt)
 			decrypted, err := crypto.DecryptAES(ciphertext, key)
 			if err == nil {
-				lines := bytes.Split(decrypted, []byte("\n"))
-				for _, line := range lines {
-					s := string(bytes.TrimSpace(line))
-					if (len(s) > 5 && s[:5] == "PORT=") || (len(s) > 10 && s[:10] == "JOSS_PORT=") {
-						parts := bytes.SplitN(line, []byte("="), 2)
-						if len(parts) == 2 {
-							val := bytes.TrimSpace(parts[1])
-							val = bytes.Trim(val, "\"")
-							val = bytes.Trim(val, "'")
-							port = string(val)
-						}
-					}
+				envData = decrypted
+			}
+		}
+	}
+
+	if port == "" && len(envData) > 0 {
+		lines := bytes.Split(envData, []byte("\n"))
+		for _, line := range lines {
+			s := bytes.TrimSpace(line)
+			if bytes.HasPrefix(s, []byte("#")) {
+				continue
+			}
+			parts := bytes.SplitN(s, []byte("="), 2)
+			if len(parts) == 2 {
+				key := string(bytes.ToUpper(bytes.TrimSpace(parts[0])))
+				if key == "PORT" || key == "JOSS_PORT" || key == "APP_PORT" || key == "SERVER_PORT" {
+					val := bytes.TrimSpace(parts[1])
+					val = bytes.Trim(val, "\"")
+					val = bytes.Trim(val, "'")
+					port = string(val)
+					break
 				}
 			}
 		}
+	}
+
+	if port == "" {
+		port = "8000"
 	}
 
 	// Wait for resolved port, or fallback to default
