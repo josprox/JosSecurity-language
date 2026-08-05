@@ -58,21 +58,3 @@ func handleBrevoConfig() {
 	}
 }
 
-func removeEnvKey(path, key string) {
-	content, err := os.ReadFile(path)
-	if err != nil {
-		fmt.Printf("Error leyendo %s: %v\n", path, err)
-		return
-	}
-
-	lines := strings.Split(string(content), "\n")
-	var newLines []string
-	for _, line := range lines {
-		if strings.HasPrefix(strings.TrimSpace(line), key+"=") {
-			continue
-		}
-		newLines = append(newLines, line)
-	}
-
-	os.WriteFile(path, []byte(strings.Join(newLines, "\n")), 0644)
-}

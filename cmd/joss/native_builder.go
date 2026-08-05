@@ -23,7 +23,6 @@ const (
 	sqliteWalFile = "database.sqlite-wal"
 )
 
-// Supported OS and Architecture targets
 var supportedTargets = map[string][]string{
 	"windows": {"amd64", "arm64", "386"},
 	"linux":   {"amd64", "arm64", "386"},
@@ -130,49 +129,7 @@ func collectAndEncryptAssets() ([]byte, []byte, error) {
 
 	compiledCount := 0
 	err := filepath.Walk(".", func(path string, info os.FileInfo, err error) error {
-		if err != nil || path == "." {
-			return nil
-		}
-		parts := strings.Split(path, string(os.PathSeparator))
-		if len(parts) > 0 && ignoredDirs[parts[0]] {
-			if info.IsDir() {
-				return filepath.SkipDir
-			}
-			return nil
-		}
-		if info.IsDir() {
-			return nil
-		}
-
-		name := strings.ToLower(info.Name())
-		if strings.HasSuffix(name, ".exe") || strings.HasSuffix(name, ".log") || strings.HasSuffix(name, ".enc") || strings.HasSuffix(name, ".dll") || strings.HasSuffix(name, ".so") || strings.HasSuffix(name, ".dylib") || name == "runner" || name == "joss" {
-			return nil
-		}
-
-		if info.Size() > 5<<20 {
-			return nil
-		}
-
-		data, err := os.ReadFile(path)
-		if err != nil {
-			return nil
-		}
-
-		relPath := filepath.ToSlash(path)
-		if strings.HasSuffix(relPath, ".joss") {
-			l := parser.NewLexer(string(data))
-			p := parser.NewParser(l)
-			prog := p.ParseProgram()
-			if len(p.Errors()) == 0 && prog != nil {
-				if bc, bcErr := bytecode.Encode(prog); bcErr == nil {
-					data = bc
-					compiledCount++
-				}
-			}
-		}
-
-		files[relPath] = data
-		return nil
+		return processSingleWalkFile(path, info, err, files, ignoredDirs, &compiledCount)
 	})
 
 	if err != nil {
@@ -180,22 +137,7 @@ func collectAndEncryptAssets() ([]byte, []byte, error) {
 	}
 
 	fmt.Printf("⚡ Pre-compilados %d archivos Joss a bytecode nativo.\n", compiledCount)
-
-	envPath := GetEnvFile()
-	if data, err := os.ReadFile(envPath); err == nil {
-		if _, err := os.Stat(sqliteDbFile); err == nil {
-			override := "\nDB_PATH=\"Storage/" + sqliteDbFile + "\""
-			data = append(data, []byte(override)...)
-		}
-		salt := make([]byte, 16)
-		rand.Read(salt)
-		masterSecret := []byte("JOSSECURITY_MASTER_SECRET_2025")
-		key := crypto.DeriveKey(masterSecret, salt)
-		encrypted, err := crypto.EncryptAES(data, key)
-		if err == nil {
-			files["env.enc"] = append(salt, encrypted...)
-		}
-	}
+	encryptProjectEnvironment(files)
 
 	var buf bytes.Buffer
 	enc := gob.NewEncoder(&buf)
@@ -205,6 +147,83 @@ func collectAndEncryptAssets() ([]byte, []byte, error) {
 
 	encryptedAssets, err := crypto.EncryptAES(buf.Bytes(), buildKey)
 	return encryptedAssets, buildKey, err
+}
+
+func processSingleWalkFile(path string, info os.FileInfo, err error, files map[string][]byte, ignoredDirs map[string]bool, compiledCount *int) error {
+	if err != nil || path == "." {
+		return nil
+	}
+	parts := strings.Split(path, string(os.PathSeparator))
+	if len(parts) > 0 && ignoredDirs[parts[0]] {
+		if info.IsDir() {
+			return filepath.SkipDir
+		}
+		return nil
+	}
+	if info.IsDir() {
+		return nil
+	}
+
+	name := strings.ToLower(info.Name())
+	if shouldSkipFileByName(name) || info.Size() > 5<<20 {
+		return nil
+	}
+
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return nil
+	}
+
+	relPath := filepath.ToSlash(path)
+	if strings.HasSuffix(relPath, ".joss") {
+		if bcData, ok := tryCompileJossBytecode(data); ok {
+			data = bcData
+			*compiledCount++
+		}
+	}
+
+	files[relPath] = data
+	return nil
+}
+
+func shouldSkipFileByName(name string) bool {
+	return strings.HasSuffix(name, ".exe") || strings.HasSuffix(name, ".log") ||
+		strings.HasSuffix(name, ".enc") || strings.HasSuffix(name, ".dll") ||
+		strings.HasSuffix(name, ".so") || strings.HasSuffix(name, ".dylib") ||
+		name == "runner" || name == "joss"
+}
+
+func tryCompileJossBytecode(data []byte) ([]byte, bool) {
+	l := parser.NewLexer(string(data))
+	p := parser.NewParser(l)
+	prog := p.ParseProgram()
+	if len(p.Errors()) == 0 && prog != nil {
+		if bc, bcErr := bytecode.Encode(prog); bcErr == nil {
+			return bc, true
+		}
+	}
+	return nil, false
+}
+
+func encryptProjectEnvironment(files map[string][]byte) {
+	envPath := GetEnvFile()
+	data, err := os.ReadFile(envPath)
+	if err != nil {
+		return
+	}
+
+	if _, err := os.Stat(sqliteDbFile); err == nil {
+		override := "\nDB_PATH=\"Storage/" + sqliteDbFile + "\""
+		data = append(data, []byte(override)...)
+	}
+	salt := make([]byte, 16)
+	rand.Read(salt)
+	masterSecret := []byte("JOSSECURITY_MASTER_SECRET_2025")
+	key := crypto.DeriveKey(masterSecret, salt)
+	encrypted, err := crypto.EncryptAES(data, key)
+	if err == nil {
+		files["env.enc"] = append(salt, encrypted...)
+	}
 }
 
 func compileRunnerBinary(targetOS, targetArch string) ([]byte, error) {

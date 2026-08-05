@@ -112,9 +112,9 @@ func main() {
 		if len(os.Args) >= 3 {
 			target = os.Args[2]
 		}
-		if target == "native" {
-			targetOS := ""
-			targetArch := ""
+		switch target {
+		case "native":
+			targetOS, targetArch := "", ""
 			if len(os.Args) >= 4 {
 				targetOS = os.Args[3]
 			}
@@ -122,9 +122,8 @@ func main() {
 				targetArch = os.Args[4]
 			}
 			buildNative(targetOS, targetArch)
-		} else if target == "program" {
-			targetOS := ""
-			targetArch := ""
+		case "program":
+			targetOS, targetArch := "", ""
 			if len(os.Args) >= 4 {
 				targetOS = os.Args[3]
 			}
@@ -136,13 +135,13 @@ func main() {
 			} else {
 				buildProgram()
 			}
-		} else if target == "package" {
+		case "package":
 			if len(os.Args) < 4 {
 				fmt.Println("Uso: joss build package [ruta_del_paquete]")
 				return
 			}
 			buildPackage(os.Args[3])
-		} else {
+		default:
 			buildWeb()
 		}
 	case "make:controller":
@@ -210,25 +209,26 @@ func main() {
 		}
 
 		// Detectar tipo de proyecto
-		if os.Args[2] == "console" {
+		switch os.Args[2] {
+		case "console":
 			if len(os.Args) < 4 {
 				fmt.Println("Uso: joss new console [ruta]")
 				return
 			}
 			template.CreateConsoleProject(os.Args[3])
-		} else if os.Args[2] == "web" {
+		case "web":
 			if len(os.Args) < 4 {
 				fmt.Println("Uso: joss new web [ruta]")
 				return
 			}
 			template.CreateBibleProject(os.Args[3])
-		} else if os.Args[2] == "package" {
+		case "package":
 			if len(os.Args) < 4 {
 				fmt.Println("Uso: joss new package [nombre]")
 				return
 			}
 			createNewPackage(os.Args[3])
-		} else {
+		default:
 			// Default: web project
 			template.CreateBibleProject(os.Args[2])
 		}
@@ -258,16 +258,17 @@ func main() {
 			return
 		}
 
-		if os.Args[3] == "migrate" {
+		switch os.Args[3] {
+		case "migrate":
 			changeDatabaseMigrate()
-		} else if os.Args[3] == "prefix" {
+		case "prefix":
 			if len(os.Args) < 5 {
 				fmt.Println("Uso: joss change db prefix [nuevo_prefijo]")
 				return
 			}
 			newPrefix := os.Args[4]
 			changeDatabasePrefix(newPrefix)
-		} else {
+		default:
 			targetEngine := os.Args[3]
 			changeDatabaseEngine(targetEngine)
 		}

@@ -141,3 +141,33 @@ func readLine() string {
 	}
 	return strings.TrimSpace(string(line))
 }
+
+func getCLIOption(flag string) string {
+	flagPrefix := "--" + flag + "="
+	for _, arg := range os.Args[1:] {
+		if strings.HasPrefix(arg, flagPrefix) {
+			return strings.TrimPrefix(arg, flagPrefix)
+		}
+	}
+	for i, arg := range os.Args[1:] {
+		if arg == "--"+flag && i+1 < len(os.Args[1:]) {
+			return os.Args[1:][i+1]
+		}
+	}
+	return ""
+}
+
+func removeEnvKey(path, key string) {
+	content, err := os.ReadFile(path)
+	if err != nil {
+		return
+	}
+	lines := strings.Split(string(content), "\n")
+	var newLines []string
+	for _, line := range lines {
+		if !strings.HasPrefix(strings.TrimSpace(line), key+"=") {
+			newLines = append(newLines, line)
+		}
+	}
+	os.WriteFile(path, []byte(strings.Join(newLines, "\n")), 0644)
+}
