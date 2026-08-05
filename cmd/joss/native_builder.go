@@ -6,7 +6,6 @@ import (
 	"encoding/binary"
 	"encoding/gob"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -130,7 +129,7 @@ func buildNative(targetOS, targetArch string) {
 			return nil
 		}
 
-		data, err := ioutil.ReadFile(path)
+		data, err := os.ReadFile(path)
 		if err != nil {
 			return nil
 		}
@@ -164,7 +163,7 @@ func buildNative(targetOS, targetArch string) {
 	// Handle environment file (.env / env.joss)
 	envPath := GetEnvFile()
 
-	if data, err := ioutil.ReadFile(envPath); err == nil {
+	if data, err := os.ReadFile(envPath); err == nil {
 		if _, err := os.Stat("database.sqlite"); err == nil {
 			override := "\nDB_PATH=\"Storage/database.sqlite\""
 			data = append(data, []byte(override)...)
@@ -195,7 +194,7 @@ func buildNative(targetOS, targetArch string) {
 
 	// 4. Cross-compile runner binary via Go toolchain
 	fmt.Println("🔨 Compilando ejecutable nativo con la toolchain de Go...")
-	tempRunnerDir, err := ioutil.TempDir("", "joss-build-*")
+	tempRunnerDir, err := os.MkdirTemp("", "joss-build-*")
 	if err != nil {
 		fmt.Printf("Error creando directorio temporal: %v\n", err)
 		return
@@ -223,7 +222,7 @@ func buildNative(targetOS, targetArch string) {
 		return
 	}
 
-	runnerBytes, err := ioutil.ReadFile(tempRunnerBin)
+	runnerBytes, err := os.ReadFile(tempRunnerBin)
 	if err != nil {
 		fmt.Printf("Error leyendo binario base: %v\n", err)
 		return

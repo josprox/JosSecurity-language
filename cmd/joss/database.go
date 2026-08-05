@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"database/sql"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -514,12 +513,12 @@ func cloneEnvMap(env map[string]string) map[string]string {
 }
 
 func backupEnvFile(path string) error {
-	content, err := ioutil.ReadFile(path)
+	content, err := os.ReadFile(path)
 	if err != nil {
 		return err
 	}
 	backupPath := fmt.Sprintf("%s.bak.%s", path, time.Now().Format("20060102150405"))
-	return ioutil.WriteFile(backupPath, content, 0644)
+	return os.WriteFile(backupPath, content, 0644)
 }
 
 func getTables(db *sql.DB, driver string) ([]string, error) {
@@ -629,7 +628,7 @@ func updateSourceCodePrefix(oldPrefix, newPrefix string) {
 				return nil
 			}
 			if !info.IsDir() && strings.HasSuffix(path, ".joss") {
-				content, err := ioutil.ReadFile(path)
+				content, err := os.ReadFile(path)
 				if err == nil {
 					strContent := string(content)
 					// Replace "oldPrefix" with "newPrefix"
@@ -637,7 +636,7 @@ func updateSourceCodePrefix(oldPrefix, newPrefix string) {
 					newContent = strings.ReplaceAll(newContent, "'"+oldPrefix, "'"+newPrefix)
 
 					if strContent != newContent {
-						err = ioutil.WriteFile(path, []byte(newContent), 0644)
+						err = os.WriteFile(path, []byte(newContent), 0644)
 						if err == nil {
 							fmt.Printf("Actualizado: %s\n", path)
 						} else {

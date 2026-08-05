@@ -3,7 +3,6 @@ package main
 import (
 	"bufio"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"strings"
 
@@ -22,7 +21,7 @@ func GetEnvFile() string {
 
 func readEnvFile(path string) map[string]string {
 	m := make(map[string]string)
-	content, _ := ioutil.ReadFile(path)
+	content, _ := os.ReadFile(path)
 	lines := strings.Split(string(content), "\n")
 	for _, line := range lines {
 		parts := strings.SplitN(line, "=", 2)
@@ -37,7 +36,7 @@ func readEnvFile(path string) map[string]string {
 }
 
 func updateEnvFile(path, key, value string) {
-	content, _ := ioutil.ReadFile(path)
+	content, _ := os.ReadFile(path)
 	lines := strings.Split(string(content), "\n")
 	found := false
 	var newLines []string
@@ -52,7 +51,7 @@ func updateEnvFile(path, key, value string) {
 	if !found {
 		newLines = append(newLines, fmt.Sprintf("%s=%s", key, value))
 	}
-	ioutil.WriteFile(path, []byte(strings.Join(newLines, "\n")), 0644)
+	os.WriteFile(path, []byte(strings.Join(newLines, "\n")), 0644)
 }
 
 func printHelp() {

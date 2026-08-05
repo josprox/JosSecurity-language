@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 	"strings"
 )
@@ -35,7 +34,7 @@ func writeGenFile(path, content string) {
 		fmt.Printf("Skipped existing file: %s (use --force to overwrite)\n", path)
 		return
 	}
-	err := ioutil.WriteFile(path, []byte(content), 0644)
+	err := os.WriteFile(path, []byte(content), 0644)
 	if err != nil {
 		fmt.Printf("Error creating file %s: %v\n", path, err)
 	} else {
@@ -56,7 +55,7 @@ func snakeToCamel(s string) string {
 
 func loadEnvConfig() (string, string, string, string, string, string, string) {
 	// Simple parser for environment config
-	content, _ := ioutil.ReadFile(GetEnvFile())
+	content, _ := os.ReadFile(GetEnvFile())
 	lines := strings.Split(string(content), "\n")
 
 	config := make(map[string]string)

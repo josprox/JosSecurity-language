@@ -2,7 +2,6 @@ package template
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 
@@ -68,7 +67,7 @@ func CreateBibleProject(path string) {
 			continue
 		}
 
-		err := ioutil.WriteFile(file, []byte(content), 0644)
+		err := os.WriteFile(file, []byte(content), 0644)
 		if err != nil {
 			fmt.Printf("Error creando archivo %s: %v\n", file, err)
 		}
@@ -115,7 +114,7 @@ func CreateConsoleProject(path string) {
 
 	// Write files
 	for file, content := range allFiles {
-		err := ioutil.WriteFile(file, []byte(content), 0644)
+		err := os.WriteFile(file, []byte(content), 0644)
 		if err != nil {
 			fmt.Printf("Error creando archivo %s: %v\n", file, err)
 		}

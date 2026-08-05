@@ -8,7 +8,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -95,7 +94,7 @@ func buildWeb() {
 	}
 
 	// Dynamic copy of root directories
-	files, err := ioutil.ReadDir(".")
+	files, err := os.ReadDir(".")
 	if err == nil {
 		for _, f := range files {
 			name := f.Name()
@@ -147,7 +146,7 @@ func buildWeb() {
 	}
 
 	nginxContent := fmt.Sprintf("set $joss_port %s;", port)
-	if err := ioutil.WriteFile(filepath.Join(buildDir, "nginx_port.conf"), []byte(nginxContent), 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(buildDir, "nginx_port.conf"), []byte(nginxContent), 0644); err != nil {
 		fmt.Printf("Error creando nginx_port.conf: %v\n", err)
 	} else {
 		fmt.Printf("Archivo nginx_port.conf creado con puerto %s\n", port)
@@ -238,7 +237,7 @@ func encryptEnvTo(destPath string) {
 		return
 	}
 
-	data, err := ioutil.ReadFile(envPath)
+	data, err := os.ReadFile(envPath)
 	if err != nil {
 		fmt.Printf("Error leyendo %s: %v\n", envPath, err)
 		return
@@ -278,7 +277,7 @@ func encryptEnvTo(destPath string) {
 	// Format: [Salt 16] [Encrypted Data]
 	finalData := append(salt, encrypted...)
 
-	err = ioutil.WriteFile(destPath, finalData, 0644)
+	err = os.WriteFile(destPath, finalData, 0644)
 	if err != nil {
 		fmt.Printf("Error escribiendo %s: %v\n", destPath, err)
 		return
@@ -287,7 +286,7 @@ func encryptEnvTo(destPath string) {
 }
 
 func getEnvPort(envPath string) string {
-	content, err := ioutil.ReadFile(envPath)
+	content, err := os.ReadFile(envPath)
 	if err != nil {
 		return ""
 	}

@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -56,7 +55,7 @@ func getUpdateConfigPath() string {
 func loadUpdateConfig() UpdateConfig {
 	cfg := UpdateConfig{Channel: defaultChannel}
 	path := getUpdateConfigPath()
-	data, err := ioutil.ReadFile(path)
+	data, err := os.ReadFile(path)
 	if err == nil {
 		json.Unmarshal(data, &cfg)
 	}
@@ -70,7 +69,7 @@ func saveUpdateConfig(cfg UpdateConfig) {
 	path := getUpdateConfigPath()
 	data, err := json.MarshalIndent(cfg, "", "  ")
 	if err == nil {
-		ioutil.WriteFile(path, data, 0644)
+		os.WriteFile(path, data, 0644)
 	}
 }
 
@@ -229,7 +228,7 @@ func handleUpdateCommand(args []string) {
 
 	fmt.Printf("⬇️  Descargando actualización desde: %s\n", assetURL)
 
-	tempDir, err := ioutil.TempDir("", "joss-update-*")
+	tempDir, err := os.MkdirTemp("", "joss-update-*")
 	if err != nil {
 		fmt.Printf("Error creando directorio temporal: %v\n", err)
 		return
@@ -245,7 +244,7 @@ func handleUpdateCommand(args []string) {
 	binaryToApply := downloadPath
 
 	// Extract binary if download is a ZIP archive
-	if data, err := ioutil.ReadFile(downloadPath); err == nil && len(data) >= 4 && data[0] == 'P' && data[1] == 'K' {
+	if data, err := os.ReadFile(downloadPath); err == nil && len(data) >= 4 && data[0] == 'P' && data[1] == 'K' {
 		zipReader, err := zip.NewReader(bytes.NewReader(data), int64(len(data)))
 		if err == nil {
 			extractedBin := filepath.Join(tempDir, "extracted_joss_binary")
@@ -258,7 +257,7 @@ func handleUpdateCommand(args []string) {
 						content, _ := io.ReadAll(rc)
 						rc.Close()
 						if len(content) > 0 {
-							ioutil.WriteFile(extractedBin, content, 0755)
+							os.WriteFile(extractedBin, content, 0755)
 							binaryToApply = extractedBin
 							found = true
 							break
@@ -274,7 +273,7 @@ func handleUpdateCommand(args []string) {
 							content, _ := io.ReadAll(rc)
 							rc.Close()
 							if len(content) > 0 {
-								ioutil.WriteFile(extractedBin, content, 0755)
+								os.WriteFile(extractedBin, content, 0755)
 								binaryToApply = extractedBin
 								break
 							}
@@ -388,11 +387,11 @@ func replaceExecutable(currentExe, newExe string) error {
 		}
 
 		// Copy new executable to currentExe location
-		input, err := ioutil.ReadFile(newExe)
+		input, err := os.ReadFile(newExe)
 		if err != nil {
 			return err
 		}
-		if err := ioutil.WriteFile(currentExe, input, 0755); err != nil {
+		if err := os.WriteFile(currentExe, input, 0755); err != nil {
 			// Rollback
 			os.Rename(oldExe, currentExe)
 			return fmt.Errorf("no se pudo escribir nuevo ejecutable: %w", err)
@@ -401,11 +400,11 @@ func replaceExecutable(currentExe, newExe string) error {
 	}
 
 	// Unix-like OS (Linux / macOS)
-	input, err := ioutil.ReadFile(newExe)
+	input, err := os.ReadFile(newExe)
 	if err != nil {
 		return err
 	}
-	return ioutil.WriteFile(currentExe, input, 0755)
+	return os.WriteFile(currentExe, input, 0755)
 }
 
 func cleanVersionTag(v string) string {

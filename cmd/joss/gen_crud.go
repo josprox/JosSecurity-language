@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
@@ -393,7 +392,7 @@ func generateFormFields(cols []ColumnSchema, relations []Relation, isEdit bool) 
 func updateNavbar(modelName string) {
 	// Try to find layouts/master.joss.html
 	path := filepath.Join("app", "views", "layouts", "master.joss.html")
-	content, err := ioutil.ReadFile(path)
+	content, err := os.ReadFile(path)
 	if err == nil {
 		html := string(content)
 
@@ -418,14 +417,14 @@ func updateNavbar(modelName string) {
 			return
 		}
 
-		ioutil.WriteFile(path, []byte(html), 0644)
+		os.WriteFile(path, []byte(html), 0644)
 		fmt.Printf("Updated navbar in layouts/master.joss.html with link to /%s\n", strings.ToLower(modelName))
 	}
 }
 
 func injectProtectedRoutes(modelName string) {
 	path := "routes.joss"
-	content, err := ioutil.ReadFile(path)
+	content, err := os.ReadFile(path)
 	if err != nil {
 		return
 	}
@@ -456,7 +455,7 @@ func injectProtectedRoutes(modelName string) {
 		lastEnd := strings.LastIndex(strContent, endMarker)
 		if lastEnd != -1 {
 			strContent = strContent[:lastEnd] + routes + strContent[lastEnd:]
-			ioutil.WriteFile(path, []byte(strContent), 0644)
+			os.WriteFile(path, []byte(strContent), 0644)
 			fmt.Println("Injected protected routes into 'auth' group.")
 			return
 		}
@@ -468,7 +467,7 @@ Router::middleware("auth")
 %sRouter::end()
 `, routes)
 
-	ioutil.WriteFile(path, []byte(strContent+newGroup), 0644)
+	os.WriteFile(path, []byte(strContent+newGroup), 0644)
 	fmt.Println("Created new 'auth' group with routes.")
 }
 
@@ -508,7 +507,7 @@ func removeCRUD(tableName string) {
 
 	// 5. Remove Routes
 	routesPath := "routes.joss"
-	content, err := ioutil.ReadFile(routesPath)
+	content, err := os.ReadFile(routesPath)
 	if err == nil {
 		lines := strings.Split(string(content), "\n")
 		var newLines []string
@@ -525,13 +524,13 @@ func removeCRUD(tableName string) {
 			}
 			newLines = append(newLines, line)
 		}
-		ioutil.WriteFile(routesPath, []byte(strings.Join(newLines, "\n")), 0644)
+		os.WriteFile(routesPath, []byte(strings.Join(newLines, "\n")), 0644)
 		fmt.Println("Cleaned routes.")
 	}
 
 	// 6. Remove Navbar Link
 	masterPath := filepath.Join("app", "views", "layouts", "master.joss.html")
-	content, err = ioutil.ReadFile(masterPath)
+	content, err = os.ReadFile(masterPath)
 	if err == nil {
 		lines := strings.Split(string(content), "\n")
 		var newLines []string
@@ -542,7 +541,7 @@ func removeCRUD(tableName string) {
 			}
 			newLines = append(newLines, line)
 		}
-		ioutil.WriteFile(masterPath, []byte(strings.Join(newLines, "\n")), 0644)
+		os.WriteFile(masterPath, []byte(strings.Join(newLines, "\n")), 0644)
 		fmt.Println("Cleaned navbar.")
 	}
 
