@@ -49,17 +49,22 @@ func hotReloadHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func notifyClients() {
+func notifyClientsTyped(msgType string, filePath string) {
 	hotReloadClientsMu.Lock()
 	defer hotReloadClientsMu.Unlock()
 
+	payload := fmt.Sprintf(`{"type":"%s","file":%q}`, msgType, filePath)
 	for conn := range hotReloadClients {
-		err := conn.WriteMessage(websocket.TextMessage, []byte("reload"))
+		err := conn.WriteMessage(websocket.TextMessage, []byte(payload))
 		if err != nil {
 			conn.Close()
 			delete(hotReloadClients, conn)
 		}
 	}
+}
+
+func notifyClients() {
+	notifyClientsTyped("soft_reload", "")
 }
 
 func watchChanges() {
@@ -105,14 +110,14 @@ func watchChanges() {
 			if lastNodeModulesHash != "" && currentNMHash != lastNodeModulesHash {
 				fmt.Println("[HotReload] 'node_modules' changed. Rescanning assets...")
 				core.GetAssetManager().ScanNodeModules()
-				notifyClients()
+				notifyClientsTyped("css", "node_modules")
 			}
 			lastNodeModulesHash = currentNMHash
 		} else if lastNodeModulesHash != "" {
 			// It existed, now it doesn't (Deleted)
 			fmt.Println("[HotReload] 'node_modules' deleted. Clearing assets...")
 			core.GetAssetManager().ScanNodeModules() // Will clear map
-			notifyClients()
+			notifyClientsTyped("css", "node_modules")
 			lastNodeModulesHash = ""
 		}
 
@@ -184,7 +189,7 @@ func reloadApp(changedFile string) {
 	if changedFile == "" || strings.HasSuffix(changedFile, ".scss") || strings.HasSuffix(changedFile, ".css") {
 		compileStyles()
 		if strings.HasSuffix(changedFile, ".scss") || strings.HasSuffix(changedFile, ".css") {
-			notifyClients()
+			notifyClientsTyped("css", changedFile)
 			return
 		}
 	}
@@ -194,14 +199,14 @@ func reloadApp(changedFile string) {
 		fmt.Println("[HotReload] Detectado cambio en dependencias (package.json). Escaneando assets...")
 		am := core.GetAssetManager()
 		am.ScanNodeModules()
-		notifyClients()
+		notifyClientsTyped("css", changedFile)
 		return
 	}
 
 	// 2. Views (HTML)
 	if strings.HasSuffix(changedFile, ".html") {
-		// Views are read from disk, so just notify
-		notifyClients()
+		// Views are read from disk, so just notify soft reload
+		notifyClientsTyped("soft_reload", changedFile)
 		return
 	}
 
@@ -209,7 +214,7 @@ func reloadApp(changedFile string) {
 	if strings.HasSuffix(changedFile, ".arb") {
 		fmt.Println("[HotReload] Translations changed. Reloading I18n...")
 		i18n.GlobalManager.Load(GlobalFileSystem)
-		notifyClients()
+		notifyClientsTyped("soft_reload", changedFile)
 		return
 	}
 
