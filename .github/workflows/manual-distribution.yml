@@ -70,6 +70,15 @@ jobs:
           channel: stable
           cache: true
 
+      - name: Verify Flutter/Dart SDK and prefetch deps
+        shell: pwsh
+        run: |
+          flutter --version
+          dart --version
+          flutter config --no-analytics
+          flutter doctor -v
+          flutter pub get
+
       - name: Set up Rust
         shell: pwsh
         run: |
