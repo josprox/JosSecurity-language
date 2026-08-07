@@ -10,11 +10,40 @@ $dist = Join-Path $root 'dist'
 $work = Join-Path $root '.joss-release-work'
 
 function Invoke-Checked {
-    param([string]$Label, [scriptblock]$Command)
+    param(
+        [string]$Label,
+        [scriptblock]$Command,
+        [string]$CommandText
+    )
+
+    $resolvedCommand = if ([string]::IsNullOrWhiteSpace($CommandText)) {
+        $Command.ToString().Trim()
+    } else {
+        $CommandText
+    }
+
     Write-Host "==> $Label" -ForegroundColor Cyan
-    & $Command
-    if ($LASTEXITCODE -ne 0) {
-        throw "$Label termino con codigo $LASTEXITCODE"
+    Write-Host "Comando: $resolvedCommand" -ForegroundColor DarkCyan
+
+    $capturedOutput = @()
+    $failedWithException = $false
+    try {
+        & $Command 2>&1 | Tee-Object -Variable capturedOutput
+    } catch {
+        $failedWithException = $true
+        $capturedOutput = @($capturedOutput) + @($_)
+    }
+
+    $exitCode = if ($null -ne $LASTEXITCODE) { $LASTEXITCODE } else { 0 }
+    if ($failedWithException -or $exitCode -ne 0) {
+        Write-Host "❌ Etapa fallida: $Label" -ForegroundColor Red
+        Write-Host "Comando fallido: $resolvedCommand" -ForegroundColor Red
+        Write-Host "Codigo de salida: $exitCode" -ForegroundColor Red
+        if ($capturedOutput.Count -gt 0) {
+            Write-Host "Salida capturada (stdout/stderr):" -ForegroundColor Yellow
+            $capturedOutput | ForEach-Object { Write-Host $_ }
+        }
+        throw "$Label termino con codigo $exitCode"
     }
 }
 
