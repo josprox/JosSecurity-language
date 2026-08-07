@@ -3,6 +3,7 @@ package core
 import (
 	"fmt"
 	"strings"
+	"time"
 )
 
 // executeUpdateMethod handles update operations for GranDB
@@ -116,4 +117,110 @@ func (r *Runtime) tableHasColumn(table, column string) bool {
 		}
 	}
 	return false
+}
+
+// executeIncrementMethod handles atomic .increment() and .decrement()
+func (r *Runtime) executeIncrementMethod(instance *Instance, args []interface{}, isDecrement bool) interface{} {
+	if r.GetDB() == nil {
+		panic("GranDB Error: No hay conexión a la base de datos configurada")
+	}
+	if len(args) == 0 {
+		panic("GranDB Error: increment/decrement requiere el nombre de la columna")
+	}
+
+	col := quoteIdentifier(r.applyColumnPrefix(args[0].(string)))
+	amount := int64(1)
+	if len(args) >= 2 {
+		amount = toInt64(args[1])
+	}
+
+	table := r.getTable(instance)
+	wheres := instance.Fields["_wheres"].([]string)
+	bindings := instance.Fields["_bindings"].([]interface{})
+
+	op := "+"
+	if isDecrement {
+		op = "-"
+	}
+
+	query := fmt.Sprintf("UPDATE %s SET %s = %s %s ?", table, col, col, op)
+	if len(wheres) > 0 {
+		query += " WHERE " + buildWhereClause(wheres)
+	}
+
+	resetReadState(instance)
+	execBindings := append([]interface{}{amount}, bindings...)
+	res, err := r.GetDB().Exec(query, execBindings...)
+	if err != nil {
+		panic(fmt.Sprintf("GranDB Error en increment/decrement: %v", err))
+	}
+	affected, _ := res.RowsAffected()
+	return affected
+}
+
+// executeUpdateOrInsertMethod handles .updateOrInsert($attributes, $values)
+func (r *Runtime) executeUpdateOrInsertMethod(instance *Instance, args []interface{}) interface{} {
+	if len(args) < 1 {
+		panic("GranDB Error: updateOrInsert requiere arreglo o mapa de atributos")
+	}
+
+	attributes, ok1 := args[0].(map[string]interface{})
+	if !ok1 {
+		panic("GranDB Error: primer argumento de updateOrInsert debe ser un mapa de atributos")
+	}
+
+	values := map[string]interface{}{}
+	if len(args) >= 2 {
+		if vMap, ok := args[1].(map[string]interface{}); ok {
+			values = vMap
+		}
+	}
+
+	// 1. Check if record exists
+	searchInst := &Instance{Class: instance.Class, Fields: make(map[string]interface{})}
+	searchInst.Fields["_wheres"] = []string{}
+	searchInst.Fields["_bindings"] = []interface{}{}
+	searchInst.Fields["_table"] = instance.Fields["_table"]
+
+	for k, v := range attributes {
+		r.executeGranDBMethod(searchInst, "where", []interface{}{k, v})
+	}
+
+	existsVal := r.executeExistsMethod(searchInst, false).(bool)
+
+	if existsVal {
+		// Update matching record
+		if len(values) > 0 {
+			updateInst := &Instance{Class: instance.Class, Fields: make(map[string]interface{})}
+			updateInst.Fields["_wheres"] = []string{}
+			updateInst.Fields["_bindings"] = []interface{}{}
+			updateInst.Fields["_table"] = instance.Fields["_table"]
+			for k, v := range attributes {
+				r.executeGranDBMethod(updateInst, "where", []interface{}{k, v})
+			}
+			return r.executeUpdateMethod(updateInst, []interface{}{values})
+		}
+		return true
+	}
+
+	// Insert new record combining attributes + values
+	insertData := make(map[string]interface{})
+	for k, v := range attributes {
+		insertData[k] = v
+	}
+	for k, v := range values {
+		insertData[k] = v
+	}
+
+	insertInst := &Instance{Class: instance.Class, Fields: make(map[string]interface{})}
+	insertInst.Fields["_table"] = instance.Fields["_table"]
+	return r.executeInsertMethod(insertInst, []interface{}{insertData}, false)
+}
+
+// executeTouchMethod handles .touch()
+func (r *Runtime) executeTouchMethod(instance *Instance, args []interface{}) interface{} {
+	now := time.Now().Format("2006-01-02 15:04:05")
+	return r.executeUpdateMethod(instance, []interface{}{
+		map[string]interface{}{"updated_at": now},
+	})
 }

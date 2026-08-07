@@ -18,6 +18,14 @@ func (p *Parser) parseExpression(precedence int) Expression {
 			return leftExp
 		}
 
+		if isExpressionContinuation(p.curToken.Type) {
+			infix := p.infixParseFns[p.curToken.Type]
+			if infix != nil {
+				leftExp = infix(leftExp)
+				continue
+			}
+		}
+
 		if p.peekTokenIs(NEWLINE) {
 			p.nextToken()
 			if !isExpressionContinuation(p.peekToken.Type) {

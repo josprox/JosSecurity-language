@@ -35,12 +35,23 @@ func (r *Runtime) RegisterNativeClasses() {
 	// GranDB
 	granDBMethods := []string{
 		"table", "select",
-		"where", "orWhere", "whereIn", "orWhereIn", "whereNotIn", "whereNull", "whereNotNull", "whereBetween", "whereNotBetween",
+		"where", "orWhere", "orwhere", "whereLike", "wherelike", "orWhereLike", "orwherelike",
+		"whereColumn", "wherecolumn", "orWhereColumn", "orwherecolumn",
+		"whereNot", "wherenot", "orWhereNot", "orwherenot",
+		"whereIn", "wherein", "orWhereIn", "orwherein", "whereNotIn", "wherenotin", "orWhereNotIn", "orwherenotin",
+		"whereNull", "wherenull", "orWhereNull", "orwherenull", "whereNotNull", "wherenotnull", "orWhereNotNull", "orwherenotnull",
+		"whereBetween", "wherebetween", "orWhereBetween", "orwherebetween", "whereNotBetween", "wherenotbetween", "orWhereNotBetween", "orwherenotbetween",
+		"whereDate", "wheredate", "orWhereDate", "orwheredate", "whereYear", "whereyear", "orWhereYear", "orwhereyear",
+		"whereMonth", "wheremonth", "orWhereMonth", "orwheremonth", "whereDay", "whereday", "orWhereDay", "orwhereday",
+		"whereTime", "wheretime", "orWhereTime", "orwheretime", "whereJsonContains", "wherejsoncontains", "orWhereJsonContains", "orwherejsoncontains",
 		"join", "innerJoin", "leftJoin", "rightJoin",
-		"get", "first", "find", "value", "pluck", "exists", "doesntExist",
+		"get", "first", "firstOrFail", "firstofail", "firstWhere", "firstwhere", "sole", "find", "findMany", "findmany", "findOrFail", "findorfail",
+		"value", "pluck", "exists", "doesntExist", "paginate", "chunk",
 		"count", "sum", "avg", "min", "max",
-		"insert", "insertGetId", "update", "delete", "deleteAll", "truncate",
-		"orderBy", "latest", "oldest", "inRandomOrder", "limit", "offset",
+		"insert", "insertGetId", "insertgetid", "update", "updateOrInsert", "updateorinsert", "upsert", "delete", "deleteAll", "truncate", "increment", "decrement", "touch",
+		"orderBy", "orderby", "orderByDesc", "orderbydesc", "orderByAsc", "orderbyasc", "latest", "oldest", "inRandomOrder", "reorder", "limit", "take", "offset", "skip", "forPage", "forpage",
+		"groupBy", "groupby", "having", "orHaving", "orhaving",
+		"when", "unless", "toSql", "tosql", "getBindings", "getbindings", "dump", "dd",
 	}
 	r.registerNative("GranDB", granDBMethods, (*Runtime).executeGranDBMethod)
 

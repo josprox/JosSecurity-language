@@ -50,16 +50,111 @@ func (r *Runtime) executeFirstMethod(instance *Instance, args []interface{}) int
 	return nil
 }
 
+// executeFirstOrFailMethod handles .firstOrFail()
+func (r *Runtime) executeFirstOrFailMethod(instance *Instance, args []interface{}) interface{} {
+	res := r.executeFirstMethod(instance, args)
+	if res == nil {
+		tbl := instance.Fields["_table"]
+		panic(fmt.Sprintf("GranDB Error: No se encontró ningún registro en la tabla %v.", tbl))
+	}
+	return res
+}
+
+// executePaginateMethod handles .paginate($perPage, $page)
+func (r *Runtime) executePaginateMethod(instance *Instance, args []interface{}) interface{} {
+	if r.GetDB() == nil {
+		panic("GranDB Error: No hay conexión a la base de datos configurada")
+	}
+	perPage := 15
+	page := 1
+	if len(args) >= 1 {
+		perPage = toInt(args[0])
+	}
+	if len(args) >= 2 {
+		page = toInt(args[1])
+	}
+	if page < 1 {
+		page = 1
+	}
+	if perPage < 1 {
+		perPage = 15
+	}
+
+	totalVal := r.executeCountMethod(instance, nil)
+	total := int(toInt64(totalVal))
+
+	offset := (page - 1) * perPage
+	instance.Fields["_limit"] = perPage
+	instance.Fields["_offset"] = offset
+
+	items := r.executeGetMethod(instance, nil)
+
+	lastPage := 1
+	if total > 0 {
+		lastPage = (total + perPage - 1) / perPage
+	}
+
+	return map[string]interface{}{
+		"data":         items,
+		"total":        total,
+		"per_page":     perPage,
+		"current_page": page,
+		"last_page":    lastPage,
+	}
+}
+
+// executeChunkMethod handles .chunk($size, func($items) { ... })
+func (r *Runtime) executeChunkMethod(instance *Instance, args []interface{}) interface{} {
+	if len(args) < 2 {
+		panic("GranDB Error: chunk() requiere tamaño y función de callback")
+	}
+	size := toInt(args[0])
+	if !r.isCallable(args[1]) || size <= 0 {
+		panic("GranDB Error: argumentos inválidos para chunk()")
+	}
+
+	page := 1
+	for {
+		instance.Fields["_limit"] = size
+		instance.Fields["_offset"] = (page - 1) * size
+		items := r.executeGetMethod(instance, nil).([]map[string]interface{})
+		if len(items) == 0 {
+			break
+		}
+		r.CallFunction(args[1], []interface{}{items})
+		if len(items) < size {
+			break
+		}
+		page++
+	}
+	return true
+}
+
 // executeCountMethod handles .count()
 func (r *Runtime) executeCountMethod(instance *Instance, args []interface{}) interface{} {
 	if r.GetDB() == nil {
 		panic("GranDB Error: No hay conexión a la base de datos configurada")
 	}
+
+	savedOrder := instance.Fields["_order"]
+	savedLimit := instance.Fields["_limit"]
+	savedOffset := instance.Fields["_offset"]
+
 	delete(instance.Fields, "_order")
 	delete(instance.Fields, "_limit")
 	delete(instance.Fields, "_offset")
+
 	query, bindings := r.buildSelectQuery(instance, "COUNT(*)")
-	resetReadState(instance)
+
+	if savedOrder != nil {
+		instance.Fields["_order"] = savedOrder
+	}
+	if savedLimit != nil {
+		instance.Fields["_limit"] = savedLimit
+	}
+	if savedOffset != nil {
+		instance.Fields["_offset"] = savedOffset
+	}
 
 	var count int
 	err := r.GetDB().QueryRow(query, bindings...).Scan(&count)
@@ -144,13 +239,27 @@ func (r *Runtime) executeAggregateMethod(instance *Instance, method string, args
 		return nil
 	}
 
-	fn := strings.ToUpper(method)
-	column := quoteIdentifier(r.applyColumnPrefix(fmt.Sprintf("%v", args[0])))
+	savedOrder := instance.Fields["_order"]
+	savedLimit := instance.Fields["_limit"]
+	savedOffset := instance.Fields["_offset"]
+
 	delete(instance.Fields, "_order")
 	delete(instance.Fields, "_limit")
 	delete(instance.Fields, "_offset")
+
+	fn := strings.ToUpper(method)
+	column := quoteIdentifier(r.applyColumnPrefix(fmt.Sprintf("%v", args[0])))
 	query, bindings := r.buildSelectQuery(instance, fmt.Sprintf("%s(%s) as aggregate_value", fn, column))
-	resetReadState(instance)
+
+	if savedOrder != nil {
+		instance.Fields["_order"] = savedOrder
+	}
+	if savedLimit != nil {
+		instance.Fields["_limit"] = savedLimit
+	}
+	if savedOffset != nil {
+		instance.Fields["_offset"] = savedOffset
+	}
 
 	var value sql.NullFloat64
 	err := r.GetDB().QueryRow(query, bindings...).Scan(&value)
@@ -161,4 +270,39 @@ func (r *Runtime) executeAggregateMethod(instance *Instance, method string, args
 		return nil
 	}
 	return value.Float64
+}
+
+// executeSoleMethod handles .sole() (returns 1 item or panics if count != 1)
+func (r *Runtime) executeSoleMethod(instance *Instance, args []interface{}) interface{} {
+	items := r.executeGetMethod(instance, nil).([]map[string]interface{})
+	if len(items) == 0 {
+		panic("GranDB Error en sole(): No se encontró ningún registro para el criterio.")
+	}
+	if len(items) > 1 {
+		panic(fmt.Sprintf("GranDB Error en sole(): Se encontraron %d registros, se esperaba exactamente 1.", len(items)))
+	}
+	return items[0]
+}
+
+// executeFindManyMethod handles .findMany([id1, id2, ...])
+func (r *Runtime) executeFindManyMethod(instance *Instance, args []interface{}) interface{} {
+	if len(args) == 0 {
+		return []map[string]interface{}{}
+	}
+	ids := toInterfaceSlice(args[0])
+	return r.executeGranDBMethod(instance, "wherein", []interface{}{"id", ids}).([]map[string]interface{})
+}
+
+// executeFindOrFailMethod handles .findOrFail($id)
+func (r *Runtime) executeFindOrFailMethod(instance *Instance, args []interface{}) interface{} {
+	res := r.executeFindMethod(instance, args)
+	if res == nil {
+		tbl := instance.Fields["_table"]
+		idVal := ""
+		if len(args) > 0 {
+			idVal = fmt.Sprintf("%v", args[0])
+		}
+		panic(fmt.Sprintf("GranDB Error: No se encontró ningún registro con ID %v en la tabla %v.", idVal, tbl))
+	}
+	return res
 }

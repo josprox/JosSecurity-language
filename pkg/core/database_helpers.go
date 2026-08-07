@@ -161,6 +161,14 @@ func (r *Runtime) buildSelectQuery(instance *Instance, sel string) (string, []in
 		query += " WHERE " + buildWhereClause(wheres)
 	}
 
+	if groupBy, ok := instance.Fields["_groupBy"]; ok {
+		query += " GROUP BY " + groupBy.(string)
+	}
+
+	if having, ok := instance.Fields["_having"]; ok {
+		query += " HAVING " + buildWhereClause(having.([]string))
+	}
+
 	if order, ok := instance.Fields["_order"]; ok {
 		query += " ORDER BY " + order.(string)
 	}
@@ -285,4 +293,17 @@ func (r *Runtime) pluralize(s string) string {
 
 func isVowel(c byte) bool {
 	return c == 'a' || c == 'e' || c == 'i' || c == 'o' || c == 'u'
+}
+
+func toInt64(val interface{}) int64 {
+	switch v := val.(type) {
+	case int64:
+		return v
+	case int:
+		return int64(v)
+	case float64:
+		return int64(v)
+	default:
+		return 0
+	}
 }

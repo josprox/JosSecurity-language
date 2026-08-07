@@ -3,6 +3,8 @@ package core
 import (
 	"fmt"
 	"strings"
+
+	"github.com/jossecurity/joss/pkg/parser"
 )
 
 // GranDB Implementation
@@ -22,31 +24,52 @@ func (r *Runtime) executeGranDBMethod(instance *Instance, method string, args []
 		instance.Fields["_table"] = ""
 	}
 
-	switch method {
+	methodLower := strings.ToLower(method)
+
+	switch methodLower {
+	case "when":
+		if len(args) >= 2 {
+			condition := isTruthy(args[0])
+			if condition {
+				if r.isCallable(args[1]) {
+					r.CallFunction(args[1], []interface{}{instance, args[0]})
+				}
+			} else if len(args) >= 3 {
+				if r.isCallable(args[2]) {
+					r.CallFunction(args[2], []interface{}{instance, args[0]})
+				}
+			}
+		}
+		return instance
+
+	case "unless":
+		if len(args) >= 2 {
+			condition := isTruthy(args[0])
+			if !condition {
+				if r.isCallable(args[1]) {
+					r.CallFunction(args[1], []interface{}{instance, args[0]})
+				}
+			}
+		}
+		return instance
+
 	case "table":
 		if len(args) > 0 {
-			tableName, ok := args[0].(string)
-			if !ok {
-				panic(fmt.Sprintf("GranDB Error: table() expects string, got %T", args[0]))
-			}
+			tableName := fmt.Sprintf("%v", args[0])
 			instance.Fields["_table"] = quoteIdentifier(r.applyTablePrefix(tableName))
 		}
-		return instance // Return this for chaining
+		return instance
 
 	case "select":
 		if len(args) > 0 {
 			if cols, ok := args[0].(string); ok {
-				// Handle single string "table.col" or "col"
 				instance.Fields["_select"] = cols
 			} else if cols, ok := args[0].([]interface{}); ok {
-				// Handle array of columns
 				strCols := []string{}
 				for _, c := range cols {
 					colStr := fmt.Sprintf("%v", c)
-					// Handle "table.col as alias"
 					if strings.Contains(strings.ToLower(colStr), " as ") {
-						parts := strings.Split(colStr, " ") // simplistic split
-						// Try to find the part with "."
+						parts := strings.Split(colStr, " ")
 						for i, p := range parts {
 							if strings.Contains(p, ".") {
 								parts[i] = r.applyColumnPrefix(p)
@@ -62,17 +85,44 @@ func (r *Runtime) executeGranDBMethod(instance *Instance, method string, args []
 		}
 		return instance
 
-	case "where":
-		// Support both old and new API
-		// Old API: where("json") - uses tabla, comparar, comparable properties
-		// New API: where(col, val) or where(col, op, val) - fluent builder
+	case "where", "orwhere":
+		isOr := methodLower == "orwhere"
+		prefix := ""
+		if isOr {
+			prefix = "OR "
+		}
 
 		if len(args) == 1 {
-			// Old API: where("json") or where("array")
-			format := args[0].(string)
+			if r.isCallable(args[0]) {
+				subInst := &Instance{Class: instance.Class, Fields: make(map[string]interface{})}
+				subInst.Fields["_wheres"] = []string{}
+				subInst.Fields["_bindings"] = []interface{}{}
+				subInst.Fields["_table"] = instance.Fields["_table"]
 
-			// Use legacy properties
-			// Use getTable helper
+				r.CallFunction(args[0], []interface{}{subInst})
+
+				subWheres := subInst.Fields["_wheres"].([]string)
+				subBindings := subInst.Fields["_bindings"].([]interface{})
+
+				if len(subWheres) > 0 {
+					wheres := instance.Fields["_wheres"].([]string)
+					bindings := instance.Fields["_bindings"].([]interface{})
+
+					clause := fmt.Sprintf("%s(%s)", prefix, buildWhereClause(subWheres))
+					wheres = append(wheres, clause)
+					bindings = append(bindings, subBindings...)
+
+					instance.Fields["_wheres"] = wheres
+					instance.Fields["_bindings"] = bindings
+				}
+				return instance
+			}
+
+			format, isStr := args[0].(string)
+			if !isStr {
+				return instance
+			}
+
 			table := r.getTable(instance)
 			col := instance.Fields["comparar"]
 			val := instance.Fields["comparable"]
@@ -89,27 +139,25 @@ func (r *Runtime) executeGranDBMethod(instance *Instance, method string, args []
 			}
 			defer rows.Close()
 
-			// Return based on format
 			if format == "json" {
 				return rowsToJSON(rows)
 			}
-			return rowsToJSON(rows) // Default to JSON for legacy where()
+			return rowsToJSON(rows)
 		}
 
-		// New fluent builder API
 		wheres := instance.Fields["_wheres"].([]string)
 		bindings := instance.Fields["_bindings"].([]interface{})
 
 		if len(args) == 2 {
-			col := quoteIdentifier(r.applyColumnPrefix(args[0].(string)))
+			col := quoteIdentifier(r.applyColumnPrefix(fmt.Sprintf("%v", args[0])))
 			val := args[1]
-			wheres = append(wheres, fmt.Sprintf("%s = ?", col))
+			wheres = append(wheres, fmt.Sprintf("%s%s = ?", prefix, col))
 			bindings = append(bindings, val)
 		} else if len(args) == 3 {
-			col := quoteIdentifier(r.applyColumnPrefix(args[0].(string)))
-			op := args[1].(string)
+			col := quoteIdentifier(r.applyColumnPrefix(fmt.Sprintf("%v", args[0])))
+			op := fmt.Sprintf("%v", args[1])
 			val := args[2]
-			wheres = append(wheres, fmt.Sprintf("%s %s ?", col, op))
+			wheres = append(wheres, fmt.Sprintf("%s%s %s ?", prefix, col, op))
 			bindings = append(bindings, val)
 		}
 
@@ -117,44 +165,81 @@ func (r *Runtime) executeGranDBMethod(instance *Instance, method string, args []
 		instance.Fields["_bindings"] = bindings
 		return instance
 
-	case "orWhere":
-		wheres := instance.Fields["_wheres"].([]string)
-		bindings := instance.Fields["_bindings"].([]interface{})
-
-		if len(args) == 2 {
-			col := quoteIdentifier(r.applyColumnPrefix(args[0].(string)))
-			val := args[1]
-			wheres = append(wheres, fmt.Sprintf("OR %s = ?", col))
-			bindings = append(bindings, val)
-		} else if len(args) == 3 {
-			col := quoteIdentifier(r.applyColumnPrefix(args[0].(string)))
-			op := args[1].(string)
-			val := args[2]
-			wheres = append(wheres, fmt.Sprintf("OR %s %s ?", col, op))
-			bindings = append(bindings, val)
+	case "wherecolumn", "orwherecolumn":
+		prefix := ""
+		if methodLower == "orwherecolumn" {
+			prefix = "OR "
 		}
-
-		instance.Fields["_wheres"] = wheres
-		instance.Fields["_bindings"] = bindings
-		return instance
-
-	case "whereIn", "orWhereIn", "whereNotIn":
 		if len(args) >= 2 {
-			col := quoteIdentifier(r.applyColumnPrefix(args[0].(string)))
+			col1 := quoteIdentifier(r.applyColumnPrefix(fmt.Sprintf("%v", args[0])))
+			col2 := quoteIdentifier(r.applyColumnPrefix(fmt.Sprintf("%v", args[1])))
+			op := "="
+			if len(args) >= 3 {
+				op = fmt.Sprintf("%v", args[1])
+				col2 = quoteIdentifier(r.applyColumnPrefix(fmt.Sprintf("%v", args[2])))
+			}
+			wheres := instance.Fields["_wheres"].([]string)
+			wheres = append(wheres, fmt.Sprintf("%s%s %s %s", prefix, col1, op, col2))
+			instance.Fields["_wheres"] = wheres
+		}
+		return instance
+
+	case "wherenot", "orwherenot":
+		prefix := ""
+		if methodLower == "orwherenot" {
+			prefix = "OR "
+		}
+		if len(args) >= 2 {
+			col := quoteIdentifier(r.applyColumnPrefix(fmt.Sprintf("%v", args[0])))
+			val := args[1]
+			wheres := instance.Fields["_wheres"].([]string)
+			bindings := instance.Fields["_bindings"].([]interface{})
+			wheres = append(wheres, fmt.Sprintf("%sNOT (%s = ?)", prefix, col))
+			bindings = append(bindings, val)
+			instance.Fields["_wheres"] = wheres
+			instance.Fields["_bindings"] = bindings
+		}
+		return instance
+
+	case "wherelike", "orwherelike":
+		prefix := ""
+		if methodLower == "orwherelike" {
+			prefix = "OR "
+		}
+		if len(args) >= 2 {
+			col := quoteIdentifier(r.applyColumnPrefix(fmt.Sprintf("%v", args[0])))
+			val := fmt.Sprintf("%v", args[1])
+			if !strings.Contains(val, "%") {
+				val = "%" + val + "%"
+			}
+			wheres := instance.Fields["_wheres"].([]string)
+			bindings := instance.Fields["_bindings"].([]interface{})
+			wheres = append(wheres, fmt.Sprintf("%s%s LIKE ?", prefix, col))
+			bindings = append(bindings, val)
+			instance.Fields["_wheres"] = wheres
+			instance.Fields["_bindings"] = bindings
+		}
+		return instance
+
+	case "wherein", "orwherein", "wherenotin", "orwherenotin":
+		if len(args) >= 2 {
+			col := quoteIdentifier(r.applyColumnPrefix(fmt.Sprintf("%v", args[0])))
 			values := toInterfaceSlice(args[1])
 			wheres := instance.Fields["_wheres"].([]string)
 			bindings := instance.Fields["_bindings"].([]interface{})
-			operator := "IN"
+
 			prefix := ""
-			if method == "orWhereIn" {
+			if strings.HasPrefix(methodLower, "or") {
 				prefix = "OR "
 			}
-			if method == "whereNotIn" {
+			operator := "IN"
+			if strings.Contains(methodLower, "notin") {
 				operator = "NOT IN"
 			}
+
 			if len(values) == 0 {
 				emptyClause := "1 = 0"
-				if operator == "NOT IN" {
+				if strings.Contains(methodLower, "notin") {
 					emptyClause = "1 = 1"
 				}
 				wheres = append(wheres, prefix+emptyClause)
@@ -167,31 +252,39 @@ func (r *Runtime) executeGranDBMethod(instance *Instance, method string, args []
 		}
 		return instance
 
-	case "whereNull", "whereNotNull":
+	case "wherenull", "orwherenull", "wherenotnull", "orwherenotnull":
 		if len(args) >= 1 {
-			col := quoteIdentifier(r.applyColumnPrefix(args[0].(string)))
+			col := quoteIdentifier(r.applyColumnPrefix(fmt.Sprintf("%v", args[0])))
+			prefix := ""
+			if strings.HasPrefix(methodLower, "or") {
+				prefix = "OR "
+			}
 			op := "IS NULL"
-			if method == "whereNotNull" {
+			if strings.Contains(methodLower, "notnull") {
 				op = "IS NOT NULL"
 			}
 			wheres := instance.Fields["_wheres"].([]string)
-			wheres = append(wheres, fmt.Sprintf("%s %s", col, op))
+			wheres = append(wheres, fmt.Sprintf("%s%s %s", prefix, col, op))
 			instance.Fields["_wheres"] = wheres
 		}
 		return instance
 
-	case "whereBetween", "whereNotBetween":
+	case "wherebetween", "orwherebetween", "wherenotbetween", "orwherenotbetween":
 		if len(args) >= 2 {
+			col := quoteIdentifier(r.applyColumnPrefix(fmt.Sprintf("%v", args[0])))
 			values := toInterfaceSlice(args[1])
 			if len(values) >= 2 {
-				col := quoteIdentifier(r.applyColumnPrefix(args[0].(string)))
+				prefix := ""
+				if strings.HasPrefix(methodLower, "or") {
+					prefix = "OR "
+				}
 				op := "BETWEEN"
-				if method == "whereNotBetween" {
+				if strings.Contains(methodLower, "notbetween") {
 					op = "NOT BETWEEN"
 				}
 				wheres := instance.Fields["_wheres"].([]string)
 				bindings := instance.Fields["_bindings"].([]interface{})
-				wheres = append(wheres, fmt.Sprintf("%s %s ? AND ?", col, op))
+				wheres = append(wheres, fmt.Sprintf("%s%s %s ? AND ?", prefix, col, op))
 				bindings = append(bindings, values[0], values[1])
 				instance.Fields["_wheres"] = wheres
 				instance.Fields["_bindings"] = bindings
@@ -199,12 +292,55 @@ func (r *Runtime) executeGranDBMethod(instance *Instance, method string, args []
 		}
 		return instance
 
-	case "join", "innerJoin":
+	case "wheredate", "orwheredate", "whereyear", "orwhereyear", "wheremonth", "orwheremonth", "whereday", "orwhereday", "wheretime", "orwheretime":
+		if len(args) >= 2 {
+			col := quoteIdentifier(r.applyColumnPrefix(fmt.Sprintf("%v", args[0])))
+			prefix := ""
+			if strings.HasPrefix(methodLower, "or") {
+				prefix = "OR "
+			}
+			fn := "DATE"
+			if strings.Contains(methodLower, "year") {
+				fn = "YEAR"
+			} else if strings.Contains(methodLower, "month") {
+				fn = "MONTH"
+			} else if strings.Contains(methodLower, "day") {
+				fn = "DAY"
+			} else if strings.Contains(methodLower, "time") {
+				fn = "TIME"
+			}
+			wheres := instance.Fields["_wheres"].([]string)
+			bindings := instance.Fields["_bindings"].([]interface{})
+			wheres = append(wheres, fmt.Sprintf("%s%s(%s) = ?", prefix, fn, col))
+			bindings = append(bindings, args[1])
+			instance.Fields["_wheres"] = wheres
+			instance.Fields["_bindings"] = bindings
+		}
+		return instance
+
+	case "wherejsoncontains", "orwherejsoncontains":
+		if len(args) >= 2 {
+			col := quoteIdentifier(r.applyColumnPrefix(fmt.Sprintf("%v", args[0])))
+			val := args[1]
+			prefix := ""
+			if strings.HasPrefix(methodLower, "or") {
+				prefix = "OR "
+			}
+			wheres := instance.Fields["_wheres"].([]string)
+			bindings := instance.Fields["_bindings"].([]interface{})
+			wheres = append(wheres, fmt.Sprintf("%sJSON_CONTAINS(%s, ?)", prefix, col))
+			bindings = append(bindings, val)
+			instance.Fields["_wheres"] = wheres
+			instance.Fields["_bindings"] = bindings
+		}
+		return instance
+
+	case "join", "innerjoin":
 		if len(args) >= 4 {
-			table := r.applyTablePrefix(args[0].(string))
-			first := r.applyColumnPrefix(args[1].(string))
-			op := args[2].(string)
-			second := r.applyColumnPrefix(args[3].(string))
+			table := r.applyTablePrefix(fmt.Sprintf("%v", args[0]))
+			first := r.applyColumnPrefix(fmt.Sprintf("%v", args[1]))
+			op := fmt.Sprintf("%v", args[2])
+			second := r.applyColumnPrefix(fmt.Sprintf("%v", args[3]))
 			if _, ok := instance.Fields["_joins"]; !ok {
 				instance.Fields["_joins"] = []string{}
 			}
@@ -213,12 +349,12 @@ func (r *Runtime) executeGranDBMethod(instance *Instance, method string, args []
 		}
 		return instance
 
-	case "leftJoin":
+	case "leftjoin":
 		if len(args) >= 4 {
-			table := r.applyTablePrefix(args[0].(string))
-			first := r.applyColumnPrefix(args[1].(string))
-			op := args[2].(string)
-			second := r.applyColumnPrefix(args[3].(string))
+			table := r.applyTablePrefix(fmt.Sprintf("%v", args[0]))
+			first := r.applyColumnPrefix(fmt.Sprintf("%v", args[1]))
+			op := fmt.Sprintf("%v", args[2])
+			second := r.applyColumnPrefix(fmt.Sprintf("%v", args[3]))
 			if _, ok := instance.Fields["_joins"]; !ok {
 				instance.Fields["_joins"] = []string{}
 			}
@@ -227,12 +363,12 @@ func (r *Runtime) executeGranDBMethod(instance *Instance, method string, args []
 		}
 		return instance
 
-	case "rightJoin":
+	case "rightjoin":
 		if len(args) >= 4 {
-			table := r.applyTablePrefix(args[0].(string))
-			first := r.applyColumnPrefix(args[1].(string))
-			op := args[2].(string)
-			second := r.applyColumnPrefix(args[3].(string))
+			table := r.applyTablePrefix(fmt.Sprintf("%v", args[0]))
+			first := r.applyColumnPrefix(fmt.Sprintf("%v", args[1]))
+			op := fmt.Sprintf("%v", args[2])
+			second := r.applyColumnPrefix(fmt.Sprintf("%v", args[3]))
 			if _, ok := instance.Fields["_joins"]; !ok {
 				instance.Fields["_joins"] = []string{}
 			}
@@ -241,10 +377,41 @@ func (r *Runtime) executeGranDBMethod(instance *Instance, method string, args []
 		}
 		return instance
 
-	case "orderBy":
+	case "groupby":
+		if len(args) > 0 {
+			cols := []string{}
+			for _, a := range args {
+				cols = append(cols, quoteIdentifier(r.applyColumnPrefix(fmt.Sprintf("%v", a))))
+			}
+			instance.Fields["_groupBy"] = strings.Join(cols, ", ")
+		}
+		return instance
+
+	case "having", "orhaving":
+		if len(args) >= 3 {
+			col := quoteIdentifier(r.applyColumnPrefix(fmt.Sprintf("%v", args[0])))
+			op := fmt.Sprintf("%v", args[1])
+			val := args[2]
+			prefix := ""
+			if methodLower == "orhaving" {
+				prefix = "OR "
+			}
+			bindings := instance.Fields["_bindings"].([]interface{})
+			if _, ok := instance.Fields["_having"]; !ok {
+				instance.Fields["_having"] = []string{}
+			}
+			having := instance.Fields["_having"].([]string)
+			having = append(having, fmt.Sprintf("%s%s %s ?", prefix, col, op))
+			instance.Fields["_having"] = having
+			bindings = append(bindings, val)
+			instance.Fields["_bindings"] = bindings
+		}
+		return instance
+
+	case "orderby":
 		if len(args) >= 2 {
-			col := quoteIdentifier(r.applyColumnPrefix(args[0].(string)))
-			dir := strings.ToUpper(args[1].(string))
+			col := quoteIdentifier(r.applyColumnPrefix(fmt.Sprintf("%v", args[0])))
+			dir := strings.ToUpper(fmt.Sprintf("%v", args[1]))
 			if dir != "ASC" && dir != "DESC" {
 				dir = "ASC"
 			}
@@ -252,19 +419,37 @@ func (r *Runtime) executeGranDBMethod(instance *Instance, method string, args []
 		}
 		return instance
 
+	case "orderbydesc":
+		if len(args) >= 1 {
+			col := quoteIdentifier(r.applyColumnPrefix(fmt.Sprintf("%v", args[0])))
+			instance.Fields["_order"] = fmt.Sprintf("%s DESC", col)
+		}
+		return instance
+
+	case "orderbyasc":
+		if len(args) >= 1 {
+			col := quoteIdentifier(r.applyColumnPrefix(fmt.Sprintf("%v", args[0])))
+			instance.Fields["_order"] = fmt.Sprintf("%s ASC", col)
+		}
+		return instance
+
+	case "reorder":
+		delete(instance.Fields, "_order")
+		return instance
+
 	case "latest", "oldest":
 		col := "created_at"
 		if len(args) >= 1 {
-			col = args[0].(string)
+			col = fmt.Sprintf("%v", args[0])
 		}
 		dir := "DESC"
-		if method == "oldest" {
+		if methodLower == "oldest" {
 			dir = "ASC"
 		}
 		instance.Fields["_order"] = fmt.Sprintf("%s %s", quoteIdentifier(r.applyColumnPrefix(col)), dir)
 		return instance
 
-	case "inRandomOrder":
+	case "inrandomorder":
 		if r.Env != nil && strings.ToLower(r.Env["DB"]) == "sqlite" {
 			instance.Fields["_order"] = "RANDOM()"
 		} else {
@@ -272,44 +457,100 @@ func (r *Runtime) executeGranDBMethod(instance *Instance, method string, args []
 		}
 		return instance
 
-	case "limit":
+	case "limit", "take":
 		if len(args) >= 1 {
-			if limit, ok := args[0].(int); ok {
-				instance.Fields["_limit"] = limit
-			} else if limit, ok := args[0].(int64); ok {
-				instance.Fields["_limit"] = int(limit)
-			} else if limit, ok := args[0].(float64); ok {
-				instance.Fields["_limit"] = int(limit)
-			}
+			instance.Fields["_limit"] = toInt(args[0])
 		}
 		return instance
 
-	case "offset":
+	case "offset", "skip":
 		if len(args) >= 1 {
-			if offset, ok := args[0].(int); ok {
-				instance.Fields["_offset"] = offset
-			} else if offset, ok := args[0].(int64); ok {
-				instance.Fields["_offset"] = int(offset)
-			} else if offset, ok := args[0].(float64); ok {
-				instance.Fields["_offset"] = int(offset)
-			}
+			instance.Fields["_offset"] = toInt(args[0])
 		}
 		return instance
+
+	case "forpage":
+		if len(args) >= 2 {
+			page := toInt(args[0])
+			perPage := toInt(args[1])
+			if page < 1 {
+				page = 1
+			}
+			if perPage < 1 {
+				perPage = 15
+			}
+			instance.Fields["_limit"] = perPage
+			instance.Fields["_offset"] = (page - 1) * perPage
+		}
+		return instance
+
+	case "tosql":
+		sel := "*"
+		if s, ok := instance.Fields["_select"].(string); ok {
+			sel = s
+		}
+		sqlStr, _ := r.buildSelectQuery(instance, sel)
+		return sqlStr
+
+	case "getbindings":
+		return instance.Fields["_bindings"].([]interface{})
+
+	case "dump":
+		sel := "*"
+		if s, ok := instance.Fields["_select"].(string); ok {
+			sel = s
+		}
+		sqlStr, bindings := r.buildSelectQuery(instance, sel)
+		fmt.Printf("[GranDB Dump] SQL: %s | Bindings: %v\n", sqlStr, bindings)
+		return instance
+
+	case "dd":
+		sel := "*"
+		if s, ok := instance.Fields["_select"].(string); ok {
+			sel = s
+		}
+		sqlStr, bindings := r.buildSelectQuery(instance, sel)
+		panic(fmt.Sprintf("[GranDB DD] SQL: %s | Bindings: %v", sqlStr, bindings))
 
 	case "get":
 		return r.executeGetMethod(instance, args)
+
+	case "paginate":
+		return r.executePaginateMethod(instance, args)
+
+	case "chunk":
+		return r.executeChunkMethod(instance, args)
 
 	case "count":
 		return r.executeCountMethod(instance, args)
 
 	case "sum", "avg", "min", "max":
-		return r.executeAggregateMethod(instance, method, args)
+		return r.executeAggregateMethod(instance, methodLower, args)
 
 	case "first":
 		return r.executeFirstMethod(instance, args)
 
+	case "firstwhere":
+		if len(args) >= 2 {
+			r.executeGranDBMethod(instance, "where", args)
+			return r.executeFirstMethod(instance, nil)
+		}
+		return nil
+
+	case "sole":
+		return r.executeSoleMethod(instance, args)
+
+	case "firstorfail":
+		return r.executeFirstOrFailMethod(instance, args)
+
 	case "find":
 		return r.executeFindMethod(instance, args)
+
+	case "findmany":
+		return r.executeFindManyMethod(instance, args)
+
+	case "findorfail":
+		return r.executeFindOrFailMethod(instance, args)
 
 	case "value":
 		return r.executeValueMethod(instance, args)
@@ -320,27 +561,52 @@ func (r *Runtime) executeGranDBMethod(instance *Instance, method string, args []
 	case "exists":
 		return r.executeExistsMethod(instance, false)
 
-	case "doesntExist":
+	case "doesntexist":
 		return r.executeExistsMethod(instance, true)
 
 	case "insert":
 		return r.executeInsertMethod(instance, args, false)
 
-	case "insertGetId":
+	case "insertgetid":
 		return r.executeInsertMethod(instance, args, true)
 
 	case "update":
 		return r.executeUpdateMethod(instance, args)
 
+	case "updateorinsert":
+		return r.executeUpdateOrInsertMethod(instance, args)
+
+	case "touch":
+		return r.executeTouchMethod(instance, args)
+
+	case "increment":
+		return r.executeIncrementMethod(instance, args, false)
+
+	case "decrement":
+		return r.executeIncrementMethod(instance, args, true)
+
 	case "delete":
 		return r.executeDeleteMethod(instance)
 
-	case "deleteAll":
+	case "deleteall":
 		return r.executeDeleteAllMethod(instance)
 
 	case "truncate":
 		return r.executeTruncateMethod(instance)
 
+	default:
+		panic(fmt.Sprintf("GranDB Error: Método '%s' no encontrado", method))
 	}
-	return nil
+}
+
+func (r *Runtime) isCallable(val interface{}) bool {
+	if val == nil {
+		return false
+	}
+	switch val.(type) {
+	case *CapturedFunction, *parser.FunctionLiteral, *parser.MethodStatement, *BoundMethod:
+		return true
+	default:
+		return false
+	}
 }
