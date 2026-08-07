@@ -1,4 +1,4 @@
-# Joss Language Support 3.5
+# Joss Language Support 3.6
 
 Extensión oficial de Joss para VS Code. Incluye gramáticas para `.joss` y `.joss.html`, snippets y un servidor de lenguaje TypeScript.
 

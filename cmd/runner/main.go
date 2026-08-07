@@ -110,6 +110,7 @@ func main() {
 
 		r := core.NewRuntime()
 		r.LoadEnv(memFS)
+		r.PreloadVFSAppFiles(memFS, "app")
 
 		// Execute main.joss
 		content, err := memFS.Open("main.joss")

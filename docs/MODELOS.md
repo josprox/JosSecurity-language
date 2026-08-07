@@ -9,6 +9,16 @@ $products = $query->where("active", true)->orderBy("created_at", "DESC")->get()
 
 El prefijo de `env.joss` se aplica automáticamente a nombres sin prefijo.
 
+## Subdirectorios y Pre-carga Automática
+
+Los modelos pueden organizarse en subcarpetas temáticas dentro de `app/models/` (por ejemplo, `app/models/auth/User.joss`, `app/models/shop/Product.joss`). El motor de Joss escanea y precarga recursivamente todo el árbol de modelos al iniciar la aplicación.
+
+Para generar un modelo en un subdirectorio:
+```bash
+joss make:model auth/User
+```
+El CLI generará `app/models/auth/User.joss` declarando de forma limpia `class User extends GranDB`.
+
 ## Lectura
 
 ```joss

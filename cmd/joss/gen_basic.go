@@ -7,9 +7,24 @@ import (
 	"strings"
 )
 
+func sanitizeClassName(name string) string {
+	base := filepath.Base(name)
+	base = strings.TrimSuffix(base, ".joss.html")
+	base = strings.TrimSuffix(base, ".joss")
+	base = strings.TrimSuffix(base, ".html")
+	base = strings.ReplaceAll(base, "-", "_")
+	if len(base) > 0 {
+		base = strings.ToUpper(base[:1]) + base[1:]
+	}
+	return base
+}
+
 func createController(name string) {
 	path := filepath.Join("app", "controllers", name+".joss")
 	os.MkdirAll(filepath.Dir(path), 0755)
+
+	className := sanitizeClassName(name)
+	viewPrefix := strings.ToLower(strings.TrimSuffix(className, "Controller"))
 
 	var content string
 	if isConsoleProject() {
@@ -17,13 +32,13 @@ func createController(name string) {
     func index() {
         print("Hello from %s")
     }
-}`, name, name)
+}`, className, className)
 	} else {
 		content = fmt.Sprintf(`class %s {
     func index() {
         return View::render("%s/index")
     }
-}`, name, strings.ToLower(name))
+}`, className, viewPrefix)
 	}
 
 	writeGenFile(path, content)
@@ -33,13 +48,14 @@ func createModel(name string) {
 	path := filepath.Join("app", "models", name+".joss")
 	os.MkdirAll(filepath.Dir(path), 0755)
 
+	className := sanitizeClassName(name)
 	_, _, _, _, _, _, prefix := loadEnvConfig()
 	// Fix: singularize first to avoid double pluralization
-	tableName := prefix + strings.ToLower(pluralize(singularize(name)))
+	tableName := prefix + strings.ToLower(pluralize(singularize(className)))
 
 	content := fmt.Sprintf(`class %s extends GranDB {
     $tabla = "%s"
-}`, name, tableName)
+}`, className, tableName)
 
 	writeGenFile(path, content)
 }
@@ -76,6 +92,9 @@ func createMiddleware(name string) {
 	path := filepath.Join("app", "middleware", name+".joss")
 	os.MkdirAll(filepath.Dir(path), 0755)
 
+	className := sanitizeClassName(name)
+	middlewareKey := strings.ToLower(className)
+
 	content := fmt.Sprintf(`// Middleware: %s
 Router::registerMiddleware("%s", func() {
     // Middleware Logic
@@ -85,7 +104,7 @@ Router::registerMiddleware("%s", func() {
     // $auth = Request::header("Authorization")
     // (!$auth) ? { return Response::json({"error": "Unauthorized"}, 401) } : {}
 })
-`, name, name)
+`, className, middlewareKey)
 
 	writeGenFile(path, content)
 }

@@ -20,6 +20,15 @@ class ProductController {
     }
 }
 ```
+## Subdirectorios de Dominio y Carga Recursiva
+
+Joss escanea y precarga automáticamente todos los controladores organizados dentro del árbol de subcarpetas de `app/controllers/` (por ejemplo, `app/controllers/web/`, `app/controllers/auth/`, `app/controllers/api/`, `app/controllers/admin/`).
+
+Al utilizar el generador CLI:
+```bash
+joss make:controller admin/DashboardController
+```
+El motor genera el archivo en `app/controllers/admin/DashboardController.joss` sanitizando el nombre de la clase como `class DashboardController`, manteniendo el código limpio y libre de prefijos de ruta inválidos.
 
 ## Rutas
 

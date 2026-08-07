@@ -301,6 +301,12 @@ func executeScript(filename string) {
 	}
 
 	rt := core.NewRuntime()
+	rt.LoadEnv(nil)
+
+	// Preload all .joss files in app/ and subfolders (controllers, models, services, middleware, etc.)
+	if _, err := os.Stat("app"); err == nil {
+		rt.PreloadAppFiles("app")
+	}
 
 	defer func() {
 		if r := recover(); r != nil {

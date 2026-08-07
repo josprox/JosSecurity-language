@@ -4,7 +4,7 @@ import "path/filepath"
 
 func GetControllerFiles(path string) map[string]string {
 	return map[string]string{
-		filepath.Join(path, "app", "controllers", "ProfileController.joss"): `class ProfileController {
+		filepath.Join(path, "app", "controllers", "auth", "ProfileController.joss"): `class ProfileController {
     func index() {
         $u = Auth::user()
         $userId = Auth::id()
@@ -85,7 +85,7 @@ func GetControllerFiles(path string) map[string]string {
     }
 }`,
 
-		filepath.Join(path, "app", "controllers", "HomeController.joss"): `class HomeController {
+		filepath.Join(path, "app", "controllers", "web", "HomeController.joss"): `class HomeController {
     func index() {
         return View::render("welcome", {
             "title": "Bienvenido a Joss",
@@ -93,7 +93,7 @@ func GetControllerFiles(path string) map[string]string {
         })
     }
 }`,
-		filepath.Join(path, "app", "controllers", "AuthController.joss"): `class AuthController {
+		filepath.Join(path, "app", "controllers", "auth", "AuthController.joss"): `class AuthController {
     func showLogin() {
         (!Auth::guest()) ? { return Response::redirect("/dashboard") } : {}
         return View::render("auth.login", {"title": "Iniciar Sesión"})
@@ -191,7 +191,7 @@ func GetControllerFiles(path string) map[string]string {
         }
     }
 }`,
-		filepath.Join(path, "app", "controllers", "ApiController.joss"): `class ApiController {
+		filepath.Join(path, "app", "controllers", "api", "ApiController.joss"): `class ApiController {
     func register() {
         $data = {
             "first_name": Request::input("first_name"),
@@ -308,7 +308,7 @@ func GetControllerFiles(path string) map[string]string {
     }
 }`,
 
-		filepath.Join(path, "app", "controllers", "DashboardController.joss"): `class DashboardController {
+		filepath.Join(path, "app", "controllers", "web", "DashboardController.joss"): `class DashboardController {
     func index() {
         // Protect Route
         $check = Auth::check()
@@ -330,7 +330,7 @@ func GetControllerFiles(path string) map[string]string {
     }
 }`,
 
-		filepath.Join(path, "app", "controllers", "PasswordController.joss"): `class PasswordController {
+		filepath.Join(path, "app", "controllers", "auth", "PasswordController.joss"): `class PasswordController {
     
     // Mostrar formulario de olvido
     func showForgot() {

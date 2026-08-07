@@ -15,6 +15,21 @@ $config = {"port": 8000}
 
 Los tipos reconocidos por la validación del runtime incluyen `int`, `float`, `string`, `bool`, `array` y `map`. Una variable tipada como número intenta convertir una cadena numérica antes de fallar.
 
+## Operadores y Concatenación
+
+- **Concatenación de Cadenas (`.`)**: En Joss, la concatenación de cadenas se realiza **estrictamente mediante el operador punto (`.`)**.
+  ```joss
+  $nombre = "Joss"
+  $mensaje = "Hola " . $nombre . ", bienvenido!"
+  ```
+- **Suma Numérica (`+`)**: El operador `+` se utiliza **exclusivamente para operaciones matemáticas numéricas** (`10 + 5`). Si intentas concatenar texto usando `+`, el runtime arrojará un error explícito solicitando el uso del operador `.`.
+- **Coalescencia Nula (`??`) y Elvis (`?:`)**:
+  ```joss
+  $port = $config["port"] ?? 8000
+  $name = $user_name ?: "Anónimo"
+  ```
+
+
 ## Funciones, closures y clases
 
 ```joss

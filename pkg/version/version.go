@@ -2,6 +2,6 @@ package version
 
 const Name = "Joss"
 
-const Version = "3.6.5"
+const Version = "3.6.6"
 
-const NameVersion = "PUB version 3"
+const NameVersion = "Climasense expo"

@@ -36,7 +36,8 @@ Los logs y diagnósticos deben escribirse en `stderr`. El proceso usa su propio 
 
 ## SDK disponibles
 
-- `c/joss_plugin.h`: runner RPC header-only para C y C++.
+- `c/joss_plugin.h`: runner RPC header-only para C.
+- `c/joss_plugin.hpp`: framework orientado a objetos C++17 con registro de métodos y protección de excepciones.
 - `c/joss_driver.h`: encabezado ABI v1 para DLL, SO y dylib en memoria.
 - `python/joss_plugin.py`: runner para crear un ejecutable Python autocontenido.
 - `java/JossPlugin.java`: runner Java; use GraalVM `native-image` para que el consumidor no necesite JVM.

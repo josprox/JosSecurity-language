@@ -10,10 +10,14 @@ import (
 )
 
 var (
-	cronTickerStarted bool
-	cronTickerMutex   sync.Mutex
-	scheduledTasks    = make(map[string]*parser.BlockStatement)
-	scheduledTasksMu  sync.RWMutex
+	cronTickerStarted  bool
+	cronTickerMutex    sync.Mutex
+	scheduledTasks     = make(map[string]*parser.BlockStatement)
+	scheduledSchedules = make(map[string]string)
+	scheduledTasksMu   sync.RWMutex
+	inMemoryRunning    = make(map[string]bool)
+	inMemoryRunningMu  sync.Mutex
+	cronDBResetOnce    sync.Once
 )
 
 // EnsureCronTable creates the cron table if it doesn't exist
@@ -85,42 +89,101 @@ func (r *Runtime) StartCronTicker() {
 
 // TickCron checks scheduled tasks against the current time
 func (r *Runtime) TickCron() {
-	if r.GetDB() == nil {
-		return
-	}
-
-	prefix := r.dbPrefix()
-	tableName := prefix + "cron"
-
-	rows, err := r.GetDB().Query(fmt.Sprintf("SELECT name, schedule, is_running FROM %s", tableName))
-	if err != nil {
-		return
-	}
-	defer rows.Close()
-
 	now := time.Now()
 
-	for rows.Next() {
-		var name, expr string
-		var isRunning bool
-		if err := rows.Scan(&name, &expr, &isRunning); err != nil {
-			continue
-		}
+	// 1. If DB is available, sync and run using DB locking
+	if r.GetDB() != nil {
+		r.EnsureCronTable()
+		prefix := r.dbPrefix()
+		tableName := prefix + "cron"
 
-		if isRunning {
-			continue
-		}
+		// Reset stale locks once on start
+		cronDBResetOnce.Do(func() {
+			_, _ = r.GetDB().Exec(fmt.Sprintf("UPDATE %s SET is_running = 0 WHERE is_running = 1", tableName))
+		})
 
-		// Match cron expression
-		if MatchCron(expr, now) {
-			scheduledTasksMu.RLock()
-			block, exists := scheduledTasks[name]
-			scheduledTasksMu.RUnlock()
-
-			if exists {
-				fmt.Printf("[Cron] Disparando tarea '%s' programada (%s)...\n", name, expr)
-				r.RunCronTask(name, block)
+		// Auto-sync in-memory registered tasks to DB
+		scheduledTasksMu.RLock()
+		for name, expr := range scheduledSchedules {
+			var exists int
+			err := r.GetDB().QueryRow(fmt.Sprintf("SELECT 1 FROM %s WHERE name = ?", tableName), name).Scan(&exists)
+			if err != nil {
+				_, _ = r.GetDB().Exec(fmt.Sprintf("INSERT INTO %s (name, schedule, status) VALUES (?, ?, 'idle')", tableName), name, expr)
 			}
+		}
+		scheduledTasksMu.RUnlock()
+
+		rows, err := r.GetDB().Query(fmt.Sprintf("SELECT name, schedule, is_running FROM %s", tableName))
+		if err == nil {
+			defer rows.Close()
+			for rows.Next() {
+				var name, expr string
+				var isRunning bool
+				if err := rows.Scan(&name, &expr, &isRunning); err != nil {
+					continue
+				}
+
+				if isRunning {
+					continue
+				}
+
+				if MatchCron(expr, now) {
+					scheduledTasksMu.RLock()
+					block, exists := scheduledTasks[name]
+					scheduledTasksMu.RUnlock()
+
+					if exists {
+						fmt.Printf("[Cron] Disparando tarea '%s' programada (%s)...\n", name, expr)
+						r.RunCronTask(name, block)
+					}
+				}
+			}
+			return
+		}
+	}
+
+	// 2. In-memory fallback (when DB is not connected)
+	scheduledTasksMu.RLock()
+	tasksCopy := make(map[string]*parser.BlockStatement, len(scheduledTasks))
+	exprsCopy := make(map[string]string, len(scheduledSchedules))
+	for k, v := range scheduledTasks {
+		tasksCopy[k] = v
+		exprsCopy[k] = scheduledSchedules[k]
+	}
+	scheduledTasksMu.RUnlock()
+
+	for name, block := range tasksCopy {
+		expr := exprsCopy[name]
+		if expr == "" {
+			continue
+		}
+
+		inMemoryRunningMu.Lock()
+		running := inMemoryRunning[name]
+		inMemoryRunningMu.Unlock()
+
+		if running {
+			continue
+		}
+
+		if MatchCron(expr, now) {
+			fmt.Printf("[Cron] Disparando tarea in-memory '%s' (%s)...\n", name, expr)
+			inMemoryRunningMu.Lock()
+			inMemoryRunning[name] = true
+			inMemoryRunningMu.Unlock()
+
+			newR := r.Fork()
+			go func(taskName string, blk *parser.BlockStatement) {
+				defer func() {
+					if rec := recover(); rec != nil {
+						fmt.Printf("[Cron] Error en tarea in-memory %s: %v\n", taskName, rec)
+					}
+					inMemoryRunningMu.Lock()
+					inMemoryRunning[taskName] = false
+					inMemoryRunningMu.Unlock()
+				}()
+				newR.executeBlock(blk)
+			}(name, block)
 		}
 	}
 }

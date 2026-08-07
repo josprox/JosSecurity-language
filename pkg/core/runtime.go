@@ -5,8 +5,10 @@ import (
 	"database/sql"
 	"encoding/hex"
 	"fmt"
+	"io"
 	"net/http"
 	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 	"time"
@@ -512,4 +514,129 @@ func (i *Instance) Clone() *Instance {
 		newI.Fields[k] = v
 	}
 	return newI
+}
+
+// PreloadAppFiles strictly preloads .joss files recursively within domain folders:
+// app/controllers, app/models, app/middleware, app/services, app/database, app/jobs, app/tasks, app/providers.
+func (r *Runtime) PreloadAppFiles(targetPath string) {
+	if targetPath == "" || targetPath == "app" {
+		domains := []string{
+			filepath.Join("app", "controllers"),
+			filepath.Join("app", "models"),
+			filepath.Join("app", "middleware"),
+			filepath.Join("app", "services"),
+			filepath.Join("app", "database"),
+			filepath.Join("app", "jobs"),
+			filepath.Join("app", "tasks"),
+			filepath.Join("app", "providers"),
+		}
+		for _, domain := range domains {
+			r.preloadSingleDir(domain)
+		}
+		return
+	}
+	r.preloadSingleDir(targetPath)
+}
+
+func (r *Runtime) preloadSingleDir(dirPath string) {
+	info, err := os.Stat(dirPath)
+	if err != nil || !info.IsDir() {
+		return
+	}
+
+	_ = filepath.Walk(dirPath, func(path string, info os.FileInfo, err error) error {
+		if err != nil || info.IsDir() {
+			return nil
+		}
+		if strings.HasSuffix(path, ".joss") {
+			content, readErr := os.ReadFile(path)
+			if readErr == nil {
+				l := parser.NewLexer(string(content))
+				p := parser.NewParser(l)
+				program := p.ParseProgram()
+				if len(p.Errors()) == 0 {
+					r.Execute(program)
+				} else {
+					fmt.Printf("[Runtime Warning] Parser errors in %s:\n", path)
+					for _, msg := range p.Errors() {
+						fmt.Printf("\t%s\n", msg)
+					}
+				}
+			}
+		}
+		return nil
+	})
+}
+
+// PreloadVFSAppFiles recursively preloads .joss files from VFS within domain-scoped subfolders.
+func (r *Runtime) PreloadVFSAppFiles(fs http.FileSystem, targetPath string) {
+	if fs == nil {
+		r.PreloadAppFiles(targetPath)
+		return
+	}
+
+	domains := []string{"app/controllers", "app/models", "app/middleware", "app/services", "app/database", "app/jobs", "app/tasks", "app/providers"}
+	if targetPath != "" && targetPath != "app" {
+		domains = []string{filepath.ToSlash(targetPath)}
+	}
+
+	var walkVFS func(dir string)
+	walkVFS = func(dir string) {
+		dirFile, err := fs.Open(dir)
+		if err != nil {
+			return
+		}
+		defer dirFile.Close()
+
+		info, err := dirFile.Stat()
+		if err != nil {
+			return
+		}
+		if !info.IsDir() {
+			if strings.HasSuffix(dir, ".joss") {
+				content, err := io.ReadAll(dirFile)
+				if err == nil {
+					l := parser.NewLexer(string(content))
+					p := parser.NewParser(l)
+					program := p.ParseProgram()
+					if len(p.Errors()) == 0 {
+						r.Execute(program)
+					}
+				}
+			}
+			return
+		}
+
+		if readdir, ok := dirFile.(interface {
+			Readdir(count int) ([]os.FileInfo, error)
+		}); ok {
+			infos, err := readdir.Readdir(-1)
+			if err == nil {
+				for _, childInfo := range infos {
+					childPath := filepath.ToSlash(filepath.Join(dir, childInfo.Name()))
+					if childInfo.IsDir() {
+						walkVFS(childPath)
+					} else if strings.HasSuffix(childInfo.Name(), ".joss") {
+						cf, err := fs.Open(childPath)
+						if err == nil {
+							data, readErr := io.ReadAll(cf)
+							cf.Close()
+							if readErr == nil {
+								l := parser.NewLexer(string(data))
+								p := parser.NewParser(l)
+								program := p.ParseProgram()
+								if len(p.Errors()) == 0 {
+									r.Execute(program)
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+
+	for _, domain := range domains {
+		walkVFS(domain)
+	}
 }

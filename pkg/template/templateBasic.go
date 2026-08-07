@@ -15,8 +15,12 @@ func CreateBibleProject(path string) {
 	// Create directory structure
 	dirs := []string{
 		filepath.Join(path, "config"),
-		filepath.Join(path, "app", "models"),
-		filepath.Join(path, "app", "controllers"),
+		filepath.Join(path, "app", "models", "auth"),
+		filepath.Join(path, "app", "controllers", "web"),
+		filepath.Join(path, "app", "controllers", "auth"),
+		filepath.Join(path, "app", "controllers", "api"),
+		filepath.Join(path, "app", "services"),
+		filepath.Join(path, "app", "middleware"),
 		filepath.Join(path, "app", "views", "layouts"),
 		filepath.Join(path, "app", "views", "auth"),
 		filepath.Join(path, "app", "views", "dashboard"),
@@ -57,6 +61,7 @@ func CreateBibleProject(path string) {
 	merge(files.GetAssetFiles(path))
 	merge(files.GetNpmFiles(path))
 	merge(files.GetBrunoFiles(path))
+	merge(files.GetAgentsFiles(path))
 
 	// Write files
 	for file, content := range allFiles {
@@ -111,6 +116,7 @@ func CreateConsoleProject(path string) {
 
 	merge(files.GetConsoleConfigFiles(path))
 	merge(files.GetConsoleAppFiles(path))
+	merge(files.GetAgentsFiles(path))
 
 	// Write files
 	for file, content := range allFiles {

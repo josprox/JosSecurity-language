@@ -8,12 +8,20 @@
 mi_app/
 ├── main.joss
 ├── env.joss
+├── routes.joss
+├── api.joss
+├── joss.yaml
+├── AGENTS.md                 # Guía y sintaxis para asistentes de IA
 ├── config/
 ├── app/
-│   ├── controllers/
-│   ├── models/
-│   ├── views/
-│   ├── middleware/
+│   ├── controllers/          # Subcarpetas por dominio (web/, auth/, api/)
+│   │   ├── web/
+│   │   ├── auth/
+│   │   └── api/
+│   ├── models/               # Modelos GranDB (auth/, etc.)
+│   │   └── auth/
+│   ├── services/             # Servicios en segundo plano e integraciones
+│   ├── middleware/           # Middleware de peticiones
 │   ├── libs/
 │   └── database/migrations/
 ├── assets/

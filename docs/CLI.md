@@ -8,13 +8,14 @@ La fuente canónica de comandos es `cmd/joss/main.go`. `joss help` muestra el bi
 joss server start
 joss program start
 joss run archivo.joss
+joss update
 joss build web
 joss build program
 joss build native [os] [arch]
 joss build package ruta
 ```
 
-`server start` exige `main.joss`. `build native` compila la aplicación a un binario nativo independiente optimizado (soporta `windows`, `linux` y `darwin` / macOS). `build` sin target y cualquier target desconocido ejecutan actualmente el build web; usa un target explícito en automatizaciones.
+`server start` exige `main.joss`. `joss update` busca y aplica automáticamente actualizaciones del motor desde el registro remoto. `build native` compila la aplicación a un binario nativo independiente optimizado (soporta `windows`, `linux` y `darwin` / macOS). `build` sin target y cualquier target desconocido ejecutan actualmente el build web; usa un target explícito en automatizaciones.
 
 ## Crear y generar
 

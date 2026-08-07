@@ -484,19 +484,25 @@ func removeCRUD(tableName string) {
 
 	fmt.Printf("Inferred Model Name: %s\n", modelName)
 
-	// 2. Delete Controller
-	controllerPath := filepath.Join("app", "controllers", modelName+"Controller.joss")
-	if _, err := os.Stat(controllerPath); err == nil {
-		os.Remove(controllerPath)
-		fmt.Printf("Deleted: %s\n", controllerPath)
-	}
+	// 2. Delete Controller (recursively search app/controllers)
+	controllerFileName := modelName + "Controller.joss"
+	_ = filepath.Walk(filepath.Join("app", "controllers"), func(path string, info os.FileInfo, err error) error {
+		if err == nil && !info.IsDir() && strings.EqualFold(info.Name(), controllerFileName) {
+			os.Remove(path)
+			fmt.Printf("Deleted: %s\n", path)
+		}
+		return nil
+	})
 
-	// 3. Delete Model
-	modelPath := filepath.Join("app", "models", modelName+".joss")
-	if _, err := os.Stat(modelPath); err == nil {
-		os.Remove(modelPath)
-		fmt.Printf("Deleted: %s\n", modelPath)
-	}
+	// 3. Delete Model (recursively search app/models)
+	modelFileName := modelName + ".joss"
+	_ = filepath.Walk(filepath.Join("app", "models"), func(path string, info os.FileInfo, err error) error {
+		if err == nil && !info.IsDir() && strings.EqualFold(info.Name(), modelFileName) {
+			os.Remove(path)
+			fmt.Printf("Deleted: %s\n", path)
+		}
+		return nil
+	})
 
 	// 4. Delete Views
 	viewsPath := filepath.Join("app", "views", strings.ToLower(modelName))
