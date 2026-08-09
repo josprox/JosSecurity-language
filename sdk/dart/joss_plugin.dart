@@ -46,7 +46,7 @@ class JossPlugin {
       }
 
       _writeFrame({'id': requestId, 'result': result});
-    } catch (error, stack) {
+    } catch (error) {
       _writeFrame({
         'id': requestId,
         'error': {
