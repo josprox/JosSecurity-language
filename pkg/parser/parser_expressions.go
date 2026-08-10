@@ -61,7 +61,7 @@ func (p *Parser) parseExpression(precedence int) Expression {
 func isExpressionContinuation(t TokenType) bool {
 	switch t {
 	case ARROW, DOUBLE_COLON, DOT, LBRACKET, QUESTION, NULL_COALESCE,
-		PLUS, MINUS, SLASH, ASTERISK, PERCENT, AND, OR, EQ, NOT_EQ, LT, GT, LTE, GTE,
+		PLUS, MINUS, SLASH, ASTERISK, PERCENT, AND, OR, EQ, NOT_EQ, STRICT_EQ, STRICT_NOT_EQ, SPACESHIP, LT, GT, LTE, GTE,
 		SHIFT_LEFT, SHIFT_RIGHT, PIPE:
 		return true
 	}

@@ -229,6 +229,16 @@ func (r *Runtime) evaluateInfix(ie *parser.InfixExpression) interface{} {
 
 	right := r.evaluateExpression(ie.Right)
 
+	if ie.Operator == "===" {
+		return strictCompare(left, right)
+	}
+	if ie.Operator == "!==" {
+		return !strictCompare(left, right)
+	}
+	if ie.Operator == "<=>" {
+		return spaceshipCompare(left, right)
+	}
+
 	// Handle cout << val or channel << val
 	if ie.Operator == "<<" {
 		if _, ok := left.(*Cout); ok {
@@ -807,4 +817,79 @@ func normalizeNumber(v interface{}) interface{} {
 		return float64(val)
 	}
 	return v
+}
+
+func spaceshipCompare(left, right interface{}) int64 {
+	a := normalizeNumber(left)
+	b := normalizeNumber(right)
+	if a == nil && b == nil {
+		return 0
+	}
+	if a == nil {
+		return -1
+	}
+	if b == nil {
+		return 1
+	}
+	switch aVal := a.(type) {
+	case int64:
+		if bVal, ok := b.(int64); ok {
+			if aVal < bVal {
+				return -1
+			}
+			if aVal > bVal {
+				return 1
+			}
+			return 0
+		}
+		if bVal, ok := b.(float64); ok {
+			fVal := float64(aVal)
+			if fVal < bVal {
+				return -1
+			}
+			if fVal > bVal {
+				return 1
+			}
+			return 0
+		}
+	case float64:
+		if bVal, ok := b.(float64); ok {
+			if aVal < bVal {
+				return -1
+			}
+			if aVal > bVal {
+				return 1
+			}
+			return 0
+		}
+		if bVal, ok := b.(int64); ok {
+			fVal := float64(bVal)
+			if aVal < fVal {
+				return -1
+			}
+			if aVal > fVal {
+				return 1
+			}
+			return 0
+		}
+	case string:
+		if bVal, ok := b.(string); ok {
+			if aVal < bVal {
+				return -1
+			}
+			if aVal > bVal {
+				return 1
+			}
+			return 0
+		}
+	}
+	aStr := fmt.Sprintf("%v", left)
+	bStr := fmt.Sprintf("%v", right)
+	if aStr < bStr {
+		return -1
+	}
+	if aStr > bStr {
+		return 1
+	}
+	return 0
 }

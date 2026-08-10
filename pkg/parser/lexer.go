@@ -45,8 +45,15 @@ func (l *Lexer) NextToken() Token {
 		if l.peekChar() == '=' {
 			ch := l.ch
 			l.readChar()
-			literal := string(ch) + string(l.ch)
-			tok = Token{Type: EQ, Literal: literal, Line: l.line}
+			if l.peekChar() == '=' {
+				ch2 := l.ch
+				l.readChar()
+				literal := string(ch) + string(ch2) + string(l.ch)
+				tok = Token{Type: STRICT_EQ, Literal: literal, Line: l.line}
+			} else {
+				literal := string(ch) + string(l.ch)
+				tok = Token{Type: EQ, Literal: literal, Line: l.line}
+			}
 		} else if l.peekChar() == '>' {
 			ch := l.ch
 			l.readChar()
@@ -88,8 +95,15 @@ func (l *Lexer) NextToken() Token {
 		if l.peekChar() == '=' {
 			ch := l.ch
 			l.readChar()
-			literal := string(ch) + string(l.ch)
-			tok = Token{Type: NOT_EQ, Literal: literal, Line: l.line}
+			if l.peekChar() == '=' {
+				ch2 := l.ch
+				l.readChar()
+				literal := string(ch) + string(ch2) + string(l.ch)
+				tok = Token{Type: STRICT_NOT_EQ, Literal: literal, Line: l.line}
+			} else {
+				literal := string(ch) + string(l.ch)
+				tok = Token{Type: NOT_EQ, Literal: literal, Line: l.line}
+			}
 		} else {
 			tok = l.newToken(BANG, l.ch)
 		}
@@ -97,8 +111,15 @@ func (l *Lexer) NextToken() Token {
 		if l.peekChar() == '=' {
 			ch := l.ch
 			l.readChar()
-			literal := string(ch) + string(l.ch)
-			tok = Token{Type: LTE, Literal: literal, Line: l.line}
+			if l.peekChar() == '>' {
+				ch2 := l.ch
+				l.readChar()
+				literal := string(ch) + string(ch2) + string(l.ch)
+				tok = Token{Type: SPACESHIP, Literal: literal, Line: l.line}
+			} else {
+				literal := string(ch) + string(l.ch)
+				tok = Token{Type: LTE, Literal: literal, Line: l.line}
+			}
 		} else if l.peekChar() == '<' {
 			ch := l.ch
 			l.readChar()
