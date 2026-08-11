@@ -480,6 +480,14 @@ func (r *Runtime) callBuiltin(name string, args []interface{}) (interface{}, boo
 			}
 		}
 		return nil, true
+	case "file_exists":
+		if len(args) == 1 {
+			if path, ok := args[0].(string); ok {
+				_, err := os.Stat(path)
+				return err == nil, true
+			}
+		}
+		return false, true
 	case "file_get_contents":
 		if len(args) == 1 {
 			if path, ok := args[0].(string); ok {

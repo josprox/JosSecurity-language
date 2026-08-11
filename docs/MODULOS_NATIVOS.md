@@ -23,7 +23,7 @@ La tabla enumera la superficie registrada por el runtime. Una llamada estática 
 
 ## Builtins globales
 
-`print`, `echo`, `printf`, `env`, `len`, `count`, `html_escape`, `__`, `csrf_field`, `json_encode`, `json_decode`, `json_verify`, `toon_encode`, `toon_decode`, `toon_verify`, `async`, `await`, `make_chan`, `send`, `recv`, `close`, `keys`, `values`, `array_keys`, `array_values`, `redirect`, `explode`, `end`, `file_get_contents`, `file_put_contents`, `hive_read_box`, `append`, `merge` y `run`.
+`print`, `echo`, `printf`, `env`, `len`, `count`, `html_escape`, `__`, `csrf_field`, `json_encode`, `json_decode`, `json_verify`, `toon_encode`, `toon_decode`, `toon_verify`, `async`, `await`, `make_chan`, `send`, `recv`, `close`, `keys`, `values`, `array_keys`, `array_values`, `redirect`, `explode`, `end`, `file_exists`, `file_get_contents`, `file_put_contents`, `hive_read_box`, `append`, `merge` y `run`.
 
 `run()` y `System::Run()` requieren `ALLOW_SYSTEM_RUN=true`. `run()` solo selecciona automáticamente Python para `.py` y PHP para `.php`; para otros ejecutables usa `System::Run()` o un plugin JP.
 
