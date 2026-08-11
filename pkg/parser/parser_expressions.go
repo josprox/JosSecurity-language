@@ -728,8 +728,37 @@ func isIdentifierOrKeyword(t TokenType) bool {
 	switch t {
 	case FUNCTION, VAR, TRUE, FALSE, RETURN, PRINT, ECHO, CLASS, INIT,
 		NAMESPACE, IMPORT, NEW, FOREACH, AS, THIS, ISSET, EMPTY, BREAK,
-		CONTINUE, WHILE, DO, TRY, CATCH, THROW, EXTENDS, IF, ELSE, MATCH, DEFAULT:
+		CONTINUE, WHILE, DO, TRY, CATCH, THROW, EXTENDS, IF, ELSE, MATCH, DEFAULT, ASYNC:
 		return true
 	}
 	return false
+}
+
+func (p *Parser) parseAsyncExpression() Expression {
+	tok := p.curToken
+	if p.peekToken.Type == LBRACE {
+		p.nextToken() // move to {
+		block := p.parseBlockStatement()
+		fn := &FunctionLiteral{
+			Token:      Token{Type: FUNCTION, Literal: "function", Line: tok.Line},
+			Parameters: []*Parameter{},
+			Body:       block,
+		}
+		return &CallExpression{
+			Token:     Token{Type: IDENT, Literal: "async", Line: tok.Line},
+			Function:  &Identifier{Token: Token{Type: IDENT, Literal: "async", Line: tok.Line}, Value: "async"},
+			Arguments: []Expression{fn},
+		}
+	}
+	if p.peekToken.Type == LPAREN {
+		p.nextToken() // move to (
+		return p.parseCallExpression(&Identifier{Token: Token{Type: IDENT, Literal: "async", Line: tok.Line}, Value: "async"})
+	}
+	p.nextToken()
+	exp := p.parseExpression(LOWEST)
+	return &CallExpression{
+		Token:     Token{Type: IDENT, Literal: "async", Line: tok.Line},
+		Function:  &Identifier{Token: Token{Type: IDENT, Literal: "async", Line: tok.Line}, Value: "async"},
+		Arguments: []Expression{exp},
+	}
 }

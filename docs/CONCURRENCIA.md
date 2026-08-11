@@ -2,16 +2,25 @@
 
 ## Async y await
 
+Joss permite ejecutar bloques de código de forma asíncrona en goroutines nativas utilizando la sintaxis de bloque `async`:
+
 ```joss
-$future = async(func() {
+// Lanzar una goroutine en segundo plano
+async {
+    $downloader = new DocDownloader()
+    $downloader->sync(false)
+}
+
+// O capturar el resultado en un Future para await
+$future = async {
     return 20 + 22
-})
+}
 $result = await($future)
 ```
 
-`async()` crea el fork del runtime antes de iniciar la goroutine. El fork copia variables, mapas y listas de primer nivel y comparte definiciones de clases, funciones, conexión SQL y tablas de dispatch. No es aislamiento de proceso.
+`async` crea el fork del runtime antes de iniciar la goroutine. El fork copia variables, mapas y listas de primer nivel y comparte definiciones de clases, funciones, conexión SQL y tablas de dispatch. No es aislamiento de proceso.
 
-Una excepción en la tarea se guarda en el `Future` y se muestra como diagnóstico; `await()` devuelve el resultado almacenado.
+Una excepción en la tarea se guarda en el `Future` y se muestra como diagnóstico; `await()` devuelve el resultado almacenado. Se mantiene compatibilidad retrospectiva con `async(func() { ... })`.
 
 ## Canales
 

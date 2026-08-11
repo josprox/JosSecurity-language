@@ -88,6 +88,7 @@ const (
 	MATCH   = "MATCH"
 	DEFAULT = "DEFAULT"
 	USE     = "USE"
+	ASYNC   = "ASYNC"
 )
 
 type Token struct {
@@ -128,6 +129,7 @@ var keywords = map[string]TokenType{
 	"use":       USE,
 	"match":     MATCH,
 	"default":   DEFAULT,
+	"async":     ASYNC,
 }
 
 func LookupIdent(ident string) TokenType {

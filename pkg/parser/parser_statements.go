@@ -46,6 +46,9 @@ func (p *Parser) parseStatement() Statement {
 	if p.curToken.Type == CONTINUE {
 		return p.parseContinueStatement()
 	}
+	if p.curToken.Type == ASYNC {
+		return p.parseAsyncStatement()
+	}
 	// Check for variable declaration: type $name = value
 	if p.curToken.Type == IDENT && p.peekToken.Type == VAR {
 		return p.parseLetStatement()
@@ -511,4 +514,34 @@ func (p *Parser) parseUseStatement() Statement {
 		p.nextToken()
 	}
 	return nil
+}
+
+func (p *Parser) parseAsyncStatement() Statement {
+	tok := p.curToken
+	if p.peekToken.Type == LBRACE {
+		p.nextToken() // move to {
+		block := p.parseBlockStatement()
+		fn := &FunctionLiteral{
+			Token:      Token{Type: FUNCTION, Literal: "function", Line: tok.Line},
+			Parameters: []*Parameter{},
+			Body:       block,
+		}
+		call := &CallExpression{
+			Token:     Token{Type: IDENT, Literal: "async", Line: tok.Line},
+			Function:  &Identifier{Token: Token{Type: IDENT, Literal: "async", Line: tok.Line}, Value: "async"},
+			Arguments: []Expression{fn},
+		}
+		return &ExpressionStatement{Token: tok, Expression: call}
+	}
+	if p.peekToken.Type == LPAREN {
+		return p.parseExpressionStatement()
+	}
+	p.nextToken()
+	exp := p.parseExpression(LOWEST)
+	call := &CallExpression{
+		Token:     Token{Type: IDENT, Literal: "async", Line: tok.Line},
+		Function:  &Identifier{Token: Token{Type: IDENT, Literal: "async", Line: tok.Line}, Value: "async"},
+		Arguments: []Expression{exp},
+	}
+	return &ExpressionStatement{Token: tok, Expression: call}
 }
