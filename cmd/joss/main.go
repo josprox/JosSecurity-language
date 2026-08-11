@@ -200,11 +200,12 @@ func main() {
 		runMigrateFresh()
 	case "new":
 		if len(os.Args) < 3 {
-			fmt.Println("Uso: joss new [web|console|package] [ruta/nombre]")
+			fmt.Println("Uso: joss new [web|console|package|plugin] [ruta/nombre]")
 			fmt.Println("  joss new [ruta]            - Crea proyecto web (default)")
 			fmt.Println("  joss new console [ruta]    - Crea proyecto de consola")
 			fmt.Println("  joss new web [ruta]        - Crea proyecto web (explícito)")
 			fmt.Println("  joss new package [nombre]  - Crea un nuevo paquete optimizado para Joss")
+			fmt.Println("  joss new plugin [ruta]     - Crea un nuevo plugin oficial con sidecar nativo Go")
 			return
 		}
 
@@ -228,6 +229,12 @@ func main() {
 				return
 			}
 			createNewPackage(os.Args[3])
+		case "plugin":
+			if len(os.Args) < 4 {
+				fmt.Println("Uso: joss new plugin [ruta/nombre]")
+				return
+			}
+			createNewPluginProject(os.Args[3])
 		default:
 			// Default: web project
 			template.CreateBibleProject(os.Args[2])
