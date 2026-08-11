@@ -120,10 +120,10 @@ print($service->saludar("Joss", 25))
 
 ### 2. Concurrencia con `async` / `await`
 ```joss
-$future = async(func() {
+$future = async {
     // Proceso asíncrono en background
     return 40 + 2
-})
+}
 
 $resultado = await($future)
 print("Resultado: " . $resultado)

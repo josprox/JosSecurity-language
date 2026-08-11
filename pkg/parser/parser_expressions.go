@@ -751,8 +751,9 @@ func (p *Parser) parseAsyncExpression() Expression {
 		}
 	}
 	if p.peekToken.Type == LPAREN {
-		p.nextToken() // move to (
-		return p.parseCallExpression(&Identifier{Token: Token{Type: IDENT, Literal: "async", Line: tok.Line}, Value: "async"})
+		msg := fmt.Sprintf("Error de sintaxis (Línea %d): 'async' requiere la sintaxis de bloque 'async { ... }'. 'async(func() ...)' ha sido descontinuado.", tok.Line)
+		p.errors = append(p.errors, msg)
+		return nil
 	}
 	p.nextToken()
 	exp := p.parseExpression(LOWEST)

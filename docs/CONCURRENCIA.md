@@ -20,7 +20,7 @@ $result = await($future)
 
 `async` crea el fork del runtime antes de iniciar la goroutine. El fork copia variables, mapas y listas de primer nivel y comparte definiciones de clases, funciones, conexión SQL y tablas de dispatch. No es aislamiento de proceso.
 
-Una excepción en la tarea se guarda en el `Future` y se muestra como diagnóstico; `await()` devuelve el resultado almacenado. Se mantiene compatibilidad retrospectiva con `async(func() { ... })`.
+Una excepción en la tarea se guarda en el `Future` y se muestra como diagnóstico; `await()` devuelve el resultado almacenado.
 
 ## Canales
 
