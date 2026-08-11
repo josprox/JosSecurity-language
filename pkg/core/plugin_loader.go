@@ -215,6 +215,12 @@ func (r *Runtime) loadPlugin(name, constraint string) error {
 		if r.usePluginVFS {
 			sourcePath = path.Join(filepath.ToSlash(pkgRoot), entry)
 		}
+		if err := r.registerPluginNativePayload(name, version, pkgRoot, manifest.Native, manifest.Protocol, files); err != nil {
+			return err
+		}
+		if err := r.registerPluginABIPayload(name, version, pkgRoot, manifest.ABI, files); err != nil {
+			return err
+		}
 		if err := r.executePluginSource(name, version, code, sourcePath); err != nil {
 			return err
 		}
@@ -451,7 +457,11 @@ func readInstalledPluginVFS(pkgRoot, name string) (pluginManifest, map[string][]
 }
 
 func parsePluginManifest(data []byte) pluginManifest {
-	m := pluginManifest{Dependencies: make(map[string]string)}
+	m := pluginManifest{
+		Dependencies: make(map[string]string),
+		Native:       make(map[string]string),
+		ABI:          make(map[string]string),
+	}
 	section := ""
 	for _, raw := range strings.Split(strings.ReplaceAll(string(data), "\r\n", "\n"), "\n") {
 		line := strings.TrimRight(raw, " \t")
@@ -475,6 +485,12 @@ func parsePluginManifest(data []byte) pluginManifest {
 				m.Version = value
 			case "type":
 				m.Type = value
+			case "bytecode":
+				m.Bytecode = value
+			case "protocol":
+				m.Protocol = value
+			case "key_id":
+				m.KeyID = value
 			}
 			continue
 		}
@@ -485,6 +501,14 @@ func parsePluginManifest(data []byte) pluginManifest {
 			}
 		case "dependencies":
 			m.Dependencies[key] = value
+		case "native":
+			if key == "protocol" {
+				m.Protocol = value
+			} else {
+				m.Native[key] = value
+			}
+		case "abi":
+			m.ABI[key] = value
 		case "environment":
 			if key == "joss" {
 				m.JossVersion = value

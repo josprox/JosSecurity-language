@@ -59,8 +59,17 @@ func (r *Runtime) registerPluginNativePayload(name, version, root string, target
 	if err != nil {
 		return fmt.Errorf("plugin %s %s: %w", name, version, err)
 	}
-	if _, ok := files[clean]; !ok {
-		return fmt.Errorf("plugin %s %s: falta ejecutable nativo %q", name, version, clean)
+	if r.usePluginVFS {
+		if _, ok := files[clean]; !ok {
+			return fmt.Errorf("plugin %s %s: falta ejecutable nativo %q", name, version, clean)
+		}
+	} else {
+		if _, ok := files[clean]; !ok {
+			absPath := filepath.Join(root, filepath.FromSlash(clean))
+			if _, statErr := os.Stat(absPath); statErr != nil {
+				return fmt.Errorf("plugin %s %s: falta ejecutable nativo %q", name, version, clean)
+			}
+		}
 	}
 	r.NativePlugins[name] = &NativePluginDefinition{
 		Name:         name,
@@ -330,15 +339,34 @@ func pluginCommandEnvironment(r *Runtime, executable string) []string {
 		"JOSS_PROJECT_ROOT": r.ProjectRoot,
 		"JOSS_PLUGIN_ROOT":  filepath.Dir(executable),
 	}
-	for _, key := range strings.Split(r.Env["PLUGIN_ENV_ALLOW"], ",") {
-		key = strings.TrimSpace(key)
-		if key != "" {
-			if value, ok := r.Env[key]; ok {
-				pluginEnv[key] = value
+	allowedKeys := make(map[string]bool)
+	if configured := r.Env["PLUGIN_ENV_ALLOW"]; configured != "" {
+		for _, key := range strings.Split(configured, ",") {
+			key = strings.TrimSpace(key)
+			if key != "" {
+				allowedKeys[key] = true
 			}
 		}
 	}
+	for key, value := range r.Env {
+		if allowedKeys[key] || isDefaultPluginEnvVar(key) {
+			pluginEnv[key] = value
+		}
+	}
 	return mergedPluginEnvironment(pluginEnv)
+}
+
+func isDefaultPluginEnvVar(key string) bool {
+	prefixes := []string{
+		"MAIL_", "BREVO_", "FCM_", "NOTIFY_", "AI_", "OPENAI_",
+		"GROQ_", "GEMINI_", "DEEPSEEK_", "ANTHROPIC_", "GOOGLE_", "SMTP_",
+	}
+	for _, p := range prefixes {
+		if strings.HasPrefix(key, p) {
+			return true
+		}
+	}
+	return false
 }
 
 func materializePluginPath(definition *NativePluginDefinition, relative string) (string, error) {
