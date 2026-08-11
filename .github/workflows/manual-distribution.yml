@@ -1,9 +1,6 @@
 name: Build manual distribution
 
 on:
-  push:
-    tags:
-      - 'v*'
   workflow_dispatch:
     inputs:
       create_release:
@@ -114,14 +111,11 @@ jobs:
           retention-days: 14
 
       - name: Resolve release tag and parameters
-        if: ${{ github.event_name == 'push' || inputs.create_release }}
+        if: ${{ inputs.create_release }}
         id: release_meta
         shell: pwsh
         run: |
           $tag = '${{ inputs.release_tag }}'
-          if ([string]::IsNullOrWhiteSpace($tag) -and '$env:GITHUB_REF_TYPE' -eq 'tag') {
-            $tag = '$env:GITHUB_REF_NAME'
-          }
           if ([string]::IsNullOrWhiteSpace($tag)) {
             $versionSource = Get-Content 'pkg/version/version.go' -Raw
             if ($versionSource -match 'const Version = "([^"]+)"') {
@@ -139,13 +133,13 @@ jobs:
           "tag=$tag" >> $env:GITHUB_OUTPUT
 
       - name: Publish or update GitHub Release
-        if: ${{ github.event_name == 'push' || inputs.create_release }}
+        if: ${{ inputs.create_release }}
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
           RELEASE_TAG: ${{ steps.release_meta.outputs.tag }}
-          RELEASE_TYPE: ${{ inputs.release_type || 'draft' }}
+          RELEASE_TYPE: ${{ inputs.release_type }}
         run: |
           $files = Get-ChildItem -LiteralPath dist -File | Sort-Object Name | ForEach-Object FullName
           if (-not $files) {
