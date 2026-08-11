@@ -167,6 +167,62 @@ try {
     Copy-Required (Join-Path $root 'LICENSE') (Join-Path $sdkStage 'LICENSE')
     Compress-Directory $sdkStage (Join-Path $dist 'joss-plugin-sdk.zip')
 
+    # Compilar sidecars multiplataforma y empaquetar paquetes .jp oficiales
+    $officialPlugins = @('joss_smtp', 'joss_notify', 'joss_ai', 'joss_backup')
+    $pluginTargets = @(
+        @{ os = 'windows'; arch = 'amd64'; ext = '.exe' },
+        @{ os = 'windows'; arch = 'arm64'; ext = '.exe' },
+        @{ os = 'linux';   arch = 'amd64'; ext = '' },
+        @{ os = 'linux';   arch = 'arm64'; ext = '' },
+        @{ os = 'darwin';  arch = 'amd64'; ext = '' },
+        @{ os = 'darwin';  arch = 'arm64'; ext = '' }
+    )
+    $hostJossBinary = Join-Path $dist (if ($env:OS -eq 'Windows_NT') { 'windows-amd64/joss.exe' } else { 'linux-amd64/joss' })
+    if (-not (Test-Path -LiteralPath $hostJossBinary)) {
+        $hostJossBinary = Join-Path $root (if ($env:OS -eq 'Windows_NT') { 'joss.exe' } else { 'joss' })
+    }
+
+    $pluginsStage = New-StagingDirectory 'official-plugins'
+    foreach ($p in $officialPlugins) {
+        $pDir = Join-Path $root ("ejemplos\plugins\" + $p)
+        if (Test-Path -LiteralPath $pDir) {
+            Push-Location $pDir
+            try {
+                $oldCGO, $oldGOOS, $oldGOARCH = $env:CGO_ENABLED, $env:GOOS, $env:GOARCH
+                $env:CGO_ENABLED = '0'
+                foreach ($t in $pluginTargets) {
+                    $os = $t.os
+                    $arch = $t.arch
+                    $ext = $t.ext
+                    $outDir = Join-Path $pDir ("native\" + $os + "-" + $arch)
+                    New-Item -ItemType Directory -Force -Path $outDir | Out-Null
+                    $outFile = Join-Path $outDir ($p + $ext)
+                    $env:GOOS = $os
+                    $env:GOARCH = $arch
+                    Invoke-Checked "Sidecar $p (${os}-${arch})" {
+                        go build -trimpath -o $outFile ./cmd/sidecar
+                    }
+                }
+                $env:GOOS = $oldGOOS
+                $env:GOARCH = $oldGOARCH
+                $env:CGO_ENABLED = $oldCGO
+
+                Invoke-Checked "Empaquetado $p.jp" {
+                    & $hostJossBinary build package .
+                }
+                $jpFile = Join-Path $pDir ($p + ".jp")
+                if (Test-Path -LiteralPath $jpFile) {
+                    Copy-Required $jpFile (Join-Path $pluginsStage ($p + ".jp"))
+                    Remove-Item -LiteralPath $jpFile -Force
+                }
+            } finally {
+                Pop-Location
+            }
+        }
+    }
+    Compress-Directory $pluginsStage (Join-Path $dist 'joss-official-plugins.zip')
+    Get-ChildItem -LiteralPath $pluginsStage -File | Copy-Item -Destination $dist -Force
+
     # Solo se publican archivos finales; los binarios intermedios se quitan de dist.
     Get-ChildItem -LiteralPath $dist -Directory | Remove-Item -Recurse -Force
     $hostBinary = Join-Path $dist $(if ($env:OS -eq 'Windows_NT') { 'joss.exe' } else { 'joss' })
