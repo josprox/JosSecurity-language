@@ -1,6 +1,9 @@
 name: Build manual distribution
 
 on:
+  push:
+    branches:
+      - main
   workflow_dispatch:
     inputs:
       create_release:
@@ -111,7 +114,7 @@ jobs:
           retention-days: 14
 
       - name: Resolve release tag and parameters
-        if: ${{ inputs.create_release }}
+        if: ${{ github.event_name == 'push' || inputs.create_release }}
         id: release_meta
         shell: pwsh
         run: |
@@ -133,13 +136,13 @@ jobs:
           "tag=$tag" >> $env:GITHUB_OUTPUT
 
       - name: Publish or update GitHub Release
-        if: ${{ inputs.create_release }}
+        if: ${{ github.event_name == 'push' || inputs.create_release }}
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
           RELEASE_TAG: ${{ steps.release_meta.outputs.tag }}
-          RELEASE_TYPE: ${{ inputs.release_type }}
+          RELEASE_TYPE: ${{ inputs.release_type || 'prerelease' }}
         run: |
           $files = Get-ChildItem -LiteralPath dist -File | Sort-Object Name | ForEach-Object FullName
           if (-not $files) {
