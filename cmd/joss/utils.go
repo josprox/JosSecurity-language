@@ -103,7 +103,7 @@ func printHelp() {
 	fmt.Printf("  migrate                 - %s\n", tr("exeMigrate"))
 	fmt.Printf("  migrate:fresh           - %s\n", tr("exeMigrateFresh"))
 	fmt.Printf("  new [web|console] [path]- %s\n", tr("createProject"))
-	fmt.Printf("  new plugin [path]       - Crear plantilla de proyecto para un nuevo plugin con sidecar y workflow GitHub\n")
+	fmt.Printf("  new plugin [path]       - Crear plantilla de plugin autoejecutable (.jp Bytecode puro) con workflow GitHub\n")
 	fmt.Printf("  change db [motor]       - %s\n", tr("changeDBMotor"))
 	fmt.Printf("  change db migrate       - Migrar conexion actual a un nuevo MySQL\n")
 	fmt.Printf("    --host --port --database --user --password\n")

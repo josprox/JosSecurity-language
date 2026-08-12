@@ -84,7 +84,7 @@ permissions:
 jobs:
   release:
     name: Build & Package .jp (Bytecode JPBC)
-    runs-on: windows-latest
+    runs-on: ubuntu-latest
     steps:
       - name: Checkout plugin repository
         uses: actions/checkout@v4
@@ -95,106 +95,129 @@ jobs:
           go-version: '1.24'
           cache: true
 
-      - name: Download Joss CLI compiler
-        shell: pwsh
+      - name: Download Joss CLI (latest release)
+        shell: bash
         run: |
-          $releasesUrl = "https://api.github.com/repos/joss-language/Joss-Programming-Language/releases"
-          try {
-            $releases = Invoke-RestMethod -Uri $releasesUrl -Headers @{ "User-Agent" = "Joss-Plugin-Builder" }
-          } catch {
-            $releasesUrl = "https://api.github.com/repos/josprox/Joss-language/releases"
-            $releases = Invoke-RestMethod -Uri $releasesUrl -Headers @{ "User-Agent" = "Joss-Plugin-Builder" }
-          }
+          ASSET_URL=$(python3 <<'PYEOF'
+          import urllib.request, json, sys
+          url = "https://api.github.com/repos/joss-language/Joss-Programming-Language/releases"
+          req = urllib.request.Request(url, headers={"User-Agent": "Joss-Plugin-Builder"})
+          releases = json.loads(urllib.request.urlopen(req).read())
+          rel = next((r for r in releases if not r["draft"]), None)
+          if not rel: sys.exit("No release found")
+          asset = next((a for a in rel["assets"] if "linux" in a["name"] and "amd64" in a["name"]), None)
+          if not asset: asset = next((a for a in rel["assets"] if "linux" in a["name"]), None)
+          if asset: print(asset["browser_download_url"])
+          PYEOF
+          ) || true
 
-          $targetRelease = $releases | Where-Object { $_.draft -eq $false } | Select-Object -First 1
-          if (-not $targetRelease) {
-            throw "No se encontró ningún release de Joss CLI disponible"
-          }
+          if [ -z "$ASSET_URL" ]; then
+            echo "Compilando Joss CLI desde fuente..."
+            curl -sL "https://github.com/joss-language/Joss-Programming-Language/archive/refs/heads/main.zip" -o joss_src.zip
+            unzip -q joss_src.zip
+            cd Joss-Programming-Language-main
+            go build -trimpath -ldflags="-s -w" -o ../joss ./cmd/joss
+            cd ..
+          else
+            echo "Descargando Joss CLI desde: $ASSET_URL"
+            curl -sL "$ASSET_URL" -o joss_pkg
+            FILETYPE=$(file joss_pkg)
+            if echo "$FILETYPE" | grep -qi 'zip\|Zip'; then
+              unzip -o joss_pkg -d joss_extract
+              JOSS_BIN=$(find joss_extract -type f -name 'joss-linux-amd64' | head -1)
+              if [ -z "$JOSS_BIN" ]; then
+                JOSS_BIN=$(find joss_extract -type f -name 'joss' ! -name '*.exe' | head -1)
+              fi
+              if [ -z "$JOSS_BIN" ]; then
+                JOSS_BIN=$(find joss_extract -type f ! -name '*arm*' ! -name '*.sh' ! -name 'LICENSE*' ! -name 'README*' ! -name '*.exe' | head -1)
+              fi
+              cp "$JOSS_BIN" ./joss
+              rm -rf joss_extract
+            elif echo "$FILETYPE" | grep -qi 'gzip\|tar'; then
+              tar -xzf joss_pkg --wildcards '*/joss' --strip-components=1 2>/dev/null || \
+              tar -xzf joss_pkg -C /tmp && find /tmp -name 'joss' ! -name '*.exe' -type f | head -1 | xargs -I{} cp {} ./joss
+            else
+              mv joss_pkg joss
+            fi
+          fi
 
-          $asset = $targetRelease.assets | Where-Object { $_.name -like '*windows.zip*' -or $_.name -eq 'joss.exe' -or $_.name -like '*windows-amd64*' } | Select-Object -First 1
-          if (-not $asset) {
-            $asset = $targetRelease.assets | Where-Object { $_.name -like '*.zip' -or $_.name -like '*.exe' } | Select-Object -First 1
-          }
+          chmod +x ./joss
+          mv ./joss /usr/local/bin/joss 2>/dev/null || true
+          joss version || ./joss version
 
-          $downloadUrl = $asset.browser_download_url
-          Write-Host "Descargando compilador Joss desde: $downloadUrl"
-          Invoke-WebRequest -Uri $downloadUrl -OutFile "downloaded_joss_pkg" -UserAgent "Mozilla/5.0"
-
-          if ($asset.name -like '*.zip') {
-            Expand-Archive -LiteralPath "downloaded_joss_pkg" -DestinationPath "temp_joss" -Force
-            $exe = Get-ChildItem -Path "temp_joss" -Recurse -Filter "joss.exe" | Select-Object -First 1
-            Copy-Item $exe.FullName "joss.exe" -Force
-          } else {
-            Move-Item "downloaded_joss_pkg" "joss.exe" -Force
-          }
-
-          ./joss.exe version
-
-      - name: Parse plugin name and version
-        id: plugin_meta
-        shell: pwsh
+      - name: Parse plugin metadata from joss.yaml
+        id: meta
+        shell: bash
         run: |
-          $manifest = Get-Content 'joss.yaml' -Raw
-          if ($manifest -match 'name:\s*([^\r\n]+)') {
-            $name = $Matches[1].Trim()
-          } else {
-            throw 'joss.yaml no declara name'
-          }
-          if ($manifest -match 'version:\s*([^\r\n]+)') {
-            $ver = $Matches[1].Trim()
-          } else {
-            throw 'joss.yaml no declara version'
-          }
-          Write-Host "Plugin: $name v$ver"
-          "name=$name" >> $env:GITHUB_OUTPUT
-          "version=$ver" >> $env:GITHUB_OUTPUT
-          $tag = if ($env:GITHUB_REF_TYPE -eq 'tag') { $env:GITHUB_REF_NAME } else { "v$ver" }
-          "tag=$tag" >> $env:GITHUB_OUTPUT
+          python3 <<'PYEOF'
+          import os, sys
+          with open('joss.yaml', encoding='utf-8-sig') as f:
+              lines = f.read().splitlines()
+          vals = {}
+          for line in lines:
+              if ':' in line and not line.startswith(' '):
+                  k, _, v = line.partition(':')
+                  vals[k.strip()] = v.strip().strip('"').strip("'")
+          name = vals.get('name', '')
+          ver  = vals.get('version', '')
+          if not name or not ver:
+              print(f'ERROR: name={name!r} version={ver!r}', file=sys.stderr)
+              sys.exit(1)
+          ref_type = os.environ.get('GITHUB_REF_TYPE', '')
+          ref_name = os.environ.get('GITHUB_REF_NAME', '')
+          tag = ref_name if ref_type == 'tag' else f'v{ver}'
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as f:
+              f.write(f'name={name}\n')
+              f.write(f'version={ver}\n')
+              f.write(f'tag={tag}\n')
+          print(f'Plugin: {name} v{ver}  tag={tag}')
+          PYEOF
 
       - name: Compile pure JPBC .jp package
-        shell: pwsh
+        shell: bash
         run: |
-          $pluginName = '${{ steps.plugin_meta.outputs.name }}'
-          ./joss.exe plugin compile .
-          $jpFile = "$pluginName.jp"
-          if (-not (Test-Path -LiteralPath $jpFile)) {
-            throw "No se generó el paquete $jpFile"
-          }
+          NAME="${{ steps.meta.outputs.name }}"
+          joss plugin compile . || ./joss plugin compile .
+          JP="${NAME}.jp"
+          if [ ! -f "$JP" ]; then
+            echo "ERROR: $JP no se genero"
+            exit 1
+          fi
+          echo "OK: ${JP} generado ($(du -sh "$JP" | cut -f1))"
 
       - name: Generate SHA-256 checksum
-        shell: pwsh
+        shell: bash
         run: |
-          $pluginName = '${{ steps.plugin_meta.outputs.name }}'
-          $jpFile = "$pluginName.jp"
-          $hash = (Get-FileHash -LiteralPath $jpFile -Algorithm SHA256).Hash.ToLowerInvariant()
-          "$hash  $jpFile" | Out-File -FilePath "SHA256SUMS.txt" -Encoding utf8
+          sha256sum "${{ steps.meta.outputs.name }}.jp" > SHA256SUMS.txt
+          cat SHA256SUMS.txt
 
       - name: Publish GitHub Release
-        shell: pwsh
+        shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
-          GH_REPO: ${{ github.repository }}
-          RELEASE_TAG: ${{ steps.plugin_meta.outputs.tag }}
+          TAG:          ${{ steps.meta.outputs.tag }}
+          NAME:         ${{ steps.meta.outputs.name }}
+          VER:          ${{ steps.meta.outputs.version }}
           RELEASE_TYPE: ${{ inputs.release_type || 'published' }}
-          PLUGIN_NAME: ${{ steps.plugin_meta.outputs.name }}
-          PLUGIN_VERSION: ${{ steps.plugin_meta.outputs.version }}
         run: |
-          $jpFile = "$env:PLUGIN_NAME.jp"
-          $assets = @($jpFile, "SHA256SUMS.txt")
+          JP="${NAME}.jp"
+          ASSETS=("$JP" "SHA256SUMS.txt")
 
-          $existing = gh release view $env:RELEASE_TAG --repo $env:GH_REPO --json tagName 2>$null
-          if ($LASTEXITCODE -eq 0) {
-            gh release upload $env:RELEASE_TAG @assets --repo $env:GH_REPO --clobber
-          } else {
-            $flags = @($env:RELEASE_TAG, '--repo', $env:GH_REPO, '--title', "$env:PLUGIN_NAME v$env:PLUGIN_VERSION", '--generate-notes')
-            if ($env:RELEASE_TYPE -eq 'draft') {
-              $flags += '--draft'
-            } elseif ($env:RELEASE_TYPE -eq 'prerelease') {
-              $flags += '--prerelease'
-            }
-            $flags += $assets
-            gh release create @flags
-          }
+          if gh release view "$TAG" &>/dev/null; then
+            echo "Actualizando release existente $TAG..."
+            gh release upload "$TAG" "${ASSETS[@]}" --clobber
+          else
+            echo "Creando release $TAG ($RELEASE_TYPE)..."
+            FLAGS=("$TAG" --title "$NAME v$VER" --generate-notes)
+            [ "$RELEASE_TYPE" = "draft" ]      && FLAGS+=(--draft)
+            [ "$RELEASE_TYPE" = "prerelease" ] && FLAGS+=(--prerelease)
+            gh release create "${FLAGS[@]}" "${ASSETS[@]}"
+          fi
+
+          echo ""
+          echo "OK Release $TAG publicado:"
+          echo "  - $JP  (Bytecode JPBC puro)"
+          echo "  - SHA256SUMS.txt"
 `
 
 	gitignoreContent := `*.jp

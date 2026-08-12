@@ -215,7 +215,7 @@ func main() {
 			fmt.Println("  joss new console [ruta]    - Crea proyecto de consola")
 			fmt.Println("  joss new web [ruta]        - Crea proyecto web (explícito)")
 			fmt.Println("  joss new package [nombre]  - Crea un nuevo paquete optimizado para Joss")
-			fmt.Println("  joss new plugin [ruta]     - Crea un nuevo plugin oficial con sidecar nativo Go")
+			fmt.Println("  joss new plugin [ruta]     - Crea un nuevo plugin oficial (.jp Bytecode puro, sin sidecar)")
 			return
 		}
 

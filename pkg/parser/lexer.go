@@ -9,6 +9,10 @@ type Lexer struct {
 }
 
 func NewLexer(input string) *Lexer {
+	// Strip UTF-8 BOM (\xEF\xBB\xBF) if present
+	if len(input) >= 3 && input[0] == 0xEF && input[1] == 0xBB && input[2] == 0xBF {
+		input = input[3:]
+	}
 	l := &Lexer{input: input, line: 1}
 	l.readChar()
 	return l
@@ -158,9 +162,17 @@ func (l *Lexer) NextToken() Token {
 		}
 	case '*':
 		tok = l.newToken(ASTERISK, l.ch)
+	case '#':
+		// # is treated as a single-line comment (e.g. shebang or Python-style comments)
+		l.skipComment()
+		return l.NextToken()
 	case '/':
 		if l.peekChar() == '/' {
 			l.skipComment()
+			return l.NextToken()
+		} else if l.peekChar() == '*' {
+			l.readChar() // consume '*'
+			l.skipBlockComment()
 			return l.NextToken()
 		}
 		tok = l.newToken(SLASH, l.ch)
@@ -230,6 +242,12 @@ func (l *Lexer) NextToken() Token {
 			}
 			tok.Line = l.line
 			return tok
+		} else if l.ch > 127 {
+			// Skip multi-byte UTF-8 continuation/lead bytes silently
+			for l.ch > 127 {
+				l.readChar()
+			}
+			return l.NextToken()
 		} else {
 			tok = l.newToken(ILLEGAL, l.ch)
 		}
@@ -243,7 +261,21 @@ func (l *Lexer) skipComment() {
 	for l.ch != '\n' && l.ch != 0 {
 		l.readChar()
 	}
-	l.skipWhitespace()
+}
+
+func (l *Lexer) skipBlockComment() {
+	// l.ch is currently '*' — skip until */
+	for l.ch != 0 {
+		l.readChar()
+		if l.ch == '*' && l.peekChar() == '/' {
+			l.readChar() // consume '*'
+			l.readChar() // consume '/'
+			return
+		}
+		if l.ch == '\n' {
+			l.line++
+		}
+	}
 }
 
 func (l *Lexer) newToken(tokenType TokenType, ch byte) Token {

@@ -603,7 +603,7 @@ func isPluginRuntimeFile(relPath string) bool {
 	if clean == "joss.yaml" || clean == "README.md" {
 		return true
 	}
-	if strings.HasPrefix(clean, "src/") || strings.HasPrefix(clean, "cmd/sidecar/") || strings.HasPrefix(clean, "sidecar") {
+	if strings.HasPrefix(clean, "src/") {
 		return true
 	}
 	if strings.HasSuffix(clean, ".jp") {
@@ -654,7 +654,7 @@ func extractZipSecurely(zipPath, name, ver string) error {
 			continue
 		}
 
-		// Filter: Extract ONLY runtime essential plugin files (joss.yaml, src/, sidecar, .jp)
+		// Filter: Extract ONLY runtime essential plugin files (joss.yaml, src/, .jp)
 		if !isPluginRuntimeFile(relName) {
 			continue
 		}
