@@ -210,6 +210,10 @@ func Read(data []byte) (*Archive, error) {
 		if strings.TrimSpace(target) == "" {
 			return nil, fmt.Errorf("jp: target nativo vacio")
 		}
+		// Remote URLs are downloaded at runtime — skip file presence check
+		if strings.HasPrefix(executable, "https://") || strings.HasPrefix(executable, "http://") {
+			continue
+		}
 		if _, ok := files[executable]; !ok {
 			return nil, fmt.Errorf("jp: target %s apunta a %q inexistente", target, executable)
 		}

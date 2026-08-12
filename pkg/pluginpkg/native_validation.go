@@ -23,6 +23,9 @@ func validateNativePayloads(metadata Metadata, files map[string][]byte) error {
 		available[strings.ToLower(path.Base(strings.ReplaceAll(name, "\\", "/")))] = true
 	}
 	for target, file := range targets {
+		if strings.HasPrefix(file, "https://") || strings.HasPrefix(file, "http://") {
+			continue
+		}
 		content, ok := files[file]
 		if !ok {
 			return fmt.Errorf("jp: target %s apunta a %q inexistente", target, file)
