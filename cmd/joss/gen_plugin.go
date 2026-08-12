@@ -95,45 +95,16 @@ jobs:
           go-version: '1.24'
           cache: true
 
-      - name: Download Joss CLI (canary prerelease)
+      - name: Build Joss CLI from canary (main branch)
         shell: bash
         run: |
-          ASSET_URL=$(python3 <<'PYEOF'
-          import urllib.request, json, sys
-          url = "https://api.github.com/repos/joss-language/Joss-Programming-Language/releases"
-          req = urllib.request.Request(url, headers={"User-Agent": "Joss-Plugin-Builder"})
-          releases = json.loads(urllib.request.urlopen(req).read())
-          # Prefer prerelease (canary), fall back to latest stable
-          rel = next((r for r in releases if r["prerelease"] and not r["draft"]), None)
-          if not rel:
-              rel = next((r for r in releases if not r["draft"]), None)
-          if not rel: sys.exit("No release found")
-          print(f"Using release: {rel['tag_name']} (prerelease={rel['prerelease']})", file=sys.stderr)
-          asset = next((a for a in rel["assets"] if "linux" in a["name"] and "amd64" in a["name"]), None)
-          if not asset: asset = next((a for a in rel["assets"] if "linux" in a["name"]), None)
-          if asset: print(asset["browser_download_url"])
-          PYEOF
-          )
-
-          echo "Descargando: $ASSET_URL"
-          curl -sL "$ASSET_URL" -o joss_pkg
-          FILETYPE=$(file joss_pkg)
-          if echo "$FILETYPE" | grep -qi 'zip\|Zip'; then
-            unzip -o joss_pkg -d joss_extract
-            JOSS_BIN=$(find joss_extract -type f -name 'joss-linux-amd64' | head -1)
-            if [ -z "$JOSS_BIN" ]; then
-              JOSS_BIN=$(find joss_extract -type f -name 'joss' ! -name '*.exe' | head -1)
-            fi
-            if [ -z "$JOSS_BIN" ]; then
-              JOSS_BIN=$(find joss_extract -type f ! -name '*arm*' ! -name '*.sh' ! -name 'LICENSE*' ! -name 'README*' ! -name '*.exe' | head -1)
-            fi
-            cp "$JOSS_BIN" ./joss
-            rm -rf joss_extract
-          elif echo "$FILETYPE" | grep -qi 'gzip\|tar'; then
-            tar -xzf joss_pkg --wildcards '*/joss' --strip-components=1 2>/dev/null || true
-          else
-            mv joss_pkg joss
-          fi
+          echo "Compilando Joss CLI canary (latest de main branch)..."
+          curl -sL "https://github.com/joss-language/Joss-Programming-Language/archive/refs/heads/main.zip" -o joss_src.zip
+          unzip -q joss_src.zip
+          cd Joss-Programming-Language-main
+          go build -trimpath -ldflags="-s -w" -o ../joss ./cmd/joss
+          cd ..
+          rm -rf joss_src.zip Joss-Programming-Language-main
           chmod +x ./joss
           mv ./joss /usr/local/bin/joss 2>/dev/null || true
           joss version || ./joss version
@@ -188,6 +159,7 @@ jobs:
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
           TAG:          ${{ steps.meta.outputs.tag }}
           NAME:         ${{ steps.meta.outputs.name }}
           VER:          ${{ steps.meta.outputs.version }}
@@ -197,25 +169,25 @@ jobs:
           ASSETS=("$JP" "SHA256SUMS.txt")
 
           # Buscar si ya existe una release con este tag (draft, prerelease o published)
-          if gh release view "$TAG" &>/dev/null; then
+          if gh release view "$TAG" --repo "$GH_REPO" &>/dev/null; then
             echo "La release '$TAG' ya existe. Actualizando archivos y estado..."
 
             # Reemplazar archivos existentes
-            gh release upload "$TAG" "${ASSETS[@]}" --clobber
+            gh release upload "$TAG" "${ASSETS[@]}" --repo "$GH_REPO" --clobber
 
             # Actualizar tipo de release segun el input
             if [ "$RELEASE_TYPE" = "draft" ]; then
-              gh release edit "$TAG" --draft=true  --prerelease=false
+              gh release edit "$TAG" --repo "$GH_REPO" --draft=true  --prerelease=false
             elif [ "$RELEASE_TYPE" = "prerelease" ]; then
-              gh release edit "$TAG" --draft=false --prerelease=true
+              gh release edit "$TAG" --repo "$GH_REPO" --draft=false --prerelease=true
             else
-              gh release edit "$TAG" --draft=false --prerelease=false
+              gh release edit "$TAG" --repo "$GH_REPO" --draft=false --prerelease=false
             fi
 
             echo "Release '$TAG' actualizada ($RELEASE_TYPE)."
           else
             echo "Creando nueva release '$TAG' ($RELEASE_TYPE)..."
-            FLAGS=("$TAG" --title "$NAME v$VER" --generate-notes)
+            FLAGS=("$TAG" --repo "$GH_REPO" --title "$NAME v$VER" --generate-notes)
             [ "$RELEASE_TYPE" = "draft" ]      && FLAGS+=(--draft)
             [ "$RELEASE_TYPE" = "prerelease" ] && FLAGS+=(--prerelease)
             gh release create "${FLAGS[@]}" "${ASSETS[@]}"
