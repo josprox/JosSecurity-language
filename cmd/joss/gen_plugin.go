@@ -95,7 +95,7 @@ jobs:
           go-version: '1.24'
           cache: true
 
-      - name: Download Joss CLI (latest release)
+      - name: Download Joss CLI (canary prerelease)
         shell: bash
         run: |
           ASSET_URL=$(python3 <<'PYEOF'
@@ -103,44 +103,37 @@ jobs:
           url = "https://api.github.com/repos/joss-language/Joss-Programming-Language/releases"
           req = urllib.request.Request(url, headers={"User-Agent": "Joss-Plugin-Builder"})
           releases = json.loads(urllib.request.urlopen(req).read())
-          rel = next((r for r in releases if not r["draft"]), None)
+          # Prefer prerelease (canary), fall back to latest stable
+          rel = next((r for r in releases if r["prerelease"] and not r["draft"]), None)
+          if not rel:
+              rel = next((r for r in releases if not r["draft"]), None)
           if not rel: sys.exit("No release found")
+          print(f"Using release: {rel['tag_name']} (prerelease={rel['prerelease']})", file=sys.stderr)
           asset = next((a for a in rel["assets"] if "linux" in a["name"] and "amd64" in a["name"]), None)
           if not asset: asset = next((a for a in rel["assets"] if "linux" in a["name"]), None)
           if asset: print(asset["browser_download_url"])
           PYEOF
-          ) || true
+          )
 
-          if [ -z "$ASSET_URL" ]; then
-            echo "Compilando Joss CLI desde fuente..."
-            curl -sL "https://github.com/joss-language/Joss-Programming-Language/archive/refs/heads/main.zip" -o joss_src.zip
-            unzip -q joss_src.zip
-            cd Joss-Programming-Language-main
-            go build -trimpath -ldflags="-s -w" -o ../joss ./cmd/joss
-            cd ..
-          else
-            echo "Descargando Joss CLI desde: $ASSET_URL"
-            curl -sL "$ASSET_URL" -o joss_pkg
-            FILETYPE=$(file joss_pkg)
-            if echo "$FILETYPE" | grep -qi 'zip\|Zip'; then
-              unzip -o joss_pkg -d joss_extract
-              JOSS_BIN=$(find joss_extract -type f -name 'joss-linux-amd64' | head -1)
-              if [ -z "$JOSS_BIN" ]; then
-                JOSS_BIN=$(find joss_extract -type f -name 'joss' ! -name '*.exe' | head -1)
-              fi
-              if [ -z "$JOSS_BIN" ]; then
-                JOSS_BIN=$(find joss_extract -type f ! -name '*arm*' ! -name '*.sh' ! -name 'LICENSE*' ! -name 'README*' ! -name '*.exe' | head -1)
-              fi
-              cp "$JOSS_BIN" ./joss
-              rm -rf joss_extract
-            elif echo "$FILETYPE" | grep -qi 'gzip\|tar'; then
-              tar -xzf joss_pkg --wildcards '*/joss' --strip-components=1 2>/dev/null || \
-              tar -xzf joss_pkg -C /tmp && find /tmp -name 'joss' ! -name '*.exe' -type f | head -1 | xargs -I{} cp {} ./joss
-            else
-              mv joss_pkg joss
+          echo "Descargando: $ASSET_URL"
+          curl -sL "$ASSET_URL" -o joss_pkg
+          FILETYPE=$(file joss_pkg)
+          if echo "$FILETYPE" | grep -qi 'zip\|Zip'; then
+            unzip -o joss_pkg -d joss_extract
+            JOSS_BIN=$(find joss_extract -type f -name 'joss-linux-amd64' | head -1)
+            if [ -z "$JOSS_BIN" ]; then
+              JOSS_BIN=$(find joss_extract -type f -name 'joss' ! -name '*.exe' | head -1)
             fi
+            if [ -z "$JOSS_BIN" ]; then
+              JOSS_BIN=$(find joss_extract -type f ! -name '*arm*' ! -name '*.sh' ! -name 'LICENSE*' ! -name 'README*' ! -name '*.exe' | head -1)
+            fi
+            cp "$JOSS_BIN" ./joss
+            rm -rf joss_extract
+          elif echo "$FILETYPE" | grep -qi 'gzip\|tar'; then
+            tar -xzf joss_pkg --wildcards '*/joss' --strip-components=1 2>/dev/null || true
+          else
+            mv joss_pkg joss
           fi
-
           chmod +x ./joss
           mv ./joss /usr/local/bin/joss 2>/dev/null || true
           joss version || ./joss version
