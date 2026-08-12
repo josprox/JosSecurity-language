@@ -184,7 +184,7 @@ jobs:
           sha256sum "${{ steps.meta.outputs.name }}.jp" > SHA256SUMS.txt
           cat SHA256SUMS.txt
 
-      - name: Publish GitHub Release
+      - name: Publish or update GitHub Release
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
@@ -196,21 +196,31 @@ jobs:
           JP="${NAME}.jp"
           ASSETS=("$JP" "SHA256SUMS.txt")
 
+          # Buscar si ya existe una release con este tag (draft, prerelease o published)
           if gh release view "$TAG" &>/dev/null; then
-            echo "Actualizando release existente $TAG..."
+            echo "La release '$TAG' ya existe. Actualizando archivos y estado..."
+
+            # Reemplazar archivos existentes
             gh release upload "$TAG" "${ASSETS[@]}" --clobber
+
+            # Actualizar tipo de release segun el input
+            if [ "$RELEASE_TYPE" = "draft" ]; then
+              gh release edit "$TAG" --draft=true  --prerelease=false
+            elif [ "$RELEASE_TYPE" = "prerelease" ]; then
+              gh release edit "$TAG" --draft=false --prerelease=true
+            else
+              gh release edit "$TAG" --draft=false --prerelease=false
+            fi
+
+            echo "Release '$TAG' actualizada ($RELEASE_TYPE)."
           else
-            echo "Creando release $TAG ($RELEASE_TYPE)..."
+            echo "Creando nueva release '$TAG' ($RELEASE_TYPE)..."
             FLAGS=("$TAG" --title "$NAME v$VER" --generate-notes)
             [ "$RELEASE_TYPE" = "draft" ]      && FLAGS+=(--draft)
             [ "$RELEASE_TYPE" = "prerelease" ] && FLAGS+=(--prerelease)
             gh release create "${FLAGS[@]}" "${ASSETS[@]}"
+            echo "Release '$TAG' creada ($RELEASE_TYPE)."
           fi
-
-          echo ""
-          echo "OK Release $TAG publicado:"
-          echo "  - $JP  (Bytecode JPBC puro)"
-          echo "  - SHA256SUMS.txt"
 `
 
 	gitignoreContent := `*.jp
