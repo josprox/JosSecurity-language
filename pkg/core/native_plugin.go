@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -59,7 +60,14 @@ func (r *Runtime) registerPluginNativePayload(name, version, root string, target
 	if err != nil {
 		return fmt.Errorf("plugin %s %s: %w", name, version, err)
 	}
-	if r.usePluginVFS {
+
+	// If executable is a URL (lazy download model), download it to disk now
+	if strings.HasPrefix(executable, "https://") || strings.HasPrefix(executable, "http://") {
+		clean, err = downloadSidecarIfNeeded(name, version, root, target, executable)
+		if err != nil {
+			return fmt.Errorf("plugin %s %s: no se pudo descargar sidecar para %s: %w", name, version, target, err)
+		}
+	} else if r.usePluginVFS {
 		if _, ok := files[clean]; !ok {
 			return fmt.Errorf("plugin %s %s: falta ejecutable nativo %q", name, version, clean)
 		}
@@ -81,6 +89,56 @@ func (r *Runtime) registerPluginNativePayload(name, version, root string, target
 		UseVFS:       r.usePluginVFS,
 	}
 	return nil
+}
+
+// downloadSidecarIfNeeded fetches the sidecar binary for the current platform
+// from the URL declared in the plugin manifest and caches it on disk.
+// The binary is stored at <plugin_root>/native/<os>-<arch>/<name>[.exe]
+func downloadSidecarIfNeeded(pluginName, version, root, target, url string) (string, error) {
+	ext := ""
+	if runtime.GOOS == "windows" {
+		ext = ".exe"
+	}
+	relPath := filepath.Join("native", target, pluginName+ext)
+	absPath := filepath.Join(root, relPath)
+
+	// Already downloaded
+	if info, err := os.Stat(absPath); err == nil && info.Size() > 0 {
+		return filepath.ToSlash(relPath), nil
+	}
+
+	fmt.Printf("[plugin %s] Descargando sidecar para %s...\n", pluginName, target)
+	if err := os.MkdirAll(filepath.Dir(absPath), 0755); err != nil {
+		return "", err
+	}
+
+	client := &http.Client{Timeout: 120 * time.Second}
+	resp, err := client.Get(url) //nolint:noctx
+	if err != nil {
+		return "", fmt.Errorf("error de red: %w", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("HTTP %d al descargar sidecar desde %s", resp.StatusCode, url)
+	}
+
+	tmp := absPath + ".tmp"
+	f, err := os.OpenFile(tmp, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0755)
+	if err != nil {
+		return "", err
+	}
+	if _, err := io.Copy(f, resp.Body); err != nil {
+		f.Close()
+		os.Remove(tmp)
+		return "", err
+	}
+	f.Close()
+	if err := os.Rename(tmp, absPath); err != nil {
+		os.Remove(tmp)
+		return "", err
+	}
+	fmt.Printf("[plugin %s] Sidecar listo en %s\n", pluginName, relPath)
+	return filepath.ToSlash(relPath), nil
 }
 
 func (r *Runtime) registerPluginABIPayload(name, version, root string, targets map[string]string, files map[string][]byte) error {

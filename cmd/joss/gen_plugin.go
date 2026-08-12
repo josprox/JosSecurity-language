@@ -42,14 +42,24 @@ entry:
   main: src/plugin.joss
 native:
   protocol: joss-rpc-v1
-  windows-amd64: native/windows-amd64/%s.exe
-  windows-arm64: native/windows-arm64/%s.exe
-  linux-amd64: native/linux-amd64/%s
-  linux-arm64: native/linux-arm64/%s
-  darwin-amd64: native/darwin-amd64/%s
-  darwin-arm64: native/darwin-arm64/%s
+  # URLs apuntan a los assets del GitHub Release.
+  # El runtime descarga el sidecar correcto para la plataforma actual la primera vez.
+  # Publica los binarios en GitHub Releases con: joss pub release
+  windows-amd64: https://github.com/TU_USUARIO/%s/releases/latest/download/%s-windows-amd64.exe
+  windows-arm64: https://github.com/TU_USUARIO/%s/releases/latest/download/%s-windows-arm64.exe
+  linux-amd64: https://github.com/TU_USUARIO/%s/releases/latest/download/%s-linux-amd64
+  linux-arm64: https://github.com/TU_USUARIO/%s/releases/latest/download/%s-linux-arm64
+  darwin-amd64: https://github.com/TU_USUARIO/%s/releases/latest/download/%s-darwin-amd64
+  darwin-arm64: https://github.com/TU_USUARIO/%s/releases/latest/download/%s-darwin-arm64
 dependencies:
-`, pluginName, pluginName, pluginName, pluginName, pluginName, pluginName, pluginName)
+`, pluginName,
+		pluginName, pluginName,
+		pluginName, pluginName,
+		pluginName, pluginName,
+		pluginName, pluginName,
+		pluginName, pluginName,
+		pluginName, pluginName,
+	)
 
 	pluginJossContent := fmt.Sprintf(`// src/plugin.joss
 // Clase exportada para interactuar con el plugin %s

@@ -377,7 +377,9 @@ func buildPackage(pkgPath string) {
 		protocol = "joss-rpc-v1"
 	}
 
-	// Include assets and autonomous native payloads, never Joss/Go source.
+	// Include ONLY bytecode, symbols, joss.yaml, and small non-binary assets.
+	// Native sidecar binaries (native/ folder) are NEVER bundled in .jp —
+	// they are downloaded per-platform on demand at install time.
 	err = filepath.Walk(pkgPath, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return nil
@@ -391,8 +393,22 @@ func buildPackage(pkgPath string) {
 			return nil
 		}
 
+		// Skip native/ folder entirely — sidecars are fetched per-platform at install time
+		relCheck, _ := filepath.Rel(pkgPath, path)
+		relCheckSlash := filepath.ToSlash(relCheck)
+		if relCheckSlash == "native" || strings.HasPrefix(relCheckSlash, "native/") {
+			if info.IsDir() {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+
 		ext := strings.ToLower(filepath.Ext(path))
 		if ext == ".jp" || isPluginSourceExtension(ext) || info.Name() == "env.joss" || info.Name() == "env.enc" {
+			return nil
+		}
+		// Skip compiled native executables and shared libs that slipped outside native/
+		if ext == ".exe" || ext == ".dll" || ext == ".so" || ext == ".dylib" {
 			return nil
 		}
 
