@@ -111,6 +111,7 @@ func printHelp() {
 	fmt.Printf("  ai:activate             - %s\n", tr("IaActivate"))
 	fmt.Printf("  brevo:config            - %s\n", tr("brevoConfig"))
 	fmt.Printf("    --enable --api-key / --disable\n")
+	fmt.Printf("  plugin [subcomando]     - Compilar, inspeccionar e instalar plugins en bytecode Joss (compile, inspect, install)\n")
 	fmt.Printf("  pub [subcomando]        - Gestionar paquetes y dependencias (add, remove, install, update, publish, login)\n")
 	fmt.Printf("  package inspect [jp]    - Inspeccionar bytecode y payloads nativos de un JP v2\n")
 	fmt.Printf("  update [-f|--canary|--stable]- Actualiza la versión de Joss, SDK y plugins (-f fuerza re-descarga)\n")

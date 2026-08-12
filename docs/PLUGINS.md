@@ -23,9 +23,28 @@ joss build package .
 joss package inspect mi_plugin.jp
 ```
 
-El JP incluye bytecode sin fuentes Joss, `META-INF/joss-symbols.json` para IntelliSense, assets y payloads nativos declarados. Excluye extensiones de fuente conocidas, archivos de entorno y otros JP. El límite es 128 MiB por archivo y 256 MiB por paquete.
+## Compilación de Plugins Multilenguaje a Bytecode Joss (.jp / JPBC)
 
-Cada build se firma con Ed25519. Joss reutiliza `~/.joss/keys/<plugin>.ed25519` o la ruta de `JOSS_PLUGIN_SIGNING_KEY`; la llave privada nunca entra al paquete. El runtime, la instalación Pub y la publicación rechazan JP v2 sin firma o con contenido alterado. `joss.lock` fija también el `key_id` del autor para detectar un cambio de llave inesperado. `joss package inspect` muestra algoritmo y `key_id`.
+Joss incluye un compilador de plugins (`joss plugin compile`) que permite desarrollar en **Java, Python, PHP, C/C++, Rust, Kotlin, Dart o Flutter** y compilar el código a **Bytecode nativo de Joss (JPBC / Joss Plugin IR)**.
+
+El paquete resultante `.jp` es minificado (< 1 MB mediante Tree Shaking), firmado criptográficamente con Ed25519 y **no requiere que el usuario final tenga instalado Java, CPython, PHP, Maven o Gradle**.
+
+```bash
+# Compilar plugin desarrollado en Java (.class / .jar)
+joss plugin compile MiPlugin.jar --lang=java --name=music-plugin --exports=searchSong,getSong
+
+# Compilar plugin desarrollado en Python (.py)
+joss plugin compile script.py --lang=python --name=tax-plugin --exports=calculate_tax
+
+# Compilar plugin desarrollado en Rust / C++ (WebAssembly .wasm)
+joss plugin compile module.wasm --lang=rust --name=crypto-plugin --exports=encrypt_payload --permissions=filesystem.read
+
+# Inspeccionar el bytecode y permisos del plugin
+joss plugin inspect music-plugin.jp
+
+# Instalar localmente el plugin compilado
+joss plugin install music-plugin.jp
+```
 
 ## Payload RPC autocontenido
 
