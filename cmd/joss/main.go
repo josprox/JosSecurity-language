@@ -77,6 +77,8 @@ func main() {
 	command := os.Args[1]
 
 	switch command {
+	case "plugin":
+		runPluginCommand(os.Args[2:])
 	case "update":
 		handleUpdateCommand(os.Args[2:])
 	case "server":

@@ -29,7 +29,10 @@ type Metadata struct {
 	Format             int               `json:"format"`
 	Name               string            `json:"name"`
 	Version            string            `json:"version"`
+	Language           string            `json:"language,omitempty"`
 	Bytecode           string            `json:"bytecode"`
+	Exports            []string          `json:"exports,omitempty"`
+	Permissions        []string          `json:"permissions,omitempty"`
 	Dependencies       map[string]string `json:"dependencies,omitempty"`
 	Native             map[string]string `json:"native,omitempty"` // os-arch -> executable path
 	ABI                map[string]string `json:"abi,omitempty"`    // os-arch -> shared library path

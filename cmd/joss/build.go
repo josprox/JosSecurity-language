@@ -404,7 +404,7 @@ func buildPackage(pkgPath string) {
 		}
 
 		ext := strings.ToLower(filepath.Ext(path))
-		if ext == ".jp" || isPluginSourceExtension(ext) || info.Name() == "env.joss" || info.Name() == "env.enc" {
+		if ext == ".jp" || ext == ".go" || isPluginSourceExtension(ext) || info.Name() == "env.joss" || info.Name() == "env.enc" {
 			return nil
 		}
 		// Skip compiled native executables and shared libs that slipped outside native/
