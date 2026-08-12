@@ -598,6 +598,20 @@ func installFromGitHubRepo(name, repoURL string) error {
 	return fmt.Errorf("no se pudo descargar el paquete desde el repositorio GitHub")
 }
 
+func isPluginRuntimeFile(relPath string) bool {
+	clean := strings.TrimPrefix(filepath.ToSlash(relPath), "/")
+	if clean == "joss.yaml" || clean == "README.md" {
+		return true
+	}
+	if strings.HasPrefix(clean, "src/") || strings.HasPrefix(clean, "cmd/sidecar/") || strings.HasPrefix(clean, "sidecar") {
+		return true
+	}
+	if strings.HasSuffix(clean, ".jp") {
+		return true
+	}
+	return false
+}
+
 func extractZipSecurely(zipPath, name, ver string) error {
 	r, err := zip.OpenReader(zipPath)
 	if err != nil {
@@ -637,6 +651,11 @@ func extractZipSecurely(zipPath, name, ver string) error {
 			relName = strings.TrimPrefix(relName, rootPrefix)
 		}
 		if relName == "" || relName == "." {
+			continue
+		}
+
+		// Filter: Extract ONLY runtime essential plugin files (joss.yaml, src/, sidecar, .jp)
+		if !isPluginRuntimeFile(relName) {
 			continue
 		}
 
