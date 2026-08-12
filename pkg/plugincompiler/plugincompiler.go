@@ -6,8 +6,12 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/jossecurity/joss/pkg/plugincompiler/backends/java"
+	"github.com/jossecurity/joss/pkg/plugincompiler/backends/nativewasm"
+	"github.com/jossecurity/joss/pkg/plugincompiler/backends/php"
+	"github.com/jossecurity/joss/pkg/plugincompiler/backends/python"
 	"github.com/jossecurity/joss/pkg/plugincompiler/codegen"
 	"github.com/jossecurity/joss/pkg/plugincompiler/ir"
 	"github.com/jossecurity/joss/pkg/plugincompiler/optimizer"
@@ -26,7 +30,7 @@ type Options struct {
 	MaxSizeMB   float64
 }
 
-// CompileProject analiza el proyecto fuente (Java/Python/etc), aplica Tree Shaking y compila a .jp.
+// CompileProject analiza el proyecto fuente (Java/Python/PHP/Rust/C/Dart/etc), aplica Tree Shaking y compila a .jp.
 func CompileProject(opts Options) (string, *optimizer.Result, error) {
 	if opts.MaxSizeMB <= 0 {
 		opts.MaxSizeMB = 1.0 // Objetivo predeterminado: 1 MB
@@ -35,16 +39,27 @@ func CompileProject(opts Options) (string, *optimizer.Result, error) {
 	var module *ir.IRModule
 	var err error
 
-	switch opts.Language {
-	case "java":
+	lang := strings.ToLower(opts.Language)
+
+	switch lang {
+	case "java", "kotlin":
 		backend := java.NewJavaBackend()
 		if filepath.Ext(opts.EntryFile) == ".jar" {
 			module, err = backend.CompileFromJar(opts.EntryFile, opts.Name, opts.Version, opts.Exports, opts.Permissions)
 		} else {
 			module, err = backend.CompileFromClassFile(opts.EntryFile, opts.Name, opts.Version, opts.Exports, opts.Permissions)
 		}
+	case "python", "py":
+		backend := python.NewPythonBackend()
+		module, err = backend.Compile(opts.EntryFile, opts.Name, opts.Version, opts.Exports, opts.Permissions)
+	case "php":
+		backend := php.NewPHPBackend()
+		module, err = backend.Compile(opts.EntryFile, opts.Name, opts.Version, opts.Exports, opts.Permissions)
+	case "rust", "c", "cpp", "c++", "dart", "flutter", "wasm":
+		backend := nativewasm.NewNativeWasmBackend(lang)
+		module, err = backend.Compile(opts.EntryFile, opts.Name, opts.Version, opts.Exports, opts.Permissions)
 	default:
-		return "", nil, fmt.Errorf("compilador de plugins: lenguaje %q no soportado aun (disponibles: java)", opts.Language)
+		return "", nil, fmt.Errorf("compilador de plugins: lenguaje %q no soportado (soportados: java, python, php, rust, c, c++, dart, flutter, kotlin, wasm)", opts.Language)
 	}
 
 	if err != nil {
