@@ -115,10 +115,17 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 # Descargar e instalar la versión release oficial de Joss CLI
 RUN set -eux; \
-    echo "Descargando Joss CLI (jossecurity-linux.zip)..."; \
-    curl -fsSL "https://github.com/joss-language/Joss-Programming-Language/releases/latest/download/jossecurity-linux.zip" -o /tmp/joss_pkg.zip; \
+    arch="$(dpkg --print-architecture)"; \
+    releases_url="https://api.github.com/repos/joss-language/Joss-Programming-Language/releases"; \
+    rel_json="$(curl -fsSL "${releases_url}" | jq -c '.[] | select(.draft == false)' | head -n 1)"; \
+    asset_url="$(printf '%s' "${rel_json}" | jq -r ".assets[] | select(.name | contains(\"${arch}\")) | .browser_download_url" | head -n 1)"; \
+    if [ -z "${asset_url}" ] || [ "${asset_url}" = "null" ]; then \
+        asset_url="$(printf '%s' "${rel_json}" | jq -r '.assets[] | select(.name | contains("linux")) | .browser_download_url' | head -n 1)"; \
+    fi; \
+    echo "Descargando Joss CLI para ${arch} desde: ${asset_url}"; \
+    curl -fsSL "${asset_url}" -o /tmp/joss_pkg.zip; \
     unzip -q /tmp/joss_pkg.zip -d /tmp/joss_out; \
-    mv /tmp/joss_out/joss-linux-amd64 /usr/local/bin/joss || mv /tmp/joss_out/joss /usr/local/bin/joss || mv /tmp/joss_out/*/joss /usr/local/bin/joss; \
+    mv /tmp/joss_out/joss* /usr/local/bin/joss || mv /tmp/joss_out/*/joss* /usr/local/bin/joss; \
     rm -rf /tmp/joss_pkg.zip /tmp/joss_out; \
     chmod +x /usr/local/bin/joss; \
     joss version
