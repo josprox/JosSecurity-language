@@ -146,7 +146,7 @@ func (r *Runtime) loadPlugin(name, constraint string) error {
 	if manifest.Name != "" && manifest.Name != name {
 		return fmt.Errorf("plugin %s %s: el manifiesto declara name=%q", name, version, manifest.Name)
 	}
-	if manifest.Version != "" && version != "dev" && manifest.Version != version {
+	if manifest.Version != "" && version != "dev" && version != "compiled" && manifest.Version != version {
 		return fmt.Errorf("plugin %s: la carpeta usa %s pero el manifiesto declara %s", name, version, manifest.Version)
 	}
 	lockedKeyID := ""
@@ -288,6 +288,10 @@ func resolveInstalledPlugin(root, name, constraint string) (string, string, erro
 	if info, err := os.Stat(filepath.Join(base, "joss.yaml")); err == nil && !info.IsDir() {
 		return base, "dev", nil
 	}
+	jpCandidate := filepath.Join(root, "plugins", name+".jp")
+	if info, err := os.Stat(jpCandidate); err == nil && !info.IsDir() {
+		return jpCandidate, "compiled", nil
+	}
 	entries, err := os.ReadDir(base)
 	if err != nil {
 		return "", "", fmt.Errorf("plugin %q no esta instalado; ejecute 'joss pub install'", name)
@@ -352,6 +356,13 @@ func resolveInstalledPluginVFS(name, constraint string) (string, string, error) 
 }
 
 func readInstalledPlugin(pkgRoot, name string) (pluginManifest, map[string][]byte, error) {
+	if strings.HasSuffix(pkgRoot, ".jp") {
+		data, err := os.ReadFile(pkgRoot)
+		if err != nil {
+			return pluginManifest{}, nil, fmt.Errorf("error al leer archivo %s: %w", pkgRoot, err)
+		}
+		return decodePluginArchive(data)
+	}
 	jpPath := filepath.Join(pkgRoot, name+".jp")
 	if data, err := os.ReadFile(jpPath); err == nil && pluginpkg.IsV2(data) {
 		return decodePluginArchive(data)

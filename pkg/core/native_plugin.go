@@ -100,6 +100,12 @@ func downloadSidecarIfNeeded(pluginName, version, root, target, url string) (str
 		ext = ".exe"
 	}
 	relPath := filepath.Join("native", target, pluginName+ext)
+	// If root points to a single .jp file (e.g. plugins/joss_ai.jp), save sidecars in user cache
+	if strings.HasSuffix(root, ".jp") {
+		home, _ := os.UserHomeDir()
+		root = filepath.Join(home, ".joss", "cache", "sidecars", pluginName)
+	}
+
 	absPath := filepath.Join(root, relPath)
 
 	// Already downloaded
@@ -432,8 +438,20 @@ func materializePluginPath(definition *NativePluginDefinition, relative string) 
 	if err != nil {
 		return "", err
 	}
+	if filepath.IsAbs(clean) {
+		if _, err := os.Stat(clean); err == nil {
+			if clean == definition.Executable && runtime.GOOS != "windows" {
+				_ = os.Chmod(clean, 0755)
+			}
+			return clean, nil
+		}
+	}
 	if !definition.UseVFS {
 		resolved := filepath.Join(definition.Root, filepath.FromSlash(clean))
+		if strings.HasSuffix(definition.Root, ".jp") {
+			home, _ := os.UserHomeDir()
+			resolved = filepath.Join(home, ".joss", "cache", "sidecars", definition.Name, filepath.FromSlash(clean))
+		}
 		if _, err := os.Stat(resolved); err == nil {
 			if clean == definition.Executable && runtime.GOOS != "windows" {
 				_ = os.Chmod(resolved, 0755)
@@ -495,6 +513,9 @@ func writeVerifiedPluginAsset(target string, content []byte, executable bool) er
 }
 
 func safePluginRelativePath(value string) (string, error) {
+	if strings.HasPrefix(value, "https://") || strings.HasPrefix(value, "http://") {
+		return value, nil
+	}
 	clean := filepath.ToSlash(filepath.Clean(filepath.FromSlash(value)))
 	if clean == "." || clean == ".." || filepath.IsAbs(value) || strings.HasPrefix(clean, "../") {
 		return "", fmt.Errorf("ruta de plugin insegura: %q", value)
