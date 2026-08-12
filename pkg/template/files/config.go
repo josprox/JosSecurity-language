@@ -149,6 +149,9 @@ WORKDIR /app
 # Copiar el código del proyecto
 COPY . .
 
+# Instalar dependencias/plugins si joss.yaml las declara
+RUN joss pub install || true
+
 RUN chmod +x /app/entrypoint.sh
 
 EXPOSE 80
