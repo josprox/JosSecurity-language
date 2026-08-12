@@ -175,15 +175,15 @@ func buildProgram() {
 
 	switch option {
 	case "1", "windows":
-		buildNative("windows", "amd64")
+		buildNative("windows", "amd64", false)
 	case "2", "linux":
-		buildNative("linux", "amd64")
+		buildNative("linux", "amd64", false)
 	case "3", "mac", "macos", "darwin-arm64":
-		buildNative("darwin", "arm64")
+		buildNative("darwin", "arm64", false)
 	case "4", "darwin-amd64":
-		buildNative("darwin", "amd64")
+		buildNative("darwin", "amd64", false)
 	case "5", "current", "":
-		buildNative(runtime.GOOS, runtime.GOARCH)
+		buildNative(runtime.GOOS, runtime.GOARCH, false)
 	default:
 		fmt.Println("Opción no válida. Cancelando compilación.")
 	}

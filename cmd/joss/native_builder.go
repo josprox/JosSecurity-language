@@ -30,16 +30,22 @@ var supportedTargets = map[string][]string{
 }
 
 // buildNative builds a standalone native executable binary.
-func buildNative(targetOS, targetArch string) {
+func buildNative(targetOS, targetArch string, enableGUI bool) {
 	tOS, tArch, valid := validateBuildTarget(targetOS, targetArch)
 	if !valid {
 		return
+	}
+
+	modeStr := "Consola/Servidor Headless"
+	if enableGUI {
+		modeStr = "Interfaz Gráfica GUI (WebView2)"
 	}
 
 	fmt.Printf("\n=======================================================\n")
 	fmt.Printf("🚀 COMPILADOR NATIVO DE JOSS (AOT & Standalone Mode)\n")
 	fmt.Printf(" Target OS   : %s\n", strings.ToUpper(tOS))
 	fmt.Printf(" Target Arch : %s\n", strings.ToUpper(tArch))
+	fmt.Printf(" Modo GUI    : %s\n", modeStr)
 	fmt.Printf(" Stripped    : -ldflags=\"-s -w\"\n")
 	fmt.Printf(" CGO Enabled : 0 (Enlazado Estático Puro)\n")
 	fmt.Printf("=======================================================\n\n")
@@ -57,14 +63,14 @@ func buildNative(targetOS, targetArch string) {
 	}
 
 	fmt.Println("📦 Empaquetando y precompilando assets (AOT Bytecode AST)...")
-	encryptedAssets, buildKey, err := collectAndEncryptAssets()
+	encryptedAssets, buildKey, err := collectAndEncryptAssets(enableGUI)
 	if err != nil {
 		fmt.Printf("Error procesando assets del proyecto: %v\n", err)
 		return
 	}
 
 	fmt.Println("🔨 Compilando ejecutable nativo con la toolchain de Go...")
-	runnerBytes, err := compileRunnerBinary(tOS, tArch)
+	runnerBytes, err := compileRunnerBinary(tOS, tArch, enableGUI)
 	if err != nil {
 		fmt.Printf("Error compilando runner nativo: %v\n", err)
 		return
@@ -85,7 +91,7 @@ func buildNative(targetOS, targetArch string) {
 	fmt.Printf(" Archivo de Salida : %s\n", outPath)
 	fmt.Printf(" Tamaño Binario   : %.2f MB (Minificado & Comprimido)\n", sizeMB)
 	fmt.Printf(" Destino           : %s/%s\n", tOS, tArch)
-	fmt.Printf(" Modo              : Bytecode AOT Estático (Sin dependencias externas ni Chocolates/Choco)\n")
+	fmt.Printf(" Modo              : %s\n", modeStr)
 	fmt.Printf(" Instrucciones    : Copia '%s' a cualquier PC con %s y ejecútalo directamente.\n\n", outPath, strings.ToUpper(tOS))
 }
 
@@ -116,7 +122,7 @@ func validateBuildTarget(targetOS, targetArch string) (string, string, bool) {
 	return tOS, tArch, false
 }
 
-func collectAndEncryptAssets() ([]byte, []byte, error) {
+func collectAndEncryptAssets(enableGUI bool) ([]byte, []byte, error) {
 	buildKey := make([]byte, 32)
 	if _, err := rand.Read(buildKey); err != nil {
 		return nil, nil, err
@@ -138,7 +144,7 @@ func collectAndEncryptAssets() ([]byte, []byte, error) {
 	}
 
 	fmt.Printf("⚡ Pre-compilados %d archivos Joss a bytecode nativo.\n", compiledCount)
-	encryptProjectEnvironment(files)
+	encryptProjectEnvironment(files, enableGUI)
 
 	var buf bytes.Buffer
 	enc := gob.NewEncoder(&buf)
@@ -206,11 +212,14 @@ func tryCompileJossBytecode(data []byte) ([]byte, bool) {
 	return nil, false
 }
 
-func encryptProjectEnvironment(files map[string][]byte) {
+func encryptProjectEnvironment(files map[string][]byte, enableGUI bool) {
 	envPath := GetEnvFile()
-	data, err := os.ReadFile(envPath)
-	if err != nil {
-		return
+	data, _ := os.ReadFile(envPath)
+
+	if enableGUI {
+		data = append(data, []byte("\nJOSS_GUI=\"true\"")...)
+	} else {
+		data = append(data, []byte("\nJOSS_GUI=\"false\"")...)
 	}
 
 	if _, err := os.Stat(sqliteDbFile); err == nil {
@@ -227,7 +236,7 @@ func encryptProjectEnvironment(files map[string][]byte) {
 	}
 }
 
-func compileRunnerBinary(targetOS, targetArch string) ([]byte, error) {
+func compileRunnerBinary(targetOS, targetArch string, enableGUI bool) ([]byte, error) {
 	tempRunnerDir, err := os.MkdirTemp("", "joss-build-*")
 	if err != nil {
 		return nil, err
@@ -245,7 +254,7 @@ func compileRunnerBinary(targetOS, targetArch string) ([]byte, error) {
 	}
 
 	ldflags := "-s -w"
-	if targetOS == "windows" {
+	if targetOS == "windows" && enableGUI {
 		ldflags += " -H=windowsgui"
 	}
 	cmd := exec.Command("go", "build", "-ldflags="+ldflags, "-o", tempRunnerBin, runnerPkg)

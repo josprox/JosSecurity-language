@@ -117,23 +117,31 @@ func main() {
 		switch target {
 		case "native":
 			targetOS, targetArch := "", ""
-			if len(os.Args) >= 4 {
-				targetOS = os.Args[3]
+			enableGUI := false
+			for _, arg := range os.Args[3:] {
+				if arg == "--gui" {
+					enableGUI = true
+				} else if targetOS == "" {
+					targetOS = arg
+				} else if targetArch == "" {
+					targetArch = arg
+				}
 			}
-			if len(os.Args) >= 5 {
-				targetArch = os.Args[4]
-			}
-			buildNative(targetOS, targetArch)
+			buildNative(targetOS, targetArch, enableGUI)
 		case "program":
 			targetOS, targetArch := "", ""
-			if len(os.Args) >= 4 {
-				targetOS = os.Args[3]
-			}
-			if len(os.Args) >= 5 {
-				targetArch = os.Args[4]
+			enableGUI := false
+			for _, arg := range os.Args[3:] {
+				if arg == "--gui" {
+					enableGUI = true
+				} else if targetOS == "" {
+					targetOS = arg
+				} else if targetArch == "" {
+					targetArch = arg
+				}
 			}
 			if targetOS != "" {
-				buildNative(targetOS, targetArch)
+				buildNative(targetOS, targetArch, enableGUI)
 			} else {
 				buildProgram()
 			}
