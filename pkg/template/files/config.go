@@ -75,5 +75,85 @@ env.enc
 database.sqlite
 log.txt
 `,
+		filepath.Join(path, ".dockerignore"): `plugins/
+env.joss
+env.enc
+database.sqlite
+log.txt
+.git/
+.github/
+`,
+		filepath.Join(path, "entrypoint.sh"): `#!/bin/sh
+set -e
+
+ENV_FILE="/app/env.joss"
+mkdir -p /app/storage
+
+echo "[entrypoint] Generando env.joss..."
+rm -f "$ENV_FILE"
+touch "$ENV_FILE"
+
+for var in $(env | cut -d= -f1); do
+    case "$var" in
+        PATH|HOME|HOSTNAME|TERM|SHLVL|PWD|_|OLDPWD|DEBIAN_FRONTEND|LANG)
+            continue
+            ;;
+        *)
+            val=$(eval echo "\$$var" | sed 's/"/\\"/g')
+            echo "${var}=\"${val}\"" >> "$ENV_FILE"
+            ;;
+    esac
+done
+
+echo "[entrypoint] ✓ env.joss generado."
+echo "[entrypoint] Iniciando servidor web Joss..."
+exec joss server start
+`,
+		filepath.Join(path, "Dockerfile"): `# ============================================================
+# Joss Web — Dockerfile (Debian Minimal + Joss Release)
+# ============================================================
+
+FROM debian:bookworm-slim
+
+# Dependencias mínimas del sistema
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        curl \
+        ca-certificates \
+        unzip \
+        jq \
+    && rm -rf /var/lib/apt/lists/*
+
+# Descargar e instalar la versión release oficial de Joss CLI
+RUN set -eux; \
+    releases_url="https://api.github.com/repos/joss-language/Joss-Programming-Language/releases"; \
+    rel_json="$(curl -fsSL "${releases_url}" | jq -c '.[] | select(.draft == false)' | head -n 1)"; \
+    asset_url="$(printf '%s' "${rel_json}" | jq -r '.assets[] | select(.name | contains("jossecurity-linux.zip")) | .browser_download_url' | head -n 1)"; \
+    if [ -z "${asset_url}" ] || [ "${asset_url}" = "null" ]; then \
+        asset_url="$(printf '%s' "${rel_json}" | jq -r '.assets[] | select(.name | contains("linux")) | .browser_download_url' | head -n 1)"; \
+    fi; \
+    echo "Descargando Joss CLI desde: ${asset_url}"; \
+    curl -fsSL "${asset_url}" -o /tmp/joss_pkg; \
+    if file /tmp/joss_pkg | grep -qi "zip"; then \
+        unzip -q /tmp/joss_pkg -d /tmp/joss_out; \
+        mv /tmp/joss_out/joss-linux-amd64 /usr/local/bin/joss || mv /tmp/joss_out/joss /usr/local/bin/joss || mv /tmp/joss_out/*/joss /usr/local/bin/joss; \
+        rm -rf /tmp/joss_out; \
+    else \
+        mv /tmp/joss_pkg /usr/local/bin/joss; \
+    fi; \
+    rm -f /tmp/joss_pkg; \
+    chmod +x /usr/local/bin/joss; \
+    joss version
+
+WORKDIR /app
+
+# Copiar el código del proyecto
+COPY . .
+
+RUN chmod +x /app/entrypoint.sh
+
+EXPOSE 80
+
+ENTRYPOINT ["/app/entrypoint.sh"]
+`,
 	}
 }
