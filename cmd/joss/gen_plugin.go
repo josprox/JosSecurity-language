@@ -95,18 +95,44 @@ jobs:
           go-version: '1.24'
           cache: true
 
-      - name: Build Joss CLI from canary (main branch)
+      - name: Download Joss CLI & update to canary
         shell: bash
         run: |
-          echo "Compilando Joss CLI canary (latest de main branch)..."
-          curl -sL "https://github.com/joss-language/Joss-Programming-Language/archive/refs/heads/main.zip" -o joss_src.zip
-          unzip -q joss_src.zip
-          cd Joss-Programming-Language-main
-          go build -trimpath -ldflags="-s -w" -o ../joss ./cmd/joss
-          cd ..
-          rm -rf joss_src.zip Joss-Programming-Language-main
+          ASSET_URL=$(python3 <<'PYEOF'
+          import urllib.request, json, sys
+          url = "https://api.github.com/repos/joss-language/Joss-Programming-Language/releases"
+          req = urllib.request.Request(url, headers={"User-Agent": "Joss-Plugin-Builder"})
+          releases = json.loads(urllib.request.urlopen(req).read())
+          rel = next((r for r in releases if r["prerelease"] and not r["draft"]), None)
+          if not rel:
+              rel = next((r for r in releases if not r["draft"]), None)
+          if not rel: sys.exit("No release found")
+          asset = next((a for a in rel["assets"] if "jossecurity-linux.zip" in a["name"]), None)
+          if not asset:
+              asset = next((a for a in rel["assets"] if "linux" in a["name"] and "amd64" in a["name"]), None)
+          if not asset:
+              asset = next((a for a in rel["assets"] if "linux" in a["name"]), None)
+          if asset: print(asset["browser_download_url"])
+          PYEOF
+          )
+
+          echo "Descargando Joss CLI base desde: $ASSET_URL"
+          curl -sL "$ASSET_URL" -o joss_pkg
+          unzip -o joss_pkg -d joss_extract
+          JOSS_BIN=$(find joss_extract -type f -name 'joss-linux-amd64' | head -1)
+          if [ -z "$JOSS_BIN" ]; then
+            JOSS_BIN=$(find joss_extract -type f -name 'joss' ! -name '*.exe' | head -1)
+          fi
+          if [ -z "$JOSS_BIN" ]; then
+            JOSS_BIN=$(find joss_extract -type f ! -name '*arm*' ! -name '*.sh' ! -name 'LICENSE*' ! -name 'README*' ! -name '*.exe' | head -1)
+          fi
+          cp "$JOSS_BIN" ./joss
+          rm -rf joss_extract joss_pkg
           chmod +x ./joss
           mv ./joss /usr/local/bin/joss 2>/dev/null || true
+
+          echo "Actualizando Joss CLI a modo canary..."
+          joss update --canary -f || ./joss update --canary -f || true
           joss version || ./joss version
 
       - name: Parse plugin metadata from joss.yaml
