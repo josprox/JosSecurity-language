@@ -1,9 +1,6 @@
 name: Build manual distribution
 
 on:
-  push:
-    branches:
-      - main
   workflow_dispatch:
     inputs:
       create_release:
