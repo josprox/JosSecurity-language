@@ -93,6 +93,17 @@ func handlePluginCompile(args []string) {
 		name = strings.TrimSuffix(base, ext)
 	}
 
+	// If it's a pure Joss plugin project (joss.yaml type: joss or src/plugin.joss exists)
+	jossEntry := filepath.Join(sourcePath, "src", "plugin.joss")
+	if _, err := os.Stat(jossEntry); err == nil {
+		buildPackage(sourcePath)
+		return
+	}
+	if info, err := os.Stat(sourcePath); err == nil && !info.IsDir() && strings.HasSuffix(sourcePath, ".joss") {
+		buildPackage(filepath.Dir(sourcePath))
+		return
+	}
+
 	fmt.Printf("[Compilador de Plugins Joss] Compilando %s (Lenguaje: %s)...\n", sourcePath, lang)
 
 	opts := plugincompiler.Options{
