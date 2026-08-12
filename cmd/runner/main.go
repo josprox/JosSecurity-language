@@ -12,6 +12,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/jossecurity/joss/pkg/bytecode"
 	"github.com/jossecurity/joss/pkg/core"
 	"github.com/jossecurity/joss/pkg/crypto"
 	"github.com/jossecurity/joss/pkg/parser"
@@ -120,13 +121,26 @@ func main() {
 			content.Read(data)
 			content.Close()
 
-			l := parser.NewLexer(string(data))
-			p := parser.NewParser(l)
-			program := p.ParseProgram()
-			if len(p.Errors()) == 0 {
+			var program *parser.Program
+			if bytecode.IsBytecode(data) {
+				prog, bcErr := bytecode.Decode(data)
+				if bcErr == nil {
+					program = prog
+				} else {
+					log.Printf("Bytecode decode error in main.joss: %v", bcErr)
+				}
+			}
+			if program == nil {
+				l := parser.NewLexer(string(data))
+				p := parser.NewParser(l)
+				program = p.ParseProgram()
+				if len(p.Errors()) > 0 {
+					log.Printf("Parser Errors in main.joss: %v", p.Errors())
+					program = nil
+				}
+			}
+			if program != nil {
 				r.Execute(program)
-			} else {
-				log.Printf("Parser Errors in main.joss: %v", p.Errors())
 			}
 		} else {
 			// Fallback: Start server directly
