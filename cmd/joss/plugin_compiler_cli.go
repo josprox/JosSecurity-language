@@ -67,13 +67,30 @@ func handlePluginCompile(args []string) {
 		}
 	}
 
+	// Auto-detect parameters from joss.yaml if present
+	manifestPath := filepath.Join(sourcePath, "joss.yaml")
+	if info, err := os.Stat(sourcePath); err == nil && !info.IsDir() {
+		manifestPath = filepath.Join(filepath.Dir(sourcePath), "joss.yaml")
+	}
+
+	if data, err := os.ReadFile(manifestPath); err == nil {
+		lines := strings.Split(string(data), "\n")
+		for _, line := range lines {
+			trimmed := strings.TrimSpace(line)
+			if strings.HasPrefix(trimmed, "name:") && name == "" {
+				name = strings.Trim(strings.TrimSpace(strings.TrimPrefix(trimmed, "name:")), "\"'")
+			} else if strings.HasPrefix(trimmed, "version:") {
+				version = strings.Trim(strings.TrimSpace(strings.TrimPrefix(trimmed, "version:")), "\"'")
+			} else if strings.HasPrefix(trimmed, "language:") {
+				lang = strings.Trim(strings.TrimSpace(strings.TrimPrefix(trimmed, "language:")), "\"'")
+			}
+		}
+	}
+
 	if name == "" {
 		base := filepath.Base(sourcePath)
 		ext := filepath.Ext(base)
 		name = strings.TrimSuffix(base, ext)
-	}
-	if len(exports) == 0 {
-		exports = []string{"searchSong", "getSong"}
 	}
 
 	fmt.Printf("[Compilador de Plugins Joss] Compilando %s (Lenguaje: %s)...\n", sourcePath, lang)

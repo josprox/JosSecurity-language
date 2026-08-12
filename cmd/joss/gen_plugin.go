@@ -305,7 +305,7 @@ jobs:
         shell: pwsh
         run: |
           $pluginName = '${{ steps.plugin_meta.outputs.name }}'
-          ./joss.exe build package .
+          ./joss.exe plugin compile .
           $jpFile = "$pluginName.jp"
           if (-not (Test-Path -LiteralPath $jpFile)) {
             throw "No se genero $jpFile"
