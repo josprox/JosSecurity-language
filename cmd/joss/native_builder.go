@@ -83,8 +83,9 @@ func buildNative(targetOS, targetArch string) {
 
 	fmt.Printf("\n✨ ¡COMPILACIÓN NATIVA EXITOSA!\n")
 	fmt.Printf(" Archivo de Salida : %s\n", outPath)
-	fmt.Printf(" Tamaño Binario   : %.2f MB\n", sizeMB)
+	fmt.Printf(" Tamaño Binario   : %.2f MB (Minificado & Comprimido)\n", sizeMB)
 	fmt.Printf(" Destino           : %s/%s\n", tOS, tArch)
+	fmt.Printf(" Modo              : Bytecode AOT Estático (Sin dependencias externas ni Chocolates/Choco)\n")
 	fmt.Printf(" Instrucciones    : Copia '%s' a cualquier PC con %s y ejecútalo directamente.\n\n", outPath, strings.ToUpper(tOS))
 }
 
@@ -251,7 +252,19 @@ func compileRunnerBinary(targetOS, targetArch string) ([]byte, error) {
 		return nil, fmt.Errorf("%v: %s", err, string(out))
 	}
 
+	if upxPath, err := exec.LookPath("upx"); err == nil {
+		upxCmd := exec.Command(upxPath, "--best", "--lzma", tempRunnerBin)
+		_ = upxCmd.Run()
+	}
+
 	return os.ReadFile(tempRunnerBin)
+}
+
+func compressFinalExecutableWithUPX(outPath string) {
+	if upxPath, err := exec.LookPath("upx"); err == nil {
+		upxCmd := exec.Command(upxPath, "--best", "--lzma", outPath)
+		_ = upxCmd.Run()
+	}
 }
 
 func assembleFinalExecutable(buildDir, targetOS string, runnerBytes, encryptedAssets, buildKey []byte) (string, error) {
@@ -296,6 +309,8 @@ func assembleFinalExecutable(buildDir, targetOS string, runnerBytes, encryptedAs
 	if targetOS != "windows" {
 		os.Chmod(outPath, 0755)
 	}
+
+	compressFinalExecutableWithUPX(outPath)
 
 	return outPath, nil
 }

@@ -1,9 +1,5 @@
 package parser
 
-import (
-	"fmt"
-)
-
 type Lexer struct {
 	input        string
 	position     int  // current position in input (points to current char)
@@ -235,7 +231,6 @@ func (l *Lexer) NextToken() Token {
 			tok.Line = l.line
 			return tok
 		} else {
-			fmt.Printf("ILLEGAL CHAR: %q (%d)\n", l.ch, l.ch)
 			tok = l.newToken(ILLEGAL, l.ch)
 		}
 	}
