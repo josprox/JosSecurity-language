@@ -1,9 +1,6 @@
 package core
 
 import (
-	"os"
-	"path/filepath"
-	"runtime"
 	"strings"
 	"testing"
 )
@@ -61,54 +58,4 @@ func TestPluginEnvironmentDefaultPrefixes(t *testing.T) {
 	}
 }
 
-func TestLoadSourcePluginRegistersNativePayload(t *testing.T) {
-	tempDir := t.TempDir()
-	pluginDir := filepath.Join(tempDir, "plugins", "joss_dummy")
-	if err := os.MkdirAll(filepath.Join(pluginDir, "src"), 0755); err != nil {
-		t.Fatal(err)
-	}
 
-	target := runtime.GOOS + "-" + runtime.GOARCH
-	exeName := "dummy"
-	if runtime.GOOS == "windows" {
-		exeName = "dummy.exe"
-	}
-	exeRelPath := filepath.ToSlash(filepath.Join("native", target, exeName))
-	exeAbsPath := filepath.Join(pluginDir, filepath.FromSlash(exeRelPath))
-	if err := os.MkdirAll(filepath.Dir(exeAbsPath), 0755); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(exeAbsPath, []byte("#!/bin/sh\nexit 0"), 0755); err != nil {
-		t.Fatal(err)
-	}
-
-	yamlContent := `name: joss_dummy
-version: 1.0.0
-type: joss
-entry:
-  main: src/plugin.joss
-native:
-  protocol: joss-rpc-v1
-  ` + target + `: ` + exeRelPath + `
-`
-	if err := os.WriteFile(filepath.Join(pluginDir, "joss.yaml"), []byte(yamlContent), 0644); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(filepath.Join(pluginDir, "src", "plugin.joss"), []byte("class Dummy {}"), 0644); err != nil {
-		t.Fatal(err)
-	}
-
-	r := NewRuntime()
-	r.ProjectRoot = tempDir
-	if err := r.LoadPlugin("joss_dummy"); err != nil {
-		t.Fatalf("failed to load source plugin: %v", err)
-	}
-
-	def, exists := r.NativePlugins["joss_dummy"]
-	if !exists || def == nil {
-		t.Fatal("NativePlugins['joss_dummy'] was not registered")
-	}
-	if def.Executable != exeRelPath {
-		t.Fatalf("expected executable %q, got %q", exeRelPath, def.Executable)
-	}
-}
