@@ -249,9 +249,13 @@ func handleUpdateCommand(args []string) {
 		if err == nil {
 			extractedBin := filepath.Join(tempDir, "extracted_joss_binary")
 			found := false
+			expectedName := fmt.Sprintf("joss-%s-%s", runtime.GOOS, runtime.GOARCH)
+			if runtime.GOOS == "windows" {
+				expectedName += ".exe"
+			}
 			for _, file := range zipReader.File {
 				name := strings.ToLower(filepath.Base(file.Name))
-				if name == "joss.exe" || name == "joss" {
+				if name == "joss.exe" || name == "joss" || name == expectedName {
 					rc, err := file.Open()
 					if err == nil {
 						content, _ := io.ReadAll(rc)
@@ -267,7 +271,7 @@ func handleUpdateCommand(args []string) {
 			}
 			if !found {
 				for _, file := range zipReader.File {
-					if !file.FileInfo().IsDir() {
+					if !file.FileInfo().IsDir() && strings.HasPrefix(strings.ToLower(filepath.Base(file.Name)), "joss") {
 						rc, err := file.Open()
 						if err == nil {
 							content, _ := io.ReadAll(rc)
