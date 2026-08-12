@@ -292,70 +292,79 @@ func pubInfo(name string) {
 }
 
 func pubAdd(name string, ver string) {
-	fmt.Printf("Buscando %s...\n", name)
+	fmt.Printf("Buscando %s en joss.red...\n", name)
 
-	// Fetch package details
+	// 1. Primero consultar la API del registro oficial joss.red
 	url := fmt.Sprintf("%s/api/v1/pub/packages/%s", getRegistryURL(), name)
 	resp, err := http.Get(url)
-	if err != nil {
-		fmt.Printf("Error de red: %v\n", err)
-		return
-	}
-	defer resp.Body.Close()
 
-	if resp.StatusCode == http.StatusNotFound {
-		fmt.Printf("Error: Paquete '%s' no encontrado en el registro.\n", name)
-		return
-	}
-
-	var res map[string]interface{}
-	json.NewDecoder(resp.Body).Decode(&res)
-
-	versions, _ := res["versions"].([]interface{})
-	if len(versions) == 0 {
-		fmt.Println("Error: El paquete no tiene versiones publicadas.")
-		return
-	}
-
-	var targetVer map[string]interface{}
-	if ver == "" {
-		// Use latest
-		targetVer = versions[0].(map[string]interface{})
-	} else {
-		for _, v := range versions {
-			curr := v.(map[string]interface{})
-			if curr["version"].(string) == ver {
-				targetVer = curr
-				break
+	var repoURL string
+	if err == nil && resp.StatusCode == http.StatusOK {
+		var res map[string]interface{}
+		if json.NewDecoder(resp.Body).Decode(&res) == nil {
+			versions, _ := res["versions"].([]interface{})
+			pkgInfo, _ := res["package"].(map[string]interface{})
+			if pkgInfo != nil {
+				repoURL, _ = pkgInfo["repository_url"].(string)
 			}
+
+			// Si joss.red tiene versiones publicadas en su registro
+			if len(versions) > 0 {
+				var targetVer map[string]interface{}
+				if ver == "" {
+					targetVer = versions[0].(map[string]interface{})
+				} else {
+					for _, v := range versions {
+						curr := v.(map[string]interface{})
+						if curr["version"].(string) == ver {
+							targetVer = curr
+							break
+						}
+					}
+				}
+
+				if targetVer != nil {
+					resolvedVer := targetVer["version"].(string)
+					downloadUrl, _ := targetVer["download_url"].(string)
+					checksum, _ := targetVer["checksum"].(string)
+
+					fmt.Printf("Resolviendo dependencias desde joss.red...\n")
+					fmt.Printf("Descargando %s %s...\n", name, resolvedVer)
+
+					if err := downloadAndExtract(name, resolvedVer, downloadUrl, checksum); err == nil {
+						updateJossYamlDependency(name, "^"+resolvedVer)
+						if manifestData, readErr := os.ReadFile("joss.yaml"); readErr == nil {
+							generateLockFile(parseManifestDependencies(string(manifestData)))
+						}
+						fmt.Printf("✓ %s %s instalado correctamente desde joss.red\n", name, resolvedVer)
+						return
+					}
+				}
+			}
+		}
+		resp.Body.Close()
+	}
+
+	// 2. Si no se encontró versión publicada en joss.red, buscar en Git / GitHub
+	fmt.Printf("No se encontró versión publicada en joss.red. Buscando en repositorio Git...\n")
+	if repoURL == "" {
+		if strings.HasPrefix(name, "http://") || strings.HasPrefix(name, "https://") || strings.Contains(name, "/") {
+			repoURL = name
+		} else {
+			repoURL = fmt.Sprintf("https://github.com/joss-language/%s", name)
 		}
 	}
 
-	if targetVer == nil {
-		fmt.Printf("Error: La versión '%s' no existe para el paquete '%s'.\n", ver, name)
+	if err := installFromGitHubRepo(name, repoURL); err == nil {
+		updateJossYamlDependency(name, "latest")
+		if manifestData, readErr := os.ReadFile("joss.yaml"); readErr == nil {
+			generateLockFile(parseManifestDependencies(string(manifestData)))
+		}
+		fmt.Printf("✓ %s (latest) instalado correctamente desde Git (%s)\n", name, repoURL)
 		return
 	}
 
-	resolvedVer := targetVer["version"].(string)
-	downloadUrl := targetVer["download_url"].(string)
-	checksum := targetVer["checksum"].(string)
-
-	fmt.Printf("Resolviendo dependencias...\n")
-	fmt.Printf("Descargando %s %s...\n", name, resolvedVer)
-
-	err = downloadAndExtract(name, resolvedVer, downloadUrl, checksum)
-	if err != nil {
-		fmt.Printf("Error al descargar paquete: %v\n", err)
-		return
-	}
-
-	// Update local joss.yaml
-	updateJossYamlDependency(name, "^"+resolvedVer)
-	if manifestData, readErr := os.ReadFile("joss.yaml"); readErr == nil {
-		generateLockFile(parseManifestDependencies(string(manifestData)))
-	}
-
-	fmt.Printf("✓ %s %s instalado correctamente\n", name, resolvedVer)
+	fmt.Printf("Error: No se pudo instalar '%s' ni desde joss.red ni desde el repositorio Git.\n", name)
 }
 
 func pubRemove(name string) {
@@ -533,6 +542,49 @@ func verifyFileSHA256(path, expected string) bool {
 	return strings.EqualFold(actual, expected)
 }
 
+func installFromGitHubRepo(name, repoURL string) error {
+	repoURL = strings.TrimSuffix(strings.TrimSpace(repoURL), ".git")
+	parts := strings.Split(strings.TrimPrefix(repoURL, "https://github.com/"), "/")
+	if len(parts) < 2 {
+		return fmt.Errorf("URL de repositorio GitHub inválida: %s", repoURL)
+	}
+	owner, repo := parts[0], parts[1]
+
+	// 1. Check latest release from GitHub API
+	releaseURL := fmt.Sprintf("https://api.github.com/repos/%s/%s/releases/latest", owner, repo)
+	req, _ := http.NewRequest("GET", releaseURL, nil)
+	req.Header.Set("User-Agent", "Joss-CLI/1.0")
+	client := &http.Client{Timeout: 15 * time.Second}
+	if resp, err := client.Do(req); err == nil && resp.StatusCode == http.StatusOK {
+		var relData map[string]interface{}
+		_ = json.NewDecoder(resp.Body).Decode(&relData)
+		resp.Body.Close()
+
+		if assets, ok := relData["assets"].([]interface{}); ok {
+			for _, a := range assets {
+				asset, _ := a.(map[string]interface{})
+				assetName, _ := asset["name"].(string)
+				downloadURL, _ := asset["browser_download_url"].(string)
+				if strings.HasSuffix(assetName, ".jp") || strings.HasSuffix(assetName, ".zip") {
+					return downloadAndExtract(name, "latest", downloadURL, "")
+				}
+			}
+		}
+	}
+
+	// 2. Fallback: Download source zip from GitHub main/master branch
+	branches := []string{"main", "master"}
+	for _, branch := range branches {
+		zipURL := fmt.Sprintf("https://github.com/%s/%s/archive/refs/heads/%s.zip", owner, repo, branch)
+		err := downloadAndExtract(name, "latest", zipURL, "")
+		if err == nil {
+			return nil
+		}
+	}
+
+	return fmt.Errorf("no se pudo descargar el paquete desde el repositorio GitHub")
+}
+
 func extractZipSecurely(zipPath, name, ver string) error {
 	r, err := zip.OpenReader(zipPath)
 	if err != nil {
@@ -540,12 +592,42 @@ func extractZipSecurely(zipPath, name, ver string) error {
 	}
 	defer r.Close()
 
-	destDir := filepath.Join("plugins", name, ver)
+	destDir := filepath.Join("plugins", name)
+	if ver != "" && ver != "latest" {
+		destDir = filepath.Join("plugins", name, ver)
+	}
 	os.MkdirAll(destDir, 0755)
 
+	// Check if all files share a common root directory prefix (e.g. repo-main/)
+	var rootPrefix string
+	if len(r.File) > 0 {
+		firstParts := strings.Split(filepath.ToSlash(r.File[0].Name), "/")
+		if len(firstParts) > 1 && firstParts[0] != "" {
+			candidate := firstParts[0] + "/"
+			allShare := true
+			for _, f := range r.File {
+				rel := filepath.ToSlash(f.Name)
+				if !strings.HasPrefix(rel, candidate) && rel != strings.TrimSuffix(candidate, "/") {
+					allShare = false
+					break
+				}
+			}
+			if allShare {
+				rootPrefix = candidate
+			}
+		}
+	}
+
 	for _, f := range r.File {
-		// Secure Extraction: Prevent Zip Slip (Path Traversal)
-		targetPath := filepath.Join(destDir, f.Name)
+		relName := filepath.ToSlash(f.Name)
+		if rootPrefix != "" {
+			relName = strings.TrimPrefix(relName, rootPrefix)
+		}
+		if relName == "" || relName == "." {
+			continue
+		}
+
+		targetPath := filepath.Join(destDir, filepath.FromSlash(relName))
 		cleanDest := filepath.Clean(destDir)
 		cleanTarget := filepath.Clean(targetPath)
 
@@ -563,14 +645,12 @@ func extractZipSecurely(zipPath, name, ver string) error {
 		if err != nil {
 			return err
 		}
-		defer outFile.Close()
 
 		rc, err := f.Open()
 		if err != nil {
 			outFile.Close()
 			return err
 		}
-		defer rc.Close()
 
 		_, err = io.Copy(outFile, rc)
 		rc.Close()
@@ -579,7 +659,6 @@ func extractZipSecurely(zipPath, name, ver string) error {
 			return err
 		}
 	}
-
 	return nil
 }
 
