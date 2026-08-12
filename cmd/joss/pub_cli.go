@@ -480,7 +480,7 @@ func installJPFile(cachePath, name, ver string) error {
 		if err != nil {
 			return err
 		}
-		if archive.Metadata.Name != name || archive.Metadata.Version != ver {
+		if archive.Metadata.Name != name || (ver != "latest" && archive.Metadata.Version != ver) {
 			return fmt.Errorf("el JP declara %s %s, se esperaba %s %s", archive.Metadata.Name, archive.Metadata.Version, name, ver)
 		}
 		files = archive.Files
@@ -931,10 +931,11 @@ func installTransitiveDependencies(rootDeps map[string]string, offline bool) err
 
 func getOfficialGitHubFallback(name, version string) (string, bool) {
 	officialPackages := map[string]string{
-		"joss_ai":     "joss-language/joss_ai",
-		"joss_backup": "joss-language/joss_backup",
-		"joss_notify": "joss-language/joss_notify",
-		"joss_smtp":   "joss-language/joss_smtp",
+		"joss_ai":         "joss-language/joss_ai",
+		"joss_backup":     "joss-language/joss_backup",
+		"joss_notify":     "joss-language/joss_notify",
+		"joss_smtp":       "joss-language/joss_smtp",
+		"joss_bg_remover": "joss-language/joss_bg_remover",
 	}
 
 	repo, ok := officialPackages[name]
@@ -946,7 +947,7 @@ func getOfficialGitHubFallback(name, version string) (string, bool) {
 	verClean = strings.TrimPrefix(verClean, "^")
 	verClean = strings.TrimPrefix(verClean, "~")
 
-	if verClean == "" {
+	if verClean == "" || strings.EqualFold(verClean, "latest") {
 		return fmt.Sprintf("https://github.com/%s/releases/latest/download/%s.jp", repo, name), true
 	}
 
@@ -954,8 +955,9 @@ func getOfficialGitHubFallback(name, version string) (string, bool) {
 }
 
 func resolvePackageDownload(name, version string) (string, string, error) {
+	verClean := strings.TrimSpace(version)
 	// First query specific version endpoint from Joss Pub API
-	urlVer := fmt.Sprintf("%s/api/v1/pub/packages/%s/versions/%s", getRegistryURL(), name, version)
+	urlVer := fmt.Sprintf("%s/api/v1/pub/packages/%s/versions/%s", getRegistryURL(), name, verClean)
 	respVer, errVer := http.Get(urlVer)
 	if errVer == nil && respVer.StatusCode == http.StatusOK {
 		var singleRes struct {
@@ -964,7 +966,10 @@ func resolvePackageDownload(name, version string) (string, string, error) {
 		}
 		if json.NewDecoder(respVer.Body).Decode(&singleRes) == nil && singleRes.DownloadURL != "" {
 			respVer.Body.Close()
-			return singleRes.DownloadURL, singleRes.Checksum, nil
+			// If registry returned a fallback URL containing /releases/download/vlatest/, fix it to /releases/latest/download/
+			dl := singleRes.DownloadURL
+			dl = strings.ReplaceAll(dl, "/releases/download/vlatest/", "/releases/latest/download/")
+			return dl, singleRes.Checksum, nil
 		}
 		respVer.Body.Close()
 	}
@@ -996,8 +1001,23 @@ func resolvePackageDownload(name, version string) (string, string, error) {
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
 		return "", "", fmt.Errorf("respuesta invalida del registro para %s: %w", name, err)
 	}
+
+	cleanVer := strings.TrimSpace(version)
+
+	if len(result.Versions) == 0 {
+		if fbURL, ok := getOfficialGitHubFallback(name, version); ok {
+			fmt.Printf("[Fallback] Registro sin versiones para %s. Descargando desde GitHub...\n", name)
+			return fbURL, "", nil
+		}
+		return "", "", fmt.Errorf("el registro no tiene versiones publicadas para %s", name)
+	}
+
+	if (cleanVer == "" || strings.EqualFold(cleanVer, "latest")) && len(result.Versions) > 0 {
+		return result.Versions[0].DownloadURL, result.Versions[0].Checksum, nil
+	}
+
 	for _, candidate := range result.Versions {
-		if candidate.Version == version {
+		if candidate.Version == version || candidate.Version == cleanVer || "v"+candidate.Version == cleanVer {
 			if candidate.DownloadURL == "" {
 				return "", "", fmt.Errorf("el registro no proporciono download_url para %s %s", name, version)
 			}
