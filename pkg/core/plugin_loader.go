@@ -146,7 +146,7 @@ func (r *Runtime) loadPlugin(name, constraint string) error {
 	if manifest.Name != "" && manifest.Name != name {
 		return fmt.Errorf("plugin %s %s: el manifiesto declara name=%q", name, version, manifest.Name)
 	}
-	if manifest.Version != "" && version != "dev" && version != "compiled" && manifest.Version != version {
+	if manifest.Version != "" && version != "dev" && version != "compiled" && version != "latest" && manifest.Version != version {
 		return fmt.Errorf("plugin %s: la carpeta usa %s pero el manifiesto declara %s", name, version, manifest.Version)
 	}
 	lockedKeyID := ""
@@ -189,12 +189,6 @@ func (r *Runtime) loadPlugin(name, constraint string) error {
 		if err != nil {
 			return fmt.Errorf("plugin %s %s: %w", name, version, err)
 		}
-		if err := r.registerPluginNativePayload(name, version, pkgRoot, manifest.Native, manifest.Protocol, files); err != nil {
-			return err
-		}
-		if err := r.registerPluginABIPayload(name, version, pkgRoot, manifest.ABI, files); err != nil {
-			return err
-		}
 		if err := r.executePluginProgram(name, version, program, manifest.Bytecode); err != nil {
 			return err
 		}
@@ -214,12 +208,6 @@ func (r *Runtime) loadPlugin(name, constraint string) error {
 		sourcePath := filepath.Join(pkgRoot, filepath.FromSlash(entry))
 		if r.usePluginVFS {
 			sourcePath = path.Join(filepath.ToSlash(pkgRoot), entry)
-		}
-		if err := r.registerPluginNativePayload(name, version, pkgRoot, manifest.Native, manifest.Protocol, files); err != nil {
-			return err
-		}
-		if err := r.registerPluginABIPayload(name, version, pkgRoot, manifest.ABI, files); err != nil {
-			return err
 		}
 		if err := r.executePluginSource(name, version, code, sourcePath); err != nil {
 			return err
@@ -298,9 +286,24 @@ func resolveInstalledPlugin(root, name, constraint string) (string, string, erro
 	}
 	locked := lockedPluginVersion(root, name)
 	if locked != "" {
-		candidate := filepath.Join(base, locked)
-		if info, err := os.Stat(candidate); err == nil && info.IsDir() && versionSatisfies(locked, constraint) {
-			return candidate, locked, nil
+		candidateDir := filepath.Join(base, locked)
+		candidateJP := filepath.Join(candidateDir, name+".jp")
+		if info, err := os.Stat(candidateJP); err == nil && !info.IsDir() {
+			return candidateJP, locked, nil
+		}
+		if info, err := os.Stat(candidateDir); err == nil && info.IsDir() && versionSatisfies(locked, constraint) {
+			return candidateDir, locked, nil
+		}
+		if versionSatisfies(locked, constraint) {
+			entries, _ := os.ReadDir(base)
+			for _, entry := range entries {
+				if entry.IsDir() {
+					entryJP := filepath.Join(base, entry.Name(), name+".jp")
+					if info, err := os.Stat(entryJP); err == nil && !info.IsDir() {
+						return entryJP, entry.Name(), nil
+					}
+				}
+			}
 		}
 		return "", "", fmt.Errorf("plugin %s: joss.lock fija %s pero esa version no esta instalada o no satisface %q", name, locked, constraint)
 	}
@@ -314,7 +317,12 @@ func resolveInstalledPlugin(root, name, constraint string) (string, string, erro
 		return "", "", fmt.Errorf("plugin %s: no hay una version instalada compatible con %q", name, constraint)
 	}
 	sort.Slice(versions, func(i, j int) bool { return compareVersions(versions[i], versions[j]) > 0 })
-	return filepath.Join(base, versions[0]), versions[0], nil
+	bestVersion := versions[0]
+	bestCandidateJP := filepath.Join(base, bestVersion, name+".jp")
+	if info, err := os.Stat(bestCandidateJP); err == nil && !info.IsDir() {
+		return bestCandidateJP, bestVersion, nil
+	}
+	return filepath.Join(base, bestVersion), bestVersion, nil
 }
 
 func resolveInstalledPluginVFS(name, constraint string) (string, string, error) {
@@ -620,8 +628,8 @@ func validPackageName(name string) bool {
 
 func versionSatisfies(version, constraint string) bool {
 	constraint = strings.TrimSpace(strings.Trim(constraint, "\"'"))
-	if constraint == "" || constraint == "*" {
-		return parseVersion(version) != nil
+	if constraint == "" || constraint == "*" || strings.EqualFold(constraint, "latest") || strings.EqualFold(version, "latest") {
+		return true
 	}
 	if parts := strings.Fields(constraint); len(parts) > 1 {
 		for _, part := range parts {

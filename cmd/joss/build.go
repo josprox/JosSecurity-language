@@ -407,7 +407,7 @@ func buildPackage(pkgPath string) {
 		if ext == ".jp" || ext == ".go" || isPluginSourceExtension(ext) || info.Name() == "env.joss" || info.Name() == "env.enc" {
 			return nil
 		}
-		// Skip compiled native executables and shared libs that slipped outside native/
+		// Incluir exclusivamente manifiesto, licencias, README, bytecode y metadatos del plugin
 		if ext == ".exe" || ext == ".dll" || ext == ".so" || ext == ".dylib" {
 			return nil
 		}
@@ -416,17 +416,23 @@ func buildPackage(pkgPath string) {
 			return nil
 		}
 
-		// joss.yaml was normalized above.
+		// Skip fuente original .joss o archivos de desarrollo (.github, src, etc.)
+		relPath, err := filepath.Rel(pkgPath, path)
+		if err != nil {
+			return nil
+		}
+		relSlash := filepath.ToSlash(relPath)
+		if strings.HasPrefix(relSlash, ".github/") || strings.HasPrefix(relSlash, "src/") || ext == ".joss" || ext == ".go" {
+			return nil
+		}
+
+		// joss.yaml fue procesado arriba.
 		if filepath.Clean(path) == filepath.Clean(manifestPath) {
 			return nil
 		}
 		data, err := os.ReadFile(path)
 		if err == nil {
-			// Get path relative to the package folder
-			relPath, err := filepath.Rel(pkgPath, path)
-			if err == nil {
-				files[filepath.ToSlash(relPath)] = data
-			}
+			files[relSlash] = data
 		}
 		return nil
 	})

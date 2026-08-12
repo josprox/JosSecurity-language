@@ -474,7 +474,8 @@ func installJPFile(cachePath, name, ver string) error {
 	if len(data) > pluginpkg.MaxArchiveSize {
 		return fmt.Errorf("el paquete .jp excede %d MiB", pluginpkg.MaxArchiveSize>>20)
 	}
-	files := make(map[string][]byte)
+
+	// Validar que el archivo descargado sea un binario JP v2 o v1 válido
 	if pluginpkg.IsV2(data) {
 		archive, err := pluginpkg.ReadVerified(data)
 		if err != nil {
@@ -483,17 +484,10 @@ func installJPFile(cachePath, name, ver string) error {
 		if archive.Metadata.Name != name || (ver != "latest" && archive.Metadata.Version != ver) {
 			return fmt.Errorf("el JP declara %s %s, se esperaba %s %s", archive.Metadata.Name, archive.Metadata.Version, name, ver)
 		}
-		files = archive.Files
 	} else {
+		var files map[string][]byte
 		if err := gob.NewDecoder(bytes.NewReader(data)).Decode(&files); err != nil {
-			return fmt.Errorf("paquete JP legado inválido: %w", err)
-		}
-		manifest, ok := files["joss.yaml"]
-		if !ok {
-			return fmt.Errorf("el paquete JP legado no contiene joss.yaml")
-		}
-		if strings.EqualFold(packageManifestValue(string(manifest), "type", ""), "go_extension") {
-			return fmt.Errorf("JP v1 go_extension contiene fuente Go, no código ejecutable; recompílelo como JP v2")
+			return fmt.Errorf("paquete JP inválido: %w", err)
 		}
 	}
 
@@ -508,27 +502,13 @@ func installJPFile(cachePath, name, ver string) error {
 			_ = os.RemoveAll(tmpDir)
 		}
 	}()
-	total := 0
-	for archivePath, content := range files {
-		clean := filepath.Clean(filepath.FromSlash(archivePath))
-		if clean == "." || clean == ".." || filepath.IsAbs(clean) || strings.HasPrefix(clean, ".."+string(filepath.Separator)) {
-			return fmt.Errorf("ruta insegura dentro del .jp: %q", archivePath)
-		}
-		total += len(content)
-		if total > pluginpkg.MaxArchiveSize {
-			return fmt.Errorf("el contenido del paquete excede %d MiB", pluginpkg.MaxArchiveSize>>20)
-		}
-		target := filepath.Join(tmpDir, clean)
-		if err := os.MkdirAll(filepath.Dir(target), 0755); err != nil {
-			return err
-		}
-		if err := os.WriteFile(target, content, 0644); err != nil {
-			return err
-		}
-	}
-	if err := os.WriteFile(filepath.Join(tmpDir, name+".jp"), data, 0644); err != nil {
+
+	// Guardar ÚNICAMENTE el archivo .jp descargado del release
+	targetFile := filepath.Join(tmpDir, name+".jp")
+	if err := os.WriteFile(targetFile, data, 0644); err != nil {
 		return err
 	}
+
 	if err := os.RemoveAll(destDir); err != nil {
 		return err
 	}
@@ -574,28 +554,25 @@ func installFromGitHubRepo(name, repoURL string) error {
 		resp.Body.Close()
 
 		if assets, ok := relData["assets"].([]interface{}); ok {
+			// Priorizar archivos .jp en assets del release
 			for _, a := range assets {
 				asset, _ := a.(map[string]interface{})
 				assetName, _ := asset["name"].(string)
 				downloadURL, _ := asset["browser_download_url"].(string)
-				if strings.HasSuffix(assetName, ".jp") || strings.HasSuffix(assetName, ".zip") {
+				if strings.HasSuffix(strings.ToLower(assetName), ".jp") {
 					return downloadAndExtract(name, "latest", downloadURL, "")
 				}
 			}
 		}
 	}
 
-	// 2. Fallback: Download source zip from GitHub main/master branch
-	branches := []string{"main", "master"}
-	for _, branch := range branches {
-		zipURL := fmt.Sprintf("https://github.com/%s/%s/archive/refs/heads/%s.zip", owner, repo, branch)
-		err := downloadAndExtract(name, "latest", zipURL, "")
-		if err == nil {
-			return nil
-		}
+	// 2. Direct Release Latest Asset Download fallback
+	directJPURL := fmt.Sprintf("https://github.com/%s/%s/releases/latest/download/%s.jp", owner, repo, name)
+	if err := downloadAndExtract(name, "latest", directJPURL, ""); err == nil {
+		return nil
 	}
 
-	return fmt.Errorf("no se pudo descargar el paquete desde el repositorio GitHub")
+	return fmt.Errorf("no se pudo descargar el paquete .jp desde el release de GitHub (%s/%s)", owner, repo)
 }
 
 func isPluginRuntimeFile(relPath string) bool {
@@ -920,7 +897,16 @@ func installTransitiveDependencies(rootDeps map[string]string, offline bool) err
 		}
 		manifestData, err := os.ReadFile(filepath.Join(pluginPath, "joss.yaml"))
 		if err != nil {
-			return fmt.Errorf("leyendo manifiesto de %s %s: %w", current.name, version, err)
+			jpData, jpErr := os.ReadFile(filepath.Join(pluginPath, current.name+".jp"))
+			if jpErr == nil && pluginpkg.IsV2(jpData) {
+				if arch, archErr := pluginpkg.ReadVerified(jpData); archErr == nil {
+					manifestData = arch.Files["joss.yaml"]
+					err = nil
+				}
+			}
+		}
+		if err != nil || len(manifestData) == 0 {
+			return fmt.Errorf("leyendo manifiesto de %s %s: %v", current.name, version, err)
 		}
 		for child, constraint := range parseManifestDependencies(string(manifestData)) {
 			queue = append(queue, dependency{child, constraint})
