@@ -294,21 +294,29 @@ func pubInfo(name string) {
 func pubAdd(name string, ver string) {
 	fmt.Printf("Buscando %s en joss.red...\n", name)
 
-	// 1. Primero consultar la API del registro oficial joss.red
+	// 1. Consultar la API del registro oficial joss.red
 	url := fmt.Sprintf("%s/api/v1/pub/packages/%s", getRegistryURL(), name)
 	resp, err := http.Get(url)
 
 	var repoURL string
+	var pkgFound bool
 	if err == nil && resp.StatusCode == http.StatusOK {
 		var res map[string]interface{}
 		if json.NewDecoder(resp.Body).Decode(&res) == nil {
+			pkgFound = true
 			versions, _ := res["versions"].([]interface{})
 			pkgInfo, _ := res["package"].(map[string]interface{})
 			if pkgInfo != nil {
 				repoURL, _ = pkgInfo["repository_url"].(string)
+				displayName, _ := pkgInfo["display_name"].(string)
+				if displayName != "" {
+					fmt.Printf("✓ Paquete '%s' encontrado en joss.red\n", displayName)
+				} else {
+					fmt.Printf("✓ Paquete '%s' encontrado en joss.red\n", name)
+				}
 			}
 
-			// Si joss.red tiene versiones publicadas en su registro
+			// Si joss.red tiene versiones binarias publicadas en su registro
 			if len(versions) > 0 {
 				var targetVer map[string]interface{}
 				if ver == "" {
@@ -345,8 +353,13 @@ func pubAdd(name string, ver string) {
 		resp.Body.Close()
 	}
 
-	// 2. Si no se encontró versión publicada en joss.red, buscar en Git / GitHub
-	fmt.Printf("No se encontró versión publicada en joss.red. Buscando en repositorio Git...\n")
+	// 2. Descargar desde el repositorio vinculado (GitHub)
+	if pkgFound {
+		fmt.Printf("Sincronizando desde repositorio vinculado (%s)...\n", repoURL)
+	} else {
+		fmt.Printf("Buscando en repositorio Git...\n")
+	}
+
 	if repoURL == "" {
 		if strings.HasPrefix(name, "http://") || strings.HasPrefix(name, "https://") || strings.Contains(name, "/") {
 			repoURL = name
@@ -360,7 +373,7 @@ func pubAdd(name string, ver string) {
 		if manifestData, readErr := os.ReadFile("joss.yaml"); readErr == nil {
 			generateLockFile(parseManifestDependencies(string(manifestData)))
 		}
-		fmt.Printf("✓ %s (latest) instalado correctamente desde Git (%s)\n", name, repoURL)
+		fmt.Printf("✓ %s (latest) instalado correctamente desde %s\n", name, repoURL)
 		return
 	}
 
