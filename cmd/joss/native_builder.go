@@ -244,7 +244,11 @@ func compileRunnerBinary(targetOS, targetArch string) ([]byte, error) {
 		runnerPkg = "./cmd/runner"
 	}
 
-	cmd := exec.Command("go", "build", "-ldflags=-s -w", "-o", tempRunnerBin, runnerPkg)
+	ldflags := "-s -w"
+	if targetOS == "windows" {
+		ldflags += " -H=windowsgui"
+	}
+	cmd := exec.Command("go", "build", "-ldflags="+ldflags, "-o", tempRunnerBin, runnerPkg)
 	cmd.Env = append(os.Environ(), "CGO_ENABLED=0", "GOOS="+targetOS, "GOARCH="+targetArch)
 
 	out, err := cmd.CombinedOutput()

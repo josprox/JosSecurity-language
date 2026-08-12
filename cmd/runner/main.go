@@ -196,24 +196,7 @@ func waitForSignal() {
 }
 
 func setupLogging() {
-	exePath, err := os.Executable()
-	if err != nil {
-		exePath = "."
-	}
-	dir := filepath.Dir(exePath)
-	logFile, err := os.OpenFile(filepath.Join(dir, "error.log"), os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
-	if err == nil {
-		log.SetOutput(logFile)
-		// Redirect Stdout and Stderr to capture fmt.Println from runtime
-		// Note: This works for fmt package but not necessarily for low-level writes,
-		// but for our runtime debugging it's sufficient.
-		// Actually, assigning to os.Stdout/Stderr is not thread-safe and might not work as expected
-		// if runtime uses the original file descriptors.
-		// A better way is to replace the file descriptors, but that's OS specific.
-		// For simplicity in Go, we can just set os.Stdout = logFile.
-		os.Stdout = logFile
-		os.Stderr = logFile
-	}
+	// Keep standard output unless running in hidden GUI mode
 }
 
 func waitForPortOrPort(p1, p2 string) string {
