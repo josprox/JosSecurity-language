@@ -954,6 +954,21 @@ func getOfficialGitHubFallback(name, version string) (string, bool) {
 }
 
 func resolvePackageDownload(name, version string) (string, string, error) {
+	// First query specific version endpoint from Joss Pub API
+	urlVer := fmt.Sprintf("%s/api/v1/pub/packages/%s/versions/%s", getRegistryURL(), name, version)
+	respVer, errVer := http.Get(urlVer)
+	if errVer == nil && respVer.StatusCode == http.StatusOK {
+		var singleRes struct {
+			DownloadURL string `json:"download_url"`
+			Checksum    string `json:"checksum"`
+		}
+		if json.NewDecoder(respVer.Body).Decode(&singleRes) == nil && singleRes.DownloadURL != "" {
+			respVer.Body.Close()
+			return singleRes.DownloadURL, singleRes.Checksum, nil
+		}
+		respVer.Body.Close()
+	}
+
 	url := fmt.Sprintf("%s/api/v1/pub/packages/%s", getRegistryURL(), name)
 	resp, err := http.Get(url)
 	if err != nil {
@@ -1037,7 +1052,12 @@ func generateLockFile(deps map[string]string) {
 		checksum := ""
 		keyID := ""
 		archivePath := filepath.Join("plugins", name, verClean, name+".jp")
-		if archiveData, err := os.ReadFile(archivePath); err == nil {
+		archiveData, err := os.ReadFile(archivePath)
+		if err != nil {
+			archivePath = filepath.Join("plugins", name+".jp")
+			archiveData, err = os.ReadFile(archivePath)
+		}
+		if err == nil {
 			sum := sha256.Sum256(archiveData)
 			checksum = hex.EncodeToString(sum[:])
 			if archive, readErr := pluginpkg.ReadVerified(archiveData); readErr == nil {
@@ -1045,8 +1065,14 @@ func generateLockFile(deps map[string]string) {
 			}
 		}
 		pluginDeps := make(map[string]string)
-		if pluginManifest, err := os.ReadFile(filepath.Join("plugins", name, verClean, "joss.yaml")); err == nil {
-			pluginDeps = parseManifestDependencies(string(pluginManifest))
+		if manifestBytes, err := os.ReadFile(filepath.Join("plugins", name, verClean, "joss.yaml")); err == nil {
+			pluginDeps = parseManifestDependencies(string(manifestBytes))
+		} else if archiveData != nil {
+			if archive, readErr := pluginpkg.ReadVerified(archiveData); readErr == nil {
+				if manifestBytes, ok := archive.Files["joss.yaml"]; ok {
+					pluginDeps = parseManifestDependencies(string(manifestBytes))
+				}
+			}
 		}
 		for child, constraint := range pluginDeps {
 			if !processed[child] {

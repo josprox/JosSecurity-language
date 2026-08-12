@@ -312,6 +312,10 @@ func executeScript(filename string) {
 	rt := core.NewRuntime()
 	rt.LoadEnv(nil)
 
+	if err := rt.AutoloadPlugins("."); err != nil {
+		fmt.Printf("[Runtime Warning] Error cargando plugins: %v\n", err)
+	}
+
 	// Preload all .joss files in app/ and subfolders (controllers, models, services, middleware, etc.)
 	if _, err := os.Stat("app"); err == nil {
 		rt.PreloadAppFiles("app")
