@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -89,6 +90,10 @@ func (r *Runtime) executePluginMethod(_ *Instance, method string, args []interfa
 		}
 		definition := r.NativePlugins[name]
 		if definition == nil {
+			_ = r.LoadPlugin(name)
+			definition = r.NativePlugins[name]
+		}
+		if definition == nil {
 			panic(fmt.Sprintf("Plugin::path: plugin nativo %q no registrado", name))
 		}
 		resolved, err := materializePluginPath(definition, relative)
@@ -143,6 +148,10 @@ func (r *Runtime) executePluginMethod(_ *Instance, method string, args []interfa
 
 func (r *Runtime) callNativePluginStream(name, method string, args []interface{}, emit func(interface{})) (interface{}, error) {
 	definition := r.NativePlugins[name]
+	if definition == nil {
+		_ = r.LoadPlugin(name)
+		definition = r.NativePlugins[name]
+	}
 	if definition == nil {
 		return nil, fmt.Errorf("plugin nativo %q no registrado", name)
 	}
@@ -220,6 +229,10 @@ func (r *Runtime) callNativePluginStream(name, method string, args []interface{}
 
 func (r *Runtime) callNativePlugin(name, method string, args []interface{}) (interface{}, error) {
 	definition := r.NativePlugins[name]
+	if definition == nil {
+		_ = r.LoadPlugin(name)
+		definition = r.NativePlugins[name]
+	}
 	if definition == nil {
 		return nil, fmt.Errorf("plugin nativo %q no registrado", name)
 	}
@@ -334,6 +347,49 @@ func materializePluginPath(definition *NativePluginDefinition, relative string) 
 	clean, err := safePluginRelativePath(relative)
 	if err != nil {
 		return "", err
+	}
+	if strings.HasPrefix(clean, "https://") || strings.HasPrefix(clean, "http://") {
+		pluginMaterializeMu.Lock()
+		defer pluginMaterializeMu.Unlock()
+		home, err := os.UserHomeDir()
+		if err != nil {
+			return "", err
+		}
+		assetName := filepath.Base(clean)
+		target := filepath.Join(home, ".joss", "native", definition.Name, definition.Version, runtime.GOOS+"-"+runtime.GOARCH, assetName)
+		if info, statErr := os.Stat(target); statErr == nil && info.Size() > 0 {
+			if runtime.GOOS != "windows" {
+				_ = os.Chmod(target, 0755)
+			}
+			return target, nil
+		}
+		if err := os.MkdirAll(filepath.Dir(target), 0755); err != nil {
+			return "", err
+		}
+		resp, getErr := http.Get(clean)
+		if getErr != nil {
+			return "", fmt.Errorf("plugin %s: error descargando binario %s: %w", definition.Name, clean, getErr)
+		}
+		defer resp.Body.Close()
+		if resp.StatusCode != http.StatusOK {
+			return "", fmt.Errorf("plugin %s: HTTP %d descargando binario desde %s", definition.Name, resp.StatusCode, clean)
+		}
+		tmp := target + ".tmp"
+		out, createErr := os.OpenFile(tmp, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0755)
+		if createErr != nil {
+			return "", createErr
+		}
+		if _, copyErr := io.Copy(out, resp.Body); copyErr != nil {
+			out.Close()
+			os.Remove(tmp)
+			return "", copyErr
+		}
+		out.Close()
+		if err := os.Rename(tmp, target); err != nil {
+			os.Remove(tmp)
+			return "", err
+		}
+		return target, nil
 	}
 	if filepath.IsAbs(clean) {
 		if _, err := os.Stat(clean); err == nil {
