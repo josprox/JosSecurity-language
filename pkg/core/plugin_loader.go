@@ -180,6 +180,13 @@ func (r *Runtime) loadPlugin(name, constraint string) error {
 		}
 	}
 
+	if err := r.registerPluginNativePayload(name, version, pkgRoot, manifest.Native, manifest.Protocol, files); err != nil {
+		return err
+	}
+	if err := r.registerPluginABIPayload(name, version, pkgRoot, manifest.ABI, files); err != nil {
+		return err
+	}
+
 	if manifest.Bytecode != "" {
 		compiled, ok := files[manifest.Bytecode]
 		if !ok {
