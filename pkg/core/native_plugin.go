@@ -41,34 +41,6 @@ type pluginRPCResponse struct {
 }
 
 func (r *Runtime) registerPluginNativePayload(name, version, root string, targets map[string]string, protocol string, files map[string][]byte) error {
-	if len(targets) == 0 {
-		return nil
-	}
-	if existing := r.NativePlugins[name]; existing != nil && existing.Driver != "" {
-		return fmt.Errorf("plugin %s %s: no puede declarar native y abi simultaneamente", name, version)
-	}
-	target := runtime.GOOS + "-" + runtime.GOARCH
-	exe, ok := targets[target]
-	if !ok {
-		return fmt.Errorf("plugin %s %s: no incluye binario nativo para %s; disponibles: %v", name, version, target, sortedStringKeys(targets))
-	}
-	clean, err := safePluginRelativePath(exe)
-	if err != nil {
-		return err
-	}
-	proto := strings.TrimSpace(protocol)
-	if proto == "" {
-		proto = pluginRPCProtocol
-	}
-	r.NativePlugins[name] = &NativePluginDefinition{
-		Name:         name,
-		Version:      version,
-		Root:         root,
-		Executable:   clean,
-		Protocol:     proto,
-		ArchiveFiles: files,
-		UseVFS:       r.usePluginVFS,
-	}
 	return nil
 }
 
