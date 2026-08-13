@@ -222,6 +222,9 @@ func reloadApp(changedFile string) {
 	if currentRuntime == nil {
 		currentRuntime = core.NewRuntime()
 		currentRuntime.LoadEnv(GlobalFileSystem)
+		if err := currentRuntime.AutoloadPlugins(""); err != nil {
+			fmt.Printf("[Server] Warning cargando plugins: %v\n", err)
+		}
 
 		// Init Redis if configured
 		if currentRuntime.Env["SESSION_DRIVER"] == "redis" {
@@ -297,6 +300,9 @@ func reloadApp(changedFile string) {
 		}
 		currentRuntime = core.NewRuntime()
 		currentRuntime.LoadEnv(GlobalFileSystem)
+		if err := currentRuntime.AutoloadPlugins(""); err != nil {
+			fmt.Printf("[Server] Warning cargando plugins: %v\n", err)
+		}
 
 		// Init Redis if configured
 		if currentRuntime.Env["SESSION_DRIVER"] == "redis" {
