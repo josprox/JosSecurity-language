@@ -9,6 +9,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"runtime"
 	"sort"
 	"strconv"
 	"strings"
@@ -178,6 +179,10 @@ func (r *Runtime) loadPlugin(name, constraint string) error {
 		if err := r.loadPlugin(dep, manifest.Dependencies[dep]); err != nil {
 			return fmt.Errorf("plugin %s depende de %s: %w", name, dep, err)
 		}
+	}
+
+	if exe := manifest.Native[runtime.GOOS+"-"+runtime.GOARCH]; exe != "" {
+		r.NativePlugins[name] = &NativePluginDefinition{Name: name, Version: version, Root: pkgRoot, Executable: exe, Protocol: manifest.Protocol, ArchiveFiles: files, UseVFS: r.usePluginVFS}
 	}
 
 	if manifest.Bytecode != "" {
