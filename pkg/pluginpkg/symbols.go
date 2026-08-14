@@ -89,3 +89,15 @@ func identifierValue(identifier *parser.Identifier) string {
 	}
 	return identifier.Value
 }
+
+// BuildSymbolIndexFromCallables creates a SymbolIndex from pre-extracted classes and functions.
+func BuildSymbolIndexFromCallables(packageName, version string, classes []SymbolClass, functions []SymbolCallable) SymbolIndex {
+	return SymbolIndex{
+		Schema:    SymbolSchemaVersion,
+		Package:   packageName,
+		Version:   version,
+		Classes:   classes,
+		Functions: functions,
+	}
+}
+

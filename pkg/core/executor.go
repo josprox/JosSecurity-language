@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strings"
 
 	"github.com/jossecurity/joss/pkg/parser"
 )
@@ -14,11 +13,6 @@ func (r *Runtime) Execute(program *parser.Program) {
 	// Ensure env is loaded
 	if len(r.Env) == 0 {
 		r.LoadEnv(nil)
-	}
-	if !r.pluginsAutoloaded {
-		if err := r.AutoloadPlugins(""); err != nil {
-			panic(err)
-		}
 	}
 
 	// First pass: Register classes and functions
@@ -183,29 +177,18 @@ func (r *Runtime) executeContinue(cs *parser.ContinueStatement) interface{} {
 func (r *Runtime) executeImport(stmt *parser.ImportStatement) interface{} {
 	filename := stmt.Path
 
-	// Handle Package Import
-	if strings.HasPrefix(filename, "package:") {
-		pkgName := strings.TrimPrefix(filename, "package:")
-		if err := r.LoadPlugin(pkgName); err != nil {
-			panic(err)
-		}
-		return nil
-	}
-
 	// Handle Global Import
 	if filename == "global" {
 		filename = "config/global.joss"
-		if !r.usePluginVFS {
-			if _, err := os.Stat(filename); os.IsNotExist(err) {
-				// Try looking in parent directories if running from subfolder
-				if _, err := os.Stat("../config/global.joss"); err == nil {
-					filename = "../config/global.joss"
-				} else if _, err := os.Stat("../../config/global.joss"); err == nil {
-					filename = "../../config/global.joss"
-				} else {
-					fmt.Println("Error: @import \"global\" requiere 'config/global.joss'")
-					return nil
-				}
+		if _, err := os.Stat(filename); os.IsNotExist(err) {
+			// Try looking in parent directories if running from subfolder
+			if _, err := os.Stat("../config/global.joss"); err == nil {
+				filename = "../config/global.joss"
+			} else if _, err := os.Stat("../../config/global.joss"); err == nil {
+				filename = "../../config/global.joss"
+			} else {
+				fmt.Println("Error: @import \"global\" requiere 'config/global.joss'")
+				return nil
 			}
 		}
 	}
@@ -213,35 +196,20 @@ func (r *Runtime) executeImport(stmt *parser.ImportStatement) interface{} {
 	var content []byte
 	var err error
 	resolvedFilename := filename
-	if r.usePluginVFS {
-		if r.importBaseDir != "" {
-			resolvedFilename = filepath.Join(r.importBaseDir, filename)
-		}
-		resolvedFilename = filepath.ToSlash(filepath.Clean(resolvedFilename))
-		if r.importedFiles["vfs:"+resolvedFilename] {
-			return nil
-		}
-		content, err = readPluginVFSFile(resolvedFilename)
-	} else {
-		if !filepath.IsAbs(filename) && r.importBaseDir != "" {
-			resolvedFilename = filepath.Join(r.importBaseDir, filename)
-		}
-		resolvedFilename, _ = filepath.Abs(resolvedFilename)
-		resolvedFilename = filepath.Clean(resolvedFilename)
-		if r.importedFiles[resolvedFilename] {
-			return nil
-		}
-		content, err = os.ReadFile(resolvedFilename)
+	if !filepath.IsAbs(filename) && r.importBaseDir != "" {
+		resolvedFilename = filepath.Join(r.importBaseDir, filename)
 	}
+	resolvedFilename, _ = filepath.Abs(resolvedFilename)
+	resolvedFilename = filepath.Clean(resolvedFilename)
+	if r.importedFiles[resolvedFilename] {
+		return nil
+	}
+	content, err = os.ReadFile(resolvedFilename)
 	if err != nil {
 		fmt.Printf("Error: No se pudo importar '%s': %v\n", resolvedFilename, err)
 		return nil
 	}
-	importKey := resolvedFilename
-	if r.usePluginVFS {
-		importKey = "vfs:" + resolvedFilename
-	}
-	r.importedFiles[importKey] = true
+	r.importedFiles[resolvedFilename] = true
 
 	l := parser.NewLexer(string(content))
 	p := parser.NewParser(l)

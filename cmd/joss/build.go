@@ -2,15 +2,12 @@ package main
 
 import (
 	"bufio"
-	"crypto/ed25519"
 	"crypto/rand"
-	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
 	"os"
 	"path/filepath"
-	"regexp"
 	"runtime"
 	"sort"
 	"strings"
@@ -378,8 +375,7 @@ func buildPackage(pkgPath string) {
 	}
 
 	// Include ONLY bytecode, symbols, joss.yaml, and small non-binary assets.
-	// Native sidecar binaries (native/ folder) are NEVER bundled in .jp —
-	// they are downloaded per-platform on demand at install time.
+	// JP v2 packages contain deterministically compiled pure bytecode (main.jbc).
 	err = filepath.Walk(pkgPath, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return nil
@@ -393,7 +389,7 @@ func buildPackage(pkgPath string) {
 			return nil
 		}
 
-		// Skip native/ folder entirely — sidecars are fetched per-platform at install time
+		// Skip native/ folder if present — packages execute bytecode internally
 		relCheck, _ := filepath.Rel(pkgPath, path)
 		relCheckSlash := filepath.ToSlash(relCheck)
 		if relCheckSlash == "native" || strings.HasPrefix(relCheckSlash, "native/") {
@@ -452,7 +448,7 @@ func buildPackage(pkgPath string) {
 		Protocol:     protocol,
 		Symbols:      pluginpkg.SymbolsPath,
 	}
-	signingKey, signingKeyPath, err := loadOrCreatePluginSigningKey(name)
+	signingKey, signingKeyPath, err := pluginpkg.LoadOrCreateSigningKey(name)
 	if err != nil {
 		fmt.Printf("Error preparando firma del plugin: %v\n", err)
 		return
@@ -476,45 +472,6 @@ func buildPackage(pkgPath string) {
 
 	fmt.Printf("[Package Build] JP v2 firmado y compilado sin fuentes de implementación: %s\n", outPath)
 	fmt.Printf("[Package Build] Llave de autor: %s (no se incluye en el JP)\n", signingKeyPath)
-}
-
-func loadOrCreatePluginSigningKey(pluginName string) (ed25519.PrivateKey, string, error) {
-	configured := strings.TrimSpace(os.Getenv("JOSS_PLUGIN_SIGNING_KEY"))
-	keyPath := configured
-	if keyPath == "" {
-		home, err := os.UserHomeDir()
-		if err != nil {
-			return nil, "", err
-		}
-		safeName := regexp.MustCompile(`[^A-Za-z0-9_.-]+`).ReplaceAllString(pluginName, "_")
-		if safeName == "" {
-			safeName = "default"
-		}
-		keyPath = filepath.Join(home, ".joss", "keys", safeName+".ed25519")
-	}
-	if content, err := os.ReadFile(keyPath); err == nil {
-		decoded, decodeErr := base64.StdEncoding.DecodeString(strings.TrimSpace(string(content)))
-		if decodeErr != nil || len(decoded) != ed25519.PrivateKeySize {
-			return nil, keyPath, fmt.Errorf("llave Ed25519 invalida en %s", keyPath)
-		}
-		return ed25519.PrivateKey(decoded), keyPath, nil
-	} else if !os.IsNotExist(err) {
-		return nil, keyPath, err
-	}
-	if configured != "" {
-		return nil, keyPath, fmt.Errorf("JOSS_PLUGIN_SIGNING_KEY no existe: %s", keyPath)
-	}
-	_, privateKey, err := ed25519.GenerateKey(rand.Reader)
-	if err != nil {
-		return nil, keyPath, err
-	}
-	if err := os.MkdirAll(filepath.Dir(keyPath), 0700); err != nil {
-		return nil, keyPath, err
-	}
-	if err := os.WriteFile(keyPath, []byte(base64.StdEncoding.EncodeToString(privateKey)+"\n"), 0600); err != nil {
-		return nil, keyPath, err
-	}
-	return privateKey, keyPath, nil
 }
 
 func isPluginSourceExtension(ext string) bool {

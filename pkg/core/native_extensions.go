@@ -5,7 +5,6 @@ import (
 	"math"
 	"math/rand"
 	"strings"
-	"time"
 )
 
 func (r *Runtime) executeMathMethod(instance *Instance, method string, args []interface{}) interface{} {
@@ -41,7 +40,6 @@ func (r *Runtime) executeMathMethod(instance *Instance, method string, args []in
 			fmt.Println("Error: Argumentos de Math.random deben ser enteros")
 			return nil
 		}
-		rand.Seed(time.Now().UnixNano())
 		return min + rand.Int63n(max-min+1)
 
 	case "floor":
@@ -167,7 +165,6 @@ func (r *Runtime) executeStrMethod(instance *Instance, method string, args []int
 		}
 		const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
 		b := make([]byte, length)
-		rand.Seed(time.Now().UnixNano())
 		for i := range b {
 			b[i] = charset[rand.Intn(len(charset))]
 		}

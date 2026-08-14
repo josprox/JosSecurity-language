@@ -185,6 +185,23 @@ func (r *Runtime) executeCall(call *parser.CallExpression) interface{} {
 }
 
 func (r *Runtime) applyFunction(fn interface{}, args []interface{}) interface{} {
+	if callable, ok := fn.(*PluginCallable); ok {
+		if r.PluginRegistry != nil {
+			if callable.ClassName != "" {
+				res, err := r.PluginRegistry.CallMethod(callable.PluginName, callable.ClassName, callable.Function, nil, args)
+				if err != nil {
+					panic(fmt.Sprintf("Error en metodo de plugin %s::%s.%s: %v", callable.PluginName, callable.ClassName, callable.Function, err))
+				}
+				return res
+			}
+			res, err := r.PluginRegistry.CallFunction(callable.PluginName, callable.Function, args)
+			if err != nil {
+				panic(fmt.Sprintf("Error en funcion de plugin %s::%s: %v", callable.PluginName, callable.Function, err))
+			}
+			return res
+		}
+	}
+
 	if closure, ok := fn.(*CapturedFunction); ok {
 		return r.callCapturedFunction(closure, args)
 	}
@@ -210,6 +227,18 @@ func (r *Runtime) applyFunction(fn interface{}, args []interface{}) interface{} 
 			}
 			return r.executeNativeMethod(dummyInstance, bound.Method.Name.Value, evalArgs)
 		}
+
+		if bound.Instance != nil && bound.Instance.Fields != nil && bound.Instance.Class != nil {
+			if pluginName, isPlug := bound.Instance.Fields["__plugin__"].(string); isPlug && pluginName != "" {
+				if r.PluginRegistry != nil {
+					res, err := r.PluginRegistry.CallMethod(pluginName, bound.Instance.Class.Name.Value, bound.Method.Name.Value, bound.Instance, args)
+					if err == nil {
+						return res
+					}
+				}
+			}
+		}
+
 		return r.CallMethodEvaluated(bound.Method, bound.Instance, args)
 	}
 

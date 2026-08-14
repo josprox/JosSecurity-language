@@ -22,13 +22,12 @@ type Logger struct {
 // InitLogger initializes the global logger
 func InitLogger() {
 	loggerOnce.Do(func() {
-		f, err := os.OpenFile("log.txt", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
-		if err != nil {
-			fmt.Printf("Error opening log.txt: %v\n", err)
-			return
-		}
-		GlobalLogger = &Logger{
-			file: f,
+		GlobalLogger = &Logger{}
+		if logPath := os.Getenv("JOSS_LOG_FILE"); logPath != "" {
+			f, err := os.OpenFile(logPath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+			if err == nil {
+				GlobalLogger.file = f
+			}
 		}
 	})
 }

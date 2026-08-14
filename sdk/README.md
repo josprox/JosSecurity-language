@@ -1,54 +1,43 @@
-# SDK de plugins nativos JP v2
+# SDK de Desarrollo de Plugins Joss (JP v2)
 
-Un plugin nativo puede usar un ejecutable autónomo `joss-rpc-v1` o una biblioteca C ABI v1 cargada dentro del proceso. Ambos contratos son independientes de las estructuras internas de Go.
+Joss soporta dos métodos para el desarrollo y compilación de plugins:
 
-## Contrato
+---
 
-Joss inicia el ejecutable, envía una solicitud UTF-8 por `stdin` y cierra la entrada:
+## 1. Compilación Multilenguaje Directa a Bytecode Joss (Recomendado)
 
-```json
-{"protocol":"joss-rpc-v1","id":"123","method":"sum","args":[20,22]}
+Con el compilador integrado de Joss, puedes escribir plugins en **Java, Python, PHP, C/C++ o Rust/Wasm** y compilarlos a **Bytecode nativo de Joss (`.jp` / JPBC)**.
+
+```bash
+# Compilar código Python a Bytecode Joss
+joss plugin compile script.py --lang=python --name=mi_plugin --exports=calcular
+
+# Compilar clases Java a Bytecode Joss
+joss plugin compile App.class --lang=java --name=mi_plugin --exports=procesar
+
+# Compilar módulo Rust / C / C++ (Wasm) a Bytecode Joss
+joss plugin compile modulo.wasm --lang=rust --name=mi_plugin --exports=hashear
 ```
 
-El plugin escribe exactamente una respuesta JSON en `stdout`:
+### Ventajas:
+- **Cero subprocesos y cero dependencias**: El usuario final no necesita tener instalado Java, Python, PHP ni compiladores.
+- **Tree-Shaking Automático**: Solo empaqueta el código y funciones exportadas.
+- **Firma Ed25519 Automática**: Paquete ZIP JP v2 criptográficamente verificado.
+- **Acceso a `r.Env`**: Acceso transparente a variables de entorno del proyecto.
 
-```json
-{"id":"123","result":42}
+---
+
+## 2. Desarrollo Nativo en Joss
+
+Los plugins nativos oficiales se escriben directamente en Joss (`src/plugin.joss`) y se empaquetan con:
+
+```bash
+joss plugin compile .
 ```
 
-o un error estructurado:
+Genera un artefacto `.jp` con el AST compilado (`JOSSBC2Z`) y la tabla de símbolos en `META-INF/joss-symbols.json`.
 
-```json
-{"id":"123","error":{"code":"INVALID_ARGUMENT","message":"detalle"}}
-```
+---
 
-Para `Plugin::stream`, puede escribir cero o más frames antes de la respuesta final:
+Consulte [PLUGINS.md](../docs/PLUGINS.md) para más detalles y ejemplos prácticos.
 
-```json
-{"id":"123","event":"chunk","content":"hola"}
-{"id":"123","event":"chunk","content":" mundo"}
-{"id":"123","result":"hola mundo"}
-```
-
-Cada frame debe ser un objeto JSON completo. Joss valida el `id`, invoca el callback por chunk y exige una respuesta final.
-
-Los logs y diagnósticos deben escribirse en `stderr`. El proceso usa su propio directorio como working directory. No recibe automáticamente `env.joss`: `PLUGIN_ENV_ALLOW` controla las claves expuestas.
-
-## SDK disponibles
-
-- `c/joss_plugin.h`: runner RPC header-only para C.
-- `c/joss_plugin.hpp`: framework orientado a objetos C++17 con registro de métodos y protección de excepciones.
-- `c/joss_driver.h`: encabezado ABI v1 para DLL, SO y dylib en memoria.
-- `python/joss_plugin.py`: runner para crear un ejecutable Python autocontenido.
-- `java/JossPlugin.java`: runner Java; use GraalVM `native-image` para que el consumidor no necesite JVM.
-- `kotlin/JossPlugin.kt`: runner Kotlin; compile con Kotlin/Native.
-- `php/joss_plugin.php`: runner PHP con llamadas normales y streaming mediante `Generator`.
-- `dart/joss_plugin.dart`: runner Dart AOT, apropiado para lógica compartida de Flutter desktop.
-- `flutter/README.md`: reglas para bundles Flutter desktop y límites reales de Android/iOS.
-- `rust`: crate mínimo basado en `serde_json`, compilable como ejecutable nativo.
-
-La envoltura pública se escribe en Joss y llama al payload con `Plugin::call("paquete", "metodo", [$arg])`; la misma llamada selecciona RPC o ABI según el manifiesto. Use `Plugin::path("paquete", "ruta/asset")` para localizar assets.
-
-Cada sistema operativo y arquitectura requiere su ejecutable en `native` o biblioteca en `abi`. Todas las DLL, `.so`, modelos y runtimes requeridos deben incluirse y poder redistribuirse legalmente. El empaquetador inspecciona imports PE/ELF/Mach-O y firma el resultado con Ed25519.
-
-Consulte [BUILDING.md](./BUILDING.md) para comandos por lenguaje y targets multiplataforma.

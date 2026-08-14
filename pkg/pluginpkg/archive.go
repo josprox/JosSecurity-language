@@ -5,13 +5,17 @@ import (
 	"bytes"
 	"compress/flate"
 	"crypto/ed25519"
+	"crypto/rand"
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/binary"
 	"encoding/json"
 	"fmt"
 	"io"
+	"os"
 	"path"
+	"path/filepath"
+	"regexp"
 	"sort"
 	"strings"
 	"time"
@@ -348,3 +352,48 @@ func isNativeTarget(targets map[string]string, name string) bool {
 	}
 	return false
 }
+
+// LoadOrCreateSigningKey retrieves or creates an Ed25519 author signing key.
+func LoadOrCreateSigningKey(pluginName string) (ed25519.PrivateKey, string, error) {
+	configured := strings.TrimSpace(os.Getenv("JOSS_PLUGIN_SIGNING_KEY"))
+	keyPath := configured
+	if keyPath == "" {
+		home, err := os.UserHomeDir()
+		if err != nil {
+			return nil, "", err
+		}
+		safeName := regexp.MustCompile(`[^A-Za-z0-9_.-]+`).ReplaceAllString(pluginName, "_")
+		if safeName == "" {
+			safeName = "default"
+		}
+		keyPath = filepath.Join(home, ".joss", "keys", safeName+".ed25519")
+	}
+	if content, err := os.ReadFile(keyPath); err == nil {
+		raw := strings.TrimSpace(string(content))
+		decoded, decodeErr := base64.StdEncoding.DecodeString(raw)
+		if decodeErr == nil && len(decoded) == ed25519.PrivateKeySize {
+			return ed25519.PrivateKey(decoded), keyPath, nil
+		}
+		if len(content) == ed25519.PrivateKeySize {
+			return ed25519.PrivateKey(content), keyPath, nil
+		}
+		return nil, keyPath, fmt.Errorf("llave Ed25519 invalida en %s", keyPath)
+	} else if !os.IsNotExist(err) {
+		return nil, keyPath, err
+	}
+	if configured != "" {
+		return nil, keyPath, fmt.Errorf("JOSS_PLUGIN_SIGNING_KEY no existe: %s", keyPath)
+	}
+	_, privateKey, err := ed25519.GenerateKey(rand.Reader)
+	if err != nil {
+		return nil, keyPath, err
+	}
+	if err := os.MkdirAll(filepath.Dir(keyPath), 0700); err != nil {
+		return nil, keyPath, err
+	}
+	if err := os.WriteFile(keyPath, []byte(base64.StdEncoding.EncodeToString(privateKey)+"\n"), 0600); err != nil {
+		return nil, keyPath, err
+	}
+	return privateKey, keyPath, nil
+}
+

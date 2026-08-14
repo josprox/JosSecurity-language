@@ -65,9 +65,8 @@ CORS_WEB="https://app.example.com"
 ## Procesos y plugins
 
 - `ALLOW_SYSTEM_RUN=true` habilita `System::Run()`.
-- `PLUGIN_TIMEOUT_SECONDS` limita cada invocación RPC.
-- `PLUGIN_ENV_ALLOW="API_PUBLIC_KEY,LOCALE"` expone únicamente esas claves de `env.joss` al sidecar.
-- `JOSS_PLUGIN_SIGNING_KEY` permite seleccionar una llave privada Ed25519 existente para compilar JP. Si falta, Joss crea una por plugin bajo `~/.joss/keys/`.
+- `JOSS_PLUGIN_SIGNING_KEY` permite seleccionar una llave privada Ed25519 existente para compilar JP. Si no se especifica, Joss genera y gestiona una llave automáticamente por plugin bajo `~/.joss/keys/`.
+- Los plugins `.jp` se ejecutan directamente en memoria (bytecode VM y AST Engine), accediendo de manera segura al mapa de entorno `r.Env` del proyecto.
 
 No publiques archivos de entorno ni llaves privadas.
 

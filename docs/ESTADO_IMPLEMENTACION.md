@@ -10,19 +10,14 @@ Este documento describe capacidades comprobables del código actual. No mezcla p
 - Registro Pub con resolución dinámica de repositorios en tiempo real y fallback automático a GitHub Releases.
 - SQLite, MySQL y PostgreSQL mediante GranDB, migraciones y Schema Builder.
 - Alteración de columnas, índices simples/compuestos/únicos y claves foráneas simples o compuestas.
-- Paquetes JP v2 con bytecode, carga automática, lockfile, símbolos para IntelliSense, firma Ed25519 y validación de dependencias nativas.
-- Dos fronteras nativas: procesos aislados `joss-rpc-v1` y bibliotecas C ABI v1 cargadas en memoria.
-- SDK de bridges para C/C++, Python, PHP, Java, Kotlin, Dart/Flutter y Rust.
+- Paquetes JP v2 con bytecode optimizado, carga automática desde `plugins/`, lockfile, índice de símbolos para IntelliSense (`META-INF/joss-symbols.json`), firma criptográfica Ed25519 y validación determinista.
+- Runtime dual de plugins (`pkg/pluginruntime`): ejecución nativa de AST (`JOSSBC2Z`) y máquina virtual JPBC de 17 opcodes (`JPBC`) en memoria directa con cero procesos externos.
+- Compilador multilenguaje integrado (`joss plugin compile`): traduce Java, Python, PHP y Rust/Wasm a Bytecode Joss con tree shaking automático y cero dependencias para el usuario final.
 - Distribuciones de Windows, Linux y macOS, SDK y VSIX mediante el workflow manual.
 
 ## Compatibilidad, no limitaciones
 
 - `func` es la forma canónica. `function` sigue aceptándose para no romper código anterior.
-- Los plugins declarados en `joss.yaml` se cargan automáticamente. `use` sigue aceptándose como alias de compatibilidad, pero no es necesario.
-- Un sidecar recibe solo variables básicas del sistema, `JOSS_PROJECT_ROOT`, `JOSS_PLUGIN_ROOT` y las claves indicadas en `PLUGIN_ENV_ALLOW`; no hereda automáticamente secretos de `env.joss`.
-- Una biblioteca ABI se ejecuta dentro del proceso Joss y un sidecar se ejecuta bajo la cuenta del servidor. Ambos son código nativo de confianza: la firma asegura integridad y autoría de la llave, no convierte código hostil en código seguro.
-- La responsabilidad legal de redistribuir MATLAB Runtime, JVM, Python, PHP u otras bibliotecas sigue perteneciendo al autor. El empaquetador sí comprueba que los targets declarados existan y, para PE/ELF/Mach-O, que las bibliotecas no pertenecientes al sistema estén dentro del JP.
+- Los plugins declarados en `joss.yaml` o presentes en `plugins/` se cargan automáticamente sin necesidad de `use` ni `import`.
+- Los plugins se ejecutan dentro del runtime de Joss con acceso seguro al entorno del proyecto (`r.Env`) y límites de instrucciones para evitar loops infinitos.
 
-## Límite técnico restante
-
-- Flutter móvil, Android e iOS no pueden distribuirse como sidecars de escritorio; requieren integración durante el build de la aplicación.

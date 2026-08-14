@@ -215,7 +215,7 @@ func main() {
 			fmt.Println("  joss new console [ruta]    - Crea proyecto de consola")
 			fmt.Println("  joss new web [ruta]        - Crea proyecto web (explícito)")
 			fmt.Println("  joss new package [nombre]  - Crea un nuevo paquete optimizado para Joss")
-			fmt.Println("  joss new plugin [ruta]     - Crea un nuevo plugin oficial (.jp Bytecode puro, sin sidecar)")
+			fmt.Println("  joss new plugin [ruta]     - Crea un nuevo plugin oficial (.jp Bytecode puro)")
 			return
 		}
 
@@ -320,10 +320,6 @@ func executeScript(filename string) {
 	rt := core.NewRuntime()
 	rt.LoadEnv(nil)
 
-	if err := rt.AutoloadPlugins("."); err != nil {
-		fmt.Printf("[Runtime Warning] Error cargando plugins: %v\n", err)
-	}
-
 	// Preload all .joss files in app/ and subfolders (controllers, models, services, middleware, etc.)
 	if _, err := os.Stat("app"); err == nil {
 		rt.PreloadAppFiles("app")
@@ -390,7 +386,7 @@ class %s {
 	}
 
 	// Create README.md
-	readmeContent := fmt.Sprintf("# %s\n\nPlugin para el lenguaje de programación Joss.\n\n## Compilar\n\n```bash\njoss build package .\njoss package inspect %s.jp\n```\n\nEl JP v2 resultante contiene bytecode y no distribuye las fuentes de implementación. Para integrar C/C++, Python, PHP, MATLAB, Java, Kotlin, Dart/Flutter o Rust, declara ejecutables autocontenidos como payloads `native` en `joss.yaml` y llama `Plugin::call(...)`; consulta `docs/PLUGINS.md` y el SDK de Joss.\n\n## Instalación\n\n```bash\njoss pub add %s\n```\n\nJoss lo carga automáticamente desde `joss.yaml`; no se necesita `use`.\n\n## Uso\n\n```joss\nprint(%s::version())\n```\n", name, name, name, className)
+	readmeContent := fmt.Sprintf("# %s\n\nPlugin para el lenguaje de programación Joss.\n\n## Compilar\n\n```bash\njoss plugin compile .\njoss plugin inspect %s.jp\n```\n\nEl JP v2 resultante contiene bytecode compilado optimizado (main.jbc) y metadatos de símbolos en `META-INF/joss-symbols.json`. Para compilar plugins escritos en Java, Python, PHP o Rust/Wasm a bytecode nativo de Joss, usa `joss plugin compile <archivo> --lang=<lenguaje>`; consulta `docs/PLUGINS.md`.\n\n## Instalación\n\n```bash\njoss pub add %s\n```\n\nJoss lo carga automáticamente desde `joss.yaml`.\n\n## Uso\n\n```joss\n$plugin = new %s()\n```\n", name, name, name, className)
 	if err := os.WriteFile(filepath.Join(name, "README.md"), []byte(readmeContent), 0644); err != nil {
 		fmt.Printf("Error al escribir README.md: %v\n", err)
 		return

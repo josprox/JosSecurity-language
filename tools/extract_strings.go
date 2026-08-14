@@ -113,8 +113,8 @@ func main() {
 					wLower := strings.ToLower(w)
 					if i == 0 {
 						keyName += wLower
-					} else {
-						keyName += strings.Title(wLower)
+					} else if len(wLower) > 0 {
+						keyName += strings.ToUpper(wLower[:1]) + wLower[1:]
 					}
 				}
 

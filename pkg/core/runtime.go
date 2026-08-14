@@ -41,8 +41,6 @@ var (
 				NativeHandlers:    make(map[string]NativeHandler),
 				NativePlugins:     make(map[string]*NativePluginDefinition),
 				NativeDrivers:     make(map[string]*NativeDriverDefinition),
-				LoadedPlugins:     make(map[string]string),
-				loadingPlugins:    make(map[string]bool),
 				importedFiles:     make(map[string]bool),
 			}
 			r.Variables["cout"] = &Cout{}
@@ -60,19 +58,11 @@ func SetFileSystem(fs http.FileSystem) {
 }
 
 // NewRuntime gets a runtime from the pool
-
-// NewRuntime gets a runtime from the pool
 func NewRuntime() *Runtime {
 	// Initialize Logger globally once
 	InitLogger()
 
 	r := runtimePool.Get().(*Runtime)
-	if r.LoadedPlugins == nil {
-		r.LoadedPlugins = make(map[string]string)
-	}
-	if r.loadingPlugins == nil {
-		r.loadingPlugins = make(map[string]bool)
-	}
 	if r.importedFiles == nil {
 		r.importedFiles = make(map[string]bool)
 	}
@@ -93,6 +83,7 @@ func NewRuntime() *Runtime {
 		am := GetAssetManager()
 		am.Initialize()
 	}
+	r.AutoloadPlugins(".")
 	return r
 }
 
@@ -135,19 +126,11 @@ func (r *Runtime) Free() {
 	// But parsing every time is slow.
 	// We should also clear CurrentMiddleware
 	r.CurrentMiddleware = r.CurrentMiddleware[:0]
-	for k := range r.LoadedPlugins {
-		delete(r.LoadedPlugins, k)
-	}
-	for k := range r.loadingPlugins {
-		delete(r.loadingPlugins, k)
-	}
 	for k := range r.importedFiles {
 		delete(r.importedFiles, k)
 	}
-	r.pluginsAutoloaded = false
 	r.ProjectRoot = ""
 	r.importBaseDir = ""
-	r.usePluginVFS = false
 	r.captureEnvironment = nil
 
 	runtimePool.Put(r)
@@ -169,16 +152,10 @@ func (r *Runtime) Fork() *Runtime {
 		NativeHandlers:    copyNativeHandlerMap(r.NativeHandlers),
 		NativePlugins:     copyNativePluginMap(r.NativePlugins),
 		NativeDrivers:     copyNativeDriverMap(r.NativeDrivers),
-		LoadedPlugins:     make(map[string]string),
-		loadingPlugins:    make(map[string]bool),
+		PluginRegistry:    r.PluginRegistry,
 		importedFiles:     make(map[string]bool),
-		pluginsAutoloaded: r.pluginsAutoloaded,
 		ProjectRoot:       r.ProjectRoot,
 		importBaseDir:     r.importBaseDir,
-		usePluginVFS:      r.usePluginVFS,
-	}
-	for name, version := range r.LoadedPlugins {
-		newR.LoadedPlugins[name] = version
 	}
 	for path, loaded := range r.importedFiles {
 		newR.importedFiles[path] = loaded

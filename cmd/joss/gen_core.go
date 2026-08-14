@@ -54,19 +54,7 @@ func snakeToCamel(s string) string {
 }
 
 func loadEnvConfig() (string, string, string, string, string, string, string) {
-	// Simple parser for environment config
-	content, _ := os.ReadFile(GetEnvFile())
-	lines := strings.Split(string(content), "\n")
-
-	config := make(map[string]string)
-	for _, line := range lines {
-		parts := strings.SplitN(line, "=", 2)
-		if len(parts) == 2 {
-			key := strings.TrimSpace(parts[0])
-			val := strings.Trim(strings.TrimSpace(parts[1]), "\"")
-			config[key] = val
-		}
-	}
+	config := readEnvFile(GetEnvFile())
 
 	prefix := config["PREFIX"]
 	if prefix == "" {

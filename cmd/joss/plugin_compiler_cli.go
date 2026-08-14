@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -22,8 +23,6 @@ func runPluginCommand(args []string) {
 		handlePluginCompile(args[1:])
 	case "inspect":
 		handlePluginInspect(args[1:])
-	case "install":
-		handlePluginInstall(args[1:])
 	default:
 		fmt.Printf("Comando de plugin desconocido: %s\n\n", subCmd)
 		printPluginUsage()
@@ -32,9 +31,8 @@ func runPluginCommand(args []string) {
 
 func printPluginUsage() {
 	fmt.Println("Uso de comandos de plugins de Joss:")
-	fmt.Println("  joss plugin compile <dir|jar> [--lang=java] [--name=name] [--ver=1.0.0] [--exports=f1,f2]")
+	fmt.Println("  joss plugin compile <dir|archivo> [--lang=java|python|php|wasm] [--name=nombre] [--ver=1.0.0] [--exports=f1,f2]")
 	fmt.Println("  joss plugin inspect <plugin.jp>")
-	fmt.Println("  joss plugin install <plugin.jp>")
 }
 
 func handlePluginCompile(args []string) {
@@ -161,10 +159,29 @@ func handlePluginInspect(args []string) {
 	fmt.Printf(" Version: %s\n", pkg.Metadata.Version)
 	fmt.Printf(" Bytecode Target: JPBC (Joss Plugin Bytecode)\n")
 	fmt.Printf(" Tamaño Paquete: %.2f KB\n", sizeKB)
+	if pkg.Metadata.Signature != "" {
+		fmt.Printf(" Firma: %s (%s) verificada\n", pkg.Metadata.SignatureAlgorithm, pkg.Metadata.KeyID)
+	}
 	fmt.Println("----------------------------------------")
 	fmt.Println(" Funciones Exportadas:")
 	for _, exp := range pkg.Metadata.Exports {
 		fmt.Printf("   - %s()\n", exp)
+	}
+	if pkg.Metadata.Symbols != "" {
+		if symData, ok := pkg.Files[pkg.Metadata.Symbols]; ok {
+			var symbols pluginpkg.SymbolIndex
+			if err := json.Unmarshal(symData, &symbols); err == nil {
+				if len(symbols.Classes) > 0 {
+					fmt.Println(" Clases Declaradas:")
+					for _, cls := range symbols.Classes {
+						fmt.Printf("   - class %s\n", cls.Name)
+						for _, m := range cls.Methods {
+							fmt.Printf("       method %s()\n", m.Name)
+						}
+					}
+				}
+			}
+		}
 	}
 	fmt.Println(" Permisos Declarados:")
 	if len(pkg.Metadata.Permissions) == 0 {
@@ -175,34 +192,4 @@ func handlePluginInspect(args []string) {
 		}
 	}
 	fmt.Println("========================================")
-}
-
-func handlePluginInstall(args []string) {
-	if len(args) < 1 {
-		fmt.Println("Error: especifica el archivo .jp a instalar.")
-		return
-	}
-	jpPath := args[0]
-	archive, err := os.ReadFile(jpPath)
-	if err != nil {
-		fmt.Printf("Error abriendo %s: %v\n", jpPath, err)
-		return
-	}
-	pkg, err := pluginpkg.Read(archive)
-	if err != nil {
-		fmt.Printf("Error al validar e instalar %s: %v\n", jpPath, err)
-		return
-	}
-
-	home, _ := os.UserHomeDir()
-	pluginsDir := filepath.Join(home, ".joss", "plugins", pkg.Metadata.Name)
-	_ = os.MkdirAll(pluginsDir, 0755)
-
-	manifestPath := filepath.Join(pluginsDir, "joss.yaml")
-	_ = os.WriteFile(manifestPath, pkg.Files["joss.yaml"], 0644)
-
-	symbolsPath := filepath.Join(pluginsDir, "symbols.json")
-	_ = os.WriteFile(symbolsPath, pkg.Files[pluginpkg.SymbolsPath], 0644)
-
-	fmt.Printf("✓ Plugin '%s' v%s instalado correctamente en %s\n", pkg.Metadata.Name, pkg.Metadata.Version, pluginsDir)
 }

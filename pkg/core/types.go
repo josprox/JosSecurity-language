@@ -6,6 +6,7 @@ import (
 	"sync"
 
 	"github.com/jossecurity/joss/pkg/parser"
+	"github.com/jossecurity/joss/pkg/pluginruntime"
 )
 
 // NativeHandler is a function that executes a native method
@@ -44,13 +45,10 @@ type Runtime struct {
 	NativeHandlers    map[string]NativeHandler
 	NativePlugins     map[string]*NativePluginDefinition
 	NativeDrivers     map[string]*NativeDriverDefinition
-	LoadedPlugins     map[string]string // package name -> resolved version
-	loadingPlugins    map[string]bool   // dependency-cycle detection
-	importedFiles     map[string]bool   // idempotent file imports
-	pluginsAutoloaded bool
+	PluginRegistry    *pluginruntime.PluginRegistry
+	importedFiles     map[string]bool // idempotent file imports
 	ProjectRoot       string
 	importBaseDir     string
-	usePluginVFS      bool
 
 	// SEO & Sitemap
 	SEO            *SEOData
@@ -79,7 +77,7 @@ type CapturedFunction struct {
 	Environment *ClosureEnvironment
 }
 
-// NativePluginDefinition describes a self-contained JP v2 sidecar payload.
+// NativePluginDefinition describes a JP v2 plugin runtime payload.
 type NativePluginDefinition struct {
 	Name         string
 	Version      string

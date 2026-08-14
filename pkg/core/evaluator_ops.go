@@ -461,6 +461,29 @@ func (r *Runtime) evaluateInfix(ie *parser.InfixExpression) interface{} {
 
 func (r *Runtime) evaluateNew(ne *parser.NewExpression) interface{} {
 	className := ne.Class.Value
+
+	evalArgs := []interface{}{}
+	for _, arg := range ne.Arguments {
+		evalArgs = append(evalArgs, r.evaluateExpression(arg))
+	}
+
+	// Check PluginRegistry for exported class instantiation first
+	if r.PluginRegistry != nil {
+		for _, p := range r.PluginRegistry.List() {
+			for _, cls := range p.Symbols.Classes {
+				if cls.Name == className {
+					res, err := r.PluginRegistry.Instantiate(p.Name, cls.Name, evalArgs)
+					if err == nil && res != nil {
+						return res
+					}
+					if err != nil {
+						panic(fmt.Sprintf("Error instanciando clase de plugin %s::%s: %v", p.Name, cls.Name, err))
+					}
+				}
+			}
+		}
+	}
+
 	classStmt, ok := r.Classes[className]
 	if !ok {
 		fmt.Printf("Error: Clase '%s' no encontrada\n", className)
@@ -524,6 +547,14 @@ func (r *Runtime) evaluateNew(ne *parser.NewExpression) interface{} {
 func (r *Runtime) evaluateMember(me *parser.MemberExpression) interface{} {
 	left := r.evaluateExpression(me.Left)
 
+	// Support Plugin Namespace access (e.g. plugin_name::function or plugin_name.function)
+	if ns, ok := left.(*PluginNamespace); ok {
+		return &PluginCallable{
+			PluginName: ns.Name,
+			Function:   me.Property.Value,
+		}
+	}
+
 	// Support Map access via dot notation (e.g. $item.id where $item is a map)
 	if m, ok := left.(map[string]interface{}); ok {
 		if val, exists := m[me.Property.Value]; exists {
@@ -534,12 +565,18 @@ func (r *Runtime) evaluateMember(me *parser.MemberExpression) interface{} {
 
 	instance, ok := left.(*Instance)
 	if !ok || instance == nil {
-		// Check if it's a Static Class Access (e.g. Session::get)
-		// In this case, 'left' might be nil if the identifier wasn't found as a variable.
-		// We need to check if the original expression was an Identifier matching a known class.
-
+		// Check if it's a Static Class Access (e.g. Session::get or PluginName::function)
 		if ident, ok := me.Left.(*parser.Identifier); ok {
 			className := ident.Value
+
+			// Check if ident is a loaded plugin name in PluginRegistry
+			if r.PluginRegistry != nil && r.PluginRegistry.Get(className) != nil {
+				return &PluginCallable{
+					PluginName: className,
+					Function:   me.Property.Value,
+				}
+			}
+
 			if classStmt, ok := r.Classes[className]; ok {
 				// Native classes are dispatched through their registered handler.
 				if _, native := r.NativeHandlers[className]; native {
@@ -555,7 +592,6 @@ func (r *Runtime) evaluateMember(me *parser.MemberExpression) interface{} {
 						return &BoundMethod{Method: method, Instance: &Instance{Class: classStmt, Fields: make(map[string]interface{})}}
 					}
 				}
-				// Keep a useful error below instead of fabricating a callable method.
 			} else if isNativeClass(className) {
 				return &BoundMethod{
 					Method: &parser.MethodStatement{
@@ -566,7 +602,31 @@ func (r *Runtime) evaluateMember(me *parser.MemberExpression) interface{} {
 					StaticClass: className,
 				}
 			}
-			panic(fmt.Sprintf("Error: Clase '%s' no registrada. Si pertenece a un plugin, verifique joss.yaml, joss.lock y la instalación del paquete", className))
+
+			// Fallback: check if className is a function/class exported by any loaded plugin
+			if r.PluginRegistry != nil {
+				for _, p := range r.PluginRegistry.List() {
+					for _, fn := range p.Symbols.Functions {
+						if fn.Name == me.Property.Value && p.Name == className {
+							return &PluginCallable{
+								PluginName: p.Name,
+								Function:   fn.Name,
+							}
+						}
+					}
+					for _, cls := range p.Symbols.Classes {
+						if cls.Name == className {
+							return &PluginCallable{
+								PluginName: p.Name,
+								ClassName:  cls.Name,
+								Function:   me.Property.Value,
+							}
+						}
+					}
+				}
+			}
+
+			panic(fmt.Sprintf("Error: Clase o plugin '%s' no registrado. Si pertenece a un plugin, verifique joss.yaml y la instalación del paquete", className))
 		}
 
 		fmt.Printf("Error: %v (tipo %T) no es una instancia. Intentando acceder a: '%s'\n", left, left, me.Property.Value)
@@ -653,6 +713,28 @@ func (r *Runtime) evaluateMember(me *parser.MemberExpression) interface{} {
 				Body: nil,
 			},
 			Instance: instance,
+		}
+	}
+
+	// Check for Plugin Class methods
+	if r.PluginRegistry != nil && instance.Class != nil {
+		className := instance.Class.Name.Value
+		for _, p := range r.PluginRegistry.List() {
+			for _, cls := range p.Symbols.Classes {
+				if cls.Name == className {
+					for _, m := range cls.Methods {
+						if m.Name == propName {
+							return &BoundMethod{
+								Method: &parser.MethodStatement{
+									Name: &parser.Identifier{Value: propName},
+									Body: nil,
+								},
+								Instance: instance,
+							}
+						}
+					}
+				}
+			}
 		}
 	}
 

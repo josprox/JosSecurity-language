@@ -134,3 +134,64 @@ func ResolvePort(envMap map[string]string) string {
 	}
 	return "8000"
 }
+
+// ReadEnvFile reads a file and returns its parsed environment key-value map.
+func ReadEnvFile(path string) map[string]string {
+	m := make(map[string]string)
+	content, err := os.ReadFile(path)
+	if err != nil {
+		return m
+	}
+	lines := strings.Split(string(content), "\n")
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+		parts := strings.SplitN(line, "=", 2)
+		if len(parts) == 2 {
+			val := strings.TrimSpace(parts[1])
+			val = strings.Trim(val, "\"")
+			val = strings.Trim(val, "'")
+			m[strings.TrimSpace(parts[0])] = val
+		}
+	}
+	return m
+}
+
+// UpdateEnvFile updates or appends a key=value pair in an environment file.
+func UpdateEnvFile(path, key, value string) error {
+	content, _ := os.ReadFile(path)
+	lines := strings.Split(string(content), "\n")
+	found := false
+	var newLines []string
+	for _, line := range lines {
+		if strings.HasPrefix(strings.TrimSpace(line), key+"=") {
+			newLines = append(newLines, fmt.Sprintf("%s=%s", key, value))
+			found = true
+		} else {
+			newLines = append(newLines, line)
+		}
+	}
+	if !found {
+		newLines = append(newLines, fmt.Sprintf("%s=%s", key, value))
+	}
+	return os.WriteFile(path, []byte(strings.Join(newLines, "\n")), 0644)
+}
+
+// RemoveEnvKey removes a key from an environment file.
+func RemoveEnvKey(path, key string) error {
+	content, err := os.ReadFile(path)
+	if err != nil {
+		return err
+	}
+	lines := strings.Split(string(content), "\n")
+	var newLines []string
+	for _, line := range lines {
+		if !strings.HasPrefix(strings.TrimSpace(line), key+"=") {
+			newLines = append(newLines, line)
+		}
+	}
+	return os.WriteFile(path, []byte(strings.Join(newLines, "\n")), 0644)
+}
+

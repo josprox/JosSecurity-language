@@ -1,6 +1,9 @@
 package ir
 
-import "fmt"
+import (
+	"fmt"
+	"strings"
+)
 
 // IRModule representa un modulo compilado de plugin en Joss Plugin IR.
 type IRModule struct {
@@ -40,6 +43,60 @@ func (m *IRModule) AddConstant(val interface{}) int {
 	m.ConstantPool = append(m.ConstantPool, val)
 	return len(m.ConstantPool) - 1
 }
+
+// Validate verifica la consistencia e integridad del modulo IR antes de la optimizacion/emision.
+func (m *IRModule) Validate() error {
+	if m == nil {
+		return fmt.Errorf("ir: modulo es nil")
+	}
+	if strings.TrimSpace(m.Name) == "" {
+		return fmt.Errorf("ir: el modulo no tiene nombre o esta vacio")
+	}
+	if len(m.Exports) == 0 {
+		return fmt.Errorf("ir: el modulo no declara ninguna funcion exportada")
+	}
+	seenExports := make(map[string]bool, len(m.Exports))
+	for _, exp := range m.Exports {
+		cleanExp := strings.TrimSpace(exp)
+		if cleanExp == "" {
+			return fmt.Errorf("ir: declaracion de exportacion vacia detectada")
+		}
+		if seenExports[cleanExp] {
+			return fmt.Errorf("ir: exportacion duplicada %q detectada", cleanExp)
+		}
+		seenExports[cleanExp] = true
+		fn, ok := m.Functions[cleanExp]
+		if !ok {
+			return fmt.Errorf("ir: la funcion exportada %q no esta definida en el modulo", cleanExp)
+		}
+		if len(fn.Blocks) == 0 {
+			return fmt.Errorf("ir: la funcion exportada %q no contiene bloques de instrucciones", cleanExp)
+		}
+	}
+	for fnName, fn := range m.Functions {
+		if strings.TrimSpace(fnName) == "" {
+			return fmt.Errorf("ir: funcion con nombre vacio detectada")
+		}
+		if fn == nil {
+			return fmt.Errorf("ir: funcion %q es nil", fnName)
+		}
+		for blockIdx, blk := range fn.Blocks {
+			if blk == nil {
+				return fmt.Errorf("ir: bloque %d en funcion %q es nil", blockIdx, fnName)
+			}
+			for instIdx, inst := range blk.Instructions {
+				if inst.Op == OpConst && inst.ConstIdx >= 0 {
+					if inst.ConstIdx >= len(m.ConstantPool) {
+						return fmt.Errorf("ir: instruccion %d en bloque %d de %q referencia constante fuera de limites (%d >= %d)",
+							instIdx, blockIdx, fnName, inst.ConstIdx, len(m.ConstantPool))
+					}
+				}
+			}
+		}
+	}
+	return nil
+}
+
 
 // IRStruct define una estructura/clase en el IR.
 type IRStruct struct {

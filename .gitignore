@@ -1,27 +1,47 @@
-# Binaries
+# Binaries & Executables
 *.exe
+*.exe~
 *.exe.old
 *.dll
 *.so
 *.dylib
 /build/
 /runner
+runner
+runner.exe
 /dist/
 /.joss-release-work/
+/scratch/
 
-# Joss
+# Joss Environment & Secrets
 env.joss
 env.enc
+.env
+.env.*
+!.env.example
 *.lock
 
+# Temporary Bytecode & Logs
+temp_*
+*.tmp
+*.temp
+log.txt
+*.log
+
 # Go
-go.sum
 vendor/
 
-# IDE
+# IDE & OS Metadata
 .vscode/
 .idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
 
+# Dependencies & Build Artifacts
+node_modules/
 /ejemplos/*
 install/*.zip
 install/*.exe
@@ -29,13 +49,12 @@ install/joss-linux
 install/joss-macos
 install/*.vsix
 installer/*
-
 jossecurity-*.zip
 
+# Translation & Miscellaneous
 *.py
 translation_history.json
 translation_log.xlsx
-log.txt
 hardcoded_strings_list.json
 hardcoded_strings.arb
 hardcoded_strings.json

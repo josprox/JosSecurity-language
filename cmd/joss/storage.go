@@ -91,36 +91,7 @@ func configureOCI() {
 }
 
 func updateEnvVariable(key, value string) {
-	envPath := GetEnvFile()
-	content, err := os.ReadFile(envPath)
-	if err != nil {
-		fmt.Printf("Error leyendo env.joss: %v\n", err)
-		return
-	}
-
-	lines := strings.Split(string(content), "\n")
-	found := false
-	newLines := make([]string, 0, len(lines))
-
-	for _, line := range lines {
-		if strings.HasPrefix(strings.TrimSpace(line), key+"=") {
-			newLines = append(newLines, fmt.Sprintf("%s=%s", key, value))
-			found = true
-		} else {
-			newLines = append(newLines, line)
-		}
-	}
-
-	if !found {
-		// If not found, append it (maybe under a generic comment or at end)
-		newLines = append(newLines, fmt.Sprintf("%s=%s", key, value))
-	}
-
-	output := strings.Join(newLines, "\n")
-	err = os.WriteFile(envPath, []byte(output), 0644)
-	if err != nil {
-		fmt.Printf("Error actualizando env.joss: %v\n", err)
-	}
+	updateEnvFile(GetEnvFile(), key, value)
 }
 
 // --- Migration Logis ---
@@ -291,20 +262,5 @@ func migrateFromOCI() {
 }
 
 func loadEnvMap() map[string]string {
-	m := make(map[string]string)
-	content, err := os.ReadFile(GetEnvFile())
-	if err == nil {
-		lines := strings.Split(string(content), "\n")
-		for _, line := range lines {
-			parts := strings.SplitN(line, "=", 2)
-			if len(parts) == 2 {
-				key := strings.TrimSpace(parts[0])
-				val := strings.TrimSpace(parts[1])
-				// Remove quotes if present
-				val = strings.Trim(val, "\"")
-				m[key] = val
-			}
-		}
-	}
-	return m
+	return readEnvFile(GetEnvFile())
 }

@@ -260,8 +260,13 @@ func (r *Runtime) dbPrefix() string {
 	return "js_"
 }
 
-// pluralize helper
+// pluralize helper method on Runtime
 func (r *Runtime) pluralize(s string) string {
+	return Pluralize(s)
+}
+
+// Pluralize converts an English word to its plural form
+func Pluralize(s string) string {
 	s = strings.TrimSpace(s)
 	if s == "" {
 		return ""
@@ -281,7 +286,7 @@ func (r *Runtime) pluralize(s string) string {
 	if strings.HasSuffix(lower, "y") && len(lower) > 1 {
 		lastChar := lower[len(lower)-1]
 		secondLast := lower[len(lower)-2]
-		if lastChar == 'y' && !isVowel(secondLast) {
+		if lastChar == 'y' && !IsVowel(secondLast) {
 			return s[:len(s)-1] + "ies"
 		}
 	}
@@ -291,7 +296,44 @@ func (r *Runtime) pluralize(s string) string {
 	return s + "s"
 }
 
-func isVowel(c byte) bool {
+// Singularize converts an English plural word back to singular form
+func Singularize(s string) string {
+	s = strings.TrimSpace(s)
+	if s == "" {
+		return ""
+	}
+	lower := strings.ToLower(s)
+	irregular := map[string]string{
+		"people":   "person",
+		"men":      "man",
+		"children": "child",
+		"feet":     "foot",
+		"teeth":    "tooth",
+		"mice":     "mouse",
+	}
+	if val, ok := irregular[lower]; ok {
+		if len(val) > 0 {
+			return strings.ToUpper(val[:1]) + strings.ToLower(val[1:])
+		}
+		return val
+	}
+	if strings.HasSuffix(lower, "ies") {
+		return s[:len(s)-3] + "y"
+	}
+	// Words ending in -ses, -xes, -zes, -ches, -shes: strip -es
+	if strings.HasSuffix(lower, "ses") || strings.HasSuffix(lower, "xes") ||
+		strings.HasSuffix(lower, "zes") || strings.HasSuffix(lower, "ches") ||
+		strings.HasSuffix(lower, "shes") {
+		return s[:len(s)-2]
+	}
+	if strings.HasSuffix(lower, "s") {
+		return s[:len(s)-1]
+	}
+	return s
+}
+
+// IsVowel checks if an ASCII byte is an English vowel
+func IsVowel(c byte) bool {
 	return c == 'a' || c == 'e' || c == 'i' || c == 'o' || c == 'u'
 }
 

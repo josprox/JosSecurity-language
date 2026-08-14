@@ -1,8 +1,6 @@
 package plugincompiler
 
 import (
-	"crypto/ed25519"
-	"crypto/rand"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -30,8 +28,17 @@ type Options struct {
 	MaxSizeMB   float64
 }
 
-// CompileProject analiza el proyecto fuente (Java/Python/PHP/Rust/C/Dart/etc), aplica Tree Shaking y compila a .jp.
+// CompileProject analiza el proyecto fuente (Java/Python/PHP/Rust/C/Dart/etc), valida el IR, aplica Tree Shaking y compila a .jp.
 func CompileProject(opts Options) (string, *optimizer.Result, error) {
+	if strings.TrimSpace(opts.Name) == "" {
+		return "", nil, fmt.Errorf("compilador de plugins: el nombre del plugin (--name) es requerido")
+	}
+	if strings.TrimSpace(opts.Version) == "" {
+		opts.Version = "1.0.0"
+	}
+	if len(opts.Exports) == 0 {
+		return "", nil, fmt.Errorf("compilador de plugins: se debe declarar al menos una funcion exportada con --exports=func1,func2")
+	}
 	if opts.MaxSizeMB <= 0 {
 		opts.MaxSizeMB = 1.0 // Objetivo predeterminado: 1 MB
 	}
@@ -39,7 +46,7 @@ func CompileProject(opts Options) (string, *optimizer.Result, error) {
 	var module *ir.IRModule
 	var err error
 
-	lang := strings.ToLower(opts.Language)
+	lang := strings.ToLower(strings.TrimSpace(opts.Language))
 
 	switch lang {
 	case "java", "kotlin":
@@ -64,6 +71,11 @@ func CompileProject(opts Options) (string, *optimizer.Result, error) {
 
 	if err != nil {
 		return "", nil, fmt.Errorf("error en backend %s: %w", opts.Language, err)
+	}
+
+	// Validar consistencia del IRModule antes de optimizar
+	if err := module.Validate(); err != nil {
+		return "", nil, fmt.Errorf("error de validacion IR: %w", err)
 	}
 
 	// Aplicar Tree Shaking / Dead Code Elimination
@@ -113,7 +125,7 @@ exports:
 		Dependencies: make(map[string]string),
 	}
 
-	signingKey, _, err := loadOrCreatePluginSigningKey(opts.Name)
+	signingKey, _, err := pluginpkg.LoadOrCreateSigningKey(opts.Name)
 	if err != nil {
 		return "", nil, fmt.Errorf("error al preparar firma del plugin: %w", err)
 	}
@@ -134,25 +146,4 @@ exports:
 	}
 
 	return outPath, optRes, nil
-}
-
-func loadOrCreatePluginSigningKey(name string) ([]byte, string, error) {
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return nil, "", err
-	}
-	keyDir := filepath.Join(home, ".joss", "keys")
-	if err := os.MkdirAll(keyDir, 0700); err != nil {
-		return nil, "", err
-	}
-	keyPath := filepath.Join(keyDir, name+".ed25519")
-	if data, err := os.ReadFile(keyPath); err == nil && len(data) == ed25519.PrivateKeySize {
-		return data, keyPath, nil
-	}
-	_, privateKey, err := ed25519.GenerateKey(rand.Reader)
-	if err != nil {
-		return nil, "", fmt.Errorf("error generando llave Ed25519: %w", err)
-	}
-	_ = os.WriteFile(keyPath, privateKey, 0600)
-	return privateKey, keyPath, nil
 }

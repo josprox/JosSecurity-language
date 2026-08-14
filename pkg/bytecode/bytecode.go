@@ -128,5 +128,12 @@ func registerAST() {
 		gob.Register(&parser.EmptyExpression{})
 		gob.Register(&parser.BlockExpression{})
 		gob.Register(&parser.MatchExpression{})
+
+		// Auxiliary structs and types within AST nodes
+		gob.Register(&parser.Parameter{})
+		gob.Register(parser.SingleDecl{})
+		gob.Register(parser.MatchArm{})
+		gob.Register(parser.Token{})
+		gob.Register(parser.TokenType(""))
 	})
 }

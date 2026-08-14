@@ -74,7 +74,7 @@ func (r *Runtime) RegisterNativeClasses() {
 	r.registerNative("System", []string{"env", "Run", "load_driver", "driver_call", "log", "sleep", "now"}, (*Runtime).executeSystemMethod)
 	r.Variables["System"] = &Instance{Class: r.Classes["System"], Fields: make(map[string]interface{})}
 
-	// Plugin (JP v2 native sidecar ABI)
+	// Plugin (JP v2 plugin runtime bridge)
 	r.registerNative("Plugin", []string{"call", "stream", "path", "platform"}, (*Runtime).executePluginMethod)
 	r.Variables["Plugin"] = &Instance{Class: r.Classes["Plugin"], Fields: make(map[string]interface{})}
 

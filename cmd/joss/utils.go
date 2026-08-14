@@ -6,52 +6,20 @@ import (
 	"os"
 	"strings"
 
+	"github.com/jossecurity/joss/pkg/core"
 	"github.com/jossecurity/joss/pkg/i18n"
 )
 
 func GetEnvFile() string {
-	if _, err := os.Stat("env.joss"); err == nil {
-		return "env.joss"
-	}
-	if _, err := os.Stat(".env"); err == nil {
-		return ".env"
-	}
-	return "env.joss"
+	return core.GetEnvFile()
 }
 
 func readEnvFile(path string) map[string]string {
-	m := make(map[string]string)
-	content, _ := os.ReadFile(path)
-	lines := strings.Split(string(content), "\n")
-	for _, line := range lines {
-		parts := strings.SplitN(line, "=", 2)
-		if len(parts) == 2 {
-			val := strings.TrimSpace(parts[1])
-			val = strings.Trim(val, "\"")
-			val = strings.Trim(val, "'")
-			m[strings.TrimSpace(parts[0])] = val
-		}
-	}
-	return m
+	return core.ReadEnvFile(path)
 }
 
 func updateEnvFile(path, key, value string) {
-	content, _ := os.ReadFile(path)
-	lines := strings.Split(string(content), "\n")
-	found := false
-	var newLines []string
-	for _, line := range lines {
-		if strings.HasPrefix(strings.TrimSpace(line), key+"=") {
-			newLines = append(newLines, fmt.Sprintf("%s=%s", key, value))
-			found = true
-		} else {
-			newLines = append(newLines, line)
-		}
-	}
-	if !found {
-		newLines = append(newLines, fmt.Sprintf("%s=%s", key, value))
-	}
-	os.WriteFile(path, []byte(strings.Join(newLines, "\n")), 0644)
+	_ = core.UpdateEnvFile(path, key, value)
 }
 
 func printHelp() {
@@ -160,16 +128,5 @@ func getCLIOption(flag string) string {
 }
 
 func removeEnvKey(path, key string) {
-	content, err := os.ReadFile(path)
-	if err != nil {
-		return
-	}
-	lines := strings.Split(string(content), "\n")
-	var newLines []string
-	for _, line := range lines {
-		if !strings.HasPrefix(strings.TrimSpace(line), key+"=") {
-			newLines = append(newLines, line)
-		}
-	}
-	os.WriteFile(path, []byte(strings.Join(newLines, "\n")), 0644)
+	_ = core.RemoveEnvKey(path, key)
 }

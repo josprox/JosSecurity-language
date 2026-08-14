@@ -22,10 +22,7 @@ func (r *Runtime) executeAuthLoginResultMethod(instance *Instance, method string
 		success, okSuccess := instance.Fields["success"].(bool)
 
 		if okId && okSuccess && success {
-			prefix := "js_"
-			if val, ok := r.Env["PREFIX"]; ok {
-				prefix = val
-			}
+			prefix := r.dbPrefix()
 			mfaMethodsTable := prefix + "user_mfa_methods"
 
 			// Check if any MFA method is active for the user
@@ -140,10 +137,7 @@ func (r *Runtime) executeMFAMethod(instance *Instance, method string, args []int
 			userId := args[0]
 			code := fmt.Sprintf("%v", args[1])
 
-			prefix := "js_"
-			if val, ok := r.Env["PREFIX"]; ok {
-				prefix = val
-			}
+			prefix := r.dbPrefix()
 			recoveryCodesTable := prefix + "user_recovery_codes"
 
 			// We need to look up all unused codes for this user
@@ -177,10 +171,7 @@ func (r *Runtime) executeTwoFactorMethod(instance *Instance, method string, args
 		if len(args) > 0 {
 			if userInst, ok := args[0].(*Instance); ok {
 				userId := userInst.Fields["id"]
-				prefix := "js_"
-				if val, ok := r.Env["PREFIX"]; ok {
-					prefix = val
-				}
+				prefix := r.dbPrefix()
 				mfaMethodsTable := prefix + "user_mfa_methods"
 
 				var count int
@@ -199,10 +190,7 @@ func (r *Runtime) executeTwoFactorMethod(instance *Instance, method string, args
 			userId := args[0]
 			code := fmt.Sprintf("%v", args[1])
 
-			prefix := "js_"
-			if val, ok := r.Env["PREFIX"]; ok {
-				prefix = val
-			}
+			prefix := r.dbPrefix()
 			mfaMethodsTable := prefix + "user_mfa_methods"
 
 			// Get active TOTP secret
@@ -223,7 +211,6 @@ func (r *Runtime) executeTwoFactorMethod(instance *Instance, method string, args
 // TOTP Implementation Helpers
 func generateRandomBase32Secret() string {
 	const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567"
-	rand.Seed(time.Now().UnixNano())
 	var sb strings.Builder
 	for i := 0; i < 16; i++ {
 		sb.WriteByte(alphabet[rand.Intn(len(alphabet))])
@@ -233,7 +220,6 @@ func generateRandomBase32Secret() string {
 
 func generateRandomRecoveryCode() string {
 	const chars = "abcdefghijklmnopqrstuvwxyz0123456789"
-	rand.Seed(time.Now().UnixNano())
 	var sb strings.Builder
 	for i := 0; i < 10; i++ {
 		sb.WriteByte(chars[rand.Intn(len(chars))])

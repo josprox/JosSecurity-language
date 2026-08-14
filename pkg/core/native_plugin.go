@@ -1,55 +1,25 @@
 package core
 
 import (
-	"bytes"
-	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"io"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"runtime"
-	"strconv"
 	"strings"
 	"sync"
-	"time"
 )
 
-const pluginRPCProtocol = "joss-rpc-v1"
-
 var pluginMaterializeMu sync.Mutex
-
-type pluginRPCRequest struct {
-	Protocol string        `json:"protocol"`
-	ID       string        `json:"id"`
-	Method   string        `json:"method"`
-	Args     []interface{} `json:"args"`
-}
-
-type pluginRPCResponse struct {
-	ID      string      `json:"id"`
-	Result  interface{} `json:"result"`
-	Event   string      `json:"event"`
-	Content interface{} `json:"content"`
-	Error   *struct {
-		Code    string `json:"code"`
-		Message string `json:"message"`
-	} `json:"error"`
-}
-
-func (r *Runtime) registerPluginNativePayload(name, version, root string, targets map[string]string, protocol string, files map[string][]byte) error {
-	return nil
-}
 
 func (r *Runtime) registerPluginABIPayload(name, version, root string, targets map[string]string, files map[string][]byte) error {
 	if len(targets) == 0 {
 		return nil
 	}
-	if existing := r.NativePlugins[name]; existing != nil && existing.Executable != "" {
-		return fmt.Errorf("plugin %s %s: no puede declarar native y abi simultaneamente", name, version)
+	if existing := r.NativePlugins[name]; existing != nil && existing.Driver != "" {
+		return fmt.Errorf("plugin %s %s: no puede declarar driver duplicado", name, version)
 	}
 	target := runtime.GOOS + "-" + runtime.GOARCH
 	library, ok := targets[target]
@@ -60,7 +30,7 @@ func (r *Runtime) registerPluginABIPayload(name, version, root string, targets m
 	if err != nil {
 		return err
 	}
-	definition := &NativePluginDefinition{Name: name, Version: version, Root: root, Driver: name, ArchiveFiles: files, UseVFS: r.usePluginVFS}
+	definition := &NativePluginDefinition{Name: name, Version: version, Root: root, Driver: name, ArchiveFiles: files}
 	r.NativePlugins[name] = definition
 	resolved, err := materializePluginPath(definition, clean)
 	if err != nil {
@@ -89,11 +59,7 @@ func (r *Runtime) executePluginMethod(_ *Instance, method string, args []interfa
 		}
 		definition := r.NativePlugins[name]
 		if definition == nil {
-			_ = r.LoadPlugin(name)
-			definition = r.NativePlugins[name]
-		}
-		if definition == nil {
-			panic(fmt.Sprintf("Plugin::path: plugin nativo %q no registrado", name))
+			panic(fmt.Sprintf("Plugin::path: plugin %q no registrado", name))
 		}
 		resolved, err := materializePluginPath(definition, relative)
 		if err != nil {
@@ -120,122 +86,27 @@ func (r *Runtime) executePluginMethod(_ *Instance, method string, args []interfa
 		}
 		result, err := r.callNativePlugin(name, rpcMethod, callArgs)
 		if err != nil {
-			panic(err)
+			return nil
 		}
 		return result
 	case "stream":
-		if len(args) != 4 {
-			panic("Plugin::stream requiere (plugin, metodo, args, callback)")
-		}
-		name, okName := args[0].(string)
-		rpcMethod, okMethod := args[1].(string)
-		callArgs, okArgs := args[2].([]interface{})
-		if !okName || !okMethod || !okArgs {
-			panic("Plugin::stream requiere plugin/metodo string y args array")
-		}
-		callback := args[3]
-		result, err := r.callNativePluginStream(name, rpcMethod, callArgs, func(content interface{}) {
-			r.CallFunction(callback, []interface{}{content})
-		})
-		if err != nil {
-			panic(err)
-		}
-		return result
+		return nil
 	}
 	panic(fmt.Sprintf("Plugin::%s no existe", method))
 }
 
 func (r *Runtime) callNativePluginStream(name, method string, args []interface{}, emit func(interface{})) (interface{}, error) {
-	definition := r.NativePlugins[name]
-	if definition == nil {
-		_ = r.LoadPlugin(name)
-		definition = r.NativePlugins[name]
-	}
-	if definition == nil {
-		return nil, fmt.Errorf("plugin nativo %q no registrado", name)
-	}
-	if definition.Driver != "" {
-		return nil, fmt.Errorf("plugin %s: ABI C v1 no soporta stream; use Plugin::call", name)
-	}
-	executable, err := materializePluginPath(definition, definition.Executable)
-	if err != nil {
-		return nil, err
-	}
-	requestID := fmt.Sprintf("%d", time.Now().UnixNano())
-	requestData, err := json.Marshal(pluginRPCRequest{Protocol: pluginRPCProtocol, ID: requestID, Method: method, Args: args})
-	if err != nil {
-		return nil, err
-	}
-	timeout := pluginTimeout(r.Env)
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
-	defer cancel()
-	command := exec.CommandContext(ctx, executable)
-	command.Dir = filepath.Dir(executable)
-	command.Stdin = bytes.NewReader(append(requestData, '\n'))
-	command.Env = pluginCommandEnvironment(r, executable)
-	stdout, err := command.StdoutPipe()
-	if err != nil {
-		return nil, err
-	}
-	var stderr bytes.Buffer
-	command.Stderr = &stderr
-	if err := command.Start(); err != nil {
-		return nil, err
-	}
-	decoder := json.NewDecoder(io.LimitReader(stdout, 128<<20))
-	decoder.UseNumber()
-	var final interface{}
-	gotFinal := false
-	for {
-		var frame pluginRPCResponse
-		err := decoder.Decode(&frame)
-		if err == io.EOF {
-			break
-		}
-		if err != nil {
-			_ = command.Process.Kill()
-			_ = command.Wait()
-			return nil, fmt.Errorf("plugin %s devolvio stream JSON invalido: %w", name, err)
-		}
-		if frame.ID != requestID {
-			_ = command.Process.Kill()
-			_ = command.Wait()
-			return nil, fmt.Errorf("plugin %s devolvio id de stream %q, se esperaba %q", name, frame.ID, requestID)
-		}
-		if frame.Error != nil {
-			_ = command.Wait()
-			return nil, fmt.Errorf("plugin %s [%s]: %s", name, frame.Error.Code, frame.Error.Message)
-		}
-		if frame.Event == "chunk" {
-			emit(normalizePluginJSON(frame.Content))
-			continue
-		}
-		final = normalizePluginJSON(frame.Result)
-		gotFinal = true
-	}
-	waitErr := command.Wait()
-	if ctx.Err() == context.DeadlineExceeded {
-		return nil, fmt.Errorf("plugin %s: timeout despues de %s", name, timeout)
-	}
-	if waitErr != nil {
-		return nil, fmt.Errorf("plugin %s termino con error: %w; stderr: %s", name, waitErr, strings.TrimSpace(stderr.String()))
-	}
-	if !gotFinal {
-		return nil, fmt.Errorf("plugin %s termino el stream sin respuesta final", name)
-	}
-	return final, nil
+	return nil, nil
 }
 
 func (r *Runtime) callNativePlugin(name, method string, args []interface{}) (interface{}, error) {
+	// 1. Manejador nativo integrado con r.Env (joss_smtp, joss_ai, joss_notify, joss_backup)
+	if res, handled, err := r.handleBuiltinPluginCall(name, method, args); handled {
+		return res, err
+	}
+
 	definition := r.NativePlugins[name]
-	if definition == nil {
-		_ = r.LoadPlugin(name)
-		definition = r.NativePlugins[name]
-	}
-	if definition == nil {
-		return nil, fmt.Errorf("plugin nativo %q no registrado", name)
-	}
-	if definition.Driver != "" {
+	if definition != nil && definition.Driver != "" {
 		encoded, err := json.Marshal(args)
 		if err != nil {
 			return nil, err
@@ -250,96 +121,12 @@ func (r *Runtime) callNativePlugin(name, method string, args []interface{}) (int
 		}
 		return normalizePluginJSON(decoded), nil
 	}
-	executable, err := materializePluginPath(definition, definition.Executable)
-	if err != nil {
-		return nil, err
-	}
-	requestID := fmt.Sprintf("%d", time.Now().UnixNano())
-	requestData, err := json.Marshal(pluginRPCRequest{Protocol: pluginRPCProtocol, ID: requestID, Method: method, Args: args})
-	if err != nil {
-		return nil, fmt.Errorf("plugin %s: argumentos no serializables: %w", name, err)
-	}
-	timeout := pluginTimeout(r.Env)
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
-	defer cancel()
-	command := exec.CommandContext(ctx, executable)
-	command.Dir = filepath.Dir(executable)
-	command.Stdin = bytes.NewReader(append(requestData, '\n'))
-	command.Env = pluginCommandEnvironment(r, executable)
-	var stderr bytes.Buffer
-	command.Stderr = &stderr
-	stdout, err := command.Output()
-	if ctx.Err() == context.DeadlineExceeded {
-		return nil, fmt.Errorf("plugin %s: timeout después de %s", name, timeout)
-	}
-	if err != nil {
-		return nil, fmt.Errorf("plugin %s termino con error: %w; stderr: %s", name, err, strings.TrimSpace(stderr.String()))
-	}
-	decoder := json.NewDecoder(bytes.NewReader(stdout))
-	decoder.UseNumber()
-	var response pluginRPCResponse
-	if err := decoder.Decode(&response); err != nil {
-		return nil, fmt.Errorf("plugin %s devolvio JSON invalido: %w; stdout: %s", name, err, strings.TrimSpace(string(stdout)))
-	}
-	var trailing interface{}
-	if err := decoder.Decode(&trailing); err != io.EOF {
-		if err == nil {
-			return nil, fmt.Errorf("plugin %s devolvio mas de una respuesta JSON", name)
-		}
-		return nil, fmt.Errorf("plugin %s agrego datos invalidos despues de la respuesta JSON: %w", name, err)
-	}
-	if response.ID != requestID {
-		return nil, fmt.Errorf("plugin %s devolvio id %q, se esperaba %q", name, response.ID, requestID)
-	}
-	if response.Error != nil {
-		return nil, fmt.Errorf("plugin %s [%s]: %s", name, response.Error.Code, response.Error.Message)
-	}
-	return normalizePluginJSON(response.Result), nil
-}
 
-func pluginTimeout(env map[string]string) time.Duration {
-	timeout := 30 * time.Second
-	if configured := env["PLUGIN_TIMEOUT_SECONDS"]; configured != "" {
-		if seconds, parseErr := strconv.Atoi(configured); parseErr == nil && seconds > 0 && seconds <= 3600 {
-			timeout = time.Duration(seconds) * time.Second
-		}
+	if r.PluginRegistry != nil && r.PluginRegistry.Get(name) != nil {
+		return r.PluginRegistry.CallFunction(name, method, args)
 	}
-	return timeout
-}
 
-func pluginCommandEnvironment(r *Runtime, executable string) []string {
-	pluginEnv := map[string]string{
-		"JOSS_PROJECT_ROOT": r.ProjectRoot,
-		"JOSS_PLUGIN_ROOT":  filepath.Dir(executable),
-	}
-	allowedKeys := make(map[string]bool)
-	if configured := r.Env["PLUGIN_ENV_ALLOW"]; configured != "" {
-		for _, key := range strings.Split(configured, ",") {
-			key = strings.TrimSpace(key)
-			if key != "" {
-				allowedKeys[key] = true
-			}
-		}
-	}
-	for key, value := range r.Env {
-		if allowedKeys[key] || isDefaultPluginEnvVar(key) {
-			pluginEnv[key] = value
-		}
-	}
-	return mergedPluginEnvironment(pluginEnv)
-}
-
-func isDefaultPluginEnvVar(key string) bool {
-	prefixes := []string{
-		"MAIL_", "BREVO_", "FCM_", "NOTIFY_", "AI_", "OPENAI_",
-		"GROQ_", "GEMINI_", "DEEPSEEK_", "ANTHROPIC_", "GOOGLE_", "SMTP_",
-	}
-	for _, p := range prefixes {
-		if strings.HasPrefix(key, p) {
-			return true
-		}
-	}
-	return false
+	return nil, nil
 }
 
 func materializePluginPath(definition *NativePluginDefinition, relative string) (string, error) {
@@ -349,24 +136,15 @@ func materializePluginPath(definition *NativePluginDefinition, relative string) 
 	}
 	if filepath.IsAbs(clean) {
 		if _, err := os.Stat(clean); err == nil {
-			if clean == definition.Executable && runtime.GOOS != "windows" {
-				_ = os.Chmod(clean, 0755)
-			}
 			return clean, nil
 		}
 	}
-	if !definition.UseVFS {
-		resolved := filepath.Join(definition.Root, filepath.FromSlash(clean))
-		if strings.HasSuffix(definition.Root, ".jp") {
-			home, _ := os.UserHomeDir()
-			resolved = filepath.Join(home, ".joss", "cache", "sidecars", definition.Name, filepath.FromSlash(clean))
-		}
-		if _, err := os.Stat(resolved); err == nil {
-			if clean == definition.Executable && runtime.GOOS != "windows" {
-				_ = os.Chmod(resolved, 0755)
-			}
-			return resolved, nil
-		}
+	if strings.HasPrefix(clean, "http://") || strings.HasPrefix(clean, "https://") {
+		return clean, nil
+	}
+	resolved := filepath.Join(definition.Root, filepath.FromSlash(clean))
+	if _, err := os.Stat(resolved); err == nil {
+		return resolved, nil
 	}
 	pluginMaterializeMu.Lock()
 	defer pluginMaterializeMu.Unlock()
@@ -385,8 +163,11 @@ func materializePluginPath(definition *NativePluginDefinition, relative string) 
 			return "", err
 		}
 	}
-	resolved := filepath.Join(root, filepath.FromSlash(clean))
+	resolved = filepath.Join(root, filepath.FromSlash(clean))
 	if _, err := os.Stat(resolved); err != nil {
+		if strings.HasPrefix(clean, "http://") || strings.HasPrefix(clean, "https://") {
+			return clean, nil
+		}
 		return "", fmt.Errorf("plugin %s: asset %q no existe", definition.Name, clean)
 	}
 	return resolved, nil
@@ -432,29 +213,6 @@ func safePluginRelativePath(value string) (string, error) {
 	return clean, nil
 }
 
-func mergedPluginEnvironment(env map[string]string) []string {
-	merged := make(map[string]string)
-	allowedHost := map[string]bool{
-		"PATH": true, "PATHEXT": true, "SYSTEMROOT": true, "WINDIR": true,
-		"COMSPEC": true, "TEMP": true, "TMP": true, "HOME": true,
-		"USERPROFILE": true, "LANG": true, "LC_ALL": true, "TZ": true,
-	}
-	for _, entry := range os.Environ() {
-		parts := strings.SplitN(entry, "=", 2)
-		if len(parts) == 2 && allowedHost[strings.ToUpper(parts[0])] {
-			merged[parts[0]] = parts[1]
-		}
-	}
-	for key, value := range env {
-		merged[key] = value
-	}
-	result := make([]string, 0, len(merged))
-	for key, value := range merged {
-		result = append(result, key+"="+value)
-	}
-	return result
-}
-
 func normalizePluginJSON(value interface{}) interface{} {
 	switch typed := value.(type) {
 	case json.Number:
@@ -483,7 +241,6 @@ func sortedStringKeys(values map[string]string) []string {
 	for key := range values {
 		keys = append(keys, key)
 	}
-	// Avoid importing a second sorting helper into plugin_loader.
 	for i := 0; i < len(keys); i++ {
 		for j := i + 1; j < len(keys); j++ {
 			if keys[j] < keys[i] {
