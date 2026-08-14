@@ -310,16 +310,43 @@ func (r *Runtime) callBuiltin(name string, args []interface{}) (interface{}, boo
 			}
 		}
 		return nil, true
-	case "env":
-		if len(args) == 1 {
+	case "env", "config":
+		if len(args) > 0 {
 			if key, ok := args[0].(string); ok {
+				if val, exists := r.Env[key]; exists && val != "" {
+					return val, true
+				}
+				if len(args) > 1 {
+					return args[1], true
+				}
 				if val, exists := r.Env[key]; exists {
 					return val, true
 				}
 				return "", true
 			}
 		}
-		return nil, true
+		return "", true
+	case "view":
+		return r.executeViewMethod(nil, "render", args), true
+	case "json":
+		return r.executeResponseMethod(nil, "json", args), true
+	case "back":
+		return r.executeResponseMethod(nil, "back", nil), true
+	case "response":
+		return r.executeResponseMethod(nil, "raw", args), true
+	case "request":
+		if len(args) == 0 {
+			return r.executeRequestMethod(nil, "all", nil), true
+		}
+		return r.executeRequestMethod(nil, "input", args), true
+	case "session":
+		if len(args) == 0 {
+			if sessVal, ok := r.Variables["$__session"]; ok {
+				return sessVal, true
+			}
+			return nil, true
+		}
+		return r.executeSessionMethod(nil, "get", args), true
 	case "len", "count":
 		if len(args) == 1 {
 			if args[0] == nil {
@@ -478,12 +505,7 @@ func (r *Runtime) callBuiltin(name string, args []interface{}) (interface{}, boo
 		}
 		return []interface{}{}, true
 	case "redirect":
-		if len(args) == 1 {
-			if url, ok := args[0].(string); ok {
-				return r.createWebResponse("REDIRECT", url, nil, 302), true
-			}
-		}
-		return nil, true
+		return r.executeResponseMethod(nil, "redirect", args), true
 	case "explode":
 		if len(args) == 2 {
 			sep, ok1 := args[0].(string)
