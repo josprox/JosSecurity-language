@@ -6,17 +6,17 @@ Un controlador es una clase Joss. El dispatcher resuelve `Controller@method` y t
 class ProductController {
     func index() {
         $products = GranDB::table("products")->get()
-        return View::render("products.index", {"products": $products})
+        return view("products.index", {"products": $products})
     }
 
     func store() {
-        $name = Request::input("name")
+        $name = request("name")
         (empty($name)) ? {
-            return Response::error("El nombre es obligatorio", 422)
+            return json({"error": "El nombre es obligatorio"}, 422)
         } : {}
 
         GranDB::table("products")->insert({"name": $name})
-        return Response::redirect("/products")
+        return redirect("/products")
     }
 }
 ```

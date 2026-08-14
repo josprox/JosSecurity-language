@@ -1,6 +1,6 @@
 # Vistas
 
-`View::render("dashboard.index", $data)` busca `app/views/dashboard/index.joss.html` y después `.html`.
+`view("dashboard.index", $data)` (o `View::render`) busca `app/views/dashboard/index.joss.html` y después `.html`.
 
 ```html
 <h1>{{ $title }}</h1>

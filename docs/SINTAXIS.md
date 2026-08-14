@@ -104,6 +104,21 @@ try {
 
 `break` y `continue` funcionan en ciclos. El postfix implementado es `++`; `--` no existe todavía, por lo que un decremento se escribe como asignación. `isset()` y `empty()` son expresiones del lenguaje.
 
-## Carga de Módulos y Plugins
+## Helpers Globales y Entorno
 
-No se requieren sentencias `import` o `use`. Todas las dependencias y paquetes declarados en `joss.yaml`, así como los controladores, modelos y componentes del proyecto, son cargados e indexados automáticamente por el entorno de ejecución de Joss. Las instrucciones `import` y `use` han sido eliminadas del lenguaje.
+Joss provee funciones de primer nivel integradas para operaciones comunes, optimizadas en memoria:
+
+```joss
+$port = env("PORT", "9000")
+$app = config("APP_ENV", "production")
+$home = view("home", {"user": $user})
+$responseJson = json({"status": "ok"}, 200)
+$red = redirect("/dashboard")
+$b = back()->with("error", "Fallo")
+$email = request("email")
+$userId = session("user_id")
+```
+
+## Carga Automática (Zero Imports)
+
+No se requieren sentencias `import` ni `use`. Todas las clases del proyecto (`app/controllers/`, `app/models/`, `app/libs/`), así como los plugins instalados (`plugins/` / `joss.yaml`), son indexados y cargados automáticamente en memoria por el runtime de Joss. Las palabras clave `import` y `use` no existen en la sintaxis moderna.
