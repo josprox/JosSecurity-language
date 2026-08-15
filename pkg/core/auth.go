@@ -602,7 +602,8 @@ func (r *Runtime) executeAuthMethod(instance *Instance, method string, args []in
 
 	case "refresh":
 		if len(args) == 1 {
-			if id, ok := args[0].(int); ok {
+			id := toInt(args[0])
+			if id > 0 {
 				var email, username, roleName string
 				// Need to join with roles to get role name
 				prefix := r.dbPrefix()
@@ -626,10 +627,10 @@ func (r *Runtime) executeAuthMethod(instance *Instance, method string, args []in
 
 	case "update":
 		if len(args) == 2 {
-			id, ok1 := args[0].(int)
+			id := toInt(args[0])
 			data, ok2 := args[1].(map[string]interface{})
 
-			if ok1 && ok2 {
+			if id > 0 && ok2 {
 				if r.GetDB() == nil {
 					return false
 				}
@@ -680,7 +681,8 @@ func (r *Runtime) executeAuthMethod(instance *Instance, method string, args []in
 
 	case "delete":
 		if len(args) == 1 {
-			if id, ok := args[0].(int); ok {
+			id := toInt(args[0])
+			if id > 0 {
 				if r.GetDB() == nil {
 					return false
 				}

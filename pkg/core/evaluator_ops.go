@@ -626,7 +626,16 @@ func (r *Runtime) evaluateMember(me *parser.MemberExpression) interface{} {
 				}
 			}
 
+			// If left was nil (e.g. unassigned or nil variable like $u), safely return nil
+			if left == nil {
+				return nil
+			}
+
 			panic(fmt.Sprintf("Error: Clase o plugin '%s' no registrado. Si pertenece a un plugin, verifique joss.yaml y la instalación del paquete", className))
+		}
+
+		if left == nil {
+			return nil
 		}
 
 		fmt.Printf("Error: %v (tipo %T) no es una instancia. Intentando acceder a: '%s'\n", left, left, me.Property.Value)

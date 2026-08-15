@@ -99,7 +99,7 @@ func (r *Runtime) generateTemporaryChallengeJWT(userId int, email string) string
 func (r *Runtime) executeMFAMethod(instance *Instance, method string, args []interface{}) interface{} {
 	switch method {
 	case "generateTOTP":
-		// MFA::generateTOTP() -> returns {secret, qr_uri}
+		// MFA::generateTOTP() -> returns {secret, qr_uri, qr_url}
 		secret := generateRandomBase32Secret()
 		// Generate standard otpauth URI
 		appName := "JossApp"
@@ -112,6 +112,7 @@ func (r *Runtime) executeMFAMethod(instance *Instance, method string, args []int
 		res := make(map[string]interface{})
 		res["secret"] = secret
 		res["qr_uri"] = qrUri
+		res["qr_url"] = fmt.Sprintf("https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=%s", qrUri)
 		return res
 
 	case "verifyTOTP":

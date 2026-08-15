@@ -12,6 +12,7 @@ import (
 
 	"github.com/jossecurity/joss/pkg/core"
 	"github.com/jossecurity/joss/pkg/parser"
+	_ "github.com/jossecurity/joss/pkg/server"
 	"github.com/jossecurity/joss/pkg/template"
 	"github.com/jossecurity/joss/pkg/version"
 	"golang.org/x/term"

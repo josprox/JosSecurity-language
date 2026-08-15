@@ -8,16 +8,18 @@ func GetControllerFiles(path string) map[string]string {
     func index() {
         $u = Auth::user()
         $userId = Auth::id()
-
         $prefix = env("PREFIX", "js_")
-        $mfa = new MfaManager()
-        $mfa->setPrefix($prefix)
-        
-        $hasTOTP = $mfa->hasTOTP($userId)
+
+        // Check if MFA is active in database
+        $mfaRecord = GranDB::table($prefix . "user_mfa_methods")->where("user_id", $userId)->where("is_active", 1)->first()
+        $hasTOTP = (!empty($mfaRecord)) ? true : false
+
         $qrCode = ""
-        
         (!$hasTOTP) ? {
-            $qrCode = $mfa->generateTOTP($userId, $u->email)
+            $totp = MFA::generateTOTP()
+            $secret = $totp["secret"]
+            Session::put("temp_2fa_secret", $secret)
+            $qrCode = $totp["qr_url"]
         } : {}
 
         return view("profile.index", {
@@ -52,22 +54,36 @@ func GetControllerFiles(path string) map[string]string {
     }
 
     func activate2FA() {
-        $code = request("code")
-        $prefix = env("PREFIX", "js_")
-        $mfa = new MfaManager()
-        $mfa->setPrefix($prefix)
+        $userId = Auth::id()
+        $secret = Session::get("temp_2fa_secret")
+        $code = Str::trim(request("code"))
         
-        $success = $mfa->verifyAndActivateTOTP(Auth::id(), $code)
-        return ($success) ? redirect("/profile")->with("success", "Autenticación de dos factores (2FA) activada con éxito.") : redirect("/profile")->with("error", "Código de verificación inválido.")
+        (empty($secret) || empty($code)) ? {
+            return redirect("/profile")->with("error", "Código o sesión de 2FA no válida.")
+        } : {}
+        
+        $valid = MFA::verifyTOTP($secret, $code)
+        
+        return ($valid) ? {
+            $prefix = env("PREFIX", "js_")
+            GranDB::table($prefix . "user_mfa_methods")->insert({
+                "user_id": $userId,
+                "method_type": "totp",
+                "secret": $secret,
+                "is_active": 1
+            })
+            Session::forget("temp_2fa_secret")
+            return redirect("/profile")->with("success", "Autenticación de dos factores (2FA) activada con éxito.")
+        } : {
+            return redirect("/profile")->with("error", "Código de verificación incorrecto. Intenta de nuevo.")
+        }
     }
 
     func deactivate2FA() {
+        $userId = Auth::id()
         $prefix = env("PREFIX", "js_")
-        $mfa = new MfaManager()
-        $mfa->setPrefix($prefix)
-        
-        $success = $mfa->deactivateTOTP(Auth::id())
-        return ($success) ? redirect("/profile")->with("success", "Autenticación de dos factores (2FA) desactivada.") : redirect("/profile")->with("error", "Error al desactivar la autenticación de dos factores.")
+        GranDB::table($prefix . "user_mfa_methods")->where("user_id", $userId)->delete()
+        return redirect("/profile")->with("success", "Autenticación de dos factores (2FA) desactivada.")
     }
 
     func delete() {
@@ -78,7 +94,7 @@ func GetControllerFiles(path string) map[string]string {
 
         return ($success) ? {
             Auth::logout()
-            return redirect("/login")->with("success", "Tu cuenta ha sido eliminada permanentemente.")
+            return redirect("/login")->withCookie("joss_token", "")->with("success", "Tu cuenta ha sido eliminada permanentemente.")
         } : {
             return back()->with("error", "Error al eliminar la cuenta.")
         }
@@ -106,28 +122,64 @@ func GetControllerFiles(path string) map[string]string {
     }
     
     func doLogin() {
-        $email = request("email")
+        $email = Str::trim(request("email"))
         $password = request("password")
         
-        // Auth::attempt checks credentials and verification
-        $acceso = Auth::attempt($email, $password)
+        $loginResult = Auth::login($email, $password)
+        $loginResult->require2FA()
         
-        return ($acceso) ? {
-            return redirect("/dashboard")->withCookie("joss_token", $acceso)
+        return $loginResult->onSuccess(func($jwt) {
+            return redirect("/dashboard")->withCookie("joss_token", $jwt)
+        })->onChallenge(func($tempToken) {
+            Session::put("temp_2fa_token", $tempToken)
+            Session::forget("user_id")
+            Session::forget("user_email")
+            Session::forget("user_name")
+            Session::forget("user_role")
+            Session::forget("user_token")
+            return redirect("/2fa/verify")
+        })->onFail(func($error) {
+            $verificationStatus = Auth::verificationStatus($email)
+            ($verificationStatus == "unverified") ? {
+                $newToken = Auth::resendVerification($email)
+                ($newToken && $newToken != "already_verified") ? {
+                    $link = Request::root() . "/verify/" . $newToken
+                    $body = "<h1>Verifica tu cuenta</h1><a href='" . $link . "'>Verificar Cuenta</a>"
+                    SmtpClient::send($email, "Verifica tu cuenta", $body)
+                } : {}
+                return back()->with("error", "Cuenta no verificada. Se ha enviado un nuevo correo de verificación.")
+            } : {}
+            return back()->with("error", "El correo o la contraseña son incorrectos.")
+        })->response()
+    }
+
+    func showVerify2FA() {
+        $tempToken = Session::get("temp_2fa_token")
+        (empty($tempToken)) ? { return redirect("/login") } : {}
+        
+        return view("auth.verify_2fa", {
+            "title": "Verificación 2FA",
+            "error": session("error")
+        })
+    }
+
+    func doVerify2FA() {
+        $tempToken = Session::get("temp_2fa_token")
+        (empty($tempToken)) ? { return redirect("/login") } : {}
+        
+        $code = Str::trim(request("code"))
+        $finalToken = Auth::verify2FAChallenge($tempToken, $code)
+
+        return ($finalToken) ? {
+            Session::forget("temp_2fa_token")
+            Session::forget("user_id")
+            Session::forget("user_email")
+            Session::forget("user_name")
+            Session::forget("user_role")
+            Session::forget("user_token")
+            return redirect("/dashboard")->withCookie("joss_token", $finalToken)
         } : {
-            // Check if unverified and resend
-            $newToken = Auth::resendVerification($email)
-            
-            return ($newToken && $newToken != "already_verified") ? {
-                 $link = Request::root() . "/verify/" . $newToken
-                 $body = "<h1>Verifica tu cuenta</h1><p>Hemos detectado un intento de inicio de sesión, pero tu cuenta no está verificada. Haz click aquí:</p><a href='" . $link . "'>Verificar Cuenta</a>"
-                 
-                 SmtpClient::send($email, "Verifica tu cuenta", $body)
-                 
-                 return back()->with("error", "Cuenta no verificada. Se ha enviado un nuevo correo de verificación.")
-            } : {
-                 return back()->with("error", "Credenciales inválidas o cuenta no verificada.")
-            }
+            return redirect("/2fa/verify")->with("error", "Código incorrecto o sesión expirada.")
         }
     }
 
@@ -310,18 +362,20 @@ func GetControllerFiles(path string) map[string]string {
 
 		filepath.Join(path, "app", "controllers", "web", "DashboardController.joss"): `class DashboardController {
     func index() {
-        $check = Auth::check()
-        (!$check) ? {
-            return redirect("/login")->with("error", "Debes iniciar sesión para ver esta página.")
+        $u = Auth::user()
+        (!$u) ? {
+            Auth::logout()
+            return redirect("/login")->with("error", "Sesión no válida o usuario inexistente.")
         } : {}
 
         $isAdmin = Auth::hasRole("admin")
         $roleName = ($isAdmin) ? "Administrador" : "Cliente"
-        $u = Auth::user()
+
+        $name = ($u->name) ? $u->name : ($u->first_name . " " . $u->last_name)
 
         return view("dashboard.index", {
             "title":      "Dashboard",
-            "user_name":  $u->name,
+            "user_name":  $name,
             "user_email": $u->email,
             "role":       $roleName,
             "isAdmin":    $isAdmin

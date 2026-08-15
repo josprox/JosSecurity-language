@@ -187,6 +187,7 @@ func (r *Runtime) RegisterNativeClasses() {
 
 	// Server Control
 	r.registerNative("Server", []string{"start", "spawn"}, (*Runtime).executeServerControlMethod)
+	r.Variables["Server"] = &Instance{Class: r.Classes["Server"], Fields: make(map[string]interface{})}
 
 	// Lang (I18n)
 	r.registerNative("Lang", []string{"get", "set", "locale", "locales"}, (*Runtime).executeLangMethod)

@@ -13,6 +13,8 @@ Router::middleware("guest")
 Router::match("GET|POST", "/login", "AuthController@showLogin@doLogin")
 Router::match("GET|POST", "/register", "AuthController@showRegister@doRegister")
 Router::get("/verify/{token}", "AuthController@verify")
+Router::get("/2fa/verify", "AuthController@showVerify2FA")
+Router::post("/2fa/verify", "AuthController@doVerify2FA")
 
 // Password Recovery
 Router::get("/password/forgot", "PasswordController@showForgot")
