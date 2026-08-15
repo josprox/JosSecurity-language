@@ -46,6 +46,11 @@ dependencies:
 // Clase exportada para interactuar con el plugin %s
 
 class %s {
+    Init constructor() {
+        // Acceso directo y automático al entorno (.env) del proyecto
+        $this->apiKey = env("%s_API_KEY", "")
+    }
+
     func ping() {
         return "pong desde %s"
     }
@@ -58,7 +63,7 @@ class %s {
         }
     }
 }
-`, pluginName, className, pluginName, pluginName)
+`, pluginName, className, strings.ToUpper(pluginName), pluginName, pluginName)
 
 	workflowContent := `name: Release Plugin Package (.jp)
 

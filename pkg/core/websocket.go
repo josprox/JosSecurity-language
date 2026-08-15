@@ -111,6 +111,13 @@ func (r *Runtime) executeWebSocketMethod(instance *Instance, method string, args
 				instance.Fields["_on_message"] = r.captureFunction(fn)
 				return true
 			}
+			// CapturedFunction (Evaluated closure)
+			if fn, ok := args[0].(*CapturedFunction); ok {
+				instance.Fields["_on_message"] = fn
+				return true
+			}
+			instance.Fields["_on_message"] = args[0]
+			return true
 		}
 		return false
 
@@ -125,6 +132,12 @@ func (r *Runtime) executeWebSocketMethod(instance *Instance, method string, args
 				instance.Fields["_on_close"] = r.captureFunction(fn)
 				return true
 			}
+			if fn, ok := args[0].(*CapturedFunction); ok {
+				instance.Fields["_on_close"] = fn
+				return true
+			}
+			instance.Fields["_on_close"] = args[0]
+			return true
 		}
 		return false
 

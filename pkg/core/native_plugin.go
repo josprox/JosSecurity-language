@@ -90,19 +90,46 @@ func (r *Runtime) executePluginMethod(_ *Instance, method string, args []interfa
 		}
 		return result
 	case "stream":
-		return nil
+		if len(args) < 2 {
+			panic("Plugin::stream requiere (plugin, metodo, args_opcionales, callback_opcional)")
+		}
+		name, okName := args[0].(string)
+		rpcMethod, okMethod := args[1].(string)
+		if !okName || !okMethod {
+			panic("Plugin::stream requiere plugin y metodo string")
+		}
+		callArgs := []interface{}{}
+		if len(args) >= 3 {
+			if list, ok := args[2].([]interface{}); ok {
+				callArgs = list
+			} else {
+				callArgs = []interface{}{args[2]}
+			}
+		}
+		var callback interface{}
+		if len(args) >= 4 {
+			callback = args[3]
+		}
+		res, err := r.callNativePluginStream(name, rpcMethod, callArgs, callback)
+		if err != nil {
+			return nil
+		}
+		return res
 	}
 	panic(fmt.Sprintf("Plugin::%s no existe", method))
 }
 
-func (r *Runtime) callNativePluginStream(name, method string, args []interface{}, emit func(interface{})) (interface{}, error) {
+func (r *Runtime) callNativePluginStream(name, method string, args []interface{}, callback interface{}) (interface{}, error) {
+	if r.PluginRegistry != nil && r.PluginRegistry.Get(name) != nil {
+		fullArgs := append(args, callback)
+		return r.PluginRegistry.CallFunction(name, method, fullArgs)
+	}
 	return nil, nil
 }
 
 func (r *Runtime) callNativePlugin(name, method string, args []interface{}) (interface{}, error) {
-	// 1. Manejador nativo integrado con r.Env (joss_smtp, joss_ai, joss_notify, joss_backup)
-	if res, handled, err := r.handleBuiltinPluginCall(name, method, args); handled {
-		return res, err
+	if r.PluginRegistry != nil && r.PluginRegistry.Get(name) != nil {
+		return r.PluginRegistry.CallFunction(name, method, args)
 	}
 
 	definition := r.NativePlugins[name]
@@ -122,11 +149,7 @@ func (r *Runtime) callNativePlugin(name, method string, args []interface{}) (int
 		return normalizePluginJSON(decoded), nil
 	}
 
-	if r.PluginRegistry != nil && r.PluginRegistry.Get(name) != nil {
-		return r.PluginRegistry.CallFunction(name, method, args)
-	}
-
-	return nil, nil
+	return nil, fmt.Errorf("plugin %s no encontrado", name)
 }
 
 func materializePluginPath(definition *NativePluginDefinition, relative string) (string, error) {

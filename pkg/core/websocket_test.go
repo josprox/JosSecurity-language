@@ -23,3 +23,15 @@ func TestWebSocketCloseInvokesCloser(t *testing.T) {
 		t.Fatalf("close result=%v closed=%v", got, closed)
 	}
 }
+
+func TestWebSocketOnMessageCapturedFunction(t *testing.T) {
+	r := NewRuntime()
+	instance := &Instance{Fields: make(map[string]interface{})}
+	closure := &CapturedFunction{}
+	if got := r.executeWebSocketMethod(instance, "onMessage", []interface{}{closure}); got != true {
+		t.Fatalf("onMessage result=%v, expected true", got)
+	}
+	if instance.Fields["_on_message"] != closure {
+		t.Fatalf("instance._on_message was not set to closure")
+	}
+}
