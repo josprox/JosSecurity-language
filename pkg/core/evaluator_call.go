@@ -357,35 +357,31 @@ func (r *Runtime) callBuiltin(name string, args []interface{}) (interface{}, boo
 		return true, true
 
 	case "empty":
+		resEmpty := false
 		if len(args) == 0 || args[0] == nil {
-			return true, true
+			resEmpty = true
+		} else if b, ok := args[0].(bool); ok {
+			resEmpty = !b
+		} else if str, ok := args[0].(string); ok {
+			resEmpty = (str == "" || str == "0")
+		} else if num, ok := args[0].(int); ok {
+			resEmpty = (num == 0)
+		} else if num, ok := args[0].(int64); ok {
+			resEmpty = (num == 0)
+		} else if num, ok := args[0].(float64); ok {
+			resEmpty = (num == 0)
+		} else if list, ok := args[0].([]interface{}); ok {
+			resEmpty = (len(list) == 0)
+		} else if m, ok := args[0].(map[string]interface{}); ok {
+			resEmpty = (len(m) == 0)
+		} else {
+			val := reflect.ValueOf(args[0])
+			if val.Kind() == reflect.Slice || val.Kind() == reflect.Array || val.Kind() == reflect.Map {
+				resEmpty = (val.Len() == 0)
+			}
 		}
-		if b, ok := args[0].(bool); ok {
-			return !b, true
-		}
-		if str, ok := args[0].(string); ok {
-			return str == "" || str == "0", true
-		}
-		if num, ok := args[0].(int); ok {
-			return num == 0, true
-		}
-		if num, ok := args[0].(int64); ok {
-			return num == 0, true
-		}
-		if num, ok := args[0].(float64); ok {
-			return num == 0, true
-		}
-		if list, ok := args[0].([]interface{}); ok {
-			return len(list) == 0, true
-		}
-		if m, ok := args[0].(map[string]interface{}); ok {
-			return len(m) == 0, true
-		}
-		val := reflect.ValueOf(args[0])
-		if val.Kind() == reflect.Slice || val.Kind() == reflect.Array || val.Kind() == reflect.Map {
-			return val.Len() == 0, true
-		}
-		return false, true
+		// fmt.Printf("[callBuiltin empty] arg=%#v (type %T) -> resEmpty=%v\n", args[0], args[0], resEmpty)
+		return resEmpty, true
 
 	case "is_string":
 		if len(args) == 1 {

@@ -82,16 +82,37 @@ func (r *Runtime) executeHttpMethod(instance *Instance, method string, args []in
 			}
 		}
 
-		res := r.performFullHttpRequest(httpMethod, urlStr, bodyStr, headers, nil, 15, true)
+		res := r.performFullHttpRequest(httpMethod, urlStr, bodyStr, headers, nil, 30, true)
 		bodyRaw, _ := res["body"].(string)
+
+		if errStr, ok := res["error"].(string); ok && errStr != "" {
+			fmt.Printf("[Http::json Error] %s %s -> %s\n", httpMethod, urlStr, errStr)
+			if bodyRaw == "" {
+				return map[string]interface{}{
+					"error": map[string]interface{}{
+						"message": fmt.Sprintf("HTTP Network Error: %s", errStr),
+					},
+				}
+			}
+		}
 
 		if bodyRaw != "" {
 			var parsedJSON interface{}
 			if err := json.Unmarshal([]byte(bodyRaw), &parsedJSON); err == nil {
 				return parsedJSON
 			}
+			return map[string]interface{}{
+				"error": map[string]interface{}{
+					"message": fmt.Sprintf("Raw HTTP %v: %s", res["status"], bodyRaw),
+				},
+			}
 		}
-		return bodyRaw
+
+		return map[string]interface{}{
+			"error": map[string]interface{}{
+				"message": fmt.Sprintf("Empty response from %s (HTTP %v)", urlStr, res["status"]),
+			},
+		}
 
 	case "request":
 		if len(args) < 2 {
