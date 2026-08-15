@@ -52,3 +52,16 @@ func TestGlobalHelpers(t *testing.T) {
 		t.Fatalf("back() esperado REDIRECT, obtenido: %v", backRes)
 	}
 }
+
+func TestSmtpClientNative(t *testing.T) {
+	r := NewRuntime()
+	if _, ok := r.Classes["SmtpClient"]; !ok {
+		t.Fatalf("Clase nativa SmtpClient no registrada en Runtime")
+	}
+
+	inst := &Instance{Class: r.Classes["SmtpClient"], Fields: make(map[string]interface{})}
+	r.executeSmtpClientMethod(inst, "auth", []interface{}{"user@test.com", "secret"})
+	if inst.Fields["user"] != "user@test.com" || inst.Fields["pass"] != "secret" {
+		t.Fatalf("SmtpClient.auth no guardó credenciales")
+	}
+}

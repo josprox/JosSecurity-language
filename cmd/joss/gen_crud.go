@@ -169,42 +169,42 @@ func createCRUDController(modelName, tableName string, _ []ColumnSchema, relatio
     
     func index() {
         %s
-        return View::render("%s.index", {"items": $data})
+        return view("%s.index", {"items": $data})
     }
 
     func create() {
         %s
-        return View::render("%s.create", {%s})
+        return view("%s.create", {%s})
     }
 
     func store() {
         $db = new GranDB()
         $data = Request::except(["_token", "_referer", "_method"])
         $db->table("%s")->insert($data)
-        return Response::redirect("/%s")->with("success", "%s creado correctamente.")
+        return redirect("/%s")->with("success", "%s creado correctamente.")
     }
 
     func edit($id) {
         $model = new %s()
         $item = $model->where("id", $id)->first()
         (!$item) ? {
-            return Response::redirect("/%s")->with("error", "Registro no encontrado.")
+            return redirect("/%s")->with("error", "Registro no encontrado.")
         } : {}
         %s
-        return View::render("%s.edit", {"item": $item%s})
+        return view("%s.edit", {"item": $item%s})
     }
 
     func update($id) {
         $db = new GranDB()
         $data = Request::except(["_token", "_referer", "_method"])
         $db->table("%s")->where("id", $id)->update($data)
-        return Response::redirect("/%s")->with("success", "%s actualizado correctamente.")
+        return redirect("/%s")->with("success", "%s actualizado correctamente.")
     }
 
     func delete($id) {
         $model = new %s()
         $model->where("id", $id)->delete()
-        return Response::redirect("/%s")->with("success", "%s eliminado correctamente.")
+        return redirect("/%s")->with("success", "%s eliminado correctamente.")
     }
 }`, modelName, indexLogic, viewPrefix, createLogic, viewPrefix, strings.TrimPrefix(createVars, ", "),
 		strings.ToLower(modelName), viewPrefix, modelName,

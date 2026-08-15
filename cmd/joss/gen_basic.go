@@ -36,7 +36,7 @@ func createController(name string) {
 	} else {
 		content = fmt.Sprintf(`class %s {
     func index() {
-        return View::render("%s/index")
+        return view("%s/index")
     }
 }`, className, viewPrefix)
 	}

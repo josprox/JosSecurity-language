@@ -175,6 +175,10 @@ func (r *Runtime) RegisterNativeClasses() {
 	r.registerNative("Http", []string{"get", "post", "put", "patch", "delete", "head", "options", "json", "request"}, (*Runtime).executeHttpMethod)
 	r.Variables["Http"] = &Instance{Class: r.Classes["Http"], Fields: make(map[string]interface{})}
 
+	// SmtpClient (Native SMTP Engine)
+	r.registerNative("SmtpClient", []string{"auth", "secure", "timeout", "send", "lastError"}, (*Runtime).executeSmtpClientMethod)
+	r.Variables["SmtpClient"] = &Instance{Class: r.Classes["SmtpClient"], Fields: make(map[string]interface{})}
+
 	// Stream (Native - Instantiated by Server)
 	r.registerNative("Stream", []string{"send", "close"}, (*Runtime).executeStreamMethod)
 
