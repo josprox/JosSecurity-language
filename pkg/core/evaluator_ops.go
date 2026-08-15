@@ -592,7 +592,7 @@ func (r *Runtime) evaluateMember(me *parser.MemberExpression) interface{} {
 						return &BoundMethod{Method: method, Instance: &Instance{Class: classStmt, Fields: make(map[string]interface{})}}
 					}
 				}
-			} else if isNativeClass(className) {
+			} else if r.isNativeClass(className) {
 				return &BoundMethod{
 					Method: &parser.MethodStatement{
 						Name: &parser.Identifier{Value: me.Property.Value},
@@ -686,11 +686,7 @@ func (r *Runtime) evaluateMember(me *parser.MemberExpression) interface{} {
 	isNative := false
 	for checkClass != nil {
 		className := checkClass.Name.Value
-		if className == "Schema" || className == "Blueprint" || className == "Migration" {
-			isNative = true
-			break
-		}
-		if _, registered := r.NativeHandlers[className]; registered {
+		if r.isNativeClass(className) {
 			isNative = true
 			break
 		}
@@ -811,9 +807,15 @@ func (r *Runtime) evaluatePostfix(pe *parser.PostfixExpression) interface{} {
 	return nil
 }
 
-func isNativeClass(name string) bool {
+func (r *Runtime) isNativeClass(name string) bool {
+	if r == nil {
+		return false
+	}
+	if _, ok := r.NativeHandlers[name]; ok {
+		return true
+	}
 	switch name {
-	case "Session", "Math", "Auth", "View", "Request", "Response", "Redirect", "System", "Router", "Server", "GranDB", "Stack", "Queue", "Cron", "Task", "WebSocket", "Redis":
+	case "Schema", "Blueprint", "Migration":
 		return true
 	}
 	return false
