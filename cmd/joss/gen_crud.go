@@ -134,16 +134,16 @@ func createCRUDController(modelName, tableName string, _ []ColumnSchema, relatio
 			baseRelTable := strings.TrimPrefix(rel.Table, currentPrefix)
 			selects = append(selects, fmt.Sprintf("\"%s.%s as %s\"", baseRelTable, rel.DisplayCol, rel.Alias))
 		}
-		indexLogic += fmt.Sprintf(".select([%s])", strings.Join(selects, ", "))
+		indexLogic += fmt.Sprintf("->select([%s])", strings.Join(selects, ", "))
 
 		// Joins
 		for _, rel := range relations {
 			baseRelTable := strings.TrimPrefix(rel.Table, currentPrefix)
-			indexLogic += fmt.Sprintf(".leftJoin(\"%s\", \"%s.%s\", \"=\", \"%s.id\")", baseRelTable, baseTableName, rel.ForeignKey, baseRelTable)
+			indexLogic += fmt.Sprintf("->leftJoin(\"%s\", \"%s.%s\", \"=\", \"%s.id\")", baseRelTable, baseTableName, rel.ForeignKey, baseRelTable)
 		}
-		indexLogic += ".get()"
+		indexLogic += "->get()"
 	} else {
-		indexLogic += fmt.Sprintf("\n        $data = $%s.get()", strings.ToLower(modelName))
+		indexLogic += fmt.Sprintf("\n        $data = $%s->get()", strings.ToLower(modelName))
 	}
 
 	// Build Create Logic (Fetch relations)
@@ -160,7 +160,7 @@ func createCRUDController(modelName, tableName string, _ []ColumnSchema, relatio
 			relModel = strings.Title(singularize(relModel))
 			varName := strings.ToLower(pluralize(relModel)) // roles
 			createLogic += fmt.Sprintf("\n        $%sModel = new %s()", strings.ToLower(relModel), relModel)
-			createLogic += fmt.Sprintf("\n        $%s = $%sModel.get()", varName, strings.ToLower(relModel))
+			createLogic += fmt.Sprintf("\n        $%s = $%sModel->get()", varName, strings.ToLower(relModel))
 			createVars += fmt.Sprintf(", \"%s\": $%s", varName, varName)
 		}
 	}
@@ -178,9 +178,9 @@ func createCRUDController(modelName, tableName string, _ []ColumnSchema, relatio
     }
 
     func store() {
-        $db = new GranDB()
+        $model = new %s()
         $data = Request::except(["_token", "_referer", "_method"])
-        $db->table("%s")->insert($data)
+        $model->insert($data)
         return redirect("/%s")->with("success", "%s creado correctamente.")
     }
 
@@ -195,9 +195,9 @@ func createCRUDController(modelName, tableName string, _ []ColumnSchema, relatio
     }
 
     func update($id) {
-        $db = new GranDB()
+        $model = new %s()
         $data = Request::except(["_token", "_referer", "_method"])
-        $db->table("%s")->where("id", $id)->update($data)
+        $model->where("id", $id)->update($data)
         return redirect("/%s")->with("success", "%s actualizado correctamente.")
     }
 
@@ -207,9 +207,9 @@ func createCRUDController(modelName, tableName string, _ []ColumnSchema, relatio
         return redirect("/%s")->with("success", "%s eliminado correctamente.")
     }
 }`, modelName, indexLogic, viewPrefix, createLogic, viewPrefix, strings.TrimPrefix(createVars, ", "),
-		strings.ToLower(modelName), viewPrefix, modelName,
+		modelName, viewPrefix, modelName,
 		modelName, viewPrefix, createLogic, viewPrefix, createVars,
-		strings.ToLower(modelName), viewPrefix, modelName,
+		modelName, viewPrefix, modelName,
 		modelName, viewPrefix, modelName)
 
 	writeGenFile(path, content)
