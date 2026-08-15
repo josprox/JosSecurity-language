@@ -347,6 +347,69 @@ func (r *Runtime) callBuiltin(name string, args []interface{}) (interface{}, boo
 			return nil, true
 		}
 		return r.executeSessionMethod(nil, "get", args), true
+	case "isset":
+		if len(args) == 0 || args[0] == nil {
+			return false, true
+		}
+		if str, ok := args[0].(string); ok && str == "" {
+			return false, true
+		}
+		return true, true
+
+	case "empty":
+		if len(args) == 0 || args[0] == nil {
+			return true, true
+		}
+		if b, ok := args[0].(bool); ok {
+			return !b, true
+		}
+		if str, ok := args[0].(string); ok {
+			return str == "" || str == "0", true
+		}
+		if num, ok := args[0].(int); ok {
+			return num == 0, true
+		}
+		if num, ok := args[0].(int64); ok {
+			return num == 0, true
+		}
+		if num, ok := args[0].(float64); ok {
+			return num == 0, true
+		}
+		if list, ok := args[0].([]interface{}); ok {
+			return len(list) == 0, true
+		}
+		if m, ok := args[0].(map[string]interface{}); ok {
+			return len(m) == 0, true
+		}
+		val := reflect.ValueOf(args[0])
+		if val.Kind() == reflect.Slice || val.Kind() == reflect.Array || val.Kind() == reflect.Map {
+			return val.Len() == 0, true
+		}
+		return false, true
+
+	case "is_string":
+		if len(args) == 1 {
+			_, ok := args[0].(string)
+			return ok, true
+		}
+		return false, true
+
+	case "is_array":
+		if len(args) == 1 {
+			if _, ok := args[0].([]interface{}); ok {
+				return true, true
+			}
+			val := reflect.ValueOf(args[0])
+			return val.Kind() == reflect.Slice || val.Kind() == reflect.Array, true
+		}
+		return false, true
+
+	case "is_null":
+		if len(args) == 1 {
+			return args[0] == nil, true
+		}
+		return true, true
+
 	case "len", "count":
 		if len(args) == 1 {
 			if args[0] == nil {
