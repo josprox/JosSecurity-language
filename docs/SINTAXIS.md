@@ -119,6 +119,13 @@ $email = request("email")
 $userId = session("user_id")
 ```
 
+### Funciones Estándar de Utilidad:
+* **Fechas**: `time()`, `date("Y-m-d H:i:s")`, `strtotime("-2 days")`, `now()`, `microtime(true)`.
+* **Cadenas**: `str_contains($str, "foo")`, `str_starts_with`, `str_ends_with`, `str_replace`, `strtolower`, `strtoupper`, `trim`, `substr`, `strpos`, `implode`, `explode`, `md5`, `sha256`, `base64_encode`, `base64_decode`.
+* **Arreglos**: `in_array("admin", $roles)`, `array_key_exists("key", $map)`, `array_merge($arr1, $arr2)`, `array_push($arr, $val)`, `array_pop($arr)`, `array_slice($arr, 0, 10)`, `count($arr)`.
+* **Archivos**: `file_exists($path)`, `file_get_contents($path)`, `file_put_contents($path, $data)`, `unlink($path)`, `mkdir($dir)`, `is_dir($path)`.
+* **Asincronía**: `async { ... }`, `await $future`, `make_chan()`, `send($chan, $val)`, `recv($chan)`.
+
 ## Carga Automática (Zero Imports)
 
 No se requieren sentencias `import` ni `use`. Todas las clases del proyecto (`app/controllers/`, `app/models/`, `app/libs/`), así como los plugins instalados (`plugins/` / `joss.yaml`), son indexados y cargados automáticamente en memoria por el runtime de Joss. Las palabras clave `import` y `use` no existen en la sintaxis moderna.

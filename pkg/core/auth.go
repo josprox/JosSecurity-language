@@ -3,13 +3,9 @@ package core
 import (
 	"database/sql"
 	"fmt"
-	"os"
-	"sync"
+	"strings"
 	"time"
 
-	"strings" // Added for TrimSpace
-
-	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
 	"golang.org/x/crypto/bcrypt"
 )
@@ -63,7 +59,6 @@ func (r *Runtime) executeAuthMethod(instance *Instance, method string, args []in
 
 			err := r.GetDB().QueryRow(query, userId).Scan(&email, &username, &roleName)
 			if err == nil {
-				// Generar token JWT real con datos reales del usuario
 				return r.generateJWT(userId, email.String, username.String, roleName.String, false)
 			}
 			return nil
@@ -139,15 +134,10 @@ func (r *Runtime) executeAuthMethod(instance *Instance, method string, args []in
 		return nil
 
 	case "create":
-		// Auth::create({ ... })
 		if len(args) > 0 {
 			if data, ok := args[0].(map[string]interface{}); ok {
-				// 1. Generar User Token Obligatorio
 				userToken := uuid.New().String()
 
-				// Definir función de tiempo según DB (Removed unused nowFunc)
-
-				// Extraer campos (Sin 'name')
 				username := getString(data, "username", "")
 				firstName := getString(data, "first_name", "")
 				lastName := getString(data, "last_name", "")
@@ -155,7 +145,6 @@ func (r *Runtime) executeAuthMethod(instance *Instance, method string, args []in
 				phone := getString(data, "phone", "")
 				password := getString(data, "password", "")
 
-				// Opcional: role_id
 				roleId := 2
 				if rId, ok := data["role_id"].(int64); ok {
 					roleId = int(rId)
@@ -171,10 +160,8 @@ func (r *Runtime) executeAuthMethod(instance *Instance, method string, args []in
 					panic("Auth Error: No hay conexión a la base de datos configurada")
 				}
 
-				// Token expira en 24 horas
 				tokenExpires := time.Now().UTC().Add(24 * time.Hour).Format("2006-01-02 15:04:05")
 
-				// Use GranDB helper for safer/cleaner insert
 				insertData := map[string]interface{}{
 					"user_token":       userToken,
 					"username":         username,
@@ -186,7 +173,6 @@ func (r *Runtime) executeAuthMethod(instance *Instance, method string, args []in
 					"role_id":          roleId,
 					"token_expires_at": tokenExpires,
 					"verificado":       0,
-					// created_at / updated_at handled automatically by insertFromMap if omitted
 				}
 
 				insertResult := r.insertFromMap(usersTable, insertData, false)
@@ -212,15 +198,13 @@ func (r *Runtime) executeAuthMethod(instance *Instance, method string, args []in
 				panic("Auth Error: No hay conexión a la base de datos configurada")
 			}
 
-			// Variables para Scan
 			var storedHash sql.NullString
 			var userId int
-			var userName sql.NullString // Username del sistema
+			var userName sql.NullString
 			var userToken sql.NullString
 			var roleName sql.NullString
 			var verificado int
 
-			// Join con roles
 			query := fmt.Sprintf(`
 				SELECT u.id, u.user_token, u.username, u.password, u.verificado, r.name 
 				FROM %s u 
@@ -239,7 +223,7 @@ func (r *Runtime) executeAuthMethod(instance *Instance, method string, args []in
 
 			if verificado == 0 {
 				LogError("[Auth] Account not verified for '%s'", email)
-				return false // Fallar si no está verificado
+				return false
 			}
 
 			err = bcrypt.CompareHashAndPassword([]byte(storedHash.String), []byte(password))
@@ -250,7 +234,6 @@ func (r *Runtime) executeAuthMethod(instance *Instance, method string, args []in
 
 			LogInfo("[Auth] Login successful for '%s' (ID: %d)", email, userId)
 
-			// Guardar en Sesión ($__session)
 			if sessVal, ok := r.Variables["$__session"]; ok {
 				if sessInst, ok := sessVal.(*Instance); ok {
 					sessInst.Fields["user_id"] = userId
@@ -262,14 +245,12 @@ func (r *Runtime) executeAuthMethod(instance *Instance, method string, args []in
 				}
 			}
 
-			// Actualizar last_login_at
 			updateQuery := fmt.Sprintf("UPDATE %s SET last_login_at = %s WHERE id = ?", usersTable, "CURRENT_TIMESTAMP")
 			if val, ok := r.Env["DB"]; ok && val == "mysql" {
 				updateQuery = fmt.Sprintf("UPDATE %s SET last_login_at = NOW() WHERE id = ?", usersTable)
 			}
 			r.GetDB().Exec(updateQuery, userId)
 
-			// Retornar JWT Token
 			return r.generateJWT(userId, email, userName.String, roleName.String, false)
 		}
 
@@ -293,22 +274,19 @@ func (r *Runtime) executeAuthMethod(instance *Instance, method string, args []in
 				return false
 			}
 			var id int
-			var expiresAtStr sql.NullString // Changed to string for SQLite compatibility
+			var expiresAtStr sql.NullString
 
-			// Verificar existencia y expiración
 			query := fmt.Sprintf("SELECT id, token_expires_at FROM %s WHERE user_token = ? AND verificado = 0 LIMIT 1", usersTable)
 			err := r.GetDB().QueryRow(query, token).Scan(&id, &expiresAtStr)
 
 			if err != nil {
-				return false // Token not found
+				return false
 			}
 
-			// Check Expiry
 			if expiresAtStr.Valid && expiresAtStr.String != "" {
-				// Parse time from DB string
 				expiryTime, ok := parseAuthExpiry(expiresAtStr.String)
 				if !ok || time.Now().After(expiryTime) {
-					return false // Expired
+					return false
 				}
 			}
 
@@ -331,12 +309,11 @@ func (r *Runtime) executeAuthMethod(instance *Instance, method string, args []in
 				return false
 			}
 
-			// Verificar si existe el usuario
 			var userId int
 			queryCheck := fmt.Sprintf("SELECT id FROM %s WHERE LOWER(email) = ?", usersTable)
 			err := r.GetDB().QueryRow(queryCheck, email).Scan(&userId)
 			if err != nil {
-				return false // Usuario no existe, por seguridad retornamos falso o genérico
+				return false
 			}
 
 			resetsTable := prefix + "password_resets"
@@ -356,7 +333,6 @@ func (r *Runtime) executeAuthMethod(instance *Instance, method string, args []in
 			_, err = r.GetDB().Exec(query, email, token, expiresAt)
 
 			if err == nil {
-				// Retornamos el token para que el controlador envíe el email usando SmtpClient
 				return token
 			}
 			LogError("[Auth] Could not create password reset token: %v", err)
@@ -380,7 +356,6 @@ func (r *Runtime) executeAuthMethod(instance *Instance, method string, args []in
 
 			resetsTable := prefix + "password_resets"
 
-			// Validar token en tabla resets
 			var email string
 			var expiresAtStr sql.NullString
 			var used int
@@ -403,21 +378,18 @@ func (r *Runtime) executeAuthMethod(instance *Instance, method string, args []in
 			}
 
 			if expiresAtStr.Valid && expiresAtStr.String != "" {
-				// Parse time from DB string
 				expiryTime, ok := parseAuthExpiry(expiresAtStr.String)
 				if !ok || time.Now().After(expiryTime) {
 					return "expired_token"
 				}
 			}
 
-			// Token válido, actualizar password
 			hashedBytes, err := bcrypt.GenerateFromPassword([]byte(newPass), bcrypt.DefaultCost)
 			if err != nil {
 				return "database_error"
 			}
 			hashedPassword := string(hashedBytes)
 
-			// Actualizar contraseña usuario
 			claimToken := fmt.Sprintf("UPDATE %s SET used = 1 WHERE token = ? AND used = 0", resetsTable)
 			claimResult, err := tx.Exec(claimToken, token)
 			if err != nil {
@@ -475,7 +447,6 @@ func (r *Runtime) executeAuthMethod(instance *Instance, method string, args []in
 				}
 			}
 
-			// Generar nuevo token
 			newToken := uuid.New().String()
 			newExpiry := time.Now().UTC().Add(24 * time.Hour).Format("2006-01-02 15:04:05")
 
@@ -516,14 +487,12 @@ func (r *Runtime) executeAuthMethod(instance *Instance, method string, args []in
 						return nil
 					}
 
-					// Objeto usuario a retornar
 					user := make(map[string]interface{})
 
 					var id, roleId int
 					var username, email, firstName, lastName, userToken, createdAt, roleName sql.NullString
 					var pPhone sql.NullString
 
-					// Join with roles table
 					query := fmt.Sprintf(`SELECT u.id, u.username, u.first_name, u.last_name, u.email, u.phone, u.role_id, r.name, u.user_token, u.created_at 
 						FROM %s u 
 						LEFT JOIN %s r ON u.role_id = r.id 
@@ -538,18 +507,15 @@ func (r *Runtime) executeAuthMethod(instance *Instance, method string, args []in
 						user["username"] = username.String
 						user["first_name"] = firstName.String
 						user["last_name"] = lastName.String
-						// Helper name para UI (concatenado)
 						user["full_name"] = firstName.String + " " + lastName.String
 						user["email"] = email.String
 						user["phone"] = pPhone.String
 						user["role_id"] = roleId
-						user["role"] = roleName.String // Add role name
+						user["role"] = roleName.String
 						user["user_token"] = userToken.String
 						user["created_at"] = createdAt.String
-						// Compatibility for templates using user.name
 						user["name"] = firstName.String
 
-						// Debug Print
 						fmt.Printf("[Auth] User found: %s (ID: %d)\n", firstName.String, id)
 
 						return &Instance{
@@ -580,7 +546,6 @@ func (r *Runtime) executeAuthMethod(instance *Instance, method string, args []in
 						if currentRole == roleToCheck {
 							return true
 						}
-						// Admin bypass
 						if currentRole == "admin" {
 							return true
 						}
@@ -605,12 +570,10 @@ func (r *Runtime) executeAuthMethod(instance *Instance, method string, args []in
 			id := toInt(args[0])
 			if id > 0 {
 				var email, username, roleName string
-				// Need to join with roles to get role name
 				prefix := r.dbPrefix()
 				usersTable := prefix + "users"
 				rolesTable := prefix + "roles"
 
-				// Fixed query to include role
 				query := fmt.Sprintf(`
 					SELECT u.email, u.username, r.name 
 					FROM %s u 
@@ -635,7 +598,6 @@ func (r *Runtime) executeAuthMethod(instance *Instance, method string, args []in
 					return false
 				}
 
-				// Handle Password Hashing
 				if pwd, ok := data["password"]; ok {
 					passwordStr := fmt.Sprintf("%v", pwd)
 					if passwordStr != "" {
@@ -644,16 +606,13 @@ func (r *Runtime) executeAuthMethod(instance *Instance, method string, args []in
 							data["password"] = string(hashedBytes)
 						}
 					} else {
-						// Don't update empty password
 						delete(data, "password")
 					}
 				}
 
-				// Construct Query
 				var sets []string
 				var vals []interface{}
 
-				// Add updated_at automatically
 				if val, ok := r.Env["DB"]; ok && val == "sqlite" {
 					sets = append(sets, "updated_at = CURRENT_TIMESTAMP")
 				} else {
@@ -661,7 +620,6 @@ func (r *Runtime) executeAuthMethod(instance *Instance, method string, args []in
 				}
 
 				for k, v := range data {
-					// Protect strict columns if needed, but for now trust controller
 					if k != "id" && k != "user_token" && k != "created_at" && k != "updated_at" {
 						sets = append(sets, fmt.Sprintf("%s = ?", k))
 						vals = append(vals, v)
@@ -670,7 +628,7 @@ func (r *Runtime) executeAuthMethod(instance *Instance, method string, args []in
 				vals = append(vals, id)
 
 				if len(sets) == 0 {
-					return true // Nothing to update
+					return true
 				}
 
 				query := fmt.Sprintf("UPDATE %s SET %s WHERE id = ?", usersTable, strings.Join(sets, ", "))
@@ -728,323 +686,4 @@ func (r *Runtime) executeAuthMethod(instance *Instance, method string, args []in
 		}
 	}
 	return nil
-}
-
-// --- HELPERS Y CONFIGURACIÓN DE TABLAS ---
-
-var authTablesEnsured sync.Map
-var usedMFAChallenges sync.Map
-
-func (r *Runtime) ensureAuthTables(usersTable, rolesTable, prefix string) {
-	db := r.GetDB()
-	if db == nil {
-		return
-	}
-	ensureKey := fmt.Sprintf("%p:%s", db, usersTable)
-	if _, exists := authTablesEnsured.Load(ensureKey); exists {
-		return
-	}
-
-	// 1. Crear Tabla Roles
-	createRoles := fmt.Sprintf(`CREATE TABLE IF NOT EXISTS %s (
-		id INTEGER PRIMARY KEY AUTOINCREMENT,
-		name VARCHAR(50) NOT NULL UNIQUE
-	);`, rolesTable)
-	dbDriver := normalizeDatabaseDriver(r.Env["DB"])
-
-	if val, ok := r.Env["DB"]; ok && val == "mysql" {
-		createRoles = fmt.Sprintf(`CREATE TABLE IF NOT EXISTS %s (
-			id INT AUTO_INCREMENT PRIMARY KEY,
-			name VARCHAR(50) NOT NULL UNIQUE
-		);`, rolesTable)
-	} else if dbDriver == "postgres" {
-		createRoles = fmt.Sprintf(`CREATE TABLE IF NOT EXISTS %s (
-			id BIGSERIAL PRIMARY KEY,
-			name VARCHAR(50) NOT NULL UNIQUE
-		);`, rolesTable)
-	}
-	r.GetDB().Exec(createRoles)
-
-	// 2. Crear Tabla Users (Sin columna 'name')
-	createUsers := fmt.Sprintf(`CREATE TABLE IF NOT EXISTS %s (
-		id INTEGER PRIMARY KEY AUTOINCREMENT,
-		user_token VARCHAR(128) NOT NULL,
-		username VARCHAR(50) NOT NULL,
-		first_name VARCHAR(100) NOT NULL,
-		last_name VARCHAR(100) NOT NULL,
-		email VARCHAR(100) NOT NULL UNIQUE,
-		phone VARCHAR(20),
-		password VARCHAR(255) NOT NULL,
-		role_id INTEGER NOT NULL DEFAULT 2,
-		created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-		updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-		verificado INTEGER DEFAULT 0,
-		last_login_at DATETIME,
-		FOREIGN KEY(role_id) REFERENCES %s(id)
-	);`, usersTable, rolesTable)
-
-	if val, ok := r.Env["DB"]; ok && val == "mysql" {
-		createUsers = fmt.Sprintf(`CREATE TABLE IF NOT EXISTS %s (
-			id INT AUTO_INCREMENT PRIMARY KEY,
-			user_token VARCHAR(128) NOT NULL,
-			username VARCHAR(50) NOT NULL,
-			first_name VARCHAR(100) NOT NULL,
-			last_name VARCHAR(100) NOT NULL,
-			email VARCHAR(100) NOT NULL UNIQUE,
-			phone VARCHAR(20),
-			password VARCHAR(255) NOT NULL,
-			role_id INT NOT NULL DEFAULT 2,
-			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-			updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-			verificado TINYINT(1) DEFAULT 0,
-			last_login_at DATETIME,
-			FOREIGN KEY(role_id) REFERENCES %s(id)
-		);`, usersTable, rolesTable)
-	} else if dbDriver == "postgres" {
-		createUsers = fmt.Sprintf(`CREATE TABLE IF NOT EXISTS %s (
-			id BIGSERIAL PRIMARY KEY,
-			user_token VARCHAR(128) NOT NULL,
-			username VARCHAR(50) NOT NULL,
-			first_name VARCHAR(100) NOT NULL,
-			last_name VARCHAR(100) NOT NULL,
-			email VARCHAR(100) NOT NULL UNIQUE,
-			phone VARCHAR(20), password VARCHAR(255) NOT NULL,
-			role_id BIGINT NOT NULL DEFAULT 2,
-			created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-			updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-			verificado INTEGER DEFAULT 0, last_login_at TIMESTAMP,
-			FOREIGN KEY(role_id) REFERENCES %s(id)
-		);`, usersTable, rolesTable)
-	}
-	r.GetDB().Exec(createUsers)
-
-	// 3. Insertar Roles por defecto
-	if dbDriver == "sqlite" {
-		r.GetDB().Exec(fmt.Sprintf("INSERT OR IGNORE INTO %s (name) VALUES ('admin'), ('client')", rolesTable))
-	} else if dbDriver == "mysql" {
-		r.GetDB().Exec(fmt.Sprintf("INSERT INTO %s (name) VALUES ('admin'), ('client') ON DUPLICATE KEY UPDATE name=name", rolesTable))
-	} else if dbDriver == "postgres" {
-		r.GetDB().Exec(fmt.Sprintf("INSERT INTO %s (name) VALUES ('admin'), ('client') ON CONFLICT (name) DO NOTHING", rolesTable))
-	}
-
-	// 4. AUTO-MIGRACIÓN (Esto arregla el problema de SQLite)
-	isMySQL := false
-	if val, ok := r.Env["DB"]; ok && val == "mysql" {
-		isMySQL = true
-	}
-
-	// Agregamos columnas si no existen (Patching)
-	patchColumn(r.GetDB(), usersTable, "username", "VARCHAR(50) NOT NULL DEFAULT ''", isMySQL)
-	patchColumn(r.GetDB(), usersTable, "user_token", "VARCHAR(128) NOT NULL DEFAULT ''", isMySQL)
-	patchColumn(r.GetDB(), usersTable, "first_name", "VARCHAR(100) NOT NULL DEFAULT ''", isMySQL)
-	patchColumn(r.GetDB(), usersTable, "last_name", "VARCHAR(100) NOT NULL DEFAULT ''", isMySQL)
-	patchColumn(r.GetDB(), usersTable, "phone", "VARCHAR(20) NOT NULL DEFAULT ''", isMySQL)
-	patchColumn(r.GetDB(), usersTable, "verificado", "INTEGER DEFAULT 0", isMySQL)
-	timeType := "DATETIME"
-	if dbDriver == "postgres" {
-		timeType = "TIMESTAMP"
-	}
-	patchColumn(r.GetDB(), usersTable, "token_expires_at", timeType, isMySQL)
-	patchColumn(r.GetDB(), usersTable, "created_at", timeType+" DEFAULT CURRENT_TIMESTAMP", isMySQL)
-	patchColumn(r.GetDB(), usersTable, "updated_at", timeType+" DEFAULT CURRENT_TIMESTAMP", isMySQL)
-	patchColumn(r.GetDB(), usersTable, "last_login_at", timeType, isMySQL)
-	// 5. Crear Tabla Recuperación Contraseñas
-	resetsTable := prefix + "password_resets"
-	createResets := fmt.Sprintf(`CREATE TABLE IF NOT EXISTS %s (
-		id INTEGER PRIMARY KEY AUTOINCREMENT,
-		email VARCHAR(100) NOT NULL,
-		token VARCHAR(255) NOT NULL,
-		created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-		expires_at DATETIME,
-		used INTEGER DEFAULT 0
-	);`, resetsTable)
-
-	if val, ok := r.Env["DB"]; ok && val == "mysql" {
-		createResets = fmt.Sprintf(`CREATE TABLE IF NOT EXISTS %s (
-			id INT AUTO_INCREMENT PRIMARY KEY,
-			email VARCHAR(100) NOT NULL,
-			token VARCHAR(255) NOT NULL,
-			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-			expires_at DATETIME,
-			used TINYINT(1) DEFAULT 0
-		);`, resetsTable)
-	} else if dbDriver == "postgres" {
-		createResets = fmt.Sprintf(`CREATE TABLE IF NOT EXISTS %s (
-			id BIGSERIAL PRIMARY KEY, email VARCHAR(100) NOT NULL, token VARCHAR(255) NOT NULL,
-			created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, expires_at TIMESTAMP, used INTEGER DEFAULT 0
-		);`, resetsTable)
-	}
-	if _, err := r.GetDB().Exec(createResets); err != nil {
-		LogError("[Auth] Could not create password reset table: %v", err)
-		return
-	}
-	authTablesEnsured.Store(ensureKey, true)
-}
-
-func patchColumn(db *sql.DB, table, col, def string, isMySQL bool) {
-	// Verificar si la columna ya existe
-	rows, err := db.Query(fmt.Sprintf("SELECT %s FROM %s LIMIT 1", col, table))
-	if err == nil {
-		rows.Close()
-		return // Existe, no hacemos nada
-	}
-
-	// Si falla, asumimos que no existe y la creamos
-	fmt.Printf("[Auth] Auto-patching: Agregando columna '%s' a tabla '%s'...\n", col, table)
-
-	alter := fmt.Sprintf("ALTER TABLE %s ADD COLUMN %s %s", table, col, def)
-	if isMySQL {
-		alter = fmt.Sprintf("ALTER TABLE %s ADD COLUMN %s %s", table, col, def)
-	}
-	_, err = db.Exec(alter)
-	// Ignoramos error si falla el alter, para no detener el runtime
-}
-
-func normalizeAuthEmail(email string) string {
-	return strings.ToLower(strings.TrimSpace(email))
-}
-
-func parseAuthExpiry(raw string) (time.Time, bool) {
-	value := strings.TrimSpace(raw)
-	if value == "" {
-		return time.Time{}, false
-	}
-
-	for _, layout := range []string{
-		"2006-01-02 15:04:05.999999999",
-		"2006-01-02 15:04:05",
-	} {
-		if parsed, err := time.ParseInLocation(layout, value, time.UTC); err == nil {
-			return parsed, true
-		}
-	}
-
-	for _, layout := range []string{time.RFC3339Nano, time.RFC3339} {
-		if parsed, err := time.Parse(layout, value); err == nil {
-			return parsed, true
-		}
-	}
-	return time.Time{}, false
-}
-
-func getString(data map[string]interface{}, key, def string) string {
-	if val, ok := data[key]; ok {
-		return fmt.Sprintf("%v", val)
-	}
-	return def
-}
-
-func (r *Runtime) generateJWT(userId int, email string, userName string, roleName string, isRefresh bool) interface{} {
-	expirationTime := time.Now().Add(24 * 30 * time.Hour)
-	tokenType := "access"
-	if isRefresh {
-		expirationTime = time.Now().Add(24 * 180 * time.Hour)
-		tokenType = "refresh"
-	}
-
-	jwtSecret := os.Getenv("JWT_SECRET")
-	if jwtSecret == "" {
-		jwtSecret = "joss_default_secret_change_in_production"
-	}
-
-	claims := jwt.MapClaims{
-		"user_id":    userId,
-		"email":      email,
-		"name":       userName,
-		"role":       roleName,
-		"token_type": tokenType,
-		"exp":        expirationTime.Unix(),
-	}
-
-	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-	tokenString, err := token.SignedString([]byte(jwtSecret))
-	if err != nil {
-		fmt.Printf("[Security] Error generando JWT: %v\n", err)
-		return false
-	}
-
-	return tokenString
-}
-
-func (r *Runtime) generateMFAChallengeJWT(userId int, email string) interface{} {
-	usedMFAChallenges.Range(func(key, value interface{}) bool {
-		if usedAt, ok := value.(time.Time); ok && time.Since(usedAt) > 10*time.Minute {
-			usedMFAChallenges.Delete(key)
-		}
-		return true
-	})
-
-	jwtSecret := os.Getenv("JWT_SECRET")
-	if jwtSecret == "" {
-		jwtSecret = "joss_default_secret_change_in_production"
-	}
-
-	claims := jwt.MapClaims{
-		"user_id":    userId,
-		"email":      email,
-		"name":       "MFA_Pending",
-		"role":       "guest",
-		"token_type": "mfa_challenge",
-		"jti":        uuid.New().String(),
-		"iat":        time.Now().Unix(),
-		"exp":        time.Now().Add(5 * time.Minute).Unix(),
-	}
-	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-	tokenString, err := token.SignedString([]byte(jwtSecret))
-	if err != nil {
-		LogError("[Security] Error generating MFA challenge: %v", err)
-		return false
-	}
-	return tokenString
-}
-
-func claimUserID(value interface{}) int {
-	switch typed := value.(type) {
-	case float64:
-		return int(typed)
-	case int:
-		return typed
-	case int64:
-		return int(typed)
-	default:
-		var userId int
-		fmt.Sscanf(fmt.Sprintf("%v", typed), "%d", &userId)
-		return userId
-	}
-}
-
-func (r *Runtime) parseJWT(tokenString string) (map[string]interface{}, bool) {
-	jwtSecret := os.Getenv("JWT_SECRET")
-	if jwtSecret == "" {
-		jwtSecret = "joss_default_secret_change_in_production"
-	}
-
-	token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
-		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
-			return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
-		}
-		return []byte(jwtSecret), nil
-	})
-
-	if err != nil {
-		fmt.Printf("[ValidateJWT Error] Token Length: %d | Error: %v\n", len(tokenString), err)
-		return nil, false
-	}
-
-	if claims, ok := token.Claims.(jwt.MapClaims); ok && token.Valid {
-		return claims, true
-	}
-
-	return nil, false
-}
-
-func (r *Runtime) ValidateJWT(tokenString string) (map[string]interface{}, bool) {
-	claims, valid := r.parseJWT(tokenString)
-	if !valid {
-		return nil, false
-	}
-	if fmt.Sprintf("%v", claims["token_type"]) == "mfa_challenge" {
-		return nil, false
-	}
-	return claims, true
 }
