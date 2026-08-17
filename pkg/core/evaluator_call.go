@@ -1,15 +1,22 @@
 package core
 
 import (
+	"crypto/md5"
+	"crypto/sha1"
+	"crypto/sha256"
+	"encoding/base64"
+	"encoding/hex"
 	"fmt"
 	"html"
 	"os"
 	"os/exec"
+	"reflect"
+	"strconv"
 	"strings"
+	"time"
 
 	"github.com/jossecurity/joss/pkg/i18n"
 	"github.com/jossecurity/joss/pkg/parser"
-	"reflect"
 )
 
 func (r *Runtime) CallMethod(method *parser.MethodStatement, instance *Instance, args []parser.Expression) (res interface{}) {
@@ -703,6 +710,435 @@ func (r *Runtime) callBuiltin(name string, args []interface{}) (interface{}, boo
 			return string(output), true
 		}
 		return "", true
+
+	// --- Date & Time Functions ---
+	case "time":
+		return time.Now().Unix(), true
+	case "microtime":
+		if len(args) > 0 {
+			if asFloat, ok := args[0].(bool); ok && asFloat {
+				return float64(time.Now().UnixNano()) / 1e9, true
+			}
+		}
+		now := time.Now()
+		sec := now.Unix()
+		usec := float64(now.Nanosecond()) / 1e9
+		return fmt.Sprintf("%.8f %d", usec, sec), true
+	case "date":
+		format := "Y-m-d H:i:s"
+		t := time.Now()
+		if len(args) > 0 {
+			if f, ok := args[0].(string); ok {
+				format = f
+			}
+		}
+		if len(args) > 1 && args[1] != nil {
+			switch val := args[1].(type) {
+			case int64:
+				t = time.Unix(val, 0)
+			case int:
+				t = time.Unix(int64(val), 0)
+			case float64:
+				t = time.Unix(int64(val), 0)
+			case string:
+				if n, err := strconv.ParseInt(val, 10, 64); err == nil {
+					t = time.Unix(n, 0)
+				} else if parsed, err := ParseHumanTime(val, time.Now()); err == nil {
+					t = parsed
+				}
+			case time.Time:
+				t = val
+			}
+		}
+		return FormatDate(format, t), true
+	case "strtotime":
+		if len(args) == 0 || args[0] == nil {
+			return nil, true
+		}
+		timeStr := fmt.Sprintf("%v", args[0])
+		base := time.Now()
+		if len(args) > 1 && args[1] != nil {
+			switch bVal := args[1].(type) {
+			case int64:
+				base = time.Unix(bVal, 0)
+			case int:
+				base = time.Unix(int64(bVal), 0)
+			case float64:
+				base = time.Unix(int64(bVal), 0)
+			}
+		}
+		parsed, err := ParseHumanTime(timeStr, base)
+		if err != nil {
+			return nil, true
+		}
+		return parsed.Unix(), true
+	case "now":
+		format := "Y-m-d H:i:s"
+		if len(args) > 0 {
+			if f, ok := args[0].(string); ok {
+				format = f
+			}
+		}
+		return FormatDate(format, time.Now()), true
+	case "sleep":
+		if len(args) > 0 {
+			sec := 0
+			switch v := args[0].(type) {
+			case int:
+				sec = v
+			case int64:
+				sec = int(v)
+			case float64:
+				time.Sleep(time.Duration(v * float64(time.Second)))
+				return nil, true
+			}
+			if sec > 0 {
+				time.Sleep(time.Duration(sec) * time.Second)
+			}
+		}
+		return nil, true
+	case "usleep":
+		if len(args) > 0 {
+			usec := int64(0)
+			switch v := args[0].(type) {
+			case int:
+				usec = int64(v)
+			case int64:
+				usec = v
+			case float64:
+				usec = int64(v)
+			}
+			if usec > 0 {
+				time.Sleep(time.Duration(usec) * time.Microsecond)
+			}
+		}
+		return nil, true
+
+	// --- String Functions ---
+	case "str_contains", "contains":
+		if len(args) >= 2 {
+			s1 := fmt.Sprintf("%v", args[0])
+			s2 := fmt.Sprintf("%v", args[1])
+			return strings.Contains(s1, s2), true
+		}
+		return false, true
+	case "str_starts_with", "starts_with":
+		if len(args) >= 2 {
+			s1 := fmt.Sprintf("%v", args[0])
+			s2 := fmt.Sprintf("%v", args[1])
+			return strings.HasPrefix(s1, s2), true
+		}
+		return false, true
+	case "str_ends_with", "ends_with":
+		if len(args) >= 2 {
+			s1 := fmt.Sprintf("%v", args[0])
+			s2 := fmt.Sprintf("%v", args[1])
+			return strings.HasSuffix(s1, s2), true
+		}
+		return false, true
+	case "str_replace":
+		if len(args) >= 3 {
+			search := fmt.Sprintf("%v", args[0])
+			replace := fmt.Sprintf("%v", args[1])
+			subject := fmt.Sprintf("%v", args[2])
+			return strings.ReplaceAll(subject, search, replace), true
+		}
+		return "", true
+	case "strtolower", "to_lower":
+		if len(args) > 0 {
+			return strings.ToLower(fmt.Sprintf("%v", args[0])), true
+		}
+		return "", true
+	case "strtoupper", "to_upper":
+		if len(args) > 0 {
+			return strings.ToUpper(fmt.Sprintf("%v", args[0])), true
+		}
+		return "", true
+	case "trim":
+		if len(args) > 0 {
+			str := fmt.Sprintf("%v", args[0])
+			if len(args) > 1 {
+				cutset := fmt.Sprintf("%v", args[1])
+				return strings.Trim(str, cutset), true
+			}
+			return strings.TrimSpace(str), true
+		}
+		return "", true
+	case "ltrim":
+		if len(args) > 0 {
+			str := fmt.Sprintf("%v", args[0])
+			if len(args) > 1 {
+				cutset := fmt.Sprintf("%v", args[1])
+				return strings.TrimLeft(str, cutset), true
+			}
+			return strings.TrimLeft(str, " \t\n\r\v\f"), true
+		}
+		return "", true
+	case "rtrim":
+		if len(args) > 0 {
+			str := fmt.Sprintf("%v", args[0])
+			if len(args) > 1 {
+				cutset := fmt.Sprintf("%v", args[1])
+				return strings.TrimRight(str, cutset), true
+			}
+			return strings.TrimRight(str, " \t\n\r\v\f"), true
+		}
+		return "", true
+	case "substr":
+		if len(args) >= 2 {
+			str := fmt.Sprintf("%v", args[0])
+			start := 0
+			switch v := args[1].(type) {
+			case int:
+				start = v
+			case int64:
+				start = int(v)
+			}
+			runes := []rune(str)
+			rLen := len(runes)
+			if start < 0 {
+				start = rLen + start
+				if start < 0 {
+					start = 0
+				}
+			}
+			if start > rLen {
+				return "", true
+			}
+			if len(args) >= 3 {
+				length := 0
+				switch v := args[2].(type) {
+				case int:
+					length = v
+				case int64:
+					length = int(v)
+				}
+				if length < 0 {
+					end := rLen + length
+					if end <= start {
+						return "", true
+					}
+					return string(runes[start:end]), true
+				}
+				end := start + length
+				if end > rLen {
+					end = rLen
+				}
+				return string(runes[start:end]), true
+			}
+			return string(runes[start:]), true
+		}
+		return "", true
+	case "strpos":
+		if len(args) >= 2 {
+			haystack := fmt.Sprintf("%v", args[0])
+			needle := fmt.Sprintf("%v", args[1])
+			idx := strings.Index(haystack, needle)
+			if idx == -1 {
+				return false, true
+			}
+			return int64(idx), true
+		}
+		return false, true
+	case "implode", "join":
+		if len(args) >= 2 {
+			glue := fmt.Sprintf("%v", args[0])
+			if list, ok := args[1].([]interface{}); ok {
+				strs := make([]string, len(list))
+				for i, item := range list {
+					strs[i] = fmt.Sprintf("%v", item)
+				}
+				return strings.Join(strs, glue), true
+			}
+		}
+		return "", true
+	case "md5":
+		if len(args) > 0 {
+			h := md5.Sum([]byte(fmt.Sprintf("%v", args[0])))
+			return hex.EncodeToString(h[:]), true
+		}
+		return "", true
+	case "sha1":
+		if len(args) > 0 {
+			h := sha1.Sum([]byte(fmt.Sprintf("%v", args[0])))
+			return hex.EncodeToString(h[:]), true
+		}
+		return "", true
+	case "sha256":
+		if len(args) > 0 {
+			h := sha256.Sum256([]byte(fmt.Sprintf("%v", args[0])))
+			return hex.EncodeToString(h[:]), true
+		}
+		return "", true
+	case "base64_encode":
+		if len(args) > 0 {
+			return base64.StdEncoding.EncodeToString([]byte(fmt.Sprintf("%v", args[0]))), true
+		}
+		return "", true
+	case "base64_decode":
+		if len(args) > 0 {
+			b, err := base64.StdEncoding.DecodeString(fmt.Sprintf("%v", args[0]))
+			if err != nil {
+				return false, true
+			}
+			return string(b), true
+		}
+		return false, true
+
+	// --- Array & Map Functions ---
+	case "in_array":
+		if len(args) >= 2 {
+			target := args[0]
+			if list, ok := args[1].([]interface{}); ok {
+				for _, item := range list {
+					if reflect.DeepEqual(item, target) || fmt.Sprintf("%v", item) == fmt.Sprintf("%v", target) {
+						return true, true
+					}
+				}
+				return false, true
+			}
+			val := reflect.ValueOf(args[1])
+			if val.Kind() == reflect.Slice || val.Kind() == reflect.Array {
+				for i := 0; i < val.Len(); i++ {
+					if reflect.DeepEqual(val.Index(i).Interface(), target) {
+						return true, true
+					}
+				}
+			}
+		}
+		return false, true
+	case "array_key_exists":
+		if len(args) >= 2 {
+			k := fmt.Sprintf("%v", args[0])
+			if m, ok := args[1].(map[string]interface{}); ok {
+				_, exists := m[k]
+				return exists, true
+			}
+		}
+		return false, true
+	case "array_merge":
+		if len(args) >= 2 {
+			if l1, ok1 := args[0].([]interface{}); ok1 {
+				res := append([]interface{}{}, l1...)
+				for _, next := range args[1:] {
+					if lNext, okN := next.([]interface{}); okN {
+						res = append(res, lNext...)
+					}
+				}
+				return res, true
+			}
+			if m1, ok1 := args[0].(map[string]interface{}); ok1 {
+				res := make(map[string]interface{}, len(m1))
+				for k, v := range m1 {
+					res[k] = v
+				}
+				for _, next := range args[1:] {
+					if mNext, okN := next.(map[string]interface{}); okN {
+						for k, v := range mNext {
+							res[k] = v
+						}
+					}
+				}
+				return res, true
+			}
+		}
+		return []interface{}{}, true
+	case "array_push":
+		if len(args) >= 2 {
+			if list, ok := args[0].([]interface{}); ok {
+				return append(list, args[1:]...), true
+			}
+		}
+		return nil, true
+	case "array_pop":
+		if len(args) >= 1 {
+			if list, ok := args[0].([]interface{}); ok && len(list) > 0 {
+				return list[len(list)-1], true
+			}
+		}
+		return nil, true
+	case "array_shift":
+		if len(args) >= 1 {
+			if list, ok := args[0].([]interface{}); ok && len(list) > 0 {
+				return list[0], true
+			}
+		}
+		return nil, true
+	case "array_slice":
+		if len(args) >= 2 {
+			if list, ok := args[0].([]interface{}); ok {
+				offset := 0
+				switch v := args[1].(type) {
+				case int:
+					offset = v
+				case int64:
+					offset = int(v)
+				}
+				l := len(list)
+				if offset < 0 {
+					offset = l + offset
+					if offset < 0 {
+						offset = 0
+					}
+				}
+				if offset > l {
+					return []interface{}{}, true
+				}
+				if len(args) >= 3 {
+					length := 0
+					switch v := args[2].(type) {
+					case int:
+						length = v
+					case int64:
+						length = int(v)
+					}
+					if length < 0 {
+						end := l + length
+						if end <= offset {
+							return []interface{}{}, true
+						}
+						return list[offset:end], true
+					}
+					end := offset + length
+					if end > l {
+						end = l
+					}
+					return list[offset:end], true
+				}
+				return list[offset:], true
+			}
+		}
+		return []interface{}{}, true
+
+	// --- File & Directory Functions ---
+	case "unlink", "file_delete":
+		if len(args) > 0 {
+			path := fmt.Sprintf("%v", args[0])
+			err := os.Remove(path)
+			return err == nil, true
+		}
+		return false, true
+	case "mkdir":
+		if len(args) > 0 {
+			path := fmt.Sprintf("%v", args[0])
+			err := os.MkdirAll(path, 0755)
+			return err == nil, true
+		}
+		return false, true
+	case "is_dir":
+		if len(args) > 0 {
+			path := fmt.Sprintf("%v", args[0])
+			fi, err := os.Stat(path)
+			return err == nil && fi.IsDir(), true
+		}
+		return false, true
+	case "is_file":
+		if len(args) > 0 {
+			path := fmt.Sprintf("%v", args[0])
+			fi, err := os.Stat(path)
+			return err == nil && !fi.IsDir(), true
+		}
+		return false, true
 	}
 	return nil, false
 }
