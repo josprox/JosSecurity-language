@@ -45,6 +45,19 @@ DB_SSLMODE="require"
 
 Los aliases `postgresql` y `pgx` también se normalizan a PostgreSQL.
 
+Microsoft SQL Server usa el puerto 1433 y acepta `DB_ENCRYPT`:
+
+```env
+DB="sqlserver"
+DB_HOST="127.0.0.1:1433"
+DB_NAME="mi_app"
+DB_USER="sa"
+DB_PASS="secreto"
+DB_ENCRYPT="disable"
+```
+
+Los aliases `mssql` y `mssqlserver` también se normalizan a SQL Server.
+
 ## Servidor y sesiones
 
 ```env

@@ -1,6 +1,6 @@
 # Schema Builder
 
-Schema opera sobre SQLite, MySQL y PostgreSQL y aplica `PREFIX`/`DB_PREFIX` automáticamente.
+Schema opera de forma agnóstica sobre **SQLite, MySQL, PostgreSQL y Microsoft SQL Server (`sqlserver`/`mssql`)** y aplica `PREFIX`/`DB_PREFIX` automáticamente.
 
 ```joss
 Schema::create("products", func($table) {
@@ -18,10 +18,23 @@ Schema::create("products", func($table) {
 })
 ```
 
+También admite la sintaxis declarativa concisa basada en mapas:
+```joss
+Schema::create("users", {
+    "id": "increments",
+    "email": "string(191)|unique",
+    "password": "string(255)",
+    "role_id": "integer|default(2)",
+    "is_active": "boolean|default(1)",
+    "created_at": "timestamp|nullable",
+    "updated_at": "timestamp|nullable"
+})
+```
+
 ## Schema
 
-- `create($table, func($blueprint))`
-- `table($table, func($blueprint))`
+- `create($table, func($blueprint))` o `create($table, $columnsMap)`
+- `table($table, func($blueprint))` o `table($table, $columnsMap)`
 - `rename($from, $to)`
 - `drop($table)` y `dropIfExists($table)`
 - `hasTable($table)` y `hasColumn($table, $column)`
@@ -41,4 +54,4 @@ Comandos de tabla:
 - `dropIndex($name)`
 - `foreign($columns, $name=nil)->references($columns)->on($table)->onDelete($action)->onUpdate($action)`
 
-SQLite reconstruye la tabla de forma transaccional cuando se agrega una clave foránea mediante `Schema::table()`, preservando datos, índices y triggers explícitos. PostgreSQL usa `SERIAL`/`BIGSERIAL`, `JSONB` y tipos equivalentes; `unsigned` solo modifica SQL en MySQL.
+SQLite reconstruye la tabla de forma transaccional cuando se agrega una clave foránea mediante `Schema::table()`, preservando datos, índices y triggers explícitos. PostgreSQL usa `SERIAL`/`BIGSERIAL`, `JSONB` y tipos equivalentes. SQL Server usa `IDENTITY(1,1) PRIMARY KEY`, `NVARCHAR(MAX)`, `DATETIME2` y delimitadores `[...]`.

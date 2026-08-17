@@ -73,7 +73,7 @@ $paquetes = GranDB::table("pub_packages")
 - `dump()`: Imprime el SQL y bindings en consola.
 - `dd()`: Imprime el SQL y bindings y detiene la ejecución inmediatamente.
 
-### 6. Escritura, Upserts e Incrementos
+### 6. Escritura, Upserts, Incrementos y Transacciones
 ```joss
 $db = GranDB::table("products")
 $id = $db->insertGetId({"name": "Teclado RGB", "price": 899.99})
@@ -88,8 +88,27 @@ $db->where("id", 1)->decrement("credits", 5)
 // Actualizar marca de tiempo updated_at
 $db->where("id", 1)->touch()
 
+// Transacciones Atómicas (Commit automático y Rollback ante excepciones)
+GranDB::transaction(function($db) {
+    GranDB::table("wallets")->where("user_id", 1)->decrement("balance", 50)
+    GranDB::table("wallets")->where("user_id", 2)->increment("balance", 50)
+})
+
 // Eliminaciones seguras
 $db->where("id", $id)->delete()
+```
+
+### 7. Motores Soportados y Cambio Dinámico
+GranDB es 100% compatible y optimizado para 4 motores de base de datos:
+* **SQLite**: Archivos embebidos locales con modo WAL y timeout concurrente.
+* **MySQL / MariaDB**: Sintaxis nativa, `LAST_INSERT_ID` y prefijos.
+* **PostgreSQL**: Rebinding transparente `$1, $2`, secuencias `SERIAL` y `RETURNING id`.
+* **Microsoft SQL Server (`sqlserver` / `mssql`)**: Delimitadores `[columna]`, binding `@p1`, `OFFSET...FETCH NEXT`, `TOP` y `OUTPUT INSERTED.id`.
+
+```joss
+// Cambio dinámico de motor en tiempo de ejecución:
+System::change_db("sqlite", {"DB_PATH": "local.sqlite", "DB_PREFIX": "app_"})
+GranDB::connection("postgres", {"DB_HOST": "127.0.0.1", "DB_NAME": "empresa"})
 ```
 
 `delete()` sin cláusula `where` se aborta automáticamente por seguridad. `deleteAll()` y `truncate()` son métodos explícitos destructivos.
