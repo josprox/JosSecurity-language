@@ -19,6 +19,9 @@ func quoteSchemaIdentifier(name, driver string) (string, error) {
 	if driver == "mysql" {
 		return "`" + name + "`", nil
 	}
+	if driver == "sqlserver" {
+		return "[" + name + "]", nil
+	}
 	return `"` + name + `"`, nil
 }
 
@@ -306,6 +309,9 @@ func (r *Runtime) executeSchemaMethod(instance *Instance, method string, args []
 			} else if dbDriver == "postgres" {
 				query := "SELECT count(*) FROM information_schema.tables WHERE table_schema = current_schema() AND table_name = ?"
 				r.GetDB().QueryRow(query, tableName).Scan(&exists)
+			} else if dbDriver == "sqlserver" {
+				query := "SELECT count(*) FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = ?"
+				r.GetDB().QueryRow(query, tableName).Scan(&exists)
 			} else {
 				query := "SELECT count(*) FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = ?"
 				r.GetDB().QueryRow(query, tableName).Scan(&exists)
@@ -343,6 +349,11 @@ func (r *Runtime) executeSchemaMethod(instance *Instance, method string, args []
 			} else if dbDriver == "postgres" {
 				var count int
 				query := "SELECT count(*) FROM information_schema.columns WHERE table_schema = current_schema() AND table_name = ? AND column_name = ?"
+				r.GetDB().QueryRow(query, tableName, columnName).Scan(&count)
+				return count > 0
+			} else if dbDriver == "sqlserver" {
+				var count int
+				query := "SELECT count(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = ? AND COLUMN_NAME = ?"
 				r.GetDB().QueryRow(query, tableName, columnName).Scan(&count)
 				return count > 0
 			} else {

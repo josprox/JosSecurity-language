@@ -11,46 +11,15 @@ func (r *Runtime) EnsureMigrationTable() {
 		return
 	}
 
-	prefix := r.dbPrefix()
-	tableName := prefix + "migration"
-
-	query := fmt.Sprintf(`
-	CREATE TABLE IF NOT EXISTS %s (
-		id INTEGER PRIMARY KEY AUTOINCREMENT,
-		migration VARCHAR(255) NOT NULL,
-		batch INTEGER NOT NULL,
-		executed_at DATETIME DEFAULT CURRENT_TIMESTAMP
-	);
-	`, tableName)
-
-	dbDriver := "mysql"
-	if val, ok := r.Env["DB"]; ok {
-		dbDriver = normalizeDatabaseDriver(val)
-	}
-
-	if dbDriver == "mysql" {
-		query = fmt.Sprintf(`
-		CREATE TABLE IF NOT EXISTS %s (
-			id INT AUTO_INCREMENT PRIMARY KEY,
-			migration VARCHAR(255) NOT NULL,
-			batch INT NOT NULL,
-			executed_at DATETIME DEFAULT CURRENT_TIMESTAMP
-		);
-		`, tableName)
-	} else if dbDriver == "postgres" {
-		query = fmt.Sprintf(`
-		CREATE TABLE IF NOT EXISTS %s (
-			id BIGSERIAL PRIMARY KEY,
-			migration VARCHAR(255) NOT NULL,
-			batch INTEGER NOT NULL,
-			executed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-		);`, tableName)
-	}
-
-	_, err := r.GetDB().Exec(query)
-	if err != nil {
-		fmt.Printf("[Migration] Error creando tabla %s: %v\n", tableName, err)
-	}
+	r.executeSchemaMethod(nil, "create", []interface{}{
+		"migration",
+		map[string]interface{}{
+			"id":          "increments",
+			"migration":   "string(255)",
+			"batch":       "integer",
+			"executed_at": "timestamp|default(CURRENT_TIMESTAMP)",
+		},
+	})
 }
 
 // GetExecutedMigrations returns a map of executed migration filenames

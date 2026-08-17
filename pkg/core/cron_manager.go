@@ -26,53 +26,17 @@ func (r *Runtime) EnsureCronTable() {
 		return
 	}
 
-	prefix := r.dbPrefix()
-	tableName := prefix + "cron"
-
-	dbDriver := "mysql"
-	if val, ok := r.Env["DB"]; ok {
-		dbDriver = normalizeDatabaseDriver(val)
-	}
-
-	var query string
-	if dbDriver == "mysql" {
-		query = fmt.Sprintf(`
-		CREATE TABLE IF NOT EXISTS %s (
-			id INT AUTO_INCREMENT PRIMARY KEY,
-			name VARCHAR(255) NOT NULL UNIQUE,
-			schedule VARCHAR(255) NOT NULL,
-			last_run_at DATETIME,
-			is_running BOOLEAN DEFAULT 0,
-			status VARCHAR(50)
-		);
-		`, tableName)
-	} else if dbDriver == "postgres" {
-		query = fmt.Sprintf(`
-		CREATE TABLE IF NOT EXISTS %s (
-			id BIGSERIAL PRIMARY KEY,
-			name VARCHAR(255) NOT NULL UNIQUE,
-			schedule VARCHAR(255) NOT NULL,
-			last_run_at TIMESTAMP,
-			is_running SMALLINT DEFAULT 0,
-			status VARCHAR(50)
-		);`, tableName)
-	} else {
-		query = fmt.Sprintf(`
-		CREATE TABLE IF NOT EXISTS %s (
-			id INTEGER PRIMARY KEY AUTOINCREMENT,
-			name VARCHAR(255) NOT NULL UNIQUE,
-			schedule VARCHAR(255) NOT NULL,
-			last_run_at DATETIME,
-			is_running BOOLEAN DEFAULT 0,
-			status VARCHAR(50)
-		);
-		`, tableName)
-	}
-
-	_, err := r.GetDB().Exec(query)
-	if err != nil {
-		fmt.Printf("[Cron] Error creando tabla %s: %v\n", tableName, err)
-	}
+	r.executeSchemaMethod(nil, "create", []interface{}{
+		"cron",
+		map[string]interface{}{
+			"id":          "increments",
+			"name":        "string(255)|unique",
+			"schedule":    "string(255)",
+			"last_run_at": "timestamp|nullable",
+			"is_running":  "boolean|default(0)",
+			"status":      "string(50)|nullable",
+		},
+	})
 }
 
 // StartCronTicker starts the background evaluation loop

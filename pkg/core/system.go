@@ -13,6 +13,26 @@ import (
 // System Implementation
 func (r *Runtime) executeSystemMethod(instance *Instance, method string, args []interface{}) interface{} {
 	switch method {
+	case "change_db", "use_db":
+		if len(args) > 0 {
+			driverName := fmt.Sprintf("%v", args[0])
+			var config map[string]string
+			if len(args) > 1 {
+				if m, ok := args[1].(map[string]interface{}); ok {
+					config = make(map[string]string, len(m))
+					for k, v := range m {
+						config[k] = fmt.Sprintf("%v", v)
+					}
+				}
+			}
+			err := r.ChangeDB(driverName, config)
+			if err != nil {
+				fmt.Printf("[System Error] Fallo al cambiar base de datos a '%s': %v\n", driverName, err)
+				return false
+			}
+			return true
+		}
+		return false
 	case "env":
 		if len(args) > 0 {
 			key := args[0].(string)

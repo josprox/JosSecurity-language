@@ -80,6 +80,12 @@ func quoteIdentifier(name string) string {
 	if strings.HasPrefix(name, "`") && strings.HasSuffix(name, "`") {
 		return name
 	}
+	if strings.HasPrefix(name, "[") && strings.HasSuffix(name, "]") {
+		return name
+	}
+	if strings.HasPrefix(name, "\"") && strings.HasSuffix(name, "\"") {
+		return name
+	}
 	return "`" + name + "`"
 }
 
@@ -139,6 +145,9 @@ func resetReadState(instance *Instance) {
 	instance.Fields["_bindings"] = []interface{}{}
 	instance.Fields["_select"] = "*"
 	instance.Fields["_joins"] = []string{}
+	delete(instance.Fields, "_distinct")
+	delete(instance.Fields, "_groupBy")
+	delete(instance.Fields, "_having")
 	delete(instance.Fields, "_order")
 	delete(instance.Fields, "_limit")
 	delete(instance.Fields, "_offset")
@@ -149,7 +158,27 @@ func (r *Runtime) buildSelectQuery(instance *Instance, sel string) (string, []in
 	wheres := instance.Fields["_wheres"].([]string)
 	bindings := instance.Fields["_bindings"].([]interface{})
 
-	query := fmt.Sprintf("SELECT %s FROM %s", sel, table)
+	driver := "mysql"
+	if r.Env != nil {
+		if val, ok := r.Env["DB"]; ok {
+			driver = normalizeDatabaseDriver(val)
+		}
+	}
+
+	distinctStr := ""
+	if dist, ok := instance.Fields["_distinct"].(bool); ok && dist {
+		distinctStr = "DISTINCT "
+	}
+
+	limitVal, hasLimit := instance.Fields["_limit"].(int)
+	offsetVal, hasOffset := instance.Fields["_offset"].(int)
+
+	topClause := ""
+	if driver == "sqlserver" && hasLimit && !hasOffset {
+		topClause = fmt.Sprintf("TOP %d ", limitVal)
+	}
+
+	query := fmt.Sprintf("SELECT %s%s%s FROM %s", topClause, distinctStr, sel, table)
 
 	if joins, ok := instance.Fields["_joins"]; ok {
 		for _, j := range joins.([]string) {
@@ -169,16 +198,28 @@ func (r *Runtime) buildSelectQuery(instance *Instance, sel string) (string, []in
 		query += " HAVING " + buildWhereClause(having.([]string))
 	}
 
-	if order, ok := instance.Fields["_order"]; ok {
-		query += " ORDER BY " + order.(string)
+	order, hasOrder := instance.Fields["_order"].(string)
+	if hasOrder {
+		query += " ORDER BY " + order
 	}
 
-	if limit, ok := instance.Fields["_limit"]; ok {
-		query += fmt.Sprintf(" LIMIT %d", limit.(int))
-	}
-
-	if offset, ok := instance.Fields["_offset"]; ok {
-		query += fmt.Sprintf(" OFFSET %d", offset.(int))
+	if driver == "sqlserver" {
+		if hasOffset {
+			if !hasOrder {
+				query += " ORDER BY (SELECT NULL)"
+			}
+			query += fmt.Sprintf(" OFFSET %d ROWS", offsetVal)
+			if hasLimit {
+				query += fmt.Sprintf(" FETCH NEXT %d ROWS ONLY", limitVal)
+			}
+		}
+	} else {
+		if hasLimit {
+			query += fmt.Sprintf(" LIMIT %d", limitVal)
+		}
+		if hasOffset {
+			query += fmt.Sprintf(" OFFSET %d", offsetVal)
+		}
 	}
 
 	return query, bindings
@@ -251,10 +292,10 @@ func (r *Runtime) dbPrefix() string {
 	if r == nil || r.Env == nil {
 		return "js_"
 	}
-	if val := strings.TrimSpace(r.Env["PREFIX"]); val != "" {
+	if val, ok := r.Env["PREFIX"]; ok {
 		return val
 	}
-	if val := strings.TrimSpace(r.Env["DB_PREFIX"]); val != "" {
+	if val, ok := r.Env["DB_PREFIX"]; ok {
 		return val
 	}
 	return "js_"
@@ -312,29 +353,27 @@ func Singularize(s string) string {
 		"mice":     "mouse",
 	}
 	if val, ok := irregular[lower]; ok {
-		if len(val) > 0 {
-			return strings.ToUpper(val[:1]) + strings.ToLower(val[1:])
-		}
 		return val
 	}
-	if strings.HasSuffix(lower, "ies") {
+	if strings.HasSuffix(lower, "ies") && len(lower) > 3 {
 		return s[:len(s)-3] + "y"
 	}
-	// Words ending in -ses, -xes, -zes, -ches, -shes: strip -es
-	if strings.HasSuffix(lower, "ses") || strings.HasSuffix(lower, "xes") ||
-		strings.HasSuffix(lower, "zes") || strings.HasSuffix(lower, "ches") ||
-		strings.HasSuffix(lower, "shes") {
+	if strings.HasSuffix(lower, "es") && len(lower) > 2 {
 		return s[:len(s)-2]
 	}
-	if strings.HasSuffix(lower, "s") {
+	if strings.HasSuffix(lower, "s") && len(lower) > 1 {
 		return s[:len(s)-1]
 	}
 	return s
 }
 
-// IsVowel checks if an ASCII byte is an English vowel
-func IsVowel(c byte) bool {
-	return c == 'a' || c == 'e' || c == 'i' || c == 'o' || c == 'u'
+func IsVowel(b byte) bool {
+	switch b {
+	case 'a', 'e', 'i', 'o', 'u', 'A', 'E', 'I', 'O', 'U':
+		return true
+	default:
+		return false
+	}
 }
 
 func toInt64(val interface{}) int64 {
@@ -343,9 +382,13 @@ func toInt64(val interface{}) int64 {
 		return v
 	case int:
 		return int64(v)
+	case int32:
+		return int64(v)
 	case float64:
 		return int64(v)
+	case float32:
+		return int64(v)
 	default:
-		return 0
+		return int64(toInt(val))
 	}
 }

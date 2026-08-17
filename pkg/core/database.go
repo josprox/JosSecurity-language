@@ -27,6 +27,70 @@ func (r *Runtime) executeGranDBMethod(instance *Instance, method string, args []
 	methodLower := strings.ToLower(method)
 
 	switch methodLower {
+	case "changedb", "connection", "use":
+		if len(args) > 0 {
+			driverName := fmt.Sprintf("%v", args[0])
+			var config map[string]string
+			if len(args) > 1 {
+				if m, ok := args[1].(map[string]interface{}); ok {
+					config = make(map[string]string, len(m))
+					for k, v := range m {
+						config[k] = fmt.Sprintf("%v", v)
+					}
+				}
+			}
+			err := r.ChangeDB(driverName, config)
+			if err != nil {
+				fmt.Printf("[GranDB Error] No se pudo cambiar el motor a %s: %v\n", driverName, err)
+				return false
+			}
+			return instance
+		}
+		return instance
+
+	case "distinct":
+		instance.Fields["_distinct"] = true
+		return instance
+
+	case "crossjoin":
+		if len(args) >= 1 {
+			table := r.applyTablePrefix(fmt.Sprintf("%v", args[0]))
+			if _, ok := instance.Fields["_joins"]; !ok {
+				instance.Fields["_joins"] = []string{}
+			}
+			join := fmt.Sprintf("CROSS JOIN %s", table)
+			instance.Fields["_joins"] = append(instance.Fields["_joins"].([]string), join)
+		}
+		return instance
+
+	case "transaction":
+		if len(args) > 0 && r.isCallable(args[0]) {
+			db := r.GetDB()
+			if db == nil {
+				return nil
+			}
+			tx, err := db.Begin()
+			if err != nil {
+				fmt.Printf("[GranDB Transaction] Error iniciando transacción: %v\n", err)
+				return nil
+			}
+			var res interface{}
+			defer func() {
+				if p := recover(); p != nil {
+					_ = tx.Rollback()
+					panic(p)
+				}
+			}()
+			res = r.CallFunction(args[0], []interface{}{instance})
+			if err := tx.Commit(); err != nil {
+				_ = tx.Rollback()
+				fmt.Printf("[GranDB Transaction] Error al confirmar transacción: %v\n", err)
+				return nil
+			}
+			return res
+		}
+		return nil
+
 	case "when":
 		if len(args) >= 2 {
 			condition := isTruthy(args[0])

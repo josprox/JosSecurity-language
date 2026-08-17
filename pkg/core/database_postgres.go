@@ -101,19 +101,25 @@ func normalizeDatabaseDriver(driverName string) string {
 		return "postgres"
 	case "sqlite", "sqlite3":
 		return "sqlite"
+	case "sqlserver", "mssql", "mssqlserver":
+		return "sqlserver"
 	default:
 		return "mysql"
 	}
 }
 
 func sqlDriverName(driverName string) string {
-	if normalizeDatabaseDriver(driverName) == "postgres" {
+	normalized := normalizeDatabaseDriver(driverName)
+	if normalized == "postgres" {
 		return postgresSQLDriver
 	}
-	return normalizeDatabaseDriver(driverName)
+	if normalized == "sqlserver" {
+		return sqlServerDriverName
+	}
+	return normalized
 }
 
-// OpenConfiguredDatabase opens SQLite, MySQL or PostgreSQL using env.joss keys.
+// OpenConfiguredDatabase opens SQLite, MySQL, PostgreSQL or SQL Server using environment keys.
 func OpenConfiguredDatabase(driverName string, env map[string]string) (*sql.DB, error) {
 	driverName = normalizeDatabaseDriver(driverName)
 	if driverName == "sqlite" {
@@ -122,6 +128,9 @@ func OpenConfiguredDatabase(driverName string, env map[string]string) (*sql.DB, 
 			path = "database.sqlite"
 		}
 		return sql.Open("sqlite", path)
+	}
+	if driverName == "sqlserver" {
+		return openSQLServerDatabase(env)
 	}
 	host := strings.TrimSpace(env["DB_HOST"])
 	if driverName == "postgres" {

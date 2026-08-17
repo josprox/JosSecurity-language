@@ -391,53 +391,8 @@ func (r *Runtime) GetDB() *sql.DB {
 		dbDriver = normalizeDatabaseDriver(val)
 	}
 
-	var dsn string
-
-	if dbDriver == "sqlite" {
-		dbPath := "database.sqlite"
-		if val, ok := r.Env["DB_PATH"]; ok {
-			dbPath = val
-		}
-		dsn = dbPath
-		fmt.Printf("[Security] Conectando a SQLite: %s\n", dbPath)
-	} else if dbDriver == "postgres" {
-		host := strings.TrimSpace(r.Env["DB_HOST"])
-		if host == "" {
-			return nil
-		}
-		if !strings.Contains(host, ":") {
-			host += ":5432"
-		}
-		sslMode := strings.TrimSpace(r.Env["DB_SSLMODE"])
-		if sslMode == "" {
-			sslMode = "disable"
-		}
-		dsn = fmt.Sprintf("host=%s user=%s password=%s dbname=%s sslmode=%s", host, r.Env["DB_USER"], r.Env["DB_PASS"], r.Env["DB_NAME"], sslMode)
-		fmt.Printf("[Security] Conectando a PostgreSQL: %s\n", host)
-	} else {
-		// Default to MySQL
-		if host, ok := r.Env["DB_HOST"]; ok {
-			host = strings.TrimSpace(host)
-			targetHost := host
-			if !strings.Contains(host, ":") {
-				targetHost = host + ":3306"
-			}
-			dsn = fmt.Sprintf("%s:%s@tcp(%s)/%s?parseTime=true&multiStatements=true", r.Env["DB_USER"], r.Env["DB_PASS"], targetHost, r.Env["DB_NAME"])
-			fmt.Printf("[Security] Conectando a MySQL: %s\n", targetHost)
-		} else {
-			// No DB config found
-			return nil
-		}
-	}
-
-	var db *sql.DB
-	var err error
-	if dbDriver == "postgres" {
-		db, err = OpenConfiguredDatabase(dbDriver, r.Env)
-	} else {
-		db, err = sql.Open(sqlDriverName(dbDriver), dsn)
-	}
-	if err == nil {
+	db, err := OpenConfiguredDatabase(dbDriver, r.Env)
+	if err == nil && db != nil {
 		r.DB = db
 
 		// Optimize SQLite for Concurrency
@@ -461,11 +416,42 @@ func (r *Runtime) GetDB() *sql.DB {
 		db.SetMaxOpenConns(25)
 		db.SetMaxIdleConns(25)
 		db.SetConnMaxLifetime(5 * time.Minute)
-	} else {
-		fmt.Printf("[Security] Error fatal de conexión SQL: %v\n", err)
+	} else if err != nil {
+		fmt.Printf("[Security] Error fatal de conexión SQL (%s): %v\n", dbDriver, err)
 	}
 
 	return r.DB
+}
+
+// ChangeDB dynamically switches the database connection and driver at runtime.
+func (r *Runtime) ChangeDB(driverName string, config ...map[string]string) error {
+	normalized := normalizeDatabaseDriver(driverName)
+	if r.Env == nil {
+		r.Env = make(map[string]string)
+	}
+	r.Env["DB"] = normalized
+	if len(config) > 0 && config[0] != nil {
+		for k, v := range config[0] {
+			r.Env[k] = v
+		}
+	}
+	if r.DB != nil {
+		_ = r.DB.Close()
+		r.DB = nil
+	}
+	db, err := OpenConfiguredDatabase(normalized, r.Env)
+	if err != nil {
+		return err
+	}
+	r.DB = db
+	if normalized == "sqlite" {
+		_, _ = db.Exec("PRAGMA journal_mode=WAL;")
+		_, _ = db.Exec("PRAGMA busy_timeout = 5000;")
+	}
+	db.SetMaxOpenConns(25)
+	db.SetMaxIdleConns(25)
+	db.SetConnMaxLifetime(5 * time.Minute)
+	return nil
 }
 
 // Server connection is now handled lazily via r.GetDB()

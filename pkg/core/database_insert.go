@@ -85,12 +85,29 @@ func (r *Runtime) insertFromMap(table string, data map[string]interface{}, retur
 
 	fmt.Printf("[GranDB] Insert Query: %s\n", query)
 	fmt.Printf("[GranDB] Bindings: %v\n", bindings)
-	if returnID && normalizeDatabaseDriver(r.Env["DB"]) == "postgres" {
-		var id int64
-		if err := r.GetDB().QueryRow(query+" RETURNING id", bindings...).Scan(&id); err != nil {
-			panic(fmt.Sprintf("GranDB Error en insert: %v", err))
+	driver := normalizeDatabaseDriver(r.Env["DB"])
+	if returnID {
+		if driver == "postgres" {
+			var id int64
+			if err := r.GetDB().QueryRow(query+" RETURNING id", bindings...).Scan(&id); err != nil {
+				panic(fmt.Sprintf("GranDB Error en insert: %v", err))
+			}
+			return id
 		}
-		return id
+		if driver == "sqlserver" {
+			var id int64
+			outputQuery := strings.Replace(query, " VALUES", " OUTPUT INSERTED.id VALUES", 1)
+			if err := r.GetDB().QueryRow(outputQuery, bindings...).Scan(&id); err == nil && id > 0 {
+				return id
+			}
+			if _, err := r.GetDB().Exec(query, bindings...); err == nil {
+				_ = r.GetDB().QueryRow("SELECT SCOPE_IDENTITY()").Scan(&id)
+				if id > 0 {
+					return id
+				}
+			}
+			return false
+		}
 	}
 
 	result, err := r.GetDB().Exec(query, bindings...)
@@ -131,12 +148,30 @@ func (r *Runtime) insertFromArrays(table string, cols []interface{}, vals []inte
 		table,
 		strings.Join(colNames, ", "),
 		strings.Join(placeholders, ", "))
-	if returnID && normalizeDatabaseDriver(r.Env["DB"]) == "postgres" {
-		var id int64
-		if err := r.GetDB().QueryRow(query+" RETURNING id", bindings...).Scan(&id); err != nil {
-			panic(fmt.Sprintf("GranDB Error en insert from arrays: %v", err))
+
+	driver := normalizeDatabaseDriver(r.Env["DB"])
+	if returnID {
+		if driver == "postgres" {
+			var id int64
+			if err := r.GetDB().QueryRow(query+" RETURNING id", bindings...).Scan(&id); err != nil {
+				panic(fmt.Sprintf("GranDB Error en insert from arrays: %v", err))
+			}
+			return id
 		}
-		return id
+		if driver == "sqlserver" {
+			var id int64
+			outputQuery := strings.Replace(query, " VALUES", " OUTPUT INSERTED.id VALUES", 1)
+			if err := r.GetDB().QueryRow(outputQuery, bindings...).Scan(&id); err == nil && id > 0 {
+				return id
+			}
+			if _, err := r.GetDB().Exec(query, bindings...); err == nil {
+				_ = r.GetDB().QueryRow("SELECT SCOPE_IDENTITY()").Scan(&id)
+				if id > 0 {
+					return id
+				}
+			}
+			return false
+		}
 	}
 
 	result, err := r.GetDB().Exec(query, bindings...)

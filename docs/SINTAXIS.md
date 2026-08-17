@@ -126,6 +126,39 @@ $userId = session("user_id")
 * **Archivos**: `file_exists($path)`, `file_get_contents($path)`, `file_put_contents($path, $data)`, `unlink($path)`, `mkdir($dir)`, `is_dir($path)`.
 * **Asincronía**: `async { ... }`, `await $future`, `make_chan()`, `send($chan, $val)`, `recv($chan)`.
 
+## GranDB ORM y Bases de Datos Multimotor
+
+GranDB es el ORM fluido nativo de Joss con soporte completo para **SQLite, MySQL, PostgreSQL y Microsoft SQL Server (`sqlserver`/`mssql`)**, con gestión transparente de prefijos de tablas (`DB_PREFIX`):
+
+```joss
+// Consultas fluidas
+$users = GranDB::table("users")
+    ->where("is_active", 1)
+    ->whereIn("role_id", [1, 2])
+    ->orderBy("created_at", "DESC")
+    ->take(10)
+    ->get()
+
+// Mutaciones e inserciones
+$newId = GranDB::table("products")->insertGetId({
+    "name": "Teclado Mecánico",
+    "price": 89.90,
+    "stock": 25,
+    "created_at": now()
+})
+
+GranDB::table("products")->where("id", $newId)->increment("stock", 5)
+
+// Transacciones atómicas
+GranDB::transaction(function($db) {
+    GranDB::table("accounts")->where("id", 1)->decrement("balance", 100)
+    GranDB::table("accounts")->where("id", 2)->increment("balance", 100)
+})
+
+// Cambio dinámico de motor en caliente
+System::change_db("sqlite", {"DB_PATH": "local.sqlite", "DB_PREFIX": "app_"})
+```
+
 ## Carga Automática (Zero Imports)
 
 No se requieren sentencias `import` ni `use`. Todas las clases del proyecto (`app/controllers/`, `app/models/`, `app/libs/`), así como los plugins instalados (`plugins/` / `joss.yaml`), son indexados y cargados automáticamente en memoria por el runtime de Joss. Las palabras clave `import` y `use` no existen en la sintaxis moderna.

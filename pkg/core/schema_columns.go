@@ -12,7 +12,6 @@ func (r *Runtime) buildColumnDefinition(name, typeStr, driver string) string {
 
 	var sqlDef string
 
-	// Parse base type (handle arguments like char(100))
 	typeName := baseType
 	typeArgs := ""
 	if strings.Contains(baseType, "(") {
@@ -28,6 +27,8 @@ func (r *Runtime) buildColumnDefinition(name, typeStr, driver string) string {
 			sqlDef = "INTEGER PRIMARY KEY AUTOINCREMENT"
 		} else if driver == "postgres" {
 			sqlDef = "SERIAL PRIMARY KEY"
+		} else if driver == "sqlserver" {
+			sqlDef = "INT IDENTITY(1,1) PRIMARY KEY"
 		} else {
 			sqlDef = "INT AUTO_INCREMENT PRIMARY KEY"
 		}
@@ -36,6 +37,8 @@ func (r *Runtime) buildColumnDefinition(name, typeStr, driver string) string {
 			sqlDef = "INTEGER PRIMARY KEY AUTOINCREMENT"
 		} else if driver == "postgres" {
 			sqlDef = "BIGSERIAL PRIMARY KEY"
+		} else if driver == "sqlserver" {
+			sqlDef = "BIGINT IDENTITY(1,1) PRIMARY KEY"
 		} else {
 			sqlDef = "BIGINT AUTO_INCREMENT PRIMARY KEY"
 		}
@@ -48,17 +51,21 @@ func (r *Runtime) buildColumnDefinition(name, typeStr, driver string) string {
 	case "smallInteger":
 		sqlDef = "SMALLINT"
 	case "mediumInteger":
-		if driver == "postgres" {
+		if driver == "postgres" || driver == "sqlserver" {
 			sqlDef = "INTEGER"
 		} else {
 			sqlDef = "MEDIUMINT"
 		}
 	case "integer":
-		sqlDef = "INTEGER"
+		if driver == "sqlserver" {
+			sqlDef = "INT"
+		} else {
+			sqlDef = "INTEGER"
+		}
 	case "bigInteger":
 		sqlDef = "BIGINT"
 	case "float":
-		if driver == "postgres" {
+		if driver == "postgres" || driver == "sqlserver" {
 			sqlDef = "REAL"
 		} else {
 			sqlDef = "FLOAT"
@@ -80,24 +87,40 @@ func (r *Runtime) buildColumnDefinition(name, typeStr, driver string) string {
 		if typeArgs != "" {
 			length = typeArgs
 		}
-		sqlDef = fmt.Sprintf("CHAR(%s)", length)
+		if driver == "sqlserver" {
+			sqlDef = fmt.Sprintf("NCHAR(%s)", length)
+		} else {
+			sqlDef = fmt.Sprintf("CHAR(%s)", length)
+		}
 	case "string":
 		length := "255"
 		if typeArgs != "" {
 			length = typeArgs
 		}
-		sqlDef = fmt.Sprintf("VARCHAR(%s)", length)
+		if driver == "sqlserver" {
+			sqlDef = fmt.Sprintf("NVARCHAR(%s)", length)
+		} else {
+			sqlDef = fmt.Sprintf("VARCHAR(%s)", length)
+		}
 	case "text":
-		sqlDef = "TEXT"
+		if driver == "sqlserver" {
+			sqlDef = "NVARCHAR(MAX)"
+		} else {
+			sqlDef = "TEXT"
+		}
 	case "mediumText":
 		if driver == "sqlite" || driver == "postgres" {
 			sqlDef = "TEXT"
+		} else if driver == "sqlserver" {
+			sqlDef = "NVARCHAR(MAX)"
 		} else {
 			sqlDef = "MEDIUMTEXT"
 		}
 	case "longText":
 		if driver == "sqlite" || driver == "postgres" {
 			sqlDef = "TEXT"
+		} else if driver == "sqlserver" {
+			sqlDef = "NVARCHAR(MAX)"
 		} else {
 			sqlDef = "LONGTEXT"
 		}
@@ -106,16 +129,24 @@ func (r *Runtime) buildColumnDefinition(name, typeStr, driver string) string {
 	case "dateTime":
 		if driver == "postgres" {
 			sqlDef = "TIMESTAMP"
+		} else if driver == "sqlserver" {
+			sqlDef = "DATETIME2"
 		} else {
 			sqlDef = "DATETIME"
 		}
 	case "time":
 		sqlDef = "TIME"
 	case "timestamp":
-		sqlDef = "TIMESTAMP"
+		if driver == "sqlserver" {
+			sqlDef = "DATETIME2"
+		} else {
+			sqlDef = "TIMESTAMP"
+		}
 	case "boolean":
 		if driver == "sqlite" || driver == "postgres" {
 			sqlDef = "BOOLEAN"
+		} else if driver == "sqlserver" {
+			sqlDef = "BIT"
 		} else {
 			sqlDef = "TINYINT(1)"
 		}
@@ -124,22 +155,29 @@ func (r *Runtime) buildColumnDefinition(name, typeStr, driver string) string {
 			sqlDef = "TEXT"
 		} else if driver == "postgres" {
 			sqlDef = "JSONB"
+		} else if driver == "sqlserver" {
+			sqlDef = "NVARCHAR(MAX)"
 		} else {
 			sqlDef = "JSON"
 		}
 	case "enum":
 		if driver == "sqlite" || driver == "postgres" {
 			sqlDef = "TEXT"
+		} else if driver == "sqlserver" {
+			sqlDef = "NVARCHAR(255)"
 		} else {
 			sqlDef = fmt.Sprintf("ENUM(%s)", typeArgs)
 		}
 	default:
-		sqlDef = "VARCHAR(255)"
+		if driver == "sqlserver" {
+			sqlDef = "NVARCHAR(255)"
+		} else {
+			sqlDef = "VARCHAR(255)"
+		}
 	}
 
 	def := fmt.Sprintf("%s %s", name, sqlDef)
 
-	// Process modifiers
 	isUnsigned := false
 	isNullable := false
 
@@ -151,21 +189,18 @@ func (r *Runtime) buildColumnDefinition(name, typeStr, driver string) string {
 		}
 	}
 
-	// Apply Unsigned (MySQL only mostly)
 	if isUnsigned && driver == "mysql" {
 		if strings.Contains(strings.ToLower(sqlDef), "int") || strings.Contains(strings.ToLower(sqlDef), "double") || strings.Contains(strings.ToLower(sqlDef), "float") || strings.Contains(strings.ToLower(sqlDef), "decimal") {
 			def = strings.Replace(def, sqlDef, sqlDef+" UNSIGNED", 1)
 		}
 	}
 
-	// Apply Nullable
 	if !isNullable && !strings.Contains(typeName, "increments") {
 		def += " NOT NULL"
 	} else if isNullable {
 		def += " NULL"
 	}
 
-	// Apply Default
 	for _, mod := range modifiers {
 		if strings.HasPrefix(mod, "default") {
 			start := strings.Index(mod, "(")
@@ -177,14 +212,12 @@ func (r *Runtime) buildColumnDefinition(name, typeStr, driver string) string {
 		}
 	}
 
-	// Apply Unique
 	for _, mod := range modifiers {
 		if mod == "unique" {
 			def += " UNIQUE"
 		}
 	}
 
-	// Apply Comment (MySQL only)
 	if driver == "mysql" {
 		for _, mod := range modifiers {
 			if strings.HasPrefix(mod, "comment") {
