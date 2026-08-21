@@ -30,41 +30,48 @@ Los tipos reconocidos por la validación del runtime incluyen `int`, `float`, `s
   ```
 
 
-## Funciones, closures y clases
-
-## Clases y Visibilidad
-
-Joss soporta modificadores explícitos de visibilidad (`public`, `private`, `protected`) y métodos estáticos (`static`):
+## Funciones, Closures y Tipado de Parámetros
 
 ```joss
-public class UserService {
-    public string $appName = "Joss App"
-    private $secretKey = "sk_prod_12345"
-    protected $cache = []
+// Funciones globales con tipado y coerción automática inteligente
+func transferir(int $userId, float $monto, string $concepto) {
+    // Si $monto entra como string "150.50", Joss lo convierte limpiamente al tipo float
+    return "Transferidos $" . $monto . " al usuario #" . $userId
+}
 
-    public static func instance() {
-        return new UserService()
+$doble = func(int $valor) {
+    return $valor * 2
+}
+```
+
+## Clases, Visibilidad y Herencia
+
+Joss soporta modificadores explícitos de visibilidad (`public`, `private`, `protected`), métodos estáticos (`static`) y herencia entre clases (`extends`):
+
+```joss
+public class BaseController {
+    protected $db
+
+    func constructor() {
+        $this->db = new GranDB()
     }
 
-    public func getAppName() {
-        return $this->appName
-    }
-
-    private func encryptToken($data) {
-        return md5($data . $this->secretKey)
+    protected func respondJson($data, $code = 200) {
+        return json($data, $code)
     }
 }
 
-// Clases convencionales sin modificadores (todo es público por defecto)
-class User {
-    string $name
+// Herencia de clases
+public class UserController extends BaseController {
+    private string $secret = "sk_prod_123"
 
-    func constructor($name) {
-        $this->name = $name
+    public static func make() {
+        return new UserController()
     }
 
-    func greet() {
-        return "Hola " . $this->name
+    public func index() {
+        $users = $this->db->table("users")->get()
+        return $this->respondJson($users)
     }
 }
 ```

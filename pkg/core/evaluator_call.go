@@ -40,8 +40,9 @@ func (r *Runtime) CallMethod(method *parser.MethodStatement, instance *Instance,
 		if i < len(args) {
 			val := r.evaluateExpression(args[i])
 			if param.Type.Literal != "" {
+				val = r.coerceToTypedValue(val, param.Type.Literal)
 				if !r.checkType(val, param.Type.Literal) {
-					panic(fmt.Sprintf("Type Error: El argumento %d (%s) debe ser de tipo %s, se recibió %T", i+1, param.Name.Value, param.Type.Literal, val))
+					panic(fmt.Sprintf("Type Error: El argumento %d ($%s) debe ser de tipo %s, se recibió %T", i+1, param.Name.Value, param.Type.Literal, val))
 				}
 			}
 			r.Variables[param.Name.Value] = val
@@ -104,8 +105,9 @@ func (r *Runtime) CallMethodEvaluated(method *parser.MethodStatement, instance *
 		if i < len(args) {
 			val := args[i]
 			if param.Type.Literal != "" {
+				val = r.coerceToTypedValue(val, param.Type.Literal)
 				if !r.checkType(val, param.Type.Literal) {
-					panic(fmt.Sprintf("Type Error: El argumento %d (%s) debe ser de tipo %s, se recibió %T", i+1, param.Name.Value, param.Type.Literal, val))
+					panic(fmt.Sprintf("Type Error: El argumento %d ($%s) debe ser de tipo %s, se recibió %T", i+1, param.Name.Value, param.Type.Literal, val))
 				}
 			}
 			r.Variables[param.Name.Value] = val

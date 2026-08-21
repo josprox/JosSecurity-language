@@ -4,7 +4,8 @@ Este documento describe capacidades comprobables del código actual. No mezcla p
 
 ## Implementado
 
-- Intérprete Joss, tipos opcionales, clases, herencia, funciones `func`, closures, ternarios, `match`, ciclos, excepciones, `async`/`await` y canales.
+- Intérprete Joss, tipos opcionales con coerción automática, clases, herencia (`extends`), modificadores de visibilidad (`public`, `private`, `protected`), métodos estáticos (`static`), funciones `func`, closures, ternarios, `match`, ciclos, excepciones (`try`/`catch`/`throw`), `async`/`await` y canales.
+- Motor de plantillas y vistas (`View::render`, `View::exists`, `View::share`, directiva `@json()`, `@foreach` anidado sobre arrays asociativos/expresiones complejas, comentarios `{{-- --}}`, layouts con `@extends` y `@yield`).
 - Aplicaciones web y de consola, rutas HTTP y WebSocket dinámicas (`Router::any`, `Router::query`, `Router::match`), respuestas JSON/raw/stream, sesiones persistentes, CSRF, CORS, rate limit configurable y TLS integrado.
 - Cliente HTTP nativo universal (`Http::get`, `Http::post`, `Http::put`, `Http::patch`, `Http::delete`, `Http::head`, `Http::options`, `Http::query`, `Http::json`, `Http::request`).
 - Registro Pub con resolución dinámica de repositorios en tiempo real y fallback automático a GitHub Releases.
