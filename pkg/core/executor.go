@@ -35,7 +35,22 @@ func (r *Runtime) Execute(program *parser.Program) {
 	}
 
 	if hasClasses {
-		r.executeMain(program)
+		hasMain := false
+		for _, stmt := range program.Statements {
+			if s, ok := stmt.(*parser.ClassStatement); ok && s.Name.Value == "Main" {
+				hasMain = true
+				break
+			}
+		}
+		if hasMain {
+			r.executeMain(program)
+		} else {
+			for _, stmt := range program.Statements {
+				if _, ok := stmt.(*parser.ClassStatement); !ok {
+					r.executeStatement(stmt)
+				}
+			}
+		}
 	} else {
 		// Legacy mode (Phase 2 scripts)
 		for _, stmt := range program.Statements {

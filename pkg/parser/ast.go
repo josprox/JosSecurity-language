@@ -39,8 +39,9 @@ func (p *Program) String() string {
 }
 
 type Parameter struct {
-	Type Token // Optional: string, int, etc.
-	Name *Identifier
+	Type         Token // Optional: string, int, etc.
+	Name         *Identifier
+	DefaultValue Expression // Optional: = 200, = "default", etc.
 }
 
 func (p *Parameter) String() string {
@@ -49,5 +50,8 @@ func (p *Parameter) String() string {
 		res += p.Type.Literal + " "
 	}
 	res += p.Name.String()
+	if p.DefaultValue != nil {
+		res += " = " + p.DefaultValue.String()
+	}
 	return res
 }

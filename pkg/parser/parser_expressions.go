@@ -544,6 +544,13 @@ func (p *Parser) parseParameter() *Parameter {
 			return nil
 		}
 		param.Name = &Identifier{Token: p.curToken, Value: p.curToken.Literal}
+
+		// Optional default value: $code = 200, $name = "Guest"
+		if p.peekToken.Type == ASSIGN {
+			p.nextToken() // consume '='
+			p.nextToken() // move to default expression
+			param.DefaultValue = p.parseExpression(LOWEST)
+		}
 	} else {
 		// Fallback for syntax errors, we expect VAR
 		return nil

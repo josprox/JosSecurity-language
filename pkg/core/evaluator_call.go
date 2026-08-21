@@ -46,6 +46,8 @@ func (r *Runtime) CallMethod(method *parser.MethodStatement, instance *Instance,
 				}
 			}
 			r.Variables[param.Name.Value] = val
+		} else if param.DefaultValue != nil {
+			r.Variables[param.Name.Value] = r.evaluateExpression(param.DefaultValue)
 		} else {
 			r.Variables[param.Name.Value] = nil
 		}
@@ -111,6 +113,8 @@ func (r *Runtime) CallMethodEvaluated(method *parser.MethodStatement, instance *
 				}
 			}
 			r.Variables[param.Name.Value] = val
+		} else if param.DefaultValue != nil {
+			r.Variables[param.Name.Value] = r.evaluateExpression(param.DefaultValue)
 		} else {
 			r.Variables[param.Name.Value] = nil
 		}
