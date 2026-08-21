@@ -36,13 +36,31 @@ Joss proporciona una amplia biblioteca de funciones globales nativas listas para
 * `sleep(seconds)`: Pausa la ejecución durante el número de segundos especificado.
 * `usleep(microseconds)`: Pausa la ejecución en microsegundos.
 
-### 2. Cadenas de Texto y Criptografía
+### 2. Conversión de Tipos y Comprobaciones
+* `intval(val)`: Convierte valores a entero (`int64`).
+* `floatval(val)` / `doubleval(val)`: Convierte valores a punto flotante (`float64`).
+* `strval(val)`: Convierte cualquier valor a string.
+* `boolval(val)`: Convierte cualquier valor a booleano evaluando su truthiness.
+* `is_numeric(val)`: Comprueba si un valor es un número o un string numérico válido (`"199.00"` -> `true`).
+* `is_int(val)` / `is_integer(val)`: Comprobación estricta de tipo entero.
+* `is_float(val)` / `is_double(val)`: Comprobación estricta de tipo flotante.
+* `is_string(val)`, `is_array(val)`, `is_null(val)`.
+* `isset(var)`: Evalúa si una variable o índice existe y no es nulo.
+* `empty(var)`: Evalúa si una variable o valor está vacío (`null`, `""`, `0`, `[]`, `{}`).
+
+### 3. Cadenas de Texto y Criptografía
+* `strlen(string)`: Retorna la longitud exacta de la cadena en caracteres (soporta UTF-8).
 * `str_contains(haystack, needle)`: Verifica si `needle` está contenida en `haystack` (booleano).
 * `str_starts_with(haystack, prefix)`: Verifica si la cadena inicia con el prefijo dado.
 * `str_ends_with(haystack, suffix)`: Verifica si la cadena termina con el sufijo dado.
 * `str_replace(search, replace, subject)`: Reemplaza todas las apariciones de `search` por `replace` en `subject`.
+* `str_pad(string, length, [padStr])`: Rellena una cadena hasta la longitud indicada.
+* `str_repeat(string, count)`: Repite una cadena un número determinado de veces.
 * `strtolower(string)` / `to_lower`: Convierte la cadena a minúsculas.
 * `strtoupper(string)` / `to_upper`: Convierte la cadena a mayúsculas.
+* `ucfirst(string)`: Convierte el primer carácter a mayúscula.
+* `lcfirst(string)`: Convierte el primer carácter a minúscula.
+* `ucwords(string)`: Convierte a mayúscula la primera letra de cada palabra.
 * `trim(string, [cutset])`: Elimina espacios o caracteres dados al inicio y final.
 * `ltrim(string, [cutset])` / `rtrim(string, [cutset])`: Recorta espacios a la izquierda o derecha.
 * `substr(string, start, [length])`: Extrae una subcadena soportando índices negativos.
@@ -59,7 +77,16 @@ Joss proporciona una amplia biblioteca de funciones globales nativas listas para
 * `csrf_field()`: Retorna el campo `<input type="hidden" name="_token" ...>` para formularios web.
 * `print(args...)`, `echo(args...)`, `printf(format, args...)`.
 
-### 3. Arreglos y Mapas
+### 4. Matemáticas y Números
+* `round(num, [precision])`: Redondea un número flotante con precisión decimal opcional.
+* `floor(num)`: Redondea hacia abajo al entero más cercano.
+* `ceil(num)`: Redondea hacia arriba al entero más cercano.
+* `abs(num)`: Retorna el valor absoluto de un número.
+* `min(a, b, ...)` o `min([array])`: Obtiene el valor mínimo.
+* `max(a, b, ...)` o `max([array])`: Obtiene el valor máximo.
+* `rand([min], [max])`: Genera un número entero aleatorio.
+
+### 5. Arreglos y Mapas
 * `in_array(needle, haystack)`: Comprueba si un valor existe dentro de un arreglo o lista.
 * `array_key_exists(key, map)`: Comprueba si una clave existe dentro de un mapa.
 * `array_merge(arr1, arr2, ...)`: Fusiona dos o más arreglos o mapas.
@@ -67,15 +94,15 @@ Joss proporciona una amplia biblioteca de funciones globales nativas listas para
 * `array_pop(array)`: Extrae y retorna el último elemento del arreglo.
 * `array_shift(array)`: Extrae y retorna el primer elemento del arreglo.
 * `array_slice(array, offset, [length])`: Extrae una porción de un arreglo.
+* `array_unique(array)`: Elimina valores duplicados de un arreglo.
+* `array_reverse(array)`: Invierte el orden de los elementos del arreglo.
+* `array_column(array, column)`: Extrae los valores de una columna o clave en una lista de mapas.
 * `keys(map)` / `array_keys`: Retorna una lista con todas las claves de un mapa.
 * `values(map)` / `array_values`: Retorna una lista con todos los valores de un mapa.
 * `end(array)`: Obtiene el último elemento de un arreglo sin modificarlo.
 * `count(item)` / `len(item)`: Retorna la longitud de arreglos, mapas o cadenas.
-* `isset(var)`: Evalúa si una variable o índice existe y no es nulo.
-* `empty(var)`: Evalúa si una variable o valor está vacío (`null`, `""`, `0`, `[]`, `{}`).
-* `is_string(val)`, `is_array(val)`, `is_null(val)`.
 
-### 4. Sistema de Archivos
+### 6. Sistema de Archivos
 * `file_exists(path)`: Comprueba si un archivo o directorio existe.
 * `file_get_contents(path)`: Lee el contenido completo de un archivo como string.
 * `file_put_contents(path, content)`: Escribe datos en un archivo (creándolo si no existe).

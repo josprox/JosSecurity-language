@@ -399,6 +399,52 @@ func (r *Runtime) callBuiltinArray(name string, args []interface{}) (interface{}
 			}
 		}
 		return []interface{}{}, true
+
+	case "array_unique":
+		if len(args) >= 1 {
+			if list, ok := args[0].([]interface{}); ok {
+				seen := make(map[string]bool)
+				res := []interface{}{}
+				for _, item := range list {
+					key := fmt.Sprintf("%v", item)
+					if !seen[key] {
+						seen[key] = true
+						res = append(res, item)
+					}
+				}
+				return res, true
+			}
+		}
+		return []interface{}{}, true
+
+	case "array_reverse":
+		if len(args) >= 1 {
+			if list, ok := args[0].([]interface{}); ok {
+				res := make([]interface{}, len(list))
+				for i, j := 0, len(list)-1; i < len(list); i, j = i+1, j-1 {
+					res[i] = list[j]
+				}
+				return res, true
+			}
+		}
+		return []interface{}{}, true
+
+	case "array_column":
+		if len(args) >= 2 {
+			col := fmt.Sprintf("%v", args[1])
+			if list, ok := args[0].([]interface{}); ok {
+				res := []interface{}{}
+				for _, item := range list {
+					if m, isMap := item.(map[string]interface{}); isMap {
+						if val, has := m[col]; has {
+							res = append(res, val)
+						}
+					}
+				}
+				return res, true
+			}
+		}
+		return []interface{}{}, true
 	}
 
 	return nil, false

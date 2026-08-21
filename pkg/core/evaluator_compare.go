@@ -131,3 +131,35 @@ func spaceshipCompare(left, right interface{}) int64 {
 	}
 	return 0
 }
+
+func compareLessThan(a, b interface{}) bool {
+	return spaceshipCompare(a, b) < 0
+}
+
+func compareGreaterThan(a, b interface{}) bool {
+	return spaceshipCompare(a, b) > 0
+}
+
+func toInt64Safe(v interface{}) (int64, bool) {
+	if v == nil {
+		return 0, false
+	}
+	switch val := v.(type) {
+	case int:
+		return int64(val), true
+	case int32:
+		return int64(val), true
+	case int64:
+		return val, true
+	case float64:
+		return int64(val), true
+	case float32:
+		return int64(val), true
+	case string:
+		var n int64
+		if _, err := fmt.Sscanf(val, "%d", &n); err == nil {
+			return n, true
+		}
+	}
+	return 0, false
+}
