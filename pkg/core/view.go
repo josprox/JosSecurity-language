@@ -55,19 +55,77 @@ func (r *Runtime) evaluateViewExpression(expr string, data map[string]interface{
 	return result
 }
 
+var (
+	GlobalViewSharedData = make(map[string]interface{})
+)
+
 // View Implementation
 func (r *Runtime) executeViewMethod(instance *Instance, method string, args []interface{}) interface{} {
 	// Initialize AssetManager on first use
 	am := GetAssetManager()
 	am.Initialize()
 
+	if method == "exists" {
+		if len(args) == 0 {
+			return false
+		}
+		viewName, ok := args[0].(string)
+		if !ok {
+			return false
+		}
+		viewPath := strings.ReplaceAll(viewName, ".", "/")
+		if GlobalFileSystem != nil {
+			p1 := path.Join("app", "views", viewPath+".joss.html")
+			if _, err := GlobalFileSystem.Open(p1); err == nil {
+				return true
+			}
+			p2 := path.Join("app", "views", viewPath+".html")
+			if _, err := GlobalFileSystem.Open(p2); err == nil {
+				return true
+			}
+		} else {
+			p1 := filepath.Join("app", "views", viewPath+".joss.html")
+			if _, err := os.Stat(p1); err == nil {
+				return true
+			}
+			p2 := filepath.Join("app", "views", viewPath+".html")
+			if _, err := os.Stat(p2); err == nil {
+				return true
+			}
+		}
+		return false
+	}
+
+	if method == "share" {
+		if len(args) >= 2 {
+			if key, ok := args[0].(string); ok {
+				GlobalViewSharedData[key] = args[1]
+				return true
+			}
+		} else if len(args) == 1 {
+			if m, ok := args[0].(map[string]interface{}); ok {
+				for k, v := range m {
+					GlobalViewSharedData[k] = v
+				}
+				return true
+			}
+		}
+		return false
+	}
+
 	if method == "render" {
 		if len(args) >= 1 {
 			viewName := args[0].(string)
 			data := make(map[string]interface{})
+			// Inject globally shared data
+			for k, v := range GlobalViewSharedData {
+				data[k] = v
+			}
 			if len(args) > 1 {
 				if d, ok := args[1].(map[string]interface{}); ok {
-					data = d
+					for k, v := range d {
+						data[k] = v
+					}
 				}
 			}
 			fmt.Printf("[View] Rendering %s with data: %v\n", viewName, data)
@@ -306,6 +364,14 @@ func (r *Runtime) executeViewMethod(instance *Instance, method string, args []in
 
 				finalHtml = strings.Replace(finalHtml, fullMatch, string(includeContent), 1)
 			}
+
+			// Pre-process Blade comments: {{-- comment content --}}
+			reBladeComments := regexp.MustCompile(`\{\{--[\s\S]*?--\}\}`)
+			finalHtml = reBladeComments.ReplaceAllString(finalHtml, "")
+
+			// Pre-process @json(expr) directive to raw {{! json_encode(expr) }}
+			reJsonDirective := regexp.MustCompile(`@json\s*\((.*?)\)`)
+			finalHtml = reJsonDirective.ReplaceAllString(finalHtml, `{{! json_encode($1) }}`)
 
 			// Pre-process csrf_field() to be raw output
 			reCsrfPre := regexp.MustCompile(`\{\{\s*csrf_field\(\)\s*\}\}`)

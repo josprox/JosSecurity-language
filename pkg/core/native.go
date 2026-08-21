@@ -87,7 +87,7 @@ func (r *Runtime) RegisterNativeClasses() {
 	r.Variables["Task"] = &Instance{Class: r.Classes["Task"], Fields: make(map[string]interface{})}
 
 	// View
-	r.registerNative("View", []string{"render"}, (*Runtime).executeViewMethod)
+	r.registerNative("View", []string{"render", "exists", "share"}, (*Runtime).executeViewMethod)
 	r.Variables["View"] = &Instance{Class: r.Classes["View"], Fields: make(map[string]interface{})}
 
 	// Router

@@ -38,9 +38,29 @@ El compilador procesa recursivamente el cuerpo de cada `@foreach` (soportando ex
 
 La notación `$map.key` dentro de expresiones de vista se traduce a `$map->key`. El evaluador permite leer mapas e instancias con esa forma.
 
-## Datos globales
+## Directivas y Comentarios en Plantillas
 
-El renderizador inyecta `auth_check`, `auth_guest`, `auth_user`, `auth_role`, `auth_email`, `csrf_token` y mensajes flash cuando existen. `Auth::user()` es una instancia; para una API de vista estable conviene pasar campos concretos desde el controlador.
+1. **Directiva `@json($data)`**:
+   Permite volcar objetos, mapas o arrays en atributos JavaScript de forma segura:
+   ```html
+   <script>
+       const config = @json($appConfig);
+   </script>
+   ```
 
-Los comentarios Blade `{{-- --}}` no tienen un procesador especial actualmente; usa comentarios HTML si necesitas comentarios de plantilla.
+2. **Comentarios de Plantilla `{{-- Comentario --}}`**:
+   Los bloques de comentarios Blade se eliminan antes de renderizar y no llegan al cliente HTML:
+   ```html
+   {{-- Este comentario no se muestra en el navegador ni en el código fuente --}}
+   ```
+
+## Métodos Nativos de `View`
+
+- **`View::exists("vista.nombre")`**: Retorna `true` o `false` según la existencia del archivo de vista tanto en disco como en el VFS.
+- **`View::share("key", $value)`** o **`View::share($map)`**: Comparte variables globales disponibles para todas las vistas renderizadas durante la aplicación (ej. configuraciones del sitio, datos de usuario, branding).
+- **`View::render("vista.nombre", $data)`**: Renderiza la vista con los datos proporcionados.
+
+## Datos globales automáticos
+
+El renderizador inyecta automáticamente `auth_check`, `auth_guest`, `auth_user`, `auth_role`, `auth_email`, `csrf_token` y mensajes flash cuando existen.
 
