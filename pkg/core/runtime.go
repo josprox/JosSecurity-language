@@ -132,6 +132,9 @@ func (r *Runtime) Free() {
 	r.ProjectRoot = ""
 	r.importBaseDir = ""
 	r.captureEnvironment = nil
+	r.SitemapEntries = r.SitemapEntries[:0]
+	r.SitemapProviders = r.SitemapProviders[:0]
+	r.SitemapExclusions = r.SitemapExclusions[:0]
 
 	runtimePool.Put(r)
 }
@@ -215,6 +218,20 @@ func (r *Runtime) Fork() *Runtime {
 	}
 	for k, v := range r.VarTypes {
 		newR.VarTypes[k] = v
+	}
+
+	// Copy Sitemap Entries, Providers & Exclusions
+	if len(r.SitemapEntries) > 0 {
+		newR.SitemapEntries = make([]SitemapEntry, len(r.SitemapEntries))
+		copy(newR.SitemapEntries, r.SitemapEntries)
+	}
+	if len(r.SitemapProviders) > 0 {
+		newR.SitemapProviders = make([]*CapturedFunction, len(r.SitemapProviders))
+		copy(newR.SitemapProviders, r.SitemapProviders)
+	}
+	if len(r.SitemapExclusions) > 0 {
+		newR.SitemapExclusions = make([]string, len(r.SitemapExclusions))
+		copy(newR.SitemapExclusions, r.SitemapExclusions)
 	}
 
 	return newR

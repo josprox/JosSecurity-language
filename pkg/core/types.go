@@ -51,9 +51,11 @@ type Runtime struct {
 	importBaseDir     string
 
 	// SEO & Sitemap
-	SEO            *SEOData
-	SitemapEntries []SitemapEntry
-	CurrentSource  string // "routes", "api", "app", etc.
+	SEO               *SEOData
+	SitemapEntries    []SitemapEntry
+	SitemapProviders  []*CapturedFunction
+	SitemapExclusions []string
+	CurrentSource     string // "routes", "api", "app", etc.
 
 	captureEnvironment *ClosureEnvironment
 }

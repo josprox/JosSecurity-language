@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"html"
 	"strings"
+
+	"github.com/jossecurity/joss/pkg/parser"
 )
 
 // executeSEOMethod handles SEO class methods
@@ -126,29 +128,88 @@ func (r *Runtime) executeSitemapMethod(instance *Instance, method string, args [
 	switch method {
 	case "add":
 		if len(args) >= 1 {
+			// Check if map/object passed
+			if m, ok := args[0].(map[string]interface{}); ok {
+				entry := SitemapEntry{
+					URL:        fmt.Sprintf("%v", m["url"]),
+					LastMod:    "",
+					ChangeFreq: "weekly",
+					Priority:   0.5,
+				}
+				if val, exists := m["lastmod"]; exists && val != nil {
+					entry.LastMod = fmt.Sprintf("%v", val)
+				}
+				if val, exists := m["changefreq"]; exists && val != nil {
+					entry.ChangeFreq = fmt.Sprintf("%v", val)
+				}
+				if val, exists := m["priority"]; exists && val != nil {
+					switch pv := val.(type) {
+					case float64:
+						entry.Priority = pv
+					case int:
+						entry.Priority = float64(pv)
+					case int64:
+						entry.Priority = float64(pv)
+					}
+				}
+				r.SitemapEntries = append(r.SitemapEntries, entry)
+				return nil
+			}
+
 			entry := SitemapEntry{
 				URL:        fmt.Sprintf("%v", args[0]),
 				LastMod:    "",
 				ChangeFreq: "weekly",
 				Priority:   0.5,
 			}
-			if len(args) >= 2 {
+			if len(args) >= 2 && args[1] != nil {
 				entry.LastMod = fmt.Sprintf("%v", args[1])
 			}
-			if len(args) >= 3 {
+			if len(args) >= 3 && args[2] != nil {
 				entry.ChangeFreq = fmt.Sprintf("%v", args[2])
 			}
-			if len(args) >= 4 {
-				// Priority
-				if p, ok := args[3].(float64); ok {
+			if len(args) >= 4 && args[3] != nil {
+				switch p := args[3].(type) {
+				case float64:
 					entry.Priority = p
+				case int:
+					entry.Priority = float64(p)
+				case int64:
+					entry.Priority = float64(p)
 				}
 			}
 			r.SitemapEntries = append(r.SitemapEntries, entry)
 		}
 		return nil
+
+	case "provider":
+		if len(args) >= 1 {
+			if fn, ok := args[0].(*parser.FunctionLiteral); ok {
+				captured := r.captureFunction(fn)
+				r.SitemapProviders = append(r.SitemapProviders, captured)
+			}
+		}
+		return nil
+
+	case "exclude":
+		if len(args) >= 1 {
+			switch v := args[0].(type) {
+			case string:
+				r.SitemapExclusions = append(r.SitemapExclusions, v)
+			case []interface{}:
+				for _, item := range v {
+					r.SitemapExclusions = append(r.SitemapExclusions, fmt.Sprintf("%v", item))
+				}
+			case []string:
+				r.SitemapExclusions = append(r.SitemapExclusions, v...)
+			}
+		}
+		return nil
+
+	case "xsl":
+		return r.GenerateSitemapXSL()
+
 	case "generate":
-		// Try to get baseUrl from current request if available
 		baseUrl := ""
 		if reqVal, ok := r.Variables["$__request"]; ok {
 			if reqInstance, ok := reqVal.(*Instance); ok {
@@ -172,23 +233,40 @@ func (r *Runtime) executeSitemapMethod(instance *Instance, method string, args [
 func (r *Runtime) GenerateSitemapXML(baseUrl string) string {
 	var sb strings.Builder
 	sb.WriteString("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n")
+	sb.WriteString("<?xml-stylesheet type=\"text/xsl\" href=\"/sitemap.xsl\"?>\n")
 	sb.WriteString("<urlset xmlns=\"http://www.sitemaps.org/schemas/sitemap/0.9\">\n")
 
+	isExcluded := func(p string) bool {
+		for _, excl := range r.SitemapExclusions {
+			if excl == p {
+				return true
+			}
+			if strings.HasSuffix(excl, "*") {
+				prefix := strings.TrimSuffix(excl, "*")
+				if strings.HasPrefix(p, prefix) {
+					return true
+				}
+			}
+		}
+		// Default system exclusions
+		if strings.HasPrefix(p, "/api/") || strings.HasPrefix(p, "/admin/") || strings.HasPrefix(p, "/.") {
+			return true
+		}
+		return false
+	}
+
 	// 1. Automatic Routes from routes.joss
-	// We iterate over GET routes
 	if getRoutes, ok := r.Routes["GET"]; ok {
 		for path, infoVal := range getRoutes {
 			if info, ok := infoVal.(map[string]interface{}); ok {
-				// Filter logic:
-				// - Must be from "routes"
-				// - Must NOT have middleware
-				// - Must NOT be dynamic (no : or {)
 				source, _ := info["source"].(string)
 				middleware, _ := info["middleware"].([]string)
 
 				if source == "routes" && len(middleware) == 0 {
 					if !strings.Contains(path, ":") && !strings.Contains(path, "{") {
-						r.writeSitemapEntry(&sb, path, "", "weekly", 0.8, baseUrl)
+						if !isExcluded(path) {
+							r.writeSitemapEntry(&sb, path, "", "weekly", 0.8, baseUrl)
+						}
 					}
 				}
 			}
@@ -197,18 +275,327 @@ func (r *Runtime) GenerateSitemapXML(baseUrl string) string {
 
 	// 2. Manual Entries
 	for _, entry := range r.SitemapEntries {
-		r.writeSitemapEntry(&sb, entry.URL, entry.LastMod, entry.ChangeFreq, entry.Priority, baseUrl)
+		if !isExcluded(entry.URL) {
+			r.writeSitemapEntry(&sb, entry.URL, entry.LastMod, entry.ChangeFreq, entry.Priority, baseUrl)
+		}
+	}
+
+	// 3. Dynamic Providers (Closures registered via Sitemap::provider(func() { ... }))
+	for _, provider := range r.SitemapProviders {
+		res := r.callCapturedFunction(provider, []interface{}{})
+		if list, ok := res.([]interface{}); ok {
+			for _, item := range list {
+				if m, ok := item.(map[string]interface{}); ok {
+					urlStr := fmt.Sprintf("%v", m["url"])
+					if isExcluded(urlStr) {
+						continue
+					}
+					lastMod := ""
+					if val, exists := m["lastmod"]; exists && val != nil {
+						lastMod = fmt.Sprintf("%v", val)
+					}
+					changeFreq := "weekly"
+					if val, exists := m["changefreq"]; exists && val != nil {
+						changeFreq = fmt.Sprintf("%v", val)
+					}
+					priority := 0.8
+					if val, exists := m["priority"]; exists && val != nil {
+						switch pv := val.(type) {
+						case float64:
+							priority = pv
+						case int:
+							priority = float64(pv)
+						case int64:
+							priority = float64(pv)
+						}
+					}
+					r.writeSitemapEntry(&sb, urlStr, lastMod, changeFreq, priority, baseUrl)
+				}
+			}
+		}
 	}
 
 	sb.WriteString("</urlset>")
 	return sb.String()
 }
 
+// GenerateSitemapXSL provides a modern, beautiful, responsive interactive dashboard for the sitemap
+func (r *Runtime) GenerateSitemapXSL() string {
+	return `<?xml version="1.0" encoding="UTF-8"?>
+<xsl:stylesheet version="2.0" 
+    xmlns:html="http://www.w3.org/TR/REC-html40"
+    xmlns:sitemap="http://www.sitemaps.org/schemas/sitemap/0.9"
+    xmlns:xsl="http://www.w3.org/1999/XSL/Transform">
+    <xsl:output method="html" version="1.0" encoding="UTF-8" indent="yes"/>
+    <xsl:template match="/">
+        <html lang="es">
+            <head>
+                <meta charset="UTF-8"/>
+                <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+                <title>XML Sitemap | Joss Engine</title>
+                <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css"/>
+                <style>
+                    :root {
+                        --bg-gradient: linear-gradient(135deg, #090514 0%, #170d2b 50%, #0c0818 100%);
+                        --card-bg: rgba(255, 255, 255, 0.05);
+                        --card-border: rgba(255, 255, 255, 0.1);
+                        --primary: #ff4f5f;
+                        --primary-glow: rgba(255, 79, 95, 0.35);
+                        --accent: #1bb7a5;
+                        --accent-glow: rgba(27, 183, 165, 0.35);
+                        --text: #f8fafc;
+                        --text-muted: #94a3b8;
+                    }
+                    * { box-sizing: border-box; margin: 0; padding: 0; }
+                    body {
+                        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+                        background: var(--bg-gradient);
+                        background-attachment: fixed;
+                        color: var(--text);
+                        min-height: 100vh;
+                        padding: 3rem 1.5rem;
+                    }
+                    .container {
+                        max-width: 1200px;
+                        margin: 0 auto;
+                    }
+                    .header {
+                        background: var(--card-bg);
+                        backdrop-filter: blur(20px);
+                        -webkit-backdrop-filter: blur(20px);
+                        border: 1px solid var(--card-border);
+                        border-radius: 20px;
+                        padding: 2.5rem;
+                        margin-bottom: 2rem;
+                        box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
+                        display: flex;
+                        justify-content: space-between;
+                        align-items: center;
+                        flex-wrap: wrap;
+                        gap: 1.5rem;
+                    }
+                    .brand {
+                        display: flex;
+                        align-items: center;
+                        gap: 1rem;
+                    }
+                    .logo-icon {
+                        width: 54px;
+                        height: 54px;
+                        background: linear-gradient(135deg, var(--primary), var(--accent));
+                        border-radius: 14px;
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                        font-size: 1.75rem;
+                        color: #ffffff;
+                        box-shadow: 0 10px 25px var(--primary-glow);
+                    }
+                    h1 {
+                        font-size: 1.85rem;
+                        font-weight: 900;
+                        letter-spacing: -0.5px;
+                        background: linear-gradient(to right, #ffffff, #cbd5e1);
+                        -webkit-background-clip: text;
+                        -webkit-text-fill-color: transparent;
+                    }
+                    .subtitle {
+                        color: var(--text-muted);
+                        font-size: 0.95rem;
+                        margin-top: 0.25rem;
+                    }
+                    .stats {
+                        display: flex;
+                        gap: 1rem;
+                    }
+                    .stat-badge {
+                        background: rgba(255, 255, 255, 0.04);
+                        border: 1px solid var(--card-border);
+                        padding: 0.75rem 1.25rem;
+                        border-radius: 12px;
+                        text-align: center;
+                    }
+                    .stat-value {
+                        font-size: 1.4rem;
+                        font-weight: 800;
+                        color: var(--primary);
+                    }
+                    .stat-label {
+                        font-size: 0.75rem;
+                        text-transform: uppercase;
+                        font-weight: 700;
+                        color: var(--text-muted);
+                        letter-spacing: 0.5px;
+                    }
+                    .search-bar {
+                        margin-bottom: 1.5rem;
+                    }
+                    .search-input {
+                        width: 100%;
+                        background: var(--card-bg);
+                        backdrop-filter: blur(16px);
+                        border: 1px solid var(--card-border);
+                        border-radius: 14px;
+                        padding: 1rem 1.25rem 1rem 3rem;
+                        color: #ffffff;
+                        font-size: 1rem;
+                        outline: none;
+                        transition: border 0.3s, box-shadow 0.3s;
+                    }
+                    .search-input:focus {
+                        border-color: var(--primary);
+                        box-shadow: 0 0 20px var(--primary-glow);
+                    }
+                    .table-card {
+                        background: var(--card-bg);
+                        backdrop-filter: blur(20px);
+                        -webkit-backdrop-filter: blur(20px);
+                        border: 1px solid var(--card-border);
+                        border-radius: 20px;
+                        overflow: hidden;
+                        box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
+                    }
+                    table {
+                        width: 100%;
+                        border-collapse: collapse;
+                        text-align: left;
+                    }
+                    th {
+                        background: rgba(255, 255, 255, 0.04);
+                        padding: 1.2rem 1.5rem;
+                        font-size: 0.8rem;
+                        font-weight: 800;
+                        text-transform: uppercase;
+                        letter-spacing: 0.75px;
+                        color: var(--text-muted);
+                        border-bottom: 1px solid var(--card-border);
+                    }
+                    td {
+                        padding: 1.1rem 1.5rem;
+                        font-size: 0.92rem;
+                        border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+                        transition: background 0.2s ease;
+                    }
+                    tr:hover td {
+                        background: rgba(255, 255, 255, 0.03);
+                    }
+                    .url-link {
+                        color: #60a5fa;
+                        text-decoration: none;
+                        font-weight: 600;
+                        transition: color 0.2s;
+                        word-break: break-all;
+                    }
+                    .url-link:hover {
+                        color: var(--primary);
+                        text-decoration: underline;
+                    }
+                    .badge {
+                        display: inline-block;
+                        padding: 0.25rem 0.65rem;
+                        border-radius: 6px;
+                        font-size: 0.75rem;
+                        font-weight: 800;
+                        text-transform: uppercase;
+                    }
+                    .badge-freq {
+                        background: rgba(27, 183, 165, 0.12);
+                        color: #2dd4bf;
+                        border: 1px solid rgba(27, 183, 165, 0.25);
+                    }
+                    .badge-priority {
+                        background: rgba(255, 79, 95, 0.12);
+                        color: #ff4f5f;
+                        border: 1px solid rgba(255, 79, 95, 0.25);
+                    }
+                    .footer {
+                        text-align: center;
+                        margin-top: 2.5rem;
+                        font-size: 0.85rem;
+                        color: var(--text-muted);
+                    }
+                </style>
+            </head>
+            <body>
+                <div class="container">
+                    <div class="header">
+                        <div class="brand">
+                            <div class="logo-icon">
+                                <i class="fa-solid fa-sitemap"></i>
+                            </div>
+                            <div>
+                                <h1>Mapa del Sitio XML</h1>
+                                <p class="subtitle">Generado en vivo y dinámicamente por el motor de servidor de Joss</p>
+                            </div>
+                        </div>
+                        <div class="stats">
+                            <div class="stat-badge">
+                                <div class="stat-value">
+                                    <xsl:value-of select="count(sitemap:urlset/sitemap:url)"/>
+                                </div>
+                                <div class="stat-label">URLs Indexadas</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="table-card">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th style="width: 50%;">Ubicación (URL)</th>
+                                    <th>Prioridad</th>
+                                    <th>Frecuencia</th>
+                                    <th>Última Modificación</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <xsl:for-each select="sitemap:urlset/sitemap:url">
+                                    <tr>
+                                        <td>
+                                            <a class="url-link">
+                                                <xsl:attribute name="href">
+                                                    <xsl:value-of select="sitemap:loc"/>
+                                                </xsl:attribute>
+                                                <xsl:value-of select="sitemap:loc"/>
+                                            </a>
+                                        </td>
+                                        <td>
+                                            <span class="badge badge-priority">
+                                                <xsl:value-of select="sitemap:priority"/>
+                                            </span>
+                                        </td>
+                                        <td>
+                                            <span class="badge badge-freq">
+                                                <xsl:value-of select="sitemap:changefreq"/>
+                                            </span>
+                                        </td>
+                                        <td style="color: #94a3b8; font-size: 0.85rem;">
+                                            <xsl:choose>
+                                                <xsl:when test="sitemap:lastmod">
+                                                    <xsl:value-of select="sitemap:lastmod"/>
+                                                </xsl:when>
+                                                <xsl:otherwise>
+                                                    <span style="opacity: 0.4;">—</span>
+                                                </xsl:otherwise>
+                                            </xsl:choose>
+                                        </td>
+                                    </tr>
+                                </xsl:for-each>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div class="footer">
+                        <p>Desarrollado con <i class="fa-solid fa-heart" style="color:#ff4f5f;"></i> por Joss Programming Language Engine</p>
+                    </div>
+                </div>
+            </body>
+        </html>
+    </xsl:template>
+</xsl:stylesheet>`
+}
+
 func (r *Runtime) writeSitemapEntry(sb *strings.Builder, urlPath, lastMod, freq string, priority float64, dynamicBase string) {
-	// Root URL resolution logic:
-	// 1. Dynamic Base (from request)
-	// 2. APP_URL (from environment)
-	// 3. http://localhost (fallback)
 	appUrl := dynamicBase
 	if appUrl == "" {
 		if val, ok := r.Env["APP_URL"]; ok {

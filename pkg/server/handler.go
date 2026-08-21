@@ -202,10 +202,16 @@ func MainHandler(w http.ResponseWriter, r *http.Request) {
 	host := r.Host
 	baseUrl := scheme + "://" + host
 
-	// Automatic Sitemap.xml
+	// Automatic Sitemap.xml & Sitemap.xsl stylesheet
 	if r.URL.Path == "/sitemap.xml" {
-		w.Header().Set("Content-Type", "application/xml")
+		w.Header().Set("Content-Type", "application/xml; charset=utf-8")
 		fmt.Fprintf(w, "%s", rt.GenerateSitemapXML(baseUrl))
+		return
+	}
+	if r.URL.Path == "/sitemap.xsl" {
+		w.Header().Set("Content-Type", "application/xslt+xml; charset=utf-8")
+		w.Header().Set("Cache-Control", "public, max-age=86400")
+		fmt.Fprintf(w, "%s", rt.GenerateSitemapXSL())
 		return
 	}
 

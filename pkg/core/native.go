@@ -198,7 +198,7 @@ func (r *Runtime) RegisterNativeClasses() {
 	r.Variables["SEO"] = &Instance{Class: r.Classes["SEO"], Fields: make(map[string]interface{})}
 
 	// Sitemap
-	r.registerNative("Sitemap", []string{"add", "generate"}, (*Runtime).executeSitemapMethod)
+	r.registerNative("Sitemap", []string{"add", "provider", "exclude", "generate", "xsl"}, (*Runtime).executeSitemapMethod)
 	r.Variables["Sitemap"] = &Instance{Class: r.Classes["Sitemap"], Fields: make(map[string]interface{})}
 }
 

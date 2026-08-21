@@ -4,4 +4,4 @@ const Name = "Joss"
 
 const Version = "3.6.7.2"
 
-const NameVersion = "Best JP 5"
+const NameVersion = "Best Sitemap"
