@@ -3,6 +3,80 @@ package parser
 import "fmt"
 
 func (p *Parser) parseStatement() Statement {
+	// Modifiers before class or function: public class Foo, public func bar()
+	if p.curToken.Type == PUBLIC || p.curToken.Type == PRIVATE || p.curToken.Type == PROTECTED || p.curToken.Type == STATIC {
+		vis := p.curToken.Literal
+		isStatic := false
+		if p.curToken.Type == STATIC {
+			isStatic = true
+			vis = "public"
+		}
+
+		if p.peekToken.Type == STATIC {
+			isStatic = true
+			p.nextToken() // consume static
+		}
+
+		if p.peekToken.Type == CLASS {
+			p.nextToken() // move to CLASS
+			classStmt := p.parseClassStatement()
+			if classStmt != nil {
+				classStmt.Visibility = vis
+			}
+			return classStmt
+		}
+
+		if p.peekToken.Type == FUNCTION {
+			p.nextToken() // move to FUNCTION
+			methodStmt := p.parseMethodStatement()
+			if methodStmt != nil {
+				methodStmt.Visibility = vis
+				methodStmt.IsStatic = isStatic
+			}
+			return methodStmt
+		}
+
+		// Property: public $x = 1, private string $y
+		if p.peekToken.Type == VAR {
+			p.nextToken() // move to VAR
+			name := &Identifier{Token: p.curToken, Value: p.curToken.Literal}
+			var value Expression
+			if p.peekToken.Type == ASSIGN {
+				p.nextToken()
+				p.nextToken()
+				value = p.parseExpression(LOWEST)
+			}
+			stmt := &LetStatement{
+				Token:      Token{Type: IDENT, Literal: "mixed", Line: p.curToken.Line},
+				Name:       name,
+				Value:      value,
+				Visibility: vis,
+				IsStatic:   isStatic,
+			}
+			if p.peekToken.Type == SEMICOLON || p.peekToken.Type == NEWLINE {
+				p.nextToken()
+			}
+			return stmt
+		}
+
+		if p.peekToken.Type == IDENT {
+			p.nextToken() // move to type (e.g. string)
+			typeTok := p.curToken
+			letStmt := p.parseLetStatement()
+			if ls, ok := letStmt.(*LetStatement); ok {
+				ls.Visibility = vis
+				ls.IsStatic = isStatic
+				return ls
+			}
+			if mls, ok := letStmt.(*MultiLetStatement); ok {
+				mls.Visibility = vis
+				mls.IsStatic = isStatic
+				return mls
+			}
+			return &LetStatement{Token: typeTok, Visibility: vis, IsStatic: isStatic}
+		}
+	}
+
 	if p.curToken.Type == CLASS {
 		return p.parseClassStatement()
 	}
@@ -162,12 +236,81 @@ func (p *Parser) parseClassBody() *BlockStatement {
 		}
 
 		var stmt Statement
-		if p.curToken.Type == FUNCTION {
+		if p.curToken.Type == PUBLIC || p.curToken.Type == PRIVATE || p.curToken.Type == PROTECTED || p.curToken.Type == STATIC {
+			vis := p.curToken.Literal
+			isStatic := false
+			if p.curToken.Type == STATIC {
+				isStatic = true
+				vis = "public"
+			}
+			if p.peekToken.Type == STATIC {
+				isStatic = true
+				p.nextToken() // consume static
+			}
+
+			if p.peekToken.Type == FUNCTION {
+				p.nextToken() // move to FUNCTION
+				mStmt := p.parseMethodStatement()
+				if mStmt != nil {
+					mStmt.Visibility = vis
+					mStmt.IsStatic = isStatic
+					stmt = mStmt
+				}
+			} else if p.peekToken.Type == VAR {
+				p.nextToken() // move to VAR
+				name := &Identifier{Token: p.curToken, Value: p.curToken.Literal}
+				var value Expression
+				if p.peekToken.Type == ASSIGN {
+					p.nextToken()
+					p.nextToken()
+					value = p.parseExpression(LOWEST)
+				}
+				stmt = &LetStatement{
+					Token:      Token{Type: IDENT, Literal: "mixed", Line: p.curToken.Line},
+					Name:       name,
+					Value:      value,
+					Visibility: vis,
+					IsStatic:   isStatic,
+				}
+				if p.peekToken.Type == SEMICOLON || p.peekToken.Type == NEWLINE {
+					p.nextToken()
+				}
+			} else if p.peekToken.Type == IDENT {
+				p.nextToken() // move to type (e.g. string)
+				letStmt := p.parseLetStatement()
+				if ls, ok := letStmt.(*LetStatement); ok {
+					ls.Visibility = vis
+					ls.IsStatic = isStatic
+					stmt = ls
+				} else if mls, ok := letStmt.(*MultiLetStatement); ok {
+					mls.Visibility = vis
+					mls.IsStatic = isStatic
+					stmt = mls
+				}
+			}
+		} else if p.curToken.Type == FUNCTION {
 			stmt = p.parseMethodStatement()
 		} else if p.curToken.Type == INIT {
 			stmt = p.parseInitStatement()
 		} else if p.curToken.Type == IDENT && p.peekToken.Type == VAR { // Property: string $x
 			stmt = p.parseLetStatement()
+		} else if p.curToken.Type == VAR { // Property without type: $x = 10
+			name := &Identifier{Token: p.curToken, Value: p.curToken.Literal}
+			var value Expression
+			if p.peekToken.Type == ASSIGN {
+				p.nextToken()
+				p.nextToken()
+				value = p.parseExpression(LOWEST)
+			}
+			stmt = &LetStatement{
+				Token:      Token{Type: IDENT, Literal: "mixed", Line: p.curToken.Line},
+				Name:       name,
+				Value:      value,
+				Visibility: "public",
+			}
+			if p.peekToken.Type == SEMICOLON || p.peekToken.Type == NEWLINE {
+				p.nextToken()
+			}
 		} else {
 			// Skip or error? For now skip to avoid infinite loop if unknown
 			p.nextToken()

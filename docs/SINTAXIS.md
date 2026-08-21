@@ -32,19 +32,34 @@ Los tipos reconocidos por la validación del runtime incluyen `int`, `float`, `s
 
 ## Funciones, closures y clases
 
+## Clases y Visibilidad
+
+Joss soporta modificadores explícitos de visibilidad (`public`, `private`, `protected`) y métodos estáticos (`static`):
+
 ```joss
-func sum(int $a, int $b) {
-    return $a + $b
+public class UserService {
+    public string $appName = "Joss App"
+    private $secretKey = "sk_prod_12345"
+    protected $cache = []
+
+    public static func instance() {
+        return new UserService()
+    }
+
+    public func getAppName() {
+        return $this->appName
+    }
+
+    private func encryptToken($data) {
+        return md5($data . $this->secretKey)
+    }
 }
 
-$double = func(int $value) {
-    return $value * 2
-}
-
+// Clases convencionales sin modificadores (todo es público por defecto)
 class User {
     string $name
 
-    Init constructor(string $name) {
+    func constructor($name) {
         $this->name = $name
     }
 

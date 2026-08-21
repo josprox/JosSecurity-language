@@ -7,15 +7,23 @@ import (
 
 // LetStatement: string $x = "foo"
 type LetStatement struct {
-	Token Token // The token.IDENT (e.g. string, int)
-	Name  *Identifier
-	Value Expression
+	Token      Token // The token.IDENT (e.g. string, int, public, private)
+	Name       *Identifier
+	Value      Expression
+	Visibility string // "public", "private", "protected"
+	IsStatic   bool
 }
 
 func (ls *LetStatement) statementNode()       {}
 func (ls *LetStatement) TokenLiteral() string { return ls.Token.Literal }
 func (ls *LetStatement) String() string {
 	var out bytes.Buffer
+	if ls.Visibility != "" {
+		out.WriteString(ls.Visibility + " ")
+	}
+	if ls.IsStatic {
+		out.WriteString("static ")
+	}
 	out.WriteString(ls.Token.Literal + " ")
 	out.WriteString(ls.Name.String())
 	out.WriteString(" = ")
@@ -36,6 +44,8 @@ type SingleDecl struct {
 type MultiLetStatement struct {
 	TypeToken    Token        // the type keyword token (e.g. "int")
 	Declarations []SingleDecl // one per variable
+	Visibility   string
+	IsStatic     bool
 }
 
 func (mls *MultiLetStatement) statementNode()       {}
@@ -71,6 +81,7 @@ type ClassStatement struct {
 	Name       *Identifier
 	SuperClass *Identifier
 	Body       *BlockStatement
+	Visibility string // "public", etc.
 }
 
 func (cs *ClassStatement) statementNode()       {}
@@ -183,12 +194,20 @@ type MethodStatement struct {
 	Name       *Identifier
 	Parameters []*Parameter
 	Body       *BlockStatement
+	Visibility string // "public", "private", "protected"
+	IsStatic   bool
 }
 
 func (ms *MethodStatement) statementNode()       {}
 func (ms *MethodStatement) TokenLiteral() string { return ms.Token.Literal }
 func (ms *MethodStatement) String() string {
 	var out bytes.Buffer
+	if ms.Visibility != "" {
+		out.WriteString(ms.Visibility + " ")
+	}
+	if ms.IsStatic {
+		out.WriteString("static ")
+	}
 	out.WriteString(ms.TokenLiteral() + " ")
 	out.WriteString(ms.Name.String())
 	out.WriteString("(")

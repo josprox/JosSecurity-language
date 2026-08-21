@@ -89,6 +89,12 @@ const (
 	DEFAULT = "DEFAULT"
 	USE     = "USE"
 	ASYNC   = "ASYNC"
+
+	// Modifiers & Visibility
+	PUBLIC    = "PUBLIC"
+	PRIVATE   = "PRIVATE"
+	PROTECTED = "PROTECTED"
+	STATIC    = "STATIC"
 )
 
 type Token struct {
@@ -130,6 +136,10 @@ var keywords = map[string]TokenType{
 	"match":     MATCH,
 	"default":   DEFAULT,
 	"async":     ASYNC,
+	"public":    PUBLIC,
+	"private":   PRIVATE,
+	"protected": PROTECTED,
+	"static":    STATIC,
 }
 
 func LookupIdent(ident string) TokenType {
