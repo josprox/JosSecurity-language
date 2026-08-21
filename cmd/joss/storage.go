@@ -15,12 +15,16 @@ import (
 )
 
 func handleUserStorage(provider string) {
-	fmt.Printf("Configurando UserStorage para proveedor: %s\n", provider)
-
 	switch strings.ToLower(provider) {
+	case "migrate-oci", "sync-oci":
+		migrateToOCI()
+	case "migrate-local", "sync-local":
+		migrateFromOCI()
 	case "local":
+		fmt.Printf("Configurando UserStorage para proveedor: %s\n", provider)
 		configureLocal()
 	case "oci":
+		fmt.Printf("Configurando UserStorage para proveedor: %s\n", provider)
 		configureOCI()
 	case "aws", "azure":
 		fmt.Printf("El proveedor '%s' aún no está soportado.\n", provider)
@@ -137,43 +141,48 @@ func migrateToOCI() {
 	envMap := loadEnvMap()
 	namespace := envMap["OCI_NAMESPACE"]
 	bucketName := envMap["OCI_BUCKET_NAME"]
-	baseDir := "assets/users"
+	baseDirs := []string{"assets/users", "storage/user_storage"}
 
-	err = filepath.WalkDir(baseDir, func(path string, d fs.DirEntry, err error) error {
-		if err != nil {
-			return err
+	for _, baseDir := range baseDirs {
+		if _, statErr := os.Stat(baseDir); statErr != nil {
+			continue
 		}
-		if !d.IsDir() {
-			relPath, _ := filepath.Rel(baseDir, path)
-			// Convert backslashes to slashes for object storage keys
-			objectName := filepath.ToSlash(relPath)
-
-			fmt.Printf("Subiendo: %s -> %s\n", path, objectName)
-
-			file, err := os.Open(path)
+		err = filepath.WalkDir(baseDir, func(path string, d fs.DirEntry, err error) error {
 			if err != nil {
-				fmt.Printf("Error abriendo archivo %s: %v\n", path, err)
-				return nil
+				return err
 			}
-			defer file.Close()
+			if !d.IsDir() {
+				relPath, _ := filepath.Rel(baseDir, path)
+				// Convert backslashes to slashes for object storage keys
+				objectName := filepath.ToSlash(relPath)
 
-			stat, _ := file.Stat()
+				fmt.Printf("Subiendo: %s -> %s\n", path, objectName)
 
-			req := objectstorage.PutObjectRequest{
-				NamespaceName: &namespace,
-				BucketName:    &bucketName,
-				ObjectName:    &objectName,
-				PutObjectBody: file,
-				ContentLength: common.Int64(stat.Size()),
+				file, err := os.Open(path)
+				if err != nil {
+					fmt.Printf("Error abriendo archivo %s: %v\n", path, err)
+					return nil
+				}
+				defer file.Close()
+
+				stat, _ := file.Stat()
+
+				req := objectstorage.PutObjectRequest{
+					NamespaceName: &namespace,
+					BucketName:    &bucketName,
+					ObjectName:    &objectName,
+					PutObjectBody: file,
+					ContentLength: common.Int64(stat.Size()),
+				}
+
+				_, err = client.PutObject(ctx, req)
+				if err != nil {
+					fmt.Printf("Error subiendo a OCI: %v\n", err)
+				}
 			}
-
-			_, err = client.PutObject(ctx, req)
-			if err != nil {
-				fmt.Printf("Error subiendo a OCI: %v\n", err)
-			}
-		}
-		return nil
-	})
+			return nil
+		})
+	}
 
 	if err != nil {
 		fmt.Printf("Error recorriendo directorios: %v\n", err)

@@ -252,7 +252,7 @@ func main() {
 		}
 	case "userstorage":
 		if len(os.Args) < 3 {
-			fmt.Println("Uso: joss userstorage [local | OCI]")
+			fmt.Println("Uso: joss userstorage [local | oci | sync-oci | sync-local]")
 			return
 		}
 		handleUserStorage(os.Args[2])
