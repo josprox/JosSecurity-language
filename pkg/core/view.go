@@ -396,7 +396,7 @@ func compileViewToJOSS(htmlStr string) (string, error) {
 		return s
 	}
 
-	reForeachStart := regexp.MustCompile(`^@foreach\s*\(\s*\$([a-zA-Z0-9_]+)\s+as\s+\$([a-zA-Z0-9_]+)\s*\)`)
+	reForeachStart := regexp.MustCompile(`^@foreach\s*\(\s*(.*?)\s+as\s+\$([a-zA-Z0-9_]+)\s*\)`)
 	reExprRaw := regexp.MustCompile(`^\{\{!(.*?)\}\}`)
 	reExprEscaped := regexp.MustCompile(`^\{\{(.*?)\}\}`)
 
@@ -430,7 +430,7 @@ func compileViewToJOSS(htmlStr string) (string, error) {
 				if m := reForeachStart.FindStringSubmatch(str[i:]); m != nil {
 					flushText(lastIdx, i)
 					
-					listVar := m[1]
+					listExpr := translateExpr(m[1])
 					itemVar := m[2]
 					fullMatchLen := len(m[0])
 					
@@ -454,9 +454,11 @@ func compileViewToJOSS(htmlStr string) (string, error) {
 					}
 					
 					if endIdx != -1 {
-						body := str[i+fullMatchLen : endIdx]
-						code.WriteString(fmt.Sprintf("foreach ($%s as $%s) {\n", listVar, itemVar))
-						code.WriteString(compileRange(body))
+						innerHtml := str[i+fullMatchLen : endIdx]
+						compiledInner := compileRange(innerHtml)
+						
+						code.WriteString(fmt.Sprintf("foreach (%s as $%s) {\n", listExpr, itemVar))
+						code.WriteString(compiledInner)
 						code.WriteString("}\n")
 						
 						i = endIdx + 11
