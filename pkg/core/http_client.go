@@ -211,11 +211,25 @@ func (r *Runtime) quickHttpRequestWithBody(method string, args []interface{}) st
 		return ""
 	}
 	urlStr := fmt.Sprintf("%v", args[0])
+	headers := parseHeaderMap(args, 2)
 	bodyStr := ""
 	if len(args) > 1 && args[1] != nil {
-		bodyStr = fmt.Sprintf("%v", args[1])
+		if m, ok := args[1].(map[string]interface{}); ok {
+			contentType, _ := headers["Content-Type"]
+			if strings.Contains(contentType, "application/x-www-form-urlencoded") {
+				form := url.Values{}
+				for k, v := range m {
+					form.Set(k, fmt.Sprintf("%v", v))
+				}
+				bodyStr = form.Encode()
+			} else {
+				bBytes, _ := json.Marshal(m)
+				bodyStr = string(bBytes)
+			}
+		} else {
+			bodyStr = fmt.Sprintf("%v", args[1])
+		}
 	}
-	headers := parseHeaderMap(args, 2)
 	res := r.performFullHttpRequest(method, urlStr, bodyStr, headers, nil, 15, true)
 	if body, ok := res["body"].(string); ok {
 		return body

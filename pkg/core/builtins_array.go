@@ -3,6 +3,7 @@ package core
 import (
 	"fmt"
 	"reflect"
+	"strconv"
 	"strings"
 )
 
@@ -49,6 +50,113 @@ func (r *Runtime) callBuiltinArray(name string, args []interface{}) (interface{}
 			return ok, true
 		}
 		return false, true
+
+	case "is_numeric":
+		if len(args) == 1 {
+			if args[0] == nil {
+				return false, true
+			}
+			switch v := args[0].(type) {
+			case int, int32, int64, float64, float32:
+				return true, true
+			case string:
+				vStr := strings.TrimSpace(v)
+				if _, err := strconv.ParseFloat(vStr, 64); err == nil {
+					return true, true
+				}
+				return false, true
+			}
+		}
+		return false, true
+
+	case "is_int", "is_integer":
+		if len(args) == 1 {
+			switch args[0].(type) {
+			case int, int32, int64:
+				return true, true
+			}
+		}
+		return false, true
+
+	case "is_float", "is_double":
+		if len(args) == 1 {
+			switch args[0].(type) {
+			case float64, float32:
+				return true, true
+			}
+		}
+		return false, true
+
+	case "intval":
+		if len(args) == 0 || args[0] == nil {
+			return int64(0), true
+		}
+		switch v := args[0].(type) {
+		case int:
+			return int64(v), true
+		case int32:
+			return int64(v), true
+		case int64:
+			return v, true
+		case float64:
+			return int64(v), true
+		case float32:
+			return int64(v), true
+		case bool:
+			if v {
+				return int64(1), true
+			}
+			return int64(0), true
+		case string:
+			vStr := strings.TrimSpace(v)
+			if n, err := strconv.ParseInt(vStr, 10, 64); err == nil {
+				return n, true
+			}
+			if f, err := strconv.ParseFloat(vStr, 64); err == nil {
+				return int64(f), true
+			}
+		}
+		return int64(0), true
+
+	case "floatval", "doubleval":
+		if len(args) == 0 || args[0] == nil {
+			return float64(0.0), true
+		}
+		switch v := args[0].(type) {
+		case float64:
+			return v, true
+		case float32:
+			return float64(v), true
+		case int:
+			return float64(v), true
+		case int32:
+			return float64(v), true
+		case int64:
+			return float64(v), true
+		case bool:
+			if v {
+				return float64(1.0), true
+			}
+			return float64(0.0), true
+		case string:
+			vStr := strings.TrimSpace(v)
+			if f, err := strconv.ParseFloat(vStr, 64); err == nil {
+				return f, true
+			}
+		}
+		return float64(0.0), true
+
+	case "strval":
+		if len(args) == 0 || args[0] == nil {
+			return "", true
+		}
+		return fmt.Sprintf("%v", args[0]), true
+
+	case "boolval":
+		if len(args) == 0 || args[0] == nil {
+			return false, true
+		}
+		return isTruthy(args[0]), true
 
 	case "is_array":
 		if len(args) == 1 {
