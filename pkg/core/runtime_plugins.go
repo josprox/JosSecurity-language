@@ -158,6 +158,11 @@ func (r *Runtime) LoadPluginBytes(data []byte) error {
 		return fmt.Errorf("core: error verificando plugin .jp: %w", err)
 	}
 
+	if r.PluginRegistry.Get(archive.Metadata.Name) != nil {
+		// Plugin already loaded
+		return nil
+	}
+
 	engine := NewPluginASTEngine(r, archive.Metadata.Name)
 	plugin, err := pluginruntime.LoadPluginWithEngine(data, engine)
 	if err != nil {
@@ -205,6 +210,12 @@ func (r *Runtime) registerPluginSymbols(plugin *pluginruntime.Plugin) {
 			}
 			r.Classes[cls.Name] = syntheticClass
 		}
+		// Exponer namespace de la clase del plugin (ej: AI::client o $AI.client)
+		r.Variables[cls.Name] = &PluginNamespace{
+			Name:    plugin.Name,
+			Plugin:  plugin,
+			Runtime: r,
+		}
 	}
 }
 
@@ -224,15 +235,13 @@ func (r *Runtime) AutoloadPlugins(projectRoot string) {
 			return nil
 		}
 		if info.IsDir() {
-			// Skip latest or backup subdirectories to prevent duplicate autoloads
-			if info.Name() == "latest" || info.Name() == ".backup" {
+			if info.Name() == ".backup" {
 				return filepath.SkipDir
 			}
 			return nil
 		}
 		if strings.EqualFold(filepath.Ext(path), ".jp") {
 			if err := r.LoadPluginPackage(path); err != nil {
-				// Suppress warning if plugin is already registered
 				if !strings.Contains(err.Error(), "ya registrado") {
 					fmt.Printf("[Plugin Autoload] Error cargando %s: %v\n", path, err)
 				}

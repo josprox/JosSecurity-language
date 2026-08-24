@@ -133,6 +133,29 @@ func (r *Runtime) evaluateMember(me *parser.MemberExpression) interface{} {
 				Function:   me.Property.Value,
 			}
 		}
+
+		// Check if className is an exported class or function across any loaded plugin
+		if r.PluginRegistry != nil {
+			for _, p := range r.PluginRegistry.List() {
+				for _, cls := range p.Symbols.Classes {
+					if cls.Name == className {
+						return &PluginCallable{
+							PluginName: p.Name,
+							ClassName:  cls.Name,
+							Function:   me.Property.Value,
+						}
+					}
+				}
+				for _, fn := range p.Symbols.Functions {
+					if fn.Name == me.Property.Value && p.Name == className {
+						return &PluginCallable{
+							PluginName: p.Name,
+							Function:   fn.Name,
+						}
+					}
+				}
+			}
+		}
 	}
 
 	left := r.evaluateExpression(me.Left)
