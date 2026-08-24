@@ -80,22 +80,20 @@ Las APIs estáticas usan `Clase::metodo()`. Las instancias usan `$object->method
 
 ## Control de flujo
 
-No existe una sentencia `if/else`. Usa ternarios; los bloques también son expresiones. `return` se propaga fuera de bloques y ciclos anidados.
+En Joss **no existen las sentencias `if`, `else`, `elif`, `switch` ni `for`**. El compilador cuenta con un **Syntax Guard** educacional que detecta estas palabras clave foráneas e indica de inmediato la alternativa nativa de Joss:
 
+1. **Operador Ternario**: `$cond ? $a : $b` o bloques expresivos:
 ```joss
 ($age >= 18) ? {
-    print("adulto")
+    print("Adulto")
 } : {
-    print("menor")
+    print("Menor")
 }
 
 $label = ($active) ? "activo" : "inactivo"
-$port = $config["port"] ?? 8000
-$fallback = $name ?: "Anónimo"
 ```
 
-`match` compara por tipo y valor, admite varias claves y `default`:
-
+2. **Estructura Match**: Sustituye a `switch` / `if-else` encadenados:
 ```joss
 $message = match ($status) {
     200, 201 => "correcto",
@@ -104,27 +102,36 @@ $message = match ($status) {
 }
 ```
 
-## Ciclos y errores
-
+3. **Ciclos Nativos**: Sustituyen a `for` mediante `foreach` y `while`:
 ```joss
 foreach ($items as $item) {
     print($item)
 }
+
 while ($pending > 0) {
     $pending = $pending - 1
 }
+
 do {
     $attempts++
 } while ($attempts < 3)
-
-try {
-    throw "fallo"
-} catch ($error) {
-    print($error)
-}
 ```
 
-`break` y `continue` funcionan en ciclos. El postfix implementado es `++`; `--` no existe todavía, por lo que un decremento se escribe como asignación. `isset()` y `empty()` son expresiones del lenguaje.
+## Manejo de Errores y Panic
+
+```joss
+// Excepciones estructuradas
+try {
+    throw "Fallo en la operación"
+} catch ($error) {
+    print("Error capturado: " . $error)
+}
+
+// Aborto irrecuperable
+panic("Error crítico de consistencia")
+```
+
+`panic()` interrumpe la ejecución del programa con un mensaje de error claro. Para manejo defensivo de errores esperados se utiliza el bloque `try / catch`.
 
 ## Helpers Globales y Entorno
 

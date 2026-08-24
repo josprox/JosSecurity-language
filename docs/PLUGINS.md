@@ -1,6 +1,6 @@
 # Plugins y JP (Joss Plugin Bytecode)
 
-El sistema de plugins de Joss genera, compila, carga y ejecuta paquetes binarios `.jp` (JP v2) de alto rendimiento, portables y firmados criptográficamente.
+El sistema de plugins de Joss genera, compila, carga y ejecuta paquetes binarios `.jp` (JP v2) de alto rendimiento, portables, aislados y firmados criptográficamente.
 
 ```bash
 joss pub add mi_plugin ^1.0.0
@@ -42,9 +42,10 @@ Joss cuenta con un motor compilador (`joss plugin compile`) que permite desarrol
 
 ### Características del Sistema:
 1. **Tree Shaking Avanzado**: Analiza el Grafo de Llamadas (Call Graph) a partir de las funciones indicadas en `--exports` y elimina automáticamente todo el código muerto, clases e instrucciones no utilizadas.
-2. **Cero Dependencias en el Usuario Final**: El paquete `.jp` resultante (< 10 KB a 1 MB) contiene bytecode determinista y optimizado. **El usuario final no requiere tener instalado Java (JVM/JDK), Python, PHP, Node ni compilar nada**.
+2. **Cero Dependencias en el Usuario Final**: El paquete `.jp` resultante (< 1.5 KB a 1 MB) contiene bytecode determinista y optimizado. **El usuario final no requiere tener instalado Java (JVM/JDK), Python, PHP, Node ni compilar nada**.
 3. **Firma Criptográfica Ed25519**: Cada paquete `.jp` es firmado criptográficamente de manera transparente durante la compilación (`~/.joss/keys/<plugin>.ed25519`) para garantizar su integridad y autoría.
-4. **Índice de Símbolos Estándar (`SymbolIndex`)**: Genera metadatos tipados en `META-INF/joss-symbols.json` para proveer autocompletado nativo en editores e IDEs.
+4. **Verificación de Paquetes**: Comando `joss plugin verify mi_plugin.jp` para validar la firma y estructura interna del paquete.
+5. **Índice de Símbolos Estándar (`SymbolIndex`)**: Genera metadatos tipados en `META-INF/joss-symbols.json` para proveer autocompletado nativo en editores e IDEs.
 
 ### Ejemplos de Compilación por Lenguaje:
 
@@ -60,23 +61,25 @@ joss plugin compile module.wasm --lang=rust --name=crypto-plugin --exports=encry
 
 # 4. Inspeccionar la firma, funciones exportadas, clases y tamaño de un paquete .jp
 joss plugin inspect music-plugin.jp
+
+# 5. Verificar firma e integridad digital de un paquete .jp
+joss plugin verify music-plugin.jp
 ```
 
 ---
 
-## 🔒 Estructura y Validación del Formato `.jp` (JP v2)
+## 🔒 Sandbox WASI y Permisos en el Runtime (`PermissionGuard`)
 
-Un contenedor `.jp` es un archivo ZIP determinista con compresión DEFLATE que incluye:
-- `META-INF/joss-plugin.json`: Metadatos del plugin, exportaciones, permisos, versión y firma digital Ed25519.
-- `META-INF/joss-symbols.json`: Índice tipado de símbolos (`SymbolIndex` Schema v1) con clases, propiedades, métodos y funciones.
-- `bytecode/main.jbc`: Bytecode compilado binario optimizado (JPBC o AST Codificado).
-- `joss.yaml`: Manifiesto declarativo del paquete.
+Los plugins ejecutan en la máquina virtual `JPBCVM` bajo un modelo estricto de **Aislamiento WASI**:
 
-> **Aclaración de Terminología**:
-> - `.jp`: Contenedor final distribuible.
-> - `main.jbc`: Archivo interno de bytecode dentro de `.jp`.
-> - `JPBC`: Formato binario / magic header (`0x4A 0x50 0x42 0x43`) del bytecode multilenguaje.
-> - *No existe ningún archivo con extensión `.jpbc`*.
+- **Permisos Declarativos**: Los permisos requeridos por el plugin se declaran en `joss.yaml` y en el manifiesto interno `META-INF/joss-plugin.json`.
+- **Enforcement en Tiempo de Ejecución**: La máquina virtual valida explícitamente mediante `PermissionGuard` antes de realizar llamadas al sistema host:
+  - `http_get`: Realizar peticiones HTTP salientes.
+  - `file_read` / `file_write`: Acceso a lectura/escritura de archivos locales.
+  - `env_read`: Acceso a variables de entorno del servidor host.
+  - `db_query`: Ejecutar consultas SQL en la base de datos de la aplicación.
+
+Si un plugin intenta realizar I/O o acceso a red sin contar con el permiso explícito concedido, la máquina virtual bloquea la ejecución de inmediato lanzando una excepción de seguridad.
 
 ---
 
@@ -127,8 +130,8 @@ $total = $tax->calculate(100)
           JOSSBC2Z                              JPBC
              │                                    │
              ▼                                    ▼
-       JossASTExecutor                          JPBCVM
-    (pkg/core AST Engine)               (17 OpCodes Dispatcher)
+       JossASTExecutor                          JPBCVM (WASI PermissionGuard)
+    (pkg/core AST Engine)               (17 OpCodes Dispatcher + Sandbox)
              │                                    │
              └─────────────────┬──────────────────┘
                                │
@@ -141,7 +144,7 @@ $total = $tax->calculate(100)
 ## 📚 Plugins Oficiales
 
 - [joss_ai](https://github.com/joss-language/joss_ai)
-- [joss_smtp](https://github.com/joss-language/joss_smtp)
 - [joss_notify](https://github.com/joss-language/joss_notify)
 - [joss_backup](https://github.com/joss-language/joss_backup)
 - [joss_bg_remover](https://github.com/joss-language/joss_bg_remover)
+- [joss_brevo](https://github.com/joss-language/joss_brevo)
