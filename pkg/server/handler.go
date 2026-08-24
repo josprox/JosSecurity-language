@@ -722,6 +722,21 @@ func MainHandler(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 
+			// FILE handling (Response::download)
+			if val, ok := resInst.Fields["_type"]; ok && val == "FILE" {
+				filePath, _ := resInst.Fields["data"].(string)
+				downloadName := "download.png"
+				if dn, ok := resInst.Fields["download_name"].(string); ok && dn != "" {
+					downloadName = dn
+				}
+				if filePath != "" {
+					w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=\"%s\"", downloadName))
+					w.Header().Set("Content-Type", "application/octet-stream")
+					http.ServeFile(w, r, filePath)
+					return
+				}
+			}
+
 			// STREAM handling
 			if val, ok := resInst.Fields["_type"]; ok && val == "STREAM" {
 				// Headers for SSE
