@@ -154,6 +154,100 @@ func (r *Runtime) executeRequestMethod(instance *Instance, method string, args [
 			}
 			return nil
 		}
+
+	case "hasFile", "hasfile":
+		if len(args) > 0 {
+			key, ok := args[0].(string)
+			if !ok {
+				return false
+			}
+			if reqVal, ok := r.Variables["$__request"]; ok {
+				if reqInstance, ok := reqVal.(*Instance); ok {
+					if filesVal, ok := reqInstance.Fields["_files"]; ok {
+						if filesMap, ok := filesVal.(map[string]interface{}); ok {
+							if file, ok := filesMap[key]; ok && file != nil {
+								return true
+							}
+						}
+					}
+				}
+			}
+		}
+		return false
+
+	case "has":
+		if len(args) > 0 {
+			key, ok := args[0].(string)
+			if !ok {
+				return false
+			}
+			if reqVal, ok := r.Variables["$__request"]; ok {
+				if reqInstance, ok := reqVal.(*Instance); ok {
+					if val, ok := reqInstance.Fields[key]; ok && val != nil && val != "" {
+						return true
+					}
+				}
+			}
+		}
+		return false
+
+	case "method":
+		if reqVal, ok := r.Variables["$__request"]; ok {
+			if reqInstance, ok := reqVal.(*Instance); ok {
+				if m, ok := reqInstance.Fields["_method"].(string); ok {
+					return m
+				}
+			}
+		}
+		return "GET"
+
+	case "isMethod", "ismethod":
+		if len(args) > 0 {
+			targetMethod, ok := args[0].(string)
+			if !ok {
+				return false
+			}
+			if reqVal, ok := r.Variables["$__request"]; ok {
+				if reqInstance, ok := reqVal.(*Instance); ok {
+					if m, ok := reqInstance.Fields["_method"].(string); ok {
+						return fmt.Sprintf("%v", m) == targetMethod
+					}
+				}
+			}
+		}
+		return false
+
+	case "path", "url":
+		if reqVal, ok := r.Variables["$__request"]; ok {
+			if reqInstance, ok := reqVal.(*Instance); ok {
+				if p, ok := reqInstance.Fields["_path"].(string); ok {
+					return p
+				}
+			}
+		}
+		return "/"
+
+	case "ip":
+		if reqVal, ok := r.Variables["$__request"]; ok {
+			if reqInstance, ok := reqVal.(*Instance); ok {
+				if ip, ok := reqInstance.Fields["_ip"].(string); ok {
+					return ip
+				}
+			}
+		}
+		return "127.0.0.1"
+
+	case "userAgent", "useragent":
+		return r.executeRequestMethod(instance, "header", []interface{}{"User-Agent"})
+
+	case "bearerToken", "bearertoken":
+		authHeader := r.executeRequestMethod(instance, "header", []interface{}{"Authorization"})
+		if authStr, ok := authHeader.(string); ok {
+			if len(authStr) > 7 && (authStr[:7] == "Bearer " || authStr[:7] == "bearer ") {
+				return authStr[7:]
+			}
+		}
+		return ""
 	}
 	return nil
 }
