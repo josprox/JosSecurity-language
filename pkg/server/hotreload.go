@@ -67,6 +67,15 @@ func notifyClients() {
 	notifyClientsTyped("soft_reload", "")
 }
 
+func shouldSkipDir(name string) bool {
+	switch name {
+	case "node_modules", ".git", "vendor", "build", "dist", ".system_generated", ".cache", ".turbo", ".next", ".idea", ".vscode", "tmp", "temp", "scratch":
+		return true
+	default:
+		return false
+	}
+}
+
 func watchChanges() {
 	// If using VFS (Production), disable hot reload
 	if GlobalFileSystem != nil {
@@ -76,6 +85,9 @@ func watchChanges() {
 	// Store file hashes: path -> hash
 	fileHashes := make(map[string]string)
 	var lastNodeModulesHash string
+	if nmInfo, err := os.Stat("node_modules"); err == nil {
+		lastNodeModulesHash = nmInfo.ModTime().String()
+	}
 
 	// Helper to calculate hash
 	getHash := func(path string) string {
@@ -88,13 +100,20 @@ func watchChanges() {
 		return hex.EncodeToString(hash[:])
 	}
 
-	// Initial scan
-	filepath.Walk(".", func(path string, info os.FileInfo, err error) error {
-		if err == nil && !info.IsDir() {
-			ext := filepath.Ext(path)
-			if ext == ".joss" || ext == ".html" || ext == ".css" || ext == ".js" || ext == ".scss" || ext == ".arb" || filepath.Base(path) == "package.json" || filepath.Base(path) == ".env" || filepath.Base(path) == "env.joss" {
-				fileHashes[path] = getHash(path)
+	// Initial scan (skipping node_modules and other ignored dirs)
+	_ = filepath.Walk(".", func(path string, info os.FileInfo, err error) error {
+		if err != nil || info == nil {
+			return nil
+		}
+		if info.IsDir() {
+			if shouldSkipDir(info.Name()) {
+				return filepath.SkipDir
 			}
+			return nil
+		}
+		ext := filepath.Ext(path)
+		if ext == ".joss" || ext == ".html" || ext == ".css" || ext == ".js" || ext == ".scss" || ext == ".arb" || filepath.Base(path) == "package.json" || filepath.Base(path) == ".env" || filepath.Base(path) == "env.joss" {
+			fileHashes[path] = getHash(path)
 		}
 		return nil
 	})
@@ -104,8 +123,6 @@ func watchChanges() {
 
 		// Check node_modules separately (lightweight)
 		if nmInfo, err := os.Stat("node_modules"); err == nil {
-			// Construct a simple hash from ModTime + IsDir
-			// Use ModTime string
 			currentNMHash := nmInfo.ModTime().String()
 			if lastNodeModulesHash != "" && currentNMHash != lastNodeModulesHash {
 				fmt.Println("[HotReload] 'node_modules' changed. Rescanning assets...")
@@ -124,12 +141,11 @@ func watchChanges() {
 		var changedPaths []string
 		walkedFiles := make(map[string]bool)
 		err := filepath.Walk(".", func(path string, info os.FileInfo, err error) error {
-			if err != nil {
-				fmt.Printf("[HotReload] Advertencia: no se puede acceder a '%s': %v\n", path, err)
-				return nil // log but continue walking
+			if err != nil || info == nil {
+				return nil
 			}
 			if info.IsDir() {
-				if info.Name() == ".git" || info.Name() == "vendor" || info.Name() == "node_modules" {
+				if shouldSkipDir(info.Name()) {
 					return filepath.SkipDir
 				}
 				return nil
