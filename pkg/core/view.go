@@ -12,21 +12,21 @@ import (
 )
 
 // Helper to evaluate an expression string within the current runtime context
-func (r *Runtime) evaluateViewExpression(expr string, data map[string]interface{}) interface{} {
-	// Create a temporary runtime or use current one?
-	// We use the current runtime 'r', but we need to inject 'data' into variables temporarily.
-	// Or better, we just ensure 'data' is in r.Variables.
-	// In executeViewMethod, we should merge 'data' into r.Variables or a scope.
-	// Since we don't have scopes easily accessible here without pushing a new environment,
-	// let's just use r.Variables but be careful not to pollute global scope permanently if possible.
-	// Actually, executeViewMethod is called within a request, so r is already a forked runtime.
-	// We can safely modify r.Variables.
+func (r *Runtime) evaluateViewExpression(expr string, data map[string]interface{}) (result interface{}) {
+	defer func() {
+		if rec := recover(); rec != nil {
+			result = ""
+		}
+	}()
 
-	// Inject data into variables
-	// Inject data into variables
+	// Inject data into variables (support both raw key and $key)
 	for k, v := range data {
-		// Fix: Don't prepend $ here, as Parser/Evaluator expects raw identifier name
 		r.Variables[k] = v
+		if !strings.HasPrefix(k, "$") {
+			r.Variables["$"+k] = v
+		} else {
+			r.Variables[strings.TrimPrefix(k, "$")] = v
+		}
 	}
 
 	l := parser.NewLexer(expr)
@@ -41,14 +41,11 @@ func (r *Runtime) evaluateViewExpression(expr string, data map[string]interface{
 		return ""
 	}
 
-	// Evaluate the first statement (assuming it's an expression)
-	// If it's multiple statements, we execute all and return last result?
-	var result interface{}
+	// Evaluate the statements safely
 	for _, stmt := range program.Statements {
 		if exprStmt, ok := stmt.(*parser.ExpressionStatement); ok {
 			result = r.evaluateExpression(exprStmt.Expression)
 		} else {
-			// Allow other statements? Maybe not for {{ }}
 			result = r.executeStatement(stmt)
 		}
 	}

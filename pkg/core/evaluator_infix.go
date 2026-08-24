@@ -36,6 +36,22 @@ func (r *Runtime) evaluateTernary(te *parser.TernaryExpression) interface{} {
 }
 
 func (r *Runtime) evaluateInfix(ie *parser.InfixExpression) interface{} {
+	if ie.Operator == "??" {
+		var left interface{}
+		func() {
+			defer func() {
+				if rec := recover(); rec != nil {
+					left = nil
+				}
+			}()
+			left = r.evaluateExpression(ie.Left)
+		}()
+		if left != nil {
+			return left
+		}
+		return r.evaluateExpression(ie.Right)
+	}
+
 	left := r.evaluateExpression(ie.Left)
 
 	// Short-Circuit Logic for && and ||
