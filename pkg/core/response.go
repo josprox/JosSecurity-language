@@ -83,6 +83,17 @@ func (r *Runtime) executeResponseMethod(instance *Instance, method string, args 
 			res.Fields["callback"] = callback
 			return res
 		}
+
+	case "download":
+		// Response::download(filePath, fileName)
+		if len(args) > 0 {
+			filePath := fmt.Sprintf("%v", args[0])
+			res := r.createWebResponse("FILE", "", filePath, 200)
+			if len(args) > 1 {
+				res.Fields["download_name"] = fmt.Sprintf("%v", args[1])
+			}
+			return res
+		}
 	}
 	return nil
 }

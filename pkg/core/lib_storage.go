@@ -51,6 +51,15 @@ func (r *Runtime) executeUserStorageMethod(instance *Instance, method string, ar
 	}
 
 	switch method {
+	case "path":
+		if len(args) > 0 {
+			relPath := fmt.Sprintf("%v", args[0])
+			cwd, _ := os.Getwd()
+			return filepath.Join(cwd, "storage", relPath)
+		}
+		cwd, _ := os.Getwd()
+		return filepath.Join(cwd, "storage")
+
 	case "put":
 		if len(args) < 3 {
 			return false

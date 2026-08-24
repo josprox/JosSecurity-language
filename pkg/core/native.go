@@ -103,7 +103,7 @@ func (r *Runtime) RegisterNativeClasses() {
 	r.Variables["Request"] = &Instance{Class: r.Classes["Request"], Fields: make(map[string]interface{})}
 
 	// Response
-	r.registerNative("Response", []string{"json", "error", "redirect", "back", "raw", "stream"}, (*Runtime).executeResponseMethod)
+	r.registerNative("Response", []string{"json", "error", "redirect", "back", "raw", "stream", "download"}, (*Runtime).executeResponseMethod)
 	r.Variables["Response"] = &Instance{Class: r.Classes["Response"], Fields: make(map[string]interface{})}
 
 	// WebResponse (replaces RedirectResponse)
@@ -148,7 +148,7 @@ func (r *Runtime) RegisterNativeClasses() {
 	r.Variables["Str"] = &Instance{Class: r.Classes["Str"], Fields: make(map[string]interface{})}
 
 	// UserStorage
-	r.registerNative("UserStorage", []string{"put", "get", "getToFile", "delete"}, (*Runtime).executeUserStorageMethod)
+	r.registerNative("UserStorage", []string{"put", "get", "getToFile", "delete", "path"}, (*Runtime).executeUserStorageMethod)
 	r.Variables["UserStorage"] = &Instance{Class: r.Classes["UserStorage"], Fields: make(map[string]interface{})}
 
 	// SQLite (Native)
