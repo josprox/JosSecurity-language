@@ -33,8 +33,12 @@ func (r *Runtime) evaluateNew(ne *parser.NewExpression) interface{} {
 
 	classStmt, ok := r.Classes[className]
 	if !ok {
-		fmt.Printf("Error: Clase '%s' no encontrada\n", className)
-		return nil
+		panic(&JossError{
+			Type:    "UndefinedClass",
+			Message: fmt.Sprintf("Clase '%s' no encontrada", className),
+			File:    r.CurrentFile,
+			Line:    ne.Class.Token.Line,
+		})
 	}
 
 	instance := &Instance{
@@ -170,18 +174,37 @@ func (r *Runtime) evaluateMember(me *parser.MemberExpression) interface{} {
 			}
 
 			if left == nil {
-				return nil
+				panic(&JossError{
+					Type:    "NullReference",
+					Message: fmt.Sprintf("Clase o namespace '%s' no encontrado o es nulo", className),
+					File:    r.CurrentFile,
+					Line:    me.Property.Token.Line,
+				})
 			}
 
-			panic(fmt.Sprintf("Error: Clase o plugin '%s' no registrado. Si pertenece a un plugin, verifique joss.yaml y la instalación del paquete", className))
+			panic(&JossError{
+				Type:    "UndefinedClass",
+				Message: fmt.Sprintf("Clase o plugin '%s' no registrado. Si pertenece a un plugin, verifique joss.yaml y la instalación del paquete", className),
+				File:    r.CurrentFile,
+				Line:    me.Property.Token.Line,
+			})
 		}
 
 		if left == nil {
-			return nil
+			panic(&JossError{
+				Type:    "NullReference",
+				Message: fmt.Sprintf("Intento de acceder a la propiedad '%s' sobre un valor nulo o no instanciado", me.Property.Value),
+				File:    r.CurrentFile,
+				Line:    me.Property.Token.Line,
+			})
 		}
 
-		fmt.Printf("Error: %v (tipo %T) no es una instancia. Intentando acceder a: '%s'\n", left, left, me.Property.Value)
-		return nil
+		panic(&JossError{
+			Type:    "NotAnInstance",
+			Message: fmt.Sprintf("'%v' (tipo %T) no es una instancia. Intentando acceder a: '%s'", left, left, me.Property.Value),
+			File:    r.CurrentFile,
+			Line:    me.Property.Token.Line,
+		})
 	}
 
 	propName := me.Property.Value
@@ -281,5 +304,10 @@ func (r *Runtime) evaluateMember(me *parser.MemberExpression) interface{} {
 	if instance.Class != nil {
 		className = instance.Class.Name.Value
 	}
-	panic(fmt.Sprintf("Error: Propiedad o método '%s' no encontrado en clase '%s'", propName, className))
+	panic(&JossError{
+		Type:    "UndefinedProperty",
+		Message: fmt.Sprintf("Propiedad o método '%s' no encontrado en clase '%s'", propName, className),
+		File:    r.CurrentFile,
+		Line:    me.Property.Token.Line,
+	})
 }

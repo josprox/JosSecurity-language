@@ -57,6 +57,7 @@ func printHelp() {
 	fmt.Printf("  server start            - %s\n", tr("startServerWeb"))
 	fmt.Printf("  program start           - %s\n", tr("startProgramDesktop"))
 	fmt.Printf("  run [archivo]           - %s\n", tr("runJossScript"))
+	fmt.Printf("  analyze [archivo]       - Realiza el análisis estático de código del proyecto sin ejecutarlo (por defecto 'main.joss')\n")
 	fmt.Printf("  build [web|program|native]- %s\n", tr("compileProjectDist"))
 	fmt.Printf("  build native [os] [arch] [--gui] - Compila a ejecutable nativo autoejecutable. Por defecto modo servidor/consola. Usa --gui para activar ventana de escritorio.\n")
 	fmt.Printf("  make:controller [Name]  - %s\n", tr("CreateController"))

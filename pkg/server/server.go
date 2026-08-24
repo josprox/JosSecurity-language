@@ -150,6 +150,7 @@ func Start(fileSystem http.FileSystem) {
 		err = srv.ListenAndServe()
 	}
 	if err != nil && err != http.ErrServerClosed {
-		fmt.Printf("Error iniciando servidor: %v\n", err)
+		fmt.Printf("FATAL: Error iniciando servidor: %v\n", err)
+		os.Exit(1)
 	}
 }

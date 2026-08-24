@@ -221,8 +221,11 @@ func (r *Runtime) executeImport(stmt *parser.ImportStatement) interface{} {
 	}
 	content, err = os.ReadFile(resolvedFilename)
 	if err != nil {
-		fmt.Printf("Error: No se pudo importar '%s': %v\n", resolvedFilename, err)
-		return nil
+		panic(&JossError{
+			Type:    "ImportError",
+			Message: fmt.Sprintf("No se pudo importar '%s': %v", resolvedFilename, err),
+			File:    r.CurrentFile,
+		})
 	}
 	r.importedFiles[resolvedFilename] = true
 
@@ -231,11 +234,15 @@ func (r *Runtime) executeImport(stmt *parser.ImportStatement) interface{} {
 	program := p.ParseProgram()
 
 	if len(p.Errors()) > 0 {
-		fmt.Printf("Error de parseo en '%s':\n", filename)
+		errMsg := fmt.Sprintf("Errores de parseo en '%s':\n", filename)
 		for _, msg := range p.Errors() {
-			fmt.Println("\t" + msg)
+			errMsg += "\t" + msg + "\n"
 		}
-		return nil
+		panic(&JossError{
+			Type:    "ParseError",
+			Message: errMsg,
+			File:    filename,
+		})
 	}
 
 	previousBase := r.importBaseDir
@@ -366,12 +373,21 @@ func (r *Runtime) executeTryCatch(tcs *parser.TryCatchStatement) (result interfa
 				panic(err) // Let it bubble up
 			}
 
-			// Catch the error
-			// If err is a string (from throw "msg"), use it.
-			// If it's a runtime panic, convert to string.
-			var errVal interface{} = err
-			if e, ok := err.(error); ok {
+			// Build the value exposed to the catch variable.
+			// If it is a JossError, expose a map so Joss code can inspect fields.
+			var errVal interface{}
+			if je, ok := err.(*JossError); ok {
+				errVal = map[string]interface{}{
+					"message": je.Message,
+					"type":    je.Type,
+					"file":    je.File,
+					"line":    int64(je.Line),
+					"error":   je.Error(),
+				}
+			} else if e, ok := err.(error); ok {
 				errVal = e.Error()
+			} else {
+				errVal = fmt.Sprintf("%v", err)
 			}
 
 			// Bind error variable

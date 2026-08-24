@@ -1,6 +1,8 @@
 package core
 
 import (
+	"fmt"
+
 	"github.com/jossecurity/joss/pkg/parser"
 )
 
@@ -20,7 +22,12 @@ func (r *Runtime) evaluateExpression(exp parser.Expression) interface{} {
 		if val, ok := r.Variables[e.Value]; ok {
 			return val
 		}
-		return nil
+		panic(&JossError{
+			Type:    "UndefinedVariable",
+			Message: fmt.Sprintf("Variable '%s' no definida", e.Value),
+			File:    r.CurrentFile,
+			Line:    e.Token.Line,
+		})
 	case *parser.TernaryExpression:
 		return r.evaluateTernary(e)
 	case *parser.InfixExpression:

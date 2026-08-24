@@ -20,6 +20,7 @@ type Manager struct {
 	locales       map[string]map[string]string
 	mu            sync.RWMutex
 	DefaultLocale string
+	loaded        bool
 }
 
 var GlobalManager = NewManager()
@@ -38,6 +39,10 @@ func (m *Manager) Load(externalFS http.FileSystem) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
+	if m.loaded {
+		return nil
+	}
+
 	// 1. Load Embedded Locales (Core translations)
 	embedFiles, err := fs.ReadDir(embeddedLocales, "locales")
 	if err == nil {
@@ -46,9 +51,10 @@ func (m *Manager) Load(externalFS http.FileSystem) error {
 				m.loadFromFile(embeddedLocales, "locales/"+file.Name())
 			}
 		}
+	} else {
+		fmt.Printf("[I18n] Warning: failed to read embedded locales: %v\n", err)
 	}
 
-	// 2. Load External/User Locales (if provided OR disk)
 	// 2. Load External/User Locales (if provided OR disk)
 	if externalFS != nil {
 		// VFS Mode
@@ -63,6 +69,8 @@ func (m *Manager) Load(externalFS http.FileSystem) error {
 						if err == nil {
 							m.loadFromReader(f, file.Name())
 							f.Close()
+						} else {
+							fmt.Printf("[I18n] Warning: failed to open locale file %s: %v\n", file.Name(), err)
 						}
 					}
 				}
@@ -78,18 +86,22 @@ func (m *Manager) Load(externalFS http.FileSystem) error {
 					if err == nil {
 						m.loadFromReaderFile(f, e.Name())
 						f.Close()
+					} else {
+						fmt.Printf("[I18n] Warning: failed to open locale file %s: %v\n", e.Name(), err)
 					}
 				}
 			}
 		}
 	}
 
+	m.loaded = true
 	return nil
 }
 
 func (m *Manager) loadFromFile(fsys fs.FS, path string) {
 	data, err := fs.ReadFile(fsys, path)
 	if err != nil {
+		fmt.Printf("[I18n] Warning: failed to read embedded file %s: %v\n", path, err)
 		return
 	}
 
@@ -219,7 +231,9 @@ func Tr(key string, args ...map[string]interface{}) string {
 		arg = args[0]
 	}
 	// Ensure loaded (Safe to call repeatedly, read lock inside)
-	_ = GlobalManager.Load(nil)
+	if !GlobalManager.loaded {
+		_ = GlobalManager.Load(nil)
+	}
 	return GlobalManager.Get(CurrentLocale, key, arg)
 }
 

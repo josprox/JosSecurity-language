@@ -56,6 +56,7 @@ type Runtime struct {
 	SitemapProviders  []*CapturedFunction
 	SitemapExclusions []string
 	CurrentSource     string // "routes", "api", "app", etc.
+	CurrentFile       string // Currently executing file path
 
 	captureEnvironment *ClosureEnvironment
 }

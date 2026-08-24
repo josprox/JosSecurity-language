@@ -51,52 +51,7 @@ jobs:
           cache: npm
           cache-dependency-path: vscode-joss/package-lock.json
 
-      - name: Set up Java
-        uses: actions/setup-java@v5
-        with:
-          distribution: temurin
-          java-version: '21'
 
-      - name: Set up PHP
-        uses: shivammathur/setup-php@v2
-        with:
-          php-version: '8.3'
-          tools: none
-          coverage: none
-
-      - name: Set up Flutter and Dart
-        uses: subosito/flutter-action@v2
-        with:
-          channel: stable
-          cache: true
-
-      - name: Verify Flutter/Dart SDK and prefetch deps
-        shell: pwsh
-        run: |
-          flutter --version
-          dart --version
-          flutter config --no-analytics
-          flutter doctor -v
-          dart analyze sdk/dart/joss_plugin.dart
-
-      - name: Set up Rust
-        shell: pwsh
-        run: |
-          rustup toolchain install stable --profile minimal
-          rustup default stable
-          cargo --version
-
-      - name: Set up Kotlin compiler
-        shell: pwsh
-        run: |
-          $version = '2.4.10'
-          $archive = Join-Path $env:RUNNER_TEMP 'kotlin.zip'
-          $destination = Join-Path $env:RUNNER_TEMP 'kotlin'
-          Invoke-WebRequest "https://github.com/JetBrains/kotlin/releases/download/v$version/kotlin-compiler-$version.zip" -OutFile $archive
-          Expand-Archive -LiteralPath $archive -DestinationPath $destination
-          $bin = Join-Path $destination 'kotlinc/bin'
-          $bin | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
-          & (Join-Path $bin 'kotlinc.bat') -version
 
       - name: Build and package distribution
         shell: pwsh

@@ -11,6 +11,7 @@ require (
 	github.com/gorilla/websocket v1.5.3
 	github.com/jackc/pgx/v5 v5.10.0
 	github.com/jchv/go-webview2 v0.0.0-20260205173254-56598839c808
+	github.com/microsoft/go-mssqldb v1.10.0
 	github.com/oracle/oci-go-sdk/v65 v65.123.1
 	github.com/redis/go-redis/v9 v9.22.0
 	golang.org/x/crypto v0.55.0
@@ -31,7 +32,6 @@ require (
 	github.com/jackc/puddle/v2 v2.2.2 // indirect
 	github.com/jchv/go-winloader v0.0.0-20250406163304-c1995be93bd1 // indirect
 	github.com/mattn/go-isatty v0.0.24 // indirect
-	github.com/microsoft/go-mssqldb v1.10.0 // indirect
 	github.com/ncruces/go-strftime v1.0.0 // indirect
 	github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec // indirect
 	github.com/shopspring/decimal v1.4.0 // indirect

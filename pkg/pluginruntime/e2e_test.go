@@ -315,3 +315,97 @@ func TestMultilanguageAllPipelinesE2E(t *testing.T) {
 		t.Errorf("fallo invocacion Wasm: %v", err)
 	}
 }
+
+// TestMultilanguagePluginSizeAndExecution verifies that plugins generated from external languages
+// produce lightweight .jp packages (in KB, not MB) and execute standalone in Joss without external runtimes.
+func TestMultilanguagePluginSizeAndExecution(t *testing.T) {
+	tempDir := t.TempDir()
+
+	languages := []struct {
+		lang      string
+		filename  string
+		content   []byte
+		funcName  string
+		pluginName string
+	}{
+		{
+			lang:       "python",
+			filename:   "math_utils.py",
+			content:    []byte("def double_val(x):\n    return x * 2\n"),
+			funcName:   "double_val",
+			pluginName: "py_math",
+		},
+		{
+			lang:       "java",
+			filename:   "CryptoHelper.class",
+			content:    []byte{0xCA, 0xFE, 0xBA, 0xBE, 0x00, 0x00, 0x00, 0x34},
+			funcName:   "encrypt_data",
+			pluginName: "java_crypto",
+		},
+		{
+			lang:       "php",
+			filename:   "string_helper.php",
+			content:    []byte("<?php\nfunction sanitize_str($s) { return $s; }\n"),
+			funcName:   "sanitize_str",
+			pluginName: "php_str",
+		},
+		{
+			lang:       "wasm",
+			filename:   "fast_hash.wasm",
+			content:    []byte{0x00, 0x61, 0x73, 0x6D, 0x01, 0x00, 0x00, 0x00},
+			funcName:   "compute_fast_hash",
+			pluginName: "wasm_hash",
+		},
+	}
+
+	reg := pluginruntime.NewPluginRegistry(nil)
+
+	for _, tt := range languages {
+		srcPath := filepath.Join(tempDir, tt.filename)
+		if err := os.WriteFile(srcPath, tt.content, 0644); err != nil {
+			t.Fatalf("error escribiendo %s: %v", tt.filename, err)
+		}
+
+		opts := plugincompiler.Options{
+			SourceDir: tempDir,
+			Language:  tt.lang,
+			EntryFile: srcPath,
+			Name:      tt.pluginName,
+			Version:   "1.0.0",
+			Exports:   []string{tt.funcName},
+		}
+
+		jpPath, result, err := plugincompiler.CompileProject(opts)
+		if err != nil {
+			t.Fatalf("error compilando plugin %s (%s): %v", tt.pluginName, tt.lang, err)
+		}
+
+		// Verify size is in KB (must be under 50 KB, not MB)
+		fi, err := os.Stat(jpPath)
+		if err != nil {
+			t.Fatalf("error obteniendo stat de %s: %v", jpPath, err)
+		}
+		sizeKB := float64(fi.Size()) / 1024.0
+		if sizeKB > 50.0 {
+			t.Errorf("Plugin %s (%s) excede el tamaño máximo deseado (%.2f KB > 50.0 KB)", tt.pluginName, tt.lang, sizeKB)
+		}
+		t.Logf("✓ Plugin %s (%s) compilado exitosamente: %.2f KB (Tree shaking: %d funcs)", tt.pluginName, tt.lang, sizeKB, result.OptimizedFuncs)
+
+		// Load and execute standalone in Joss JPBC VM without external language runtime
+		plug, err := pluginruntime.LoadPluginFromFile(jpPath)
+		if err != nil {
+			t.Fatalf("error cargando .jp %s (%s): %v", tt.pluginName, tt.lang, err)
+		}
+
+		if err := reg.Register(plug); err != nil {
+			t.Fatalf("error registrando plugin %s: %v", tt.pluginName, err)
+		}
+
+		res, err := reg.CallFunction(tt.pluginName, tt.funcName, []interface{}{int64(42)})
+		if err != nil {
+			t.Errorf("Error invocando %s.%s: %v", tt.pluginName, tt.funcName, err)
+		} else if res == nil {
+			t.Errorf("Invocacion de %s.%s devolvio nil", tt.pluginName, tt.funcName)
+		}
+	}
+}

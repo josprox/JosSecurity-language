@@ -133,10 +133,11 @@ func MainHandler(w http.ResponseWriter, r *http.Request) {
 	// Panic Recovery
 	defer func() {
 		if recovered := recover(); recovered != nil {
-			fmt.Printf("[SERVER PANIC] Recovered from: %v\n", recovered)
+			errMsg := core.FormatPanicAsError(recovered)
+			fmt.Printf("[SERVER ERROR] %s\n", errMsg)
 			if !webSocketUpgraded {
 				w.WriteHeader(http.StatusInternalServerError)
-				fmt.Fprintf(w, "<h1>500 Internal Server Error</h1><p>Something went wrong.</p><pre>%v</pre>", recovered)
+				fmt.Fprintf(w, "<h1>500 Internal Server Error</h1><pre>%s</pre>", errMsg)
 			}
 		}
 		rt.Free() // Return to pool

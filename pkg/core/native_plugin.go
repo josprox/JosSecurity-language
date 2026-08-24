@@ -58,14 +58,15 @@ func (r *Runtime) executePluginMethod(_ *Instance, method string, args []interfa
 			panic("Plugin::path requiere dos strings")
 		}
 		definition := r.NativePlugins[name]
-		if definition == nil {
-			panic(fmt.Sprintf("Plugin::path: plugin %q no registrado", name))
+		if definition != nil {
+			resolved, err := materializePluginPath(definition, relative)
+			if err == nil {
+				return resolved
+			}
 		}
-		resolved, err := materializePluginPath(definition, relative)
-		if err != nil {
-			panic(err)
-		}
-		return resolved
+		// Fallback para paquetes .jp cargados como AST/JPBC
+		cwd, _ := os.Getwd()
+		return filepath.Clean(filepath.Join(cwd, "plugins", name, relative))
 	case "call":
 		if len(args) < 2 || len(args) > 3 {
 			panic("Plugin::call requiere (plugin, metodo, args_opcionales)")

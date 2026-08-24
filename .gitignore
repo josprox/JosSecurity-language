@@ -58,3 +58,6 @@ translation_log.xlsx
 hardcoded_strings_list.json
 hardcoded_strings.arb
 hardcoded_strings.json
+
+# Build artifacts
+build/

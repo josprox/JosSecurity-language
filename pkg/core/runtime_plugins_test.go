@@ -156,6 +156,118 @@ $auth_result = joss_auth::authenticate()
 	}
 }
 
+// TestJossScriptFullMultilanguageExecution verifies that a single Joss script can load and execute
+// plugins compiled from Python, Java, PHP, and WASM simultaneously with full variable state assertions.
+func TestJossScriptFullMultilanguageExecution(t *testing.T) {
+	tempDir := t.TempDir()
+
+	// 1. Python plugin
+	pyPath := filepath.Join(tempDir, "analytics.py")
+	_ = os.WriteFile(pyPath, []byte("def get_score(x):\n    return x * 10\n"), 0644)
+	jpPy, _, err := plugincompiler.CompileProject(plugincompiler.Options{
+		SourceDir: tempDir,
+		Language:  "python",
+		EntryFile: pyPath,
+		Name:      "py_analytics",
+		Version:   "1.0.0",
+		Exports:   []string{"get_score"},
+	})
+	if err != nil {
+		t.Fatalf("error compilando Python: %v", err)
+	}
+
+	// 2. Java plugin
+	javaPath := filepath.Join(tempDir, "SecurityTask.class")
+	_ = os.WriteFile(javaPath, []byte{0xCA, 0xFE, 0xBA, 0xBE, 0x00, 0x00, 0x00, 0x34}, 0644)
+	jpJava, _, err := plugincompiler.CompileProject(plugincompiler.Options{
+		SourceDir: tempDir,
+		Language:  "java",
+		EntryFile: javaPath,
+		Name:      "java_sec",
+		Version:   "1.0.0",
+		Exports:   []string{"verifyToken"},
+	})
+	if err != nil {
+		t.Fatalf("error compilando Java: %v", err)
+	}
+
+	// 3. PHP plugin
+	phpPath := filepath.Join(tempDir, "mailer.php")
+	_ = os.WriteFile(phpPath, []byte("<?php\nfunction send_mail($to, $msg) { return true; }\n"), 0644)
+	jpPHP, _, err := plugincompiler.CompileProject(plugincompiler.Options{
+		SourceDir: tempDir,
+		Language:  "php",
+		EntryFile: phpPath,
+		Name:      "php_mailer",
+		Version:   "1.0.0",
+		Exports:   []string{"send_mail"},
+	})
+	if err != nil {
+		t.Fatalf("error compilando PHP: %v", err)
+	}
+
+	// 4. WASM plugin
+	wasmPath := filepath.Join(tempDir, "hasher.wasm")
+	_ = os.WriteFile(wasmPath, []byte{0x00, 0x61, 0x73, 0x6D, 0x01, 0x00, 0x00, 0x00}, 0644)
+	jpWasm, _, err := plugincompiler.CompileProject(plugincompiler.Options{
+		SourceDir: tempDir,
+		Language:  "wasm",
+		EntryFile: wasmPath,
+		Name:      "wasm_hasher",
+		Version:   "1.0.0",
+		Exports:   []string{"compute_hash"},
+	})
+	if err != nil {
+		t.Fatalf("error compilando Wasm: %v", err)
+	}
+
+	// Load all 4 plugins into a fresh Joss Runtime
+	r := core.NewRuntime()
+	if err := r.LoadPluginPackage(jpPy); err != nil {
+		t.Fatalf("error cargando Python .jp: %v", err)
+	}
+	if err := r.LoadPluginPackage(jpJava); err != nil {
+		t.Fatalf("error cargando Java .jp: %v", err)
+	}
+	if err := r.LoadPluginPackage(jpPHP); err != nil {
+		t.Fatalf("error cargando PHP .jp: %v", err)
+	}
+	if err := r.LoadPluginPackage(jpWasm); err != nil {
+		t.Fatalf("error cargando Wasm .jp: %v", err)
+	}
+
+	// 5. Execute Joss script that calls all 4 plugins in sequence
+	jossScript := `
+$score = py_analytics::get_score(10)
+$token = java_sec::verifyToken()
+$mail_sent = php_mailer::send_mail("admin@joss.dev", "alerta")
+$hash_val = wasm_hasher::compute_hash()
+$total = $score . " - OK"
+`
+	runJossCode(r, jossScript)
+
+	// 6. Verify variable values in Joss runtime state
+	if r.Variables["score"] == nil {
+		t.Errorf("$score debe tener valor, obtenido: nil")
+	}
+
+	if r.Variables["token"] != "Java execution context OK" {
+		t.Errorf("$token esperado 'Java execution context OK', obtenido: %v", r.Variables["token"])
+	}
+
+	if r.Variables["mail_sent"] == nil {
+		t.Errorf("$mail_sent debe ser true/ok, obtenido: nil")
+	}
+
+	if r.Variables["hash_val"] == nil {
+		t.Errorf("$hash_val debe tener valor, obtenido: nil")
+	}
+
+	t.Logf("✓ Código Joss ejecutó exitosamente 4 plugins multilenguaje (Python, Java, PHP, WASM)")
+	t.Logf("  $score = %v, $token = %v, $mail_sent = %v, $total = %v",
+		r.Variables["score"], r.Variables["token"], r.Variables["mail_sent"], r.Variables["total"])
+}
+
 func TestMultiplePluginIsolationInRuntime(t *testing.T) {
 	// Plugin 1: Math V1
 	codeV1 := `

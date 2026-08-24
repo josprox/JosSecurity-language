@@ -3,6 +3,21 @@ package parser
 import "fmt"
 
 func (p *Parser) parseStatement() Statement {
+	// Syntax Guard: Intercept unsupported control flow keywords from other languages
+	lit := p.curToken.Literal
+	if lit == "if" || lit == "else" || lit == "elif" {
+		p.errors = append(p.errors, fmt.Sprintf("Línea %d: La estructura '%s' no existe en Joss. Joss no utiliza 'if/else/elif'. Para condicionales utiliza expresiones ternarias ($cond ? $val1 : $val2) o la estructura 'match ($val) { ... }'.", p.curToken.Line, lit))
+		return nil
+	}
+	if lit == "switch" {
+		p.errors = append(p.errors, fmt.Sprintf("Línea %d: La estructura 'switch' no existe en Joss. Utiliza 'match ($val) { case $x: ... default: ... }' en su lugar.", p.curToken.Line))
+		return nil
+	}
+	if lit == "for" {
+		p.errors = append(p.errors, fmt.Sprintf("Línea %d: El bucle 'for' no existe en Joss. Utiliza 'foreach ($array as $item)' o 'while ($cond) { ... }' en su lugar.", p.curToken.Line))
+		return nil
+	}
+
 	// Modifiers before class or function: public class Foo, public func bar()
 	if p.curToken.Type == PUBLIC || p.curToken.Type == PRIVATE || p.curToken.Type == PROTECTED || p.curToken.Type == STATIC {
 		vis := p.curToken.Literal

@@ -27,11 +27,11 @@ function Invoke-Checked {
 
     $capturedOutput = @()
     $failedWithException = $false
+    $global:LASTEXITCODE = 0
     try {
-        & $Command 2>&1 | Tee-Object -Variable capturedOutput
+        & $Command
     } catch {
         $failedWithException = $true
-        $capturedOutput = @($capturedOutput) + @($_)
     }
 
     $exitCode = if ($null -ne $LASTEXITCODE) { $LASTEXITCODE } else { 0 }
@@ -39,10 +39,6 @@ function Invoke-Checked {
         Write-Host "❌ Etapa fallida: $Label" -ForegroundColor Red
         Write-Host "Comando fallido: $resolvedCommand" -ForegroundColor Red
         Write-Host "Codigo de salida: $exitCode" -ForegroundColor Red
-        if ($capturedOutput.Count -gt 0) {
-            Write-Host "Salida capturada (stdout/stderr):" -ForegroundColor Yellow
-            $capturedOutput | ForEach-Object { Write-Host $_ }
-        }
         throw "$Label termino con codigo $exitCode"
     }
 }
@@ -149,10 +145,10 @@ try {
         $vsixPath = Join-Path $work "joss-language-$($extensionPackage.version).vsix"
         Push-Location (Join-Path $root 'vscode-joss')
         try {
-            Invoke-Checked 'Dependencias de VS Code' { & $npm.Source ci }
-            Invoke-Checked 'Auditoria de dependencias VS Code' { & $npm.Source audit --audit-level=critical }
-            Invoke-Checked 'Compilacion IntelliSense VS Code' { & $npm.Source run compile }
-            Invoke-Checked 'Extension VS Code' { & $npm.Source run package -- --out $vsixPath }
+            Invoke-Checked 'Dependencias de VS Code' { cmd.exe /c npm ci }
+            Invoke-Checked 'Auditoria de dependencias VS Code' { cmd.exe /c npm audit --audit-level=critical }
+            Invoke-Checked 'Compilacion IntelliSense VS Code' { cmd.exe /c npm run compile }
+            Invoke-Checked 'Extension VS Code' { cmd.exe /c npm run package -- --out $vsixPath }
         } finally {
             Pop-Location
         }
@@ -161,11 +157,7 @@ try {
         Compress-Directory $vscode (Join-Path $dist 'jossecurity-vscode.zip')
     }
 
-    $sdkStage = New-StagingDirectory 'plugin-sdk'
-    Copy-Item -LiteralPath (Join-Path $root 'sdk') -Destination (Join-Path $sdkStage 'sdk') -Recurse
-    Copy-Required (Join-Path $root 'docs/PLUGINS.md') (Join-Path $sdkStage 'PLUGINS.md')
-    Copy-Required (Join-Path $root 'LICENSE') (Join-Path $sdkStage 'LICENSE')
-    Compress-Directory $sdkStage (Join-Path $dist 'joss-plugin-sdk.zip')
+
 
     # Solo se publican archivos finales; los binarios intermedios se quitan de dist.
     Get-ChildItem -LiteralPath $dist -Directory | Remove-Item -Recurse -Force

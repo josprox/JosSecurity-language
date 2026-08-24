@@ -170,7 +170,23 @@ func (p *Parser) curPrecedence() int {
 }
 
 func (p *Parser) noPrefixParseFnError(t TokenType) {
-	msg := fmt.Sprintf("line %d: no prefix parse function for %s found", p.curToken.Line, t)
+	lit := p.curToken.Literal
+	if lit == "if" || lit == "else" || lit == "elif" {
+		msg := fmt.Sprintf("Línea %d: La estructura '%s' no existe en Joss. Usa ternarias ($cond ? $a : $b) o 'match ($val) { ... }'.", p.curToken.Line, lit)
+		p.errors = append(p.errors, msg)
+		return
+	}
+	if lit == "switch" {
+		msg := fmt.Sprintf("Línea %d: La estructura 'switch' no existe en Joss. Usa 'match ($val) { ... }' en su lugar.", p.curToken.Line)
+		p.errors = append(p.errors, msg)
+		return
+	}
+	if lit == "for" {
+		msg := fmt.Sprintf("Línea %d: El bucle 'for' no existe en Joss. Usa 'foreach ($array as $item)' o 'while ($cond) { ... }' en su lugar.", p.curToken.Line)
+		p.errors = append(p.errors, msg)
+		return
+	}
+	msg := fmt.Sprintf("Línea %d: sintaxis no válida o token '%s' inesperado", p.curToken.Line, p.curToken.Literal)
 	p.errors = append(p.errors, msg)
 }
 

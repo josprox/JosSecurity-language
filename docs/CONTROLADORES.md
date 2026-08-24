@@ -78,10 +78,10 @@ $response = Http::request("POST", "https://api.ejemplo.com/v1/resource", {
     "follow_redirects": true
 })
 
-if ($response["success"]) {
+($response["success"]) ? {
     $code = $response["status"]
     $json = $response["json"]
-}
+} : {}
 ```
 
 ## Request

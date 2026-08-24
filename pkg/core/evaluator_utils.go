@@ -78,16 +78,19 @@ func (r *Runtime) checkExistence(exp parser.Expression) bool {
 		_, ok := r.Variables[e.Value]
 		return ok
 	case *parser.IndexExpression:
-		left := r.evaluateExpression(e.Left)
+		left := r.safeEvaluate(e.Left)
+		if left == nil {
+			return false
+		}
 		if list, ok := left.([]interface{}); ok {
-			index := r.evaluateExpression(e.Index)
+			index := r.safeEvaluate(e.Index)
 			if idx, ok := index.(int64); ok {
 				return idx >= 0 && idx < int64(len(list))
 			}
 		}
 		return false
 	case *parser.MemberExpression:
-		left := r.evaluateExpression(e.Left)
+		left := r.safeEvaluate(e.Left)
 		if instance, ok := left.(*Instance); ok {
 			_, ok := instance.Fields[e.Property.Value]
 			return ok
@@ -95,6 +98,17 @@ func (r *Runtime) checkExistence(exp parser.Expression) bool {
 		return false
 	}
 	return false
+}
+
+// safeEvaluate evaluates an expression and returns nil if it panics.
+// Used only for existence checks (isset/empty) where undefined is expected.
+func (r *Runtime) safeEvaluate(exp parser.Expression) (result interface{}) {
+	defer func() {
+		if rec := recover(); rec != nil {
+			result = nil
+		}
+	}()
+	return r.evaluateExpression(exp)
 }
 
 func isFalsy(val interface{}) bool {

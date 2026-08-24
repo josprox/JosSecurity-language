@@ -122,9 +122,11 @@ func watchChanges() {
 		}
 
 		var changedPaths []string
+		walkedFiles := make(map[string]bool)
 		err := filepath.Walk(".", func(path string, info os.FileInfo, err error) error {
 			if err != nil {
-				return nil
+				fmt.Printf("[HotReload] Advertencia: no se puede acceder a '%s': %v\n", path, err)
+				return nil // log but continue walking
 			}
 			if info.IsDir() {
 				if info.Name() == ".git" || info.Name() == "vendor" || info.Name() == "node_modules" {
@@ -135,6 +137,7 @@ func watchChanges() {
 
 			ext := filepath.Ext(path)
 			if ext == ".joss" || ext == ".html" || ext == ".css" || ext == ".js" || ext == ".scss" || ext == ".arb" || filepath.Base(path) == "package.json" {
+				walkedFiles[path] = true
 				currentHash := getHash(path)
 				if lastHash, ok := fileHashes[path]; ok {
 					if currentHash != lastHash {
@@ -149,6 +152,7 @@ func watchChanges() {
 					fmt.Printf("[HotReload] Nuevo archivo detectado: %s\n", path)
 				}
 			} else if filepath.Base(path) == ".env" || filepath.Base(path) == "env.joss" {
+				walkedFiles[path] = true
 				currentHash := getHash(path)
 				if lastHash, ok := fileHashes[path]; ok {
 					if currentHash != lastHash {
@@ -164,8 +168,18 @@ func watchChanges() {
 			}
 			return nil
 		})
+		_ = err // Walk errors are handled per-path above
 
-		if err == nil && len(changedPaths) > 0 {
+		// Detect deleted files: anything in fileHashes not visited this walk was deleted
+		for path := range fileHashes {
+			if !walkedFiles[path] {
+				delete(fileHashes, path)
+				fmt.Printf("[HotReload] Archivo eliminado detectado: %s — recargando...\n", path)
+				changedPaths = append(changedPaths, path)
+			}
+		}
+
+		if len(changedPaths) > 0 {
 			// Debounce
 			time.Sleep(100 * time.Millisecond)
 			for _, p := range changedPaths {
@@ -235,22 +249,23 @@ func reloadApp(changedFile string) {
 
 	// Helper to load a single file
 	loadFile := func(path string) {
-		fmt.Printf("[DEBUG] Loading file: %s\n", path)
+		fmt.Printf("[HotReload] Loading file: %s\n", path)
 		content, err := vfsReadFile(path)
-		if err == nil {
-			l := parser.NewLexer(string(content))
-			p := parser.NewParser(l)
-			program := p.ParseProgram()
-			if len(p.Errors()) > 0 {
-				fmt.Printf("[DEBUG] Parser errors in %s:\n", path)
-				for _, msg := range p.Errors() {
-					fmt.Printf("\t%s\n", msg)
-				}
-			}
-			currentRuntime.Execute(program)
-		} else {
-			fmt.Printf("[DEBUG] Error reading %s: %v\n", path, err)
+		if err != nil {
+			fmt.Printf("[HotReload] Error leyendo %s: %v\n", path, err)
+			return
 		}
+		l := parser.NewLexer(string(content))
+		p := parser.NewParser(l)
+		program := p.ParseProgram()
+		if len(p.Errors()) > 0 {
+			fmt.Printf("[HotReload] Errores de parseo en %s — no se ejecutará código roto:\n", path)
+			for _, msg := range p.Errors() {
+				fmt.Printf("\t%s\n", msg)
+			}
+			return // DO NOT execute a broken AST
+		}
+		currentRuntime.Execute(program)
 	}
 
 	if changedFile != "" && (strings.HasSuffix(changedFile, "env.joss") || strings.HasSuffix(changedFile, ".env")) {

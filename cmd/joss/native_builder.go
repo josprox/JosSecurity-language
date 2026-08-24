@@ -33,7 +33,7 @@ var supportedTargets = map[string][]string{
 func buildNative(targetOS, targetArch string, enableGUI bool) {
 	tOS, tArch, valid := validateBuildTarget(targetOS, targetArch)
 	if !valid {
-		return
+		os.Exit(1)
 	}
 
 	modeStr := "Consola/Servidor Headless"
@@ -52,34 +52,34 @@ func buildNative(targetOS, targetArch string, enableGUI bool) {
 
 	if _, err := exec.LookPath("go"); err != nil {
 		fmt.Println("Error: No se encontró la herramienta 'go' instalada en el sistema.")
-		return
+		os.Exit(1)
 	}
 
 	buildDir := "build"
 	os.RemoveAll(buildDir)
 	if err := os.MkdirAll(filepath.Join(buildDir, "Storage"), 0755); err != nil {
 		fmt.Printf("Error creando directorio build: %v\n", err)
-		return
+		os.Exit(1)
 	}
 
 	fmt.Println("📦 Empaquetando y precompilando assets (AOT Bytecode AST)...")
 	encryptedAssets, buildKey, err := collectAndEncryptAssets(enableGUI)
 	if err != nil {
 		fmt.Printf("Error procesando assets del proyecto: %v\n", err)
-		return
+		os.Exit(1)
 	}
 
 	fmt.Println("🔨 Compilando ejecutable nativo con la toolchain de Go...")
 	runnerBytes, err := compileRunnerBinary(tOS, tArch, enableGUI)
 	if err != nil {
 		fmt.Printf("Error compilando runner nativo: %v\n", err)
-		return
+		os.Exit(1)
 	}
 
 	outPath, err := assembleFinalExecutable(buildDir, tOS, runnerBytes, encryptedAssets, buildKey)
 	if err != nil {
 		fmt.Printf("Error ensamblando ejecutable final: %v\n", err)
-		return
+		os.Exit(1)
 	}
 
 	copyDatabaseFiles(buildDir)

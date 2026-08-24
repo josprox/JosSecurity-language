@@ -12,6 +12,19 @@ type HostContext interface {
 	CallHostFunction(name string, args []interface{}) (interface{}, error)
 }
 
+// Map of host functions to required permissions for PermissionGuard
+var hostFunctionPermissions = map[string]string{
+	"http_get":   "network.http",
+	"http_post":  "network.http",
+	"fetch":      "network.http",
+	"file_read":  "filesystem.read",
+	"file_write": "filesystem.write",
+	"env_read":   "env.read",
+	"env_write":  "env.write",
+	"db_query":   "database.query",
+	"db_exec":    "database.exec",
+}
+
 // JPBCVM es la maquina virtual para la ejecucion de bytecode multilenguaje JPBC.
 type JPBCVM struct {
 	Module      *JPBCModule
@@ -166,6 +179,12 @@ func (vm *JPBCVM) executeFunction(fn *JPBCFunction, args []interface{}) (interfa
 					}
 					registers["r0"] = acc
 				} else if vm.Host != nil {
+					// PermissionGuard Enforcement (ALIM Capa 3 / PLMS Specification)
+					if reqPerm, ok := hostFunctionPermissions[targetName]; ok {
+						if vm.Permissions != nil && !vm.Permissions.HasPermission(reqPerm) {
+							return nil, fmt.Errorf("error de permiso denegado: la función de host '%s' requiere el permiso '%s'", targetName, reqPerm)
+						}
+					}
 					var err error
 					acc, err = vm.Host.CallHostFunction(targetName, args)
 					if err != nil {

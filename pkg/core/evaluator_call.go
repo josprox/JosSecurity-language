@@ -165,21 +165,34 @@ func (r *Runtime) executeCall(call *parser.CallExpression) interface{} {
 		}
 	}
 
-	// 3. Evaluate Function
-	fn := r.evaluateExpression(call.Function)
-	if fn == nil {
-		if ident, ok := call.Function.(*parser.Identifier); ok {
-			if f, ok := r.Functions[ident.Value]; ok {
-				fn = f
-			}
+	// 3. For plain identifiers: check r.Functions first, then r.Variables.
+	//    This avoids a false "UndefinedVariable" panic for user-defined functions.
+	var fn interface{}
+	if ident, ok := call.Function.(*parser.Identifier); ok {
+		if f, ok := r.Functions[ident.Value]; ok {
+			fn = f
+		} else if v, ok := r.Variables[ident.Value]; ok {
+			fn = v
 		}
+	} else {
+		// Non-identifier (e.g., member expression, closure variable): evaluate normally.
+		fn = r.evaluateExpression(call.Function)
 	}
 
 	if fn == nil {
 		if ident, ok := call.Function.(*parser.Identifier); ok {
-			panic(fmt.Sprintf("Error: Función '%s' no encontrada", ident.Value))
+			panic(&JossError{
+				Type:    "UndefinedFunction",
+				Message: fmt.Sprintf("Función '%s' no encontrada", ident.Value),
+				File:    r.CurrentFile,
+				Line:    ident.Token.Line,
+			})
 		}
-		return nil
+		panic(&JossError{
+			Type:    "NotCallable",
+			Message: "Intento de invocar un objeto nulo o no invocable",
+			File:    r.CurrentFile,
+		})
 	}
 
 	return r.applyFunction(fn, args)
@@ -290,11 +303,18 @@ func (r *Runtime) applyFunction(fn interface{}, args []interface{}) interface{} 
 	}
 
 	if fn == nil {
-		return nil
+		panic(&JossError{
+			Type:    "NotCallable",
+			Message: "Intento de invocar un valor nulo",
+			File:    r.CurrentFile,
+		})
 	}
 
-	fmt.Printf("Error: '%v' (tipo %T) no es una función invocable\n", fn, fn)
-	return nil
+	panic(&JossError{
+		Type:    "NotCallable",
+		Message: fmt.Sprintf("'%v' (tipo %T) no es una función invocable", fn, fn),
+		File:    r.CurrentFile,
+	})
 }
 
 // CallFunction is the public API for executing functions

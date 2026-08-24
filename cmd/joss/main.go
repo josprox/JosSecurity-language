@@ -102,6 +102,12 @@ func main() {
 		} else {
 			fmt.Println("Uso: joss program start")
 		}
+	case "analyze":
+		filename := "main.joss"
+		if len(os.Args) >= 3 {
+			filename = os.Args[2]
+		}
+		analyzeScript(filename)
 	case "run":
 		if len(os.Args) < 3 {
 			fmt.Println("Uso: joss run [archivo.joss]")
@@ -299,6 +305,70 @@ func main() {
 	}
 }
 
+func analyzeScript(filename string) {
+	if _, err := os.Stat(filename); os.IsNotExist(err) {
+		fmt.Printf("Error: No se encontró el archivo '%s'.\n", filename)
+		if filename == "main.joss" {
+			fmt.Println("Todos los proyectos deben tener un punto de entrada 'main.joss' o especificar un archivo: joss analyze [archivo.joss]")
+		}
+		os.Exit(1)
+	}
+
+	fmt.Printf("🔍 Analizando proyecto Joss (%s)...\n", filename)
+
+	combinedProgram := &parser.Program{Statements: make([]parser.Statement, 0)}
+	var parseErrors []string
+
+	// 1. Parse entry file
+	if data, err := os.ReadFile(filename); err == nil {
+		l := parser.NewLexer(string(data))
+		p := parser.NewParser(l)
+		prog := p.ParseProgram()
+		if len(p.Errors()) > 0 {
+			parseErrors = append(parseErrors, p.Errors()...)
+		} else if prog != nil {
+			combinedProgram.Statements = append(combinedProgram.Statements, prog.Statements...)
+		}
+	}
+
+	// 2. Preload and parse all .joss files in app/ directory if present
+	if _, err := os.Stat("app"); err == nil {
+		_ = filepath.Walk("app", func(path string, info os.FileInfo, err error) error {
+			if err != nil || info == nil || info.IsDir() {
+				return nil
+			}
+			if strings.HasSuffix(path, ".joss") {
+				if data, err := os.ReadFile(path); err == nil {
+					l := parser.NewLexer(string(data))
+					p := parser.NewParser(l)
+					prog := p.ParseProgram()
+					if len(p.Errors()) > 0 {
+						parseErrors = append(parseErrors, fmt.Sprintf("%s: %s", path, strings.Join(p.Errors(), "; ")))
+					} else if prog != nil {
+						combinedProgram.Statements = append(combinedProgram.Statements, prog.Statements...)
+					}
+				}
+			}
+			return nil
+		})
+	}
+
+	if len(parseErrors) > 0 {
+		fmt.Println("❌ Errores de parseo detectados:")
+		for _, msg := range parseErrors {
+			fmt.Printf("\t%s\n", msg)
+		}
+		os.Exit(1)
+	}
+
+	report := core.AnalyzeProgram(combinedProgram)
+	report.PrintReport()
+
+	if len(report.Errors) > 0 {
+		os.Exit(1)
+	}
+}
+
 func executeScript(filename string) {
 	data, err := os.ReadFile(filename)
 	if err != nil {
@@ -315,10 +385,17 @@ func executeScript(filename string) {
 		for _, msg := range p.Errors() {
 			fmt.Printf("\t%s\n", msg)
 		}
-		return
+		os.Exit(1)
+	}
+
+	// Always run static analysis before executing script
+	report := core.AnalyzeProgram(program)
+	if report.HasIssues() {
+		report.PrintReport()
 	}
 
 	rt := core.NewRuntime()
+	rt.CurrentFile = filename
 	rt.LoadEnv(nil)
 
 	// Preload all .joss files in app/ and subfolders (controllers, models, services, middleware, etc.)
@@ -328,7 +405,7 @@ func executeScript(filename string) {
 
 	defer func() {
 		if r := recover(); r != nil {
-			fmt.Printf("\n[Error de Ejecución JOSS] %v\n", r)
+			fmt.Printf("\n[Error de Ejecución JOSS]\n%s\n", core.FormatPanicAsError(r))
 			os.Exit(1)
 		}
 	}()

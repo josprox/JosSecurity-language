@@ -18,9 +18,9 @@ int $x = 10;
 string $msg = "hello";
 int $y = 20, $z = 30;
 
-if ($x < $y) {
+($x < $y) ? {
     print($msg);
-}
+} : {}
 
 foreach ([1, 2, 3] as $item) {
     print($item);

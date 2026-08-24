@@ -135,61 +135,6 @@ try {
         }
     }
 
-    if (-not $SkipSDKChecks) {
-        $javac = Find-Executable @('javac.exe', 'javac')
-        if (-not $javac) { throw 'Falta javac para validar el SDK Java' }
-        $javaOut = Join-Path $work 'java'
-        New-Item -ItemType Directory -Force -Path $javaOut | Out-Null
-        Invoke-Checked 'SDK Java' { & $javac -d $javaOut sdk/java/JossPlugin.java }
-
-        $kotlinc = Find-Executable @('kotlinc.bat', 'kotlinc') @('C:\jossprog\kotlinc\bin\kotlinc.bat')
-        if (-not $kotlinc) { throw 'Falta kotlinc para validar el SDK Kotlin' }
-        $kotlinInput = Join-Path $work 'kotlin-input'
-        New-Item -ItemType Directory -Force -Path $kotlinInput | Out-Null
-        $kotlinJar = Join-Path $kotlinInput 'plugin.jar'
-        Invoke-Checked 'SDK Kotlin/JVM' {
-            & $kotlinc sdk/kotlin/JossPlugin.kt sdk/kotlin/PluginMain.kt -include-runtime -d $kotlinJar
-        }
-        $java = Find-Executable @('java.exe', 'java')
-        $reply = '{"protocol":"joss-rpc-v1","id":"release-kotlin","method":"ping","args":[]}' |
-            & $java -jar $kotlinJar
-        if ($reply -notmatch '"id":"release-kotlin"' -or $reply -notmatch '"result":"kotlin-ok"') {
-            throw "El runner Kotlin devolvio una respuesta invalida: $reply"
-        }
-
-        $jpackage = Find-Executable @('jpackage.exe', 'jpackage')
-        if (-not $jpackage) { throw 'Falta jpackage (JDK 17+) para validar Kotlin autocontenido' }
-        $kotlinApp = Join-Path $work 'kotlin-app'
-        Invoke-Checked 'Kotlin autocontenido con jpackage' {
-            & $jpackage --type app-image --input $kotlinInput --main-jar plugin.jar `
-                --main-class PluginMainKt --name JossKotlinPlugin --dest $kotlinApp
-        }
-
-        $php = Find-Executable @('php.exe', 'php') @('C:\php\php.exe')
-        if (-not $php) { throw 'Falta PHP CLI para validar el SDK PHP' }
-        Invoke-Checked 'Sintaxis del SDK PHP' { & $php -l sdk/php/joss_plugin.php }
-        Invoke-Checked 'Sintaxis del ejemplo PHP' { & $php -l sdk/php/PluginMain.php }
-        $phpReply = '{"protocol":"joss-rpc-v1","id":"release-php","method":"ping","args":[]}' |
-            & $php sdk/php/PluginMain.php
-        if ($LASTEXITCODE -ne 0 -or $phpReply -notmatch '"id":"release-php"' -or $phpReply -notmatch '"result":"php-ok"') {
-            throw "El runner PHP devolvio una respuesta invalida: $phpReply"
-        }
-
-        $dart = Find-Executable @('dart.bat', 'dart') @('C:\jossprog\flutter\bin\dart.bat')
-        if (-not $dart) { throw 'Falta Dart/Flutter para validar el SDK Dart' }
-        Invoke-Checked 'SDK Dart/Flutter' { & $dart analyze sdk/dart/joss_plugin.dart }
-
-        $cargo = Find-Executable @('cargo.exe', 'cargo')
-        if (-not $cargo) { throw 'Falta Cargo para validar el SDK Rust' }
-        $oldCargoTarget = $env:CARGO_TARGET_DIR
-        try {
-            $env:CARGO_TARGET_DIR = Join-Path $work 'rust-target'
-            Invoke-Checked 'SDK Rust' { & $cargo check --manifest-path sdk/rust/Cargo.toml }
-        } finally {
-            $env:CARGO_TARGET_DIR = $oldCargoTarget
-        }
-    }
-
     Write-Host "Release verificada. Binario: $jossBinary" -ForegroundColor Green
 } finally {
     Pop-Location

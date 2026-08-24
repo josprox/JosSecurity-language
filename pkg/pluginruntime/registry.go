@@ -102,6 +102,19 @@ func (r *PluginRegistry) Instantiate(pluginName, className string, args []interf
 			instanceMap := make(map[string]interface{})
 			instanceMap["__type__"] = className
 			instanceMap["__plugin__"] = pluginName
+			
+			// Look for and execute constructor if it exists
+			initName := fmt.Sprintf("%s/init", className)
+			if _, exists := plugin.jpbcModule.Functions[initName]; exists {
+				guard := NewPermissionGuard(plugin.Metadata.Permissions)
+				vm := NewJPBCVM(plugin.jpbcModule, guard, r.host)
+				initArgs := append([]interface{}{instanceMap}, args...)
+				_, err := vm.Execute(initName, initArgs)
+				if err != nil {
+					return nil, fmt.Errorf("error al inicializar instancia: %w", err)
+				}
+			}
+
 			return instanceMap, nil
 
 		default:
@@ -130,10 +143,13 @@ func (r *PluginRegistry) CallMethod(pluginName, className, methodName string, in
 			guard := NewPermissionGuard(plugin.Metadata.Permissions)
 			vm := NewJPBCVM(plugin.jpbcModule, guard, r.host)
 
+			// Pass instance as first argument
+			methodArgs := append([]interface{}{instance}, args...)
+
 			if _, exists := plugin.jpbcModule.Functions[qualifiedName]; exists {
-				return vm.Execute(qualifiedName, args)
+				return vm.Execute(qualifiedName, methodArgs)
 			}
-			return vm.Execute(methodName, args)
+			return vm.Execute(methodName, methodArgs)
 
 		default:
 			return nil, fmt.Errorf("formato no soportado para llamadas de metodo: %s", plugin.Format)

@@ -67,6 +67,7 @@ func TreeShake(module *ir.IRModule) (*Result, error) {
 			for _, inst := range block.Instructions {
 				switch inst.Op {
 				case ir.OpCallStatic, ir.OpCallVirtual:
+					// Check Args first (if populated directly)
 					if len(inst.Args) > 0 {
 						targetFn := inst.Args[0]
 						if targetFn != "" && !reachableFuncs[targetFn] {
@@ -74,11 +75,29 @@ func TreeShake(module *ir.IRModule) (*Result, error) {
 							worklist = append(worklist, targetFn)
 						}
 					}
+					// Also check ConstantPool via ConstIdx (backends store targets here)
+					if inst.ConstIdx >= 0 && inst.ConstIdx < len(module.ConstantPool) {
+						if targetFn, ok := module.ConstantPool[inst.ConstIdx].(string); ok {
+							if targetFn != "" && !reachableFuncs[targetFn] {
+								reachableFuncs[targetFn] = true
+								worklist = append(worklist, targetFn)
+							}
+						}
+					}
 				case ir.OpNewObject, ir.OpGetField, ir.OpSetField:
+					// Check Args first (if populated directly)
 					if len(inst.Args) > 0 {
 						structName := inst.Args[0]
 						if structName != "" {
 							reachableStructs[structName] = true
+						}
+					}
+					// Also check ConstantPool via ConstIdx (backends store targets here)
+					if inst.ConstIdx >= 0 && inst.ConstIdx < len(module.ConstantPool) {
+						if structName, ok := module.ConstantPool[inst.ConstIdx].(string); ok {
+							if structName != "" {
+								reachableStructs[structName] = true
+							}
 						}
 					}
 				}
