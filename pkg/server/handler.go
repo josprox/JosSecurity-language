@@ -5,8 +5,10 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"mime"
 	"net/http"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"sync"
@@ -367,9 +369,19 @@ func MainHandler(w http.ResponseWriter, r *http.Request) {
 						file.Read(content)
 						file.Close()
 
+						// Create temp file on disk so $file["path"] works
+						tmpFile, tmpErr := os.CreateTemp("", "joss_upload_*_"+fh.Filename)
+						pathStr := ""
+						if tmpErr == nil {
+							tmpFile.Write(content)
+							pathStr = tmpFile.Name()
+							tmpFile.Close()
+						}
+
 						// Create file object
 						fileObj := map[string]interface{}{
 							"name":    fh.Filename,
+							"path":    pathStr,
 							"type":    fh.Header.Get("Content-Type"),
 							"size":    fh.Size,
 							"content": string(content), // Store as string for JOSS compatibility
@@ -725,14 +737,45 @@ func MainHandler(w http.ResponseWriter, r *http.Request) {
 			// FILE handling (Response::download)
 			if val, ok := resInst.Fields["_type"]; ok && val == "FILE" {
 				filePath, _ := resInst.Fields["data"].(string)
-				downloadName := "download.png"
-				if dn, ok := resInst.Fields["download_name"].(string); ok && dn != "" {
-					downloadName = dn
-				}
 				if filePath != "" {
-					w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=\"%s\"", downloadName))
-					w.Header().Set("Content-Type", "application/octet-stream")
-					http.ServeFile(w, r, filePath)
+					absPath, err := filepath.Abs(filePath)
+					if err != nil {
+						absPath = filePath
+					}
+					content, err := os.ReadFile(absPath)
+					if err == nil {
+						downloadName := filepath.Base(absPath)
+						if dn, ok := resInst.Fields["download_name"].(string); ok && dn != "" {
+							downloadName = dn
+						}
+
+						// Detect MIME type dynamically (custom, extension-based, or sniffing)
+						contentType := "application/octet-stream"
+						if ct, ok := resInst.Fields["content_type"].(string); ok && ct != "" {
+							contentType = ct
+						} else {
+							ext := filepath.Ext(downloadName)
+							if ext != "" {
+								if mimeType := mime.TypeByExtension(ext); mimeType != "" {
+									contentType = mimeType
+								}
+							}
+							if contentType == "application/octet-stream" && len(content) > 0 {
+								detected := http.DetectContentType(content)
+								if detected != "" {
+									contentType = detected
+								}
+							}
+						}
+
+						w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=\"%s\"", downloadName))
+						w.Header().Set("Content-Type", contentType)
+						w.Header().Set("Content-Length", fmt.Sprintf("%d", len(content)))
+						w.WriteHeader(http.StatusOK)
+						w.Write(content)
+						return
+					}
+					http.Error(w, "File read error", http.StatusInternalServerError)
 					return
 				}
 			}

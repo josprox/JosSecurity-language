@@ -86,7 +86,7 @@ func (r *Runtime) executePluginMethod(_ *Instance, method string, args []interfa
 		}
 		result, err := r.callNativePlugin(name, rpcMethod, callArgs)
 		if err != nil {
-			return nil
+			return map[string]interface{}{"error": err.Error()}
 		}
 		return result
 	case "stream":
@@ -129,7 +129,10 @@ func (r *Runtime) callNativePluginStream(name, method string, args []interface{}
 
 func (r *Runtime) callNativePlugin(name, method string, args []interface{}) (interface{}, error) {
 	if r.PluginRegistry != nil && r.PluginRegistry.Get(name) != nil {
-		return r.PluginRegistry.CallFunction(name, method, args)
+		res, err := r.PluginRegistry.CallFunction(name, method, args)
+		if err == nil {
+			return res, nil
+		}
 	}
 
 	definition := r.NativePlugins[name]
