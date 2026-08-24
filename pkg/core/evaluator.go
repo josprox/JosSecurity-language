@@ -16,9 +16,20 @@ func (r *Runtime) evaluateExpression(exp parser.Expression) interface{} {
 		return e.Value
 	case *parser.Boolean:
 		return e.Value
+	case *parser.NullLiteral:
+		return nil
 	case *parser.CallExpression:
 		return r.executeCall(e)
 	case *parser.Identifier:
+		if e.Value == "null" || e.Value == "nil" {
+			return nil
+		}
+		if e.Value == "true" {
+			return true
+		}
+		if e.Value == "false" {
+			return false
+		}
 		if val, ok := r.Variables[e.Value]; ok {
 			return val
 		}

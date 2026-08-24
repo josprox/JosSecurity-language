@@ -140,6 +140,10 @@ func (p *Parser) parseBoolean() Expression {
 	return &Boolean{Token: p.curToken, Value: p.curToken.Type == TRUE}
 }
 
+func (p *Parser) parseNullLiteral() Expression {
+	return &NullLiteral{Token: p.curToken}
+}
+
 func (p *Parser) parseGroupedExpression() Expression {
 	p.nextToken()
 	exp := p.parseExpression(LOWEST)

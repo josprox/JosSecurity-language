@@ -60,6 +60,8 @@ const (
 	VAR      = "VAR" // $
 	TRUE     = "TRUE"
 	FALSE    = "FALSE"
+	NULL     = "NULL"
+	NIL      = "NIL"
 
 	RETURN    = "RETURN"
 	PRINT     = "PRINT"
@@ -107,6 +109,8 @@ type Token struct {
 var keywords = map[string]TokenType{
 	"true":  TRUE,
 	"false": FALSE,
+	"null":  NULL,
+	"nil":   NIL,
 
 	"let":       LET,
 	"return":    RETURN,

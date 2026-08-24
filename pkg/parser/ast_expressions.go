@@ -117,6 +117,14 @@ func (pe *PostfixExpression) String() string {
 	return out.String()
 }
 
+type NullLiteral struct {
+	Token Token
+}
+
+func (nl *NullLiteral) expressionNode()      {}
+func (nl *NullLiteral) TokenLiteral() string { return nl.Token.Literal }
+func (nl *NullLiteral) String() string       { return nl.Token.Literal }
+
 type Boolean struct {
 	Token Token
 	Value bool

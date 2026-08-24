@@ -115,6 +115,7 @@ func registerAST() {
 		gob.Register(&parser.PrefixExpression{})
 		gob.Register(&parser.PostfixExpression{})
 		gob.Register(&parser.Boolean{})
+		gob.Register(&parser.NullLiteral{})
 		gob.Register(&parser.IntegerLiteral{})
 		gob.Register(&parser.FloatLiteral{})
 		gob.Register(&parser.ArrayLiteral{})
