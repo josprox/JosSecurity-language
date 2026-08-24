@@ -111,11 +111,15 @@ func (e *PluginASTEngine) Instantiate(className string, args []interface{}) (int
 }
 
 func (e *PluginASTEngine) CallMethod(instance interface{}, methodName string, args []interface{}) (interface{}, error) {
-	inst, ok := instance.(*Instance)
-	if !ok || inst == nil || inst.Class == nil {
-		return nil, fmt.Errorf("instancia invalida para llamada AST")
+	var inst *Instance
+	if instance != nil {
+		if i, ok := instance.(*Instance); ok {
+			inst = i
+		}
 	}
-	if inst.Class.Body != nil {
+
+	// 1. If an instance is provided, search its class
+	if inst != nil && inst.Class != nil && inst.Class.Body != nil {
 		for _, member := range inst.Class.Body.Statements {
 			if methodStmt, ok := member.(*parser.MethodStatement); ok {
 				if methodStmt.Name.Value == methodName {
@@ -123,8 +127,33 @@ func (e *PluginASTEngine) CallMethod(instance interface{}, methodName string, ar
 				}
 			}
 		}
+		return nil, fmt.Errorf("metodo %s no encontrado en clase %s", methodName, inst.Class.Name.Value)
 	}
-	return nil, fmt.Errorf("metodo %s no encontrado en clase %s", methodName, inst.Class.Name.Value)
+
+	// 2. Static method call (instance is nil): search in plugin classes
+	for _, classStmt := range e.Classes {
+		if classStmt != nil && classStmt.Body != nil {
+			for _, member := range classStmt.Body.Statements {
+				if methodStmt, ok := member.(*parser.MethodStatement); ok {
+					if methodStmt.Name.Value == methodName {
+						dummyInst := &Instance{
+							Class:  classStmt,
+							Fields: make(map[string]interface{}),
+						}
+						dummyInst.Fields["__plugin__"] = e.PluginName
+						return e.Runtime.CallMethodEvaluated(methodStmt, dummyInst, args), nil
+					}
+				}
+			}
+		}
+	}
+
+	// 3. Fallback: search in functions
+	if fn, ok := e.Functions[methodName]; ok {
+		return e.Runtime.CallMethodEvaluated(fn, nil, args), nil
+	}
+
+	return nil, fmt.Errorf("metodo %s no encontrado en plugin %s", methodName, e.PluginName)
 }
 
 // CallHostFunction implementa pluginruntime.HostContext para callbacks de plugins.
