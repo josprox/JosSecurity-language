@@ -22,6 +22,12 @@ func (r *Runtime) evaluateExpression(exp parser.Expression) interface{} {
 		if val, ok := r.Variables[e.Value]; ok {
 			return val
 		}
+		if classStmt, ok := r.Classes[e.Value]; ok {
+			return classStmt
+		}
+		if r.isNativeClass(e.Value) || IsNativeClass(e.Value) {
+			return e.Value
+		}
 		panic(&JossError{
 			Type:    "UndefinedVariable",
 			Message: fmt.Sprintf("Variable '%s' no definida", e.Value),

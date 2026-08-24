@@ -95,6 +95,46 @@ func (r *Runtime) evaluateNew(ne *parser.NewExpression) interface{} {
 }
 
 func (r *Runtime) evaluateMember(me *parser.MemberExpression) interface{} {
+	// 1. Support Static Class Access (e.g. Turnstile::siteKey, GranDB::table, Session::get, etc.)
+	if ident, ok := me.Left.(*parser.Identifier); ok {
+		className := ident.Value
+
+		// Check user-defined class in r.Classes
+		if classStmt, ok := r.Classes[className]; ok {
+			if _, native := r.NativeHandlers[className]; native {
+				return &BoundMethod{
+					Method:      &parser.MethodStatement{Name: &parser.Identifier{Value: me.Property.Value}},
+					StaticClass: className,
+				}
+			}
+			for _, stmt := range classStmt.Body.Statements {
+				if method, methodOK := stmt.(*parser.MethodStatement); methodOK && method.Name.Value == me.Property.Value {
+					return &BoundMethod{Method: method, Instance: &Instance{Class: classStmt, Fields: make(map[string]interface{})}}
+				}
+			}
+		}
+
+		// Check native class
+		if r.isNativeClass(className) || IsNativeClass(className) {
+			return &BoundMethod{
+				Method: &parser.MethodStatement{
+					Name: &parser.Identifier{Value: me.Property.Value},
+					Body: nil,
+				},
+				Instance:    nil,
+				StaticClass: className,
+			}
+		}
+
+		// Check loaded plugin in PluginRegistry
+		if r.PluginRegistry != nil && r.PluginRegistry.Get(className) != nil {
+			return &PluginCallable{
+				PluginName: className,
+				Function:   me.Property.Value,
+			}
+		}
+	}
+
 	left := r.evaluateExpression(me.Left)
 
 	// Support Plugin Namespace access (e.g. plugin_name::function or plugin_name.function)
@@ -115,7 +155,6 @@ func (r *Runtime) evaluateMember(me *parser.MemberExpression) interface{} {
 
 	instance, ok := left.(*Instance)
 	if !ok || instance == nil {
-		// Check if it's a Static Class Access (e.g. Session::get or PluginName::function)
 		if ident, ok := me.Left.(*parser.Identifier); ok {
 			className := ident.Value
 
