@@ -138,7 +138,30 @@ func (p *Parser) parseStatement() Statement {
 	if p.curToken.Type == ASYNC {
 		return p.parseAsyncStatement()
 	}
-	// Check for variable declaration: type $name = value
+	// Check for 'let' keyword variable declaration: let int $x = 10, let $x = 10
+	if p.curToken.Type == LET || p.curToken.Literal == "let" {
+		if p.peekToken.Type == IDENT {
+			p.nextToken() // move to type (e.g. int, string)
+			return p.parseLetStatement()
+		}
+		if p.peekToken.Type == VAR {
+			typeTok := Token{Type: IDENT, Literal: "mixed", Line: p.curToken.Line}
+			p.nextToken() // move to VAR ($name)
+			name := &Identifier{Token: p.curToken, Value: p.curToken.Literal}
+			var value Expression
+			if p.peekToken.Type == ASSIGN {
+				p.nextToken()
+				p.nextToken()
+				value = p.parseExpression(LOWEST)
+			}
+			stmt := &LetStatement{Token: typeTok, Name: name, Value: value}
+			if p.peekToken.Type == SEMICOLON || p.peekToken.Type == NEWLINE {
+				p.nextToken()
+			}
+			return stmt
+		}
+	}
+	// Check for typed variable declaration: type $name = value
 	if p.curToken.Type == IDENT && p.peekToken.Type == VAR {
 		return p.parseLetStatement()
 	}
@@ -307,6 +330,28 @@ func (p *Parser) parseClassBody() *BlockStatement {
 			stmt = p.parseMethodStatement()
 		} else if p.curToken.Type == INIT {
 			stmt = p.parseInitStatement()
+		} else if (p.curToken.Type == LET || p.curToken.Literal == "let") && p.peekToken.Type == IDENT {
+			p.nextToken()
+			stmt = p.parseLetStatement()
+		} else if (p.curToken.Type == LET || p.curToken.Literal == "let") && p.peekToken.Type == VAR {
+			typeTok := Token{Type: IDENT, Literal: "mixed", Line: p.curToken.Line}
+			p.nextToken()
+			name := &Identifier{Token: p.curToken, Value: p.curToken.Literal}
+			var value Expression
+			if p.peekToken.Type == ASSIGN {
+				p.nextToken()
+				p.nextToken()
+				value = p.parseExpression(LOWEST)
+			}
+			stmt = &LetStatement{
+				Token:      typeTok,
+				Name:       name,
+				Value:      value,
+				Visibility: "public",
+			}
+			if p.peekToken.Type == SEMICOLON || p.peekToken.Type == NEWLINE {
+				p.nextToken()
+			}
 		} else if p.curToken.Type == IDENT && p.peekToken.Type == VAR { // Property: string $x
 			stmt = p.parseLetStatement()
 		} else if p.curToken.Type == VAR { // Property without type: $x = 10

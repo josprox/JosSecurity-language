@@ -94,6 +94,7 @@ const (
 	PUBLIC    = "PUBLIC"
 	PRIVATE   = "PRIVATE"
 	PROTECTED = "PROTECTED"
+	LET       = "LET"
 	STATIC    = "STATIC"
 )
 
@@ -107,6 +108,7 @@ var keywords = map[string]TokenType{
 	"true":  TRUE,
 	"false": FALSE,
 
+	"let":       LET,
 	"return":    RETURN,
 	"class":     CLASS,
 	"Init":      INIT,
