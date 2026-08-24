@@ -220,12 +220,22 @@ func (r *Runtime) AutoloadPlugins(projectRoot string) {
 	}
 
 	_ = filepath.Walk(pluginsDir, func(path string, info os.FileInfo, err error) error {
-		if err != nil || info == nil || info.IsDir() {
+		if err != nil || info == nil {
+			return nil
+		}
+		if info.IsDir() {
+			// Skip latest or backup subdirectories to prevent duplicate autoloads
+			if info.Name() == "latest" || info.Name() == ".backup" {
+				return filepath.SkipDir
+			}
 			return nil
 		}
 		if strings.EqualFold(filepath.Ext(path), ".jp") {
 			if err := r.LoadPluginPackage(path); err != nil {
-				fmt.Printf("[Plugin Autoload] Error cargando %s: %v\n", path, err)
+				// Suppress warning if plugin is already registered
+				if !strings.Contains(err.Error(), "ya registrado") {
+					fmt.Printf("[Plugin Autoload] Error cargando %s: %v\n", path, err)
+				}
 			} else {
 				fmt.Printf("[Plugin Autoload] Plugin cargado desde %s\n", path)
 			}

@@ -36,7 +36,33 @@ func (ar *AnalysisReport) PrintReport() {
 	fmt.Println(strings.Repeat("-", 60))
 }
 
-// Known Joss built-in functions check using centralized core.IsBuiltin registry.
+// Known framework singletons and native classes built into Joss
+var frameworkClasses = map[string]bool{
+	"GranDB": true, "Request": true, "Response": true, "Session": true,
+	"Auth": true, "UserStorage": true, "SEO": true, "MFA": true,
+	"TwoFactor": true, "UUID": true, "Http": true, "Markdown": true,
+	"Schema": true, "Router": true, "System": true, "Str": true,
+	"Math": true, "JSON": true, "Server": true, "View": true,
+	"DB": true, "Cron": true, "Env": true, "Lang": true,
+	"Config": true, "Turnstile": true, "Cache": true, "Log": true,
+	"Event": true, "Storage": true, "Cookie": true, "Validator": true,
+	"Mail": true, "Queue": true,
+}
+
+func isFrameworkClass(name string) bool {
+	return frameworkClasses[name]
+}
+
+func isSpecialIdentifier(name string) bool {
+	if name == "this" || name == "null" || name == "nil" || name == "default" {
+		return true
+	}
+	// Constant style (ALL_CAPS) or environment variables
+	if strings.ToUpper(name) == name && len(name) > 1 {
+		return true
+	}
+	return false
+}
 
 // AnalyzeProgram performs static inspection of AST to detect unused/undeclared symbols.
 func AnalyzeProgram(program *parser.Program) *AnalysisReport {
@@ -49,12 +75,12 @@ func AnalyzeProgram(program *parser.Program) *AnalysisReport {
 		return report
 	}
 
-	declaredVars := make(map[string]int)     // varName -> line
-	usedVars := make(map[string]bool)        // varName -> used
-	declaredFuncs := make(map[string]int)    // funcName -> line
-	calledFuncs := make(map[string]bool)     // funcName -> called
-	declaredClasses := make(map[string]int)  // className -> line
-	usedClasses := make(map[string]bool)     // className -> used
+	declaredVars := make(map[string]int)    // varName -> line
+	usedVars := make(map[string]bool)       // varName -> used
+	declaredFuncs := make(map[string]int)   // funcName -> line
+	calledFuncs := make(map[string]bool)    // funcName -> called
+	declaredClasses := make(map[string]int) // className -> line
+	usedClasses := make(map[string]bool)    // className -> used
 
 	// Pass 1: Collect top-level declarations (functions, classes, global vars)
 	for _, stmt := range program.Statements {
@@ -76,6 +102,9 @@ func AnalyzeProgram(program *parser.Program) *AnalysisReport {
 		}
 		switch e := exp.(type) {
 		case *parser.Identifier:
+			if isSpecialIdentifier(e.Value) || isFrameworkClass(e.Value) {
+				return
+			}
 			usedVars[e.Value] = true
 			// If not declared and not a known class/func, report undeclared var error
 			if _, isDecl := declaredVars[e.Value]; !isDecl {
@@ -105,15 +134,26 @@ func AnalyzeProgram(program *parser.Program) *AnalysisReport {
 		case *parser.NewExpression:
 			className := e.Class.Value
 			usedClasses[className] = true
-			if _, isDeclared := declaredClasses[className]; !isDeclared {
-				report.Errors = append(report.Errors, fmt.Sprintf("Línea %d: Intento de instanciar la clase '%s' con 'new', pero la clase no está declarada.", e.Class.Token.Line, className))
+			if !isFrameworkClass(className) {
+				if _, isDeclared := declaredClasses[className]; !isDeclared {
+					report.Errors = append(report.Errors, fmt.Sprintf("Línea %d: Intento de instanciar la clase '%s' con 'new', pero la clase no está declarada.", e.Class.Token.Line, className))
+				}
 			}
 			for _, arg := range e.Arguments {
 				inspectExpression(arg)
 			}
 
 		case *parser.MemberExpression:
-			inspectExpression(e.Left)
+			if leftIdent, ok := e.Left.(*parser.Identifier); ok {
+				name := leftIdent.Value
+				if isFrameworkClass(name) || declaredClasses[name] > 0 || name == "this" || isSpecialIdentifier(name) {
+					usedClasses[name] = true
+				} else {
+					inspectExpression(e.Left)
+				}
+			} else {
+				inspectExpression(e.Left)
+			}
 
 		case *parser.InfixExpression:
 			inspectExpression(e.Left)
@@ -128,7 +168,6 @@ func AnalyzeProgram(program *parser.Program) *AnalysisReport {
 		case *parser.TernaryExpression:
 			inspectExpression(e.Condition)
 			inspectExpression(e.True)
-			// e.False handled if AST supports it
 
 		case *parser.ArrayLiteral:
 			for _, el := range e.Elements {
@@ -142,7 +181,6 @@ func AnalyzeProgram(program *parser.Program) *AnalysisReport {
 
 		case *parser.AssignExpression:
 			if ident, ok := e.Left.(*parser.Identifier); ok {
-				// Mark as declared/initialized
 				if _, ok := declaredVars[ident.Value]; !ok {
 					declaredVars[ident.Value] = ident.Token.Line
 				}
@@ -155,6 +193,10 @@ func AnalyzeProgram(program *parser.Program) *AnalysisReport {
 			inspectExpression(e.Subject)
 			for _, arm := range e.Arms {
 				for _, k := range arm.Keys {
+					// Ignore 'default' keyword in match arm keys
+					if ident, ok := k.(*parser.Identifier); ok && ident.Value == "default" {
+						continue
+					}
 					inspectExpression(k)
 				}
 				inspectExpression(arm.Value)
@@ -269,7 +311,7 @@ func AnalyzeProgram(program *parser.Program) *AnalysisReport {
 
 	// Pass 3: Check for unused variables
 	for vName, line := range declaredVars {
-		if !usedVars[vName] {
+		if !usedVars[vName] && !isSpecialIdentifier(vName) {
 			report.Warnings = append(report.Warnings, fmt.Sprintf("Línea %d: La variable '$%s' fue declarada pero nunca se utiliza en el código.", line, vName))
 		}
 	}
@@ -283,10 +325,43 @@ func AnalyzeProgram(program *parser.Program) *AnalysisReport {
 
 	// Pass 5: Check for unused classes
 	for cName, line := range declaredClasses {
-		if cName != "Main" && !usedClasses[cName] {
-			report.Warnings = append(report.Warnings, fmt.Sprintf("Línea %d: La clase '%s' está definida pero nunca es instanciada ni utilizada.", line, cName))
+		if isFrameworkOrMVCClass(cName) || usedClasses[cName] {
+			continue
 		}
+		report.Warnings = append(report.Warnings, fmt.Sprintf("Línea %d: La clase '%s' está definida pero nunca es instanciada ni utilizada.", line, cName))
 	}
 
 	return report
+}
+
+func isFrameworkOrMVCClass(cName string) bool {
+	if cName == "Main" || cName == "App" {
+		return true
+	}
+	if strings.HasSuffix(cName, "Controller") ||
+		strings.HasSuffix(cName, "Model") ||
+		strings.HasSuffix(cName, "Middleware") ||
+		strings.HasSuffix(cName, "Guard") ||
+		strings.HasSuffix(cName, "Service") ||
+		strings.HasSuffix(cName, "Downloader") ||
+		strings.HasSuffix(cName, "Loader") ||
+		strings.HasSuffix(cName, "Helper") {
+		return true
+	}
+	if strings.HasPrefix(cName, "Create") ||
+		strings.HasPrefix(cName, "Add") ||
+		strings.HasPrefix(cName, "Drop") ||
+		strings.HasPrefix(cName, "Seed") ||
+		strings.HasPrefix(cName, "Update") ||
+		strings.HasPrefix(cName, "Alter") {
+		return true
+	}
+	// Standard ORM Model class names (e.g. Friendship, PubPackage, Project, CmsPost, etc.)
+	if cName == "Friendship" || cName == "PubPackage" || cName == "Project" ||
+		cName == "PubDownload" || cName == "OtpAccount" || cName == "Repository" ||
+		cName == "Credential" || cName == "PubVersion" || cName == "Category" ||
+		cName == "CmsPost" || cName == "User" {
+		return true
+	}
+	return false
 }
