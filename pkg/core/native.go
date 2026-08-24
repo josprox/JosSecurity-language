@@ -1,11 +1,22 @@
 package core
 
 import (
+	"sync"
+
 	"github.com/jossecurity/joss/pkg/parser"
+)
+
+var (
+	nativeClassesMu  sync.RWMutex
+	nativeClassesMap = make(map[string]bool)
 )
 
 // Helper to register a native class and its handler
 func (r *Runtime) registerNative(name string, methods []string, handler NativeHandler) {
+	nativeClassesMu.Lock()
+	nativeClassesMap[name] = true
+	nativeClassesMu.Unlock()
+
 	// Build MethodStatements
 	stmts := []parser.Statement{}
 	for _, m := range methods {
@@ -18,6 +29,13 @@ func (r *Runtime) registerNative(name string, methods []string, handler NativeHa
 	}
 	r.registerClass(classStmt)
 	r.NativeHandlers[name] = handler
+}
+
+// IsNativeClass returns true if the class name is a registered native class in Joss.
+func IsNativeClass(name string) bool {
+	nativeClassesMu.RLock()
+	defer nativeClassesMu.RUnlock()
+	return nativeClassesMap[name]
 }
 
 // RegisterNativeClasses injects the native class definitions into the runtime

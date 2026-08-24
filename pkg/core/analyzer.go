@@ -36,29 +36,14 @@ func (ar *AnalysisReport) PrintReport() {
 	fmt.Println(strings.Repeat("-", 60))
 }
 
-// Known framework singletons and native classes built into Joss
-var frameworkClasses = map[string]bool{
-	"GranDB": true, "Request": true, "Response": true, "Session": true,
-	"Auth": true, "UserStorage": true, "SEO": true, "MFA": true,
-	"TwoFactor": true, "UUID": true, "Http": true, "Markdown": true,
-	"Schema": true, "Router": true, "System": true, "Str": true,
-	"Math": true, "JSON": true, "Server": true, "View": true,
-	"DB": true, "Cron": true, "Env": true, "Lang": true,
-	"Config": true, "Turnstile": true, "Cache": true, "Log": true,
-	"Event": true, "Storage": true, "Cookie": true, "Validator": true,
-	"Mail": true, "Queue": true,
-}
-
-func isFrameworkClass(name string) bool {
-	return frameworkClasses[name]
-}
-
-func isSpecialIdentifier(name string) bool {
-	if name == "this" || name == "null" || name == "nil" || name == "default" {
+func isSpecialKeyword(name string) bool {
+	clean := strings.TrimPrefix(name, "$")
+	switch clean {
+	case "this", "null", "nil", "default", "true", "false", "self", "parent", "super":
 		return true
 	}
-	// Constant style (ALL_CAPS) or environment variables
-	if strings.ToUpper(name) == name && len(name) > 1 {
+	// Constant identifier (e.g. JOSS_VERSION, APP_ENV)
+	if strings.ToUpper(clean) == clean && len(clean) > 1 && !strings.HasPrefix(name, "$") {
 		return true
 	}
 	return false
@@ -74,6 +59,9 @@ func AnalyzeProgram(program *parser.Program) *AnalysisReport {
 	if program == nil {
 		return report
 	}
+
+	// Ensure native classes registered in Runtime are populated dynamically
+	_ = NewRuntime()
 
 	declaredVars := make(map[string]int)    // varName -> line
 	usedVars := make(map[string]bool)       // varName -> used
@@ -102,17 +90,25 @@ func AnalyzeProgram(program *parser.Program) *AnalysisReport {
 		}
 		switch e := exp.(type) {
 		case *parser.Identifier:
-			if isSpecialIdentifier(e.Value) || isFrameworkClass(e.Value) {
+			val := strings.TrimPrefix(e.Value, "$")
+
+			// Check if identifier is a class name, keyword, or function reference
+			if isSpecialKeyword(val) || IsNativeClass(val) {
+				usedClasses[val] = true
 				return
 			}
-			usedVars[e.Value] = true
-			// If not declared and not a known class/func, report undeclared var error
-			if _, isDecl := declaredVars[e.Value]; !isDecl {
-				if _, isClass := declaredClasses[e.Value]; !isClass {
-					if _, isFunc := declaredFuncs[e.Value]; !isFunc {
-						report.Errors = append(report.Errors, fmt.Sprintf("Línea %d: La variable '$%s' está siendo utilizada sin haber sido declarada previa ni formalmente.", e.Token.Line, e.Value))
-					}
-				}
+			if _, isClass := declaredClasses[val]; isClass {
+				usedClasses[val] = true
+				return
+			}
+			if _, isFunc := declaredFuncs[val]; isFunc || IsBuiltin(val) {
+				return
+			}
+
+			// Variable usage
+			usedVars[val] = true
+			if _, isDecl := declaredVars[val]; !isDecl {
+				report.Errors = append(report.Errors, fmt.Sprintf("Línea %d: La variable '$%s' está siendo utilizada sin haber sido declarada previa ni formalmente.", e.Token.Line, val))
 			}
 
 		case *parser.CallExpression:
@@ -134,7 +130,7 @@ func AnalyzeProgram(program *parser.Program) *AnalysisReport {
 		case *parser.NewExpression:
 			className := e.Class.Value
 			usedClasses[className] = true
-			if !isFrameworkClass(className) {
+			if !IsNativeClass(className) {
 				if _, isDeclared := declaredClasses[className]; !isDeclared {
 					report.Errors = append(report.Errors, fmt.Sprintf("Línea %d: Intento de instanciar la clase '%s' con 'new', pero la clase no está declarada.", e.Class.Token.Line, className))
 				}
@@ -145,8 +141,8 @@ func AnalyzeProgram(program *parser.Program) *AnalysisReport {
 
 		case *parser.MemberExpression:
 			if leftIdent, ok := e.Left.(*parser.Identifier); ok {
-				name := leftIdent.Value
-				if isFrameworkClass(name) || declaredClasses[name] > 0 || name == "this" || isSpecialIdentifier(name) {
+				name := strings.TrimPrefix(leftIdent.Value, "$")
+				if IsNativeClass(name) || declaredClasses[name] > 0 || isSpecialKeyword(name) {
 					usedClasses[name] = true
 				} else {
 					inspectExpression(e.Left)
@@ -181,8 +177,9 @@ func AnalyzeProgram(program *parser.Program) *AnalysisReport {
 
 		case *parser.AssignExpression:
 			if ident, ok := e.Left.(*parser.Identifier); ok {
-				if _, ok := declaredVars[ident.Value]; !ok {
-					declaredVars[ident.Value] = ident.Token.Line
+				val := strings.TrimPrefix(ident.Value, "$")
+				if _, ok := declaredVars[val]; !ok {
+					declaredVars[val] = ident.Token.Line
 				}
 			} else {
 				inspectExpression(e.Left)
@@ -193,7 +190,6 @@ func AnalyzeProgram(program *parser.Program) *AnalysisReport {
 			inspectExpression(e.Subject)
 			for _, arm := range e.Arms {
 				for _, k := range arm.Keys {
-					// Ignore 'default' keyword in match arm keys
 					if ident, ok := k.(*parser.Identifier); ok && ident.Value == "default" {
 						continue
 					}
@@ -210,14 +206,16 @@ func AnalyzeProgram(program *parser.Program) *AnalysisReport {
 		}
 		switch s := stmt.(type) {
 		case *parser.LetStatement:
-			declaredVars[s.Name.Value] = s.Name.Token.Line
+			val := strings.TrimPrefix(s.Name.Value, "$")
+			declaredVars[val] = s.Name.Token.Line
 			if s.Value != nil {
 				inspectExpression(s.Value)
 			}
 
 		case *parser.MultiLetStatement:
 			for _, decl := range s.Declarations {
-				declaredVars[decl.Name.Value] = s.TypeToken.Line
+				val := strings.TrimPrefix(decl.Name.Value, "$")
+				declaredVars[val] = s.TypeToken.Line
 				if decl.Value != nil {
 					inspectExpression(decl.Value)
 				}
@@ -255,7 +253,8 @@ func AnalyzeProgram(program *parser.Program) *AnalysisReport {
 
 		case *parser.ForeachStatement:
 			inspectExpression(s.Iterable)
-			declaredVars[s.Value] = s.Token.Line
+			val := strings.TrimPrefix(s.Value, "$")
+			declaredVars[val] = s.Token.Line
 			if s.Body != nil {
 				for _, bStmt := range s.Body.Statements {
 					inspectStatement(bStmt)
@@ -269,7 +268,8 @@ func AnalyzeProgram(program *parser.Program) *AnalysisReport {
 				}
 			}
 			if s.CatchVar != "" {
-				declaredVars[s.CatchVar] = s.Token.Line
+				val := strings.TrimPrefix(s.CatchVar, "$")
+				declaredVars[val] = s.Token.Line
 			}
 			if s.CatchBlock != nil {
 				for _, bStmt := range s.CatchBlock.Statements {
@@ -287,7 +287,8 @@ func AnalyzeProgram(program *parser.Program) *AnalysisReport {
 		case *parser.MethodStatement:
 			for _, param := range s.Parameters {
 				if param.Name != nil {
-					declaredVars[param.Name.Value] = param.Name.Token.Line
+					val := strings.TrimPrefix(param.Name.Value, "$")
+					declaredVars[val] = param.Name.Token.Line
 				}
 			}
 			if s.Body != nil {
@@ -311,7 +312,7 @@ func AnalyzeProgram(program *parser.Program) *AnalysisReport {
 
 	// Pass 3: Check for unused variables
 	for vName, line := range declaredVars {
-		if !usedVars[vName] && !isSpecialIdentifier(vName) {
+		if !usedVars[vName] && !isSpecialKeyword(vName) {
 			report.Warnings = append(report.Warnings, fmt.Sprintf("Línea %d: La variable '$%s' fue declarada pero nunca se utiliza en el código.", line, vName))
 		}
 	}
@@ -323,45 +324,5 @@ func AnalyzeProgram(program *parser.Program) *AnalysisReport {
 		}
 	}
 
-	// Pass 5: Check for unused classes
-	for cName, line := range declaredClasses {
-		if isFrameworkOrMVCClass(cName) || usedClasses[cName] {
-			continue
-		}
-		report.Warnings = append(report.Warnings, fmt.Sprintf("Línea %d: La clase '%s' está definida pero nunca es instanciada ni utilizada.", line, cName))
-	}
-
 	return report
-}
-
-func isFrameworkOrMVCClass(cName string) bool {
-	if cName == "Main" || cName == "App" {
-		return true
-	}
-	if strings.HasSuffix(cName, "Controller") ||
-		strings.HasSuffix(cName, "Model") ||
-		strings.HasSuffix(cName, "Middleware") ||
-		strings.HasSuffix(cName, "Guard") ||
-		strings.HasSuffix(cName, "Service") ||
-		strings.HasSuffix(cName, "Downloader") ||
-		strings.HasSuffix(cName, "Loader") ||
-		strings.HasSuffix(cName, "Helper") {
-		return true
-	}
-	if strings.HasPrefix(cName, "Create") ||
-		strings.HasPrefix(cName, "Add") ||
-		strings.HasPrefix(cName, "Drop") ||
-		strings.HasPrefix(cName, "Seed") ||
-		strings.HasPrefix(cName, "Update") ||
-		strings.HasPrefix(cName, "Alter") {
-		return true
-	}
-	// Standard ORM Model class names (e.g. Friendship, PubPackage, Project, CmsPost, etc.)
-	if cName == "Friendship" || cName == "PubPackage" || cName == "Project" ||
-		cName == "PubDownload" || cName == "OtpAccount" || cName == "Repository" ||
-		cName == "Credential" || cName == "PubVersion" || cName == "Category" ||
-		cName == "CmsPost" || cName == "User" {
-		return true
-	}
-	return false
 }
