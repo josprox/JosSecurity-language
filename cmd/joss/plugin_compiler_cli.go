@@ -23,6 +23,8 @@ func runPluginCommand(args []string) {
 		handlePluginCompile(args[1:])
 	case "inspect":
 		handlePluginInspect(args[1:])
+	case "verify":
+		handlePluginVerify(args[1:])
 	default:
 		fmt.Printf("Comando de plugin desconocido: %s\n\n", subCmd)
 		printPluginUsage()
@@ -33,6 +35,7 @@ func printPluginUsage() {
 	fmt.Println("Uso de comandos de plugins de Joss:")
 	fmt.Println("  joss plugin compile <dir|archivo> [--lang=java|python|php|wasm] [--name=nombre] [--ver=1.0.0] [--exports=f1,f2]")
 	fmt.Println("  joss plugin inspect <plugin.jp>")
+	fmt.Println("  joss plugin verify <plugin.jp>")
 }
 
 func handlePluginCompile(args []string) {
@@ -193,3 +196,34 @@ func handlePluginInspect(args []string) {
 	}
 	fmt.Println("========================================")
 }
+
+func handlePluginVerify(args []string) {
+	if len(args) < 1 {
+		fmt.Println("Error: especifica el archivo .jp a verificar.")
+		fmt.Println("Ejemplo: joss plugin verify mi_plugin.jp")
+		return
+	}
+
+	jpPath := args[0]
+	archive, err := os.ReadFile(jpPath)
+	if err != nil {
+		fmt.Printf("❌ Error al abrir %s: %v\n", jpPath, err)
+		os.Exit(1)
+	}
+
+	pkg, err := pluginpkg.ReadVerified(archive)
+	if err != nil {
+		fmt.Printf("❌ Error de verificación en '%s': %v\n", jpPath, err)
+		os.Exit(1)
+	}
+
+	fmt.Println("========================================")
+	fmt.Printf(" Plugin: %s\n", pkg.Metadata.Name)
+	fmt.Printf(" Version: %s\n", pkg.Metadata.Version)
+	fmt.Printf(" Estado: Firma Ed25519 VÁLIDA y VERIFICADA ✅\n")
+	if pkg.Metadata.SignatureAlgorithm != "" {
+		fmt.Printf(" Algoritmo: %s (%s)\n", pkg.Metadata.SignatureAlgorithm, pkg.Metadata.KeyID)
+	}
+	fmt.Println("========================================")
+}
+
