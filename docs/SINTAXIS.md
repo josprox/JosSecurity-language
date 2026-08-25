@@ -2,7 +2,7 @@
 
 ## Variables y tipos
 
-Las variables usan `$`. La primera asignación simple infiere un tipo que permanece estable; no convierte la variable en dinámica. `function` se acepta por compatibilidad, pero la palabra canónica es `func`.
+Las variables usan `$`. La primera asignación simple infiere un tipo que permanece estable; no convierte la variable en dinámica. `func` es la única palabra para funciones y closures.
 
 ```joss
 $age = 20       // infiere int
@@ -18,7 +18,7 @@ $config = {"port": 8000}
 
 `$age = "veinte"` es un error porque `$age` ya fue inferida como `int`. Sólo `let $dynamic` permite cambiar de tipo deliberadamente. Los tipos reconocidos incluyen `int`, `float`, `string`, `bool`, `array`, `map`, `object`, `channel` y clases. Una declaración numérica explícita puede convertir una cadena completa y válida antes de fallar; nunca trunca `"20.5"` a `int`.
 
-La gramática actual no implementa declaraciones `const`, nullables, unions ni anotaciones de retorno. Consulte [Sistema de tipos](SISTEMA_TIPOS.md).
+`const $name = valor` declara una constante inferida y `const Tipo $name = valor` una constante tipada. Las uniones se escriben `int|string`; `int?` es el atajo de `int|null`. Las funciones aceptan retorno opcional (`func name(...): Tipo`) y toda función anotada debe retornar o lanzar en cada ruta demostrable. Consulte [Sistema de tipos](SISTEMA_TIPOS.md).
 
 ## Operadores y Concatenación
 
@@ -184,7 +184,7 @@ $newId = GranDB::table("products")->insertGetId({
 GranDB::table("products")->where("id", $newId)->increment("stock", 5)
 
 // Transacciones atómicas
-GranDB::transaction(function($db) {
+GranDB::transaction(func($db) {
     GranDB::table("accounts")->where("id", 1)->decrement("balance", 100)
     GranDB::table("accounts")->where("id", 2)->increment("balance", 100)
 })
@@ -195,4 +195,6 @@ System::change_db("sqlite", {"DB_PATH": "local.sqlite", "DB_PREFIX": "app_"})
 
 ## Carga Automática (Zero Imports)
 
-No se requieren sentencias `import` ni `use`. Todas las clases del proyecto (`app/controllers/`, `app/models/`, `app/libs/`), así como los plugins instalados (`plugins/` / `joss.yaml`), son indexados y cargados automáticamente en memoria por el runtime de Joss. Las palabras clave `import` y `use` no existen en la sintaxis moderna.
+No existen sentencias `import` ni `use`, y no se añadirán en el futuro. Todas las clases del proyecto (`app/controllers/`, `app/models/`, `app/libs/`), así como los plugins instalados (`plugins/` / `joss.yaml`), son indexados y cargados automáticamente. `import`, `@import`, `use`, `Namespace` y la grafía histórica `function` son sintaxis eliminada y el parser las rechaza.
+
+Las funciones pueden anotar su retorno con `: Tipo` y son recursivas. Consulte [Funciones recursivas](RECURSION.md) para frames, límites y casos base.

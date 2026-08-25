@@ -21,47 +21,47 @@ func (r *Runtime) ensureAuthTables(usersTable, rolesTable, prefix string) {
 	}
 
 	// 1. Tabla de Roles con Schema::create
-	r.executeSchemaMethod(nil, "create", []interface{}{
-		"roles",
-		map[string]interface{}{
-			"id":   "increments",
-			"name": "string(50)|unique",
-		},
-	})
+	if err := r.ensureInternalSchemaTable("roles", []schemaColumn{
+		{name: "id", definition: "increments"},
+		{name: "name", definition: "string(50)|unique"},
+	}); err != nil {
+		fmt.Printf("[Auth] Error creando tabla de roles: %v\n", err)
+		return
+	}
 
 	// 2. Tabla de Usuarios con Schema::create
-	r.executeSchemaMethod(nil, "create", []interface{}{
-		"users",
-		map[string]interface{}{
-			"id":               "bigIncrements",
-			"user_token":       "string(128)|nullable",
-			"username":         "string(50)|nullable",
-			"first_name":       "string(100)|nullable",
-			"last_name":        "string(100)|nullable",
-			"email":            "string(191)|unique",
-			"phone":            "string(20)|nullable",
-			"password":         "string(255)",
-			"role_id":          "integer|default(2)",
-			"verificado":       "integer|default(0)",
-			"token_expires_at": "timestamp|nullable",
-			"last_login_at":    "timestamp|nullable",
-			"created_at":       "timestamp|nullable",
-			"updated_at":       "timestamp|nullable",
-		},
-	})
+	if err := r.ensureInternalSchemaTable("users", []schemaColumn{
+		{name: "id", definition: "bigIncrements"},
+		{name: "user_token", definition: "string(128)|nullable"},
+		{name: "username", definition: "string(50)|nullable"},
+		{name: "first_name", definition: "string(100)|nullable"},
+		{name: "last_name", definition: "string(100)|nullable"},
+		{name: "email", definition: "string(191)|unique"},
+		{name: "phone", definition: "string(20)|nullable"},
+		{name: "password", definition: "string(255)"},
+		{name: "role_id", definition: "integer|default(2)"},
+		{name: "verificado", definition: "integer|default(0)"},
+		{name: "token_expires_at", definition: "timestamp|nullable"},
+		{name: "last_login_at", definition: "timestamp|nullable"},
+		{name: "created_at", definition: "timestamp|nullable"},
+		{name: "updated_at", definition: "timestamp|nullable"},
+	}); err != nil {
+		fmt.Printf("[Auth] Error creando tabla de usuarios: %v\n", err)
+		return
+	}
 
 	// 3. Tabla de Password Resets con Schema::create
-	r.executeSchemaMethod(nil, "create", []interface{}{
-		"password_resets",
-		map[string]interface{}{
-			"id":         "increments",
-			"email":      "string(191)",
-			"token":      "string(255)",
-			"created_at": "timestamp|nullable",
-			"expires_at": "timestamp|nullable",
-			"used":       "integer|default(0)",
-		},
-	})
+	if err := r.ensureInternalSchemaTable("password_resets", []schemaColumn{
+		{name: "id", definition: "increments"},
+		{name: "email", definition: "string(191)"},
+		{name: "token", definition: "string(255)"},
+		{name: "created_at", definition: "timestamp|nullable"},
+		{name: "expires_at", definition: "timestamp|nullable"},
+		{name: "used", definition: "integer|default(0)"},
+	}); err != nil {
+		fmt.Printf("[Auth] Error creando tabla de recuperacion: %v\n", err)
+		return
+	}
 
 	// 4. Auto-Patching de columnas en tablas existentes usando Schema::hasColumn y Schema::table
 	patchColumns := map[string]string{
@@ -80,10 +80,10 @@ func (r *Runtime) ensureAuthTables(usersTable, rolesTable, prefix string) {
 	for colName, colType := range patchColumns {
 		hasCol, _ := r.executeSchemaMethod(nil, "hasColumn", []interface{}{"users", colName}).(bool)
 		if !hasCol {
-			r.executeSchemaMethod(nil, "table", []interface{}{
-				"users",
-				map[string]interface{}{colName: colType},
-			})
+			if err := r.addInternalSchemaColumn("users", schemaColumn{name: colName, definition: colType}); err != nil {
+				fmt.Printf("[Auth] Error agregando users.%s: %v\n", colName, err)
+				return
+			}
 		}
 	}
 

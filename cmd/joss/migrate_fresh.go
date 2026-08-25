@@ -32,11 +32,17 @@ func runMigrateFresh() {
 	rt.DropAllTables()
 
 	// 3. Recreate migration table
-	rt.EnsureMigrationTable()
+	if err := rt.EnsureMigrationTable(); err != nil {
+		fmt.Printf("Error creando tabla de migraciones: %v\n", err)
+		os.Exit(1)
+	}
 	rt.EnsureAuthTables()
 
 	// 4. Run migrations
-	performMigrations(rt)
+	if err := performMigrations(rt); err != nil {
+		fmt.Printf("Error ejecutando migraciones: %v\n", err)
+		os.Exit(1)
+	}
 
 	fmt.Println("¡Migraciones ejecutadas exitosamente!")
 }

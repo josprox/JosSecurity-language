@@ -27,6 +27,16 @@ func hasCode(items []diagnostics.Diagnostic, code string) bool {
 	return false
 }
 
+func countCode(items []diagnostics.Diagnostic, code string) int {
+	count := 0
+	for _, item := range items {
+		if item.Code == code {
+			count++
+		}
+	}
+	return count
+}
+
 func TestInferredVariableKeepsFirstConcreteType(t *testing.T) {
 	items := analyzeSource(t, `$age = 20
 $age = 30
@@ -133,5 +143,107 @@ func TestUnreachableStatementIsWarning(t *testing.T) {
 	items := analyzeSource(t, `func stop() { return 1 echo "never" }`, NewEnvironment())
 	if !hasCode(items, "JOSS-FLOW-001") {
 		t.Fatalf("expected unreachable warning, got %#v", items)
+	}
+}
+
+func TestRecursiveFunctionUsesPredeclaredReturnType(t *testing.T) {
+	items := analyzeSource(t, `func factorial(int $n): int {
+  ($n <= 1) ? { return 1 } : {}
+  return $n * factorial($n - 1)
+}
+$result = factorial(5)
+echo $result`, NewEnvironment())
+	if hasCode(items, "JOSS-SYM-003") || hasCode(items, "JOSS-TYPE-004") || hasCode(items, "JOSS-TYPE-008") {
+		t.Fatalf("valid recursive signature was not resolved: %#v", items)
+	}
+}
+
+func TestRecursiveMethodUsesPredeclaredReturnType(t *testing.T) {
+	items := analyzeSource(t, `class Calculator {
+    func factorial(int $value): int {
+        ($value <= 1) ? { return 1 } : { return $value * $this->factorial($value - 1) }
+    }
+}`, NewEnvironment())
+	for _, code := range []string{"JOSS-MEMBER-001", "JOSS-TYPE-004", "JOSS-TYPE-008"} {
+		if hasCode(items, code) {
+			t.Fatalf("valid recursive method produced %s: %#v", code, items)
+		}
+	}
+}
+
+func TestDeclaredReturnTypeIsChecked(t *testing.T) {
+	items := analyzeSource(t, `func invalid(): int { return "wrong" }`, NewEnvironment())
+	if !hasCode(items, "JOSS-TYPE-008") {
+		t.Fatalf("expected return type diagnostic, got %#v", items)
+	}
+}
+
+func TestUnannotatedReturnDoesNotInventATypeContract(t *testing.T) {
+	items := analyzeSource(t, `func flexible() { return "value" }`, NewEnvironment())
+	if hasCode(items, "JOSS-TYPE-008") {
+		t.Fatalf("unannotated return produced a type error: %#v", items)
+	}
+}
+
+func TestConstantReassignmentIsRejected(t *testing.T) {
+	items := analyzeSource(t, `const $limit = 10
+$limit = 20
+echo $limit`, NewEnvironment())
+	if !hasCode(items, "JOSS-SYM-006") {
+		t.Fatalf("expected immutable constant diagnostic, got %#v", items)
+	}
+}
+
+func TestConstantAndTypedPropertiesAreChecked(t *testing.T) {
+	items := analyzeSource(t, `class Limits {
+    const int $maximum = 10
+    string $label = "safe"
+    func invalid() {
+        $this->maximum = 20
+        $this->label = false
+    }
+}`, NewEnvironment())
+	if !hasCode(items, "JOSS-SYM-006") || !hasCode(items, "JOSS-TYPE-001") {
+		t.Fatalf("property diagnostics = %#v", items)
+	}
+}
+
+func TestRemovedTypeAliasesAreReportedAsUnknownTypes(t *testing.T) {
+	items := analyzeSource(t, `integer $age = 20
+func enabled(boolean $value): boolean { return $value }`, NewEnvironment())
+	if countCode(items, "JOSS-TYPE-009") != 3 {
+		t.Fatalf("diagnostics = %#v, want three JOSS-TYPE-009 errors", items)
+	}
+}
+
+func TestDeclaredClassNamesRemainValidTypes(t *testing.T) {
+	items := analyzeSource(t, `class User {}
+func identity(User $user): User { return $user }`, NewEnvironment())
+	if countCode(items, "JOSS-TYPE-009") != 0 {
+		t.Fatalf("declared class type diagnostics = %#v", items)
+	}
+}
+
+func TestNullableAndUnionAssignments(t *testing.T) {
+	items := analyzeSource(t, `int? $count = null
+$count = 2
+$count = "wrong"
+func normalize(int|string $value): string|null {
+    ($value == 0) ? { return null } : { return "ok" }
+}`, NewEnvironment())
+	if countCode(items, "JOSS-TYPE-001") != 1 || hasCode(items, "JOSS-TYPE-008") || hasCode(items, "JOSS-TYPE-010") {
+		t.Fatalf("union diagnostics = %#v", items)
+	}
+}
+
+func TestDeclaredReturnRequiresEveryPath(t *testing.T) {
+	items := analyzeSource(t, `func incomplete(bool $ok): int {
+    $ok ? { return 1 } : {}
+}
+func complete(bool $ok): int {
+    $ok ? { return 1 } : { return 2 }
+}`, NewEnvironment())
+	if countCode(items, "JOSS-TYPE-010") != 1 {
+		t.Fatalf("return-path diagnostics = %#v", items)
 	}
 }

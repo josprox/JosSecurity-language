@@ -24,15 +24,17 @@ type Analyzer struct {
 	classTokens       map[string]functionDeclaration
 	file              string
 	currentClass      string
+	currentReturnType typesystem.Type
 	suppressUndefined int
 }
 
 func Analyze(units []SourceUnit, environment Environment) []diagnostics.Diagnostic {
 	a := &Analyzer{
-		environment: environment,
-		functions:   make(map[string]functionDeclaration),
-		classes:     make(map[string]Class),
-		classTokens: make(map[string]functionDeclaration),
+		environment:       environment,
+		functions:         make(map[string]functionDeclaration),
+		classes:           make(map[string]Class),
+		classTokens:       make(map[string]functionDeclaration),
+		currentReturnType: typesystem.Type{Kind: typesystem.Unknown},
 	}
 	for name, class := range environment.Classes {
 		a.classes[name] = class
@@ -102,12 +104,24 @@ func (a *Analyzer) declareClass(classNode *parser.ClassStatement, file string) {
 			"Class names share one project-wide namespace.", "Choose a unique class name.")
 		return
 	}
-	class := Class{Name: name, Methods: make(map[string]Callable)}
+	class := Class{Name: name, Methods: make(map[string]Callable), Fields: make(map[string]Field)}
 	if classNode.SuperClass != nil {
 		class.SuperClass = classNode.SuperClass.Value
 	}
 	if classNode.Body != nil {
 		for _, member := range classNode.Body.Statements {
+			if declaration, ok := member.(*parser.LetStatement); ok && declaration.Name != nil {
+				class.Fields[declaration.Name.Value] = Field{Type: typeFromToken(declaration.Token), Constant: declaration.IsConst}
+				continue
+			}
+			if declarations, ok := member.(*parser.MultiLetStatement); ok {
+				for _, declaration := range declarations.Declarations {
+					if declaration.Name != nil {
+						class.Fields[declaration.Name.Value] = Field{Type: typeFromToken(declarations.TypeToken)}
+					}
+				}
+				continue
+			}
 			var methodName string
 			var callable Callable
 			var token parser.Token
@@ -144,8 +158,15 @@ func callableFromMethod(method *parser.MethodStatement) Callable {
 	return Callable{
 		Name:       method.Name.Value,
 		Parameters: parametersFromAST(method.Parameters),
-		ReturnType: typesystem.Type{Kind: typesystem.Unknown},
+		ReturnType: typeFromToken(method.ReturnType),
 	}
+}
+
+func typeFromToken(token parser.Token) typesystem.Type {
+	if token.Literal == "" {
+		return typesystem.Type{Kind: typesystem.Unknown}
+	}
+	return typesystem.Parse(token.Literal)
 }
 
 func parametersFromAST(parameters []*parser.Parameter) []Parameter {
@@ -179,7 +200,9 @@ func (a *Analyzer) analyzeUnits(units []SourceUnit) {
 			case *parser.ClassStatement:
 				a.analyzeClass(node, global)
 			case *parser.MethodStatement:
-				a.analyzeCallable(node.Parameters, node.Body, global, "")
+				returnType := typeFromToken(node.ReturnType)
+				a.validateDeclaredType(returnType, node.ReturnType, "return annotation")
+				a.analyzeCallable(node.Parameters, node.Body, global, "", returnType)
 			default:
 				a.analyzeStatement(statement, fileScope)
 			}
@@ -210,9 +233,11 @@ func (a *Analyzer) analyzeClass(classNode *parser.ClassStatement, global *scope)
 	for _, member := range classNode.Body.Statements {
 		switch node := member.(type) {
 		case *parser.MethodStatement:
-			a.analyzeCallable(node.Parameters, node.Body, classScope, classNode.Name.Value)
+			returnType := typeFromToken(node.ReturnType)
+			a.validateDeclaredType(returnType, node.ReturnType, "return annotation")
+			a.analyzeCallable(node.Parameters, node.Body, classScope, classNode.Name.Value, returnType)
 		case *parser.InitStatement:
-			a.analyzeCallable(node.Parameters, node.Body, classScope, classNode.Name.Value)
+			a.analyzeCallable(node.Parameters, node.Body, classScope, classNode.Name.Value, typesystem.Type{Kind: typesystem.Unknown})
 		case *parser.LetStatement:
 			a.analyzeDeclaration(node, classScope, false)
 		case *parser.MultiLetStatement:
@@ -221,7 +246,10 @@ func (a *Analyzer) analyzeClass(classNode *parser.ClassStatement, global *scope)
 	}
 }
 
-func (a *Analyzer) analyzeCallable(parameters []*parser.Parameter, body *parser.BlockStatement, parent *scope, className string) {
+func (a *Analyzer) analyzeCallable(parameters []*parser.Parameter, body *parser.BlockStatement, parent *scope, className string, returnType typesystem.Type) {
+	previousReturnType := a.currentReturnType
+	a.currentReturnType = returnType
+	defer func() { a.currentReturnType = previousReturnType }()
 	local := newScope(parent)
 	if className != "" {
 		local.put(&symbol{Name: "this", Type: typesystem.Type{Kind: typesystem.Class, Name: className}, Kind: symbolImplicit, Used: true, Synthetic: true})
@@ -233,6 +261,7 @@ func (a *Analyzer) analyzeCallable(parameters []*parser.Parameter, body *parser.
 		parameterType := typesystem.Type{Kind: typesystem.Mixed}
 		if parameter.Type.Literal != "" && parameter.Type.Type != parser.VAR {
 			parameterType = typesystem.Parse(parameter.Type.Literal)
+			a.validateDeclaredType(parameterType, parameter.Type, "parameter type")
 		}
 		if _, exists := local.local(parameter.Name.Value); exists {
 			a.redeclaration(parameter.Name.Value, parameter.Name.Token)
@@ -248,6 +277,12 @@ func (a *Analyzer) analyzeCallable(parameters []*parser.Parameter, body *parser.
 	}
 	if body != nil {
 		a.analyzeBlock(body, local)
+		if returnType.Kind != typesystem.Unknown && !blockTerminatesCallable(body) {
+			a.add("JOSS-TYPE-010", diagnostics.SeverityError, a.file, body.Token,
+				fmt.Sprintf("Not every control-flow path returns the declared type `%s`.", returnType.String()),
+				"A callable with an explicit return type must return or throw on every reachable path.",
+				"Add an explicit return to the missing path or make the return type nullable when `null` is intentional.")
+		}
 	}
 	a.reportUnused(local)
 }
@@ -279,10 +314,19 @@ func (a *Analyzer) analyzeStatement(statement parser.Statement, current *scope) 
 		a.analyzeMultiDeclaration(node, current, true)
 	case *parser.ExpressionStatement:
 		a.inferExpression(node.Expression, current)
+		return expressionTerminatesCallable(node.Expression)
 	case *parser.EchoStatement:
 		a.inferExpression(node.Value, current)
 	case *parser.ReturnStatement:
-		a.inferExpression(node.ReturnValue, current)
+		actualType := typesystem.Type{Kind: typesystem.Null}
+		if node.ReturnValue != nil {
+			actualType = a.inferExpression(node.ReturnValue, current)
+		}
+		if a.currentReturnType.Kind != typesystem.Unknown && !assignableExpression(a.currentReturnType, actualType, node.ReturnValue) {
+			a.add("JOSS-TYPE-008", diagnostics.SeverityError, a.file, node.Token,
+				fmt.Sprintf("Return value has type `%s`; callable requires `%s`.", actualType.String(), a.currentReturnType.String()),
+				"Declared return types apply to every explicit return in the callable.", "Return a compatible value or correct the return annotation.")
+		}
 		return true
 	case *parser.ThrowStatement:
 		a.inferExpression(node.Value, current)
@@ -312,8 +356,9 @@ func (a *Analyzer) analyzeStatement(statement parser.Statement, current *scope) 
 			a.analyzeBlock(node.Body, current)
 		}
 	case *parser.TryCatchStatement:
+		tryTerminates := false
 		if node.TryBlock != nil {
-			a.analyzeBlock(node.TryBlock, current)
+			tryTerminates = a.analyzeBlock(node.TryBlock, current)
 		}
 		if node.CatchVar != "" {
 			name := cleanName(node.CatchVar)
@@ -321,9 +366,11 @@ func (a *Analyzer) analyzeStatement(statement parser.Statement, current *scope) 
 				current.put(&symbol{Name: name, Type: typesystem.Type{Kind: typesystem.Object}, Kind: symbolCatch, Token: node.CatchToken, File: a.file})
 			}
 		}
+		catchTerminates := false
 		if node.CatchBlock != nil {
-			a.analyzeBlock(node.CatchBlock, current)
+			catchTerminates = a.analyzeBlock(node.CatchBlock, current)
 		}
+		return tryTerminates && catchTerminates
 	case *parser.BreakStatement, *parser.ContinueStatement:
 		return true
 	}
@@ -340,6 +387,7 @@ func (a *Analyzer) analyzeDeclaration(node *parser.LetStatement, current *scope,
 		return
 	}
 	declaredType := typesystem.Parse(node.Token.Literal)
+	a.validateDeclaredType(declaredType, node.Token, "variable type")
 	inferred := strings.EqualFold(node.Token.Literal, "var")
 	dynamic := declaredType.Kind == typesystem.Mixed
 	valueType := typesystem.Type{Kind: typesystem.Unknown}
@@ -355,7 +403,25 @@ func (a *Analyzer) analyzeDeclaration(node *parser.LetStatement, current *scope,
 	if !warnUnused {
 		kind = symbolImplicit
 	}
-	current.put(&symbol{Name: name, Type: declaredType, Kind: kind, Token: node.Name.Token, File: a.file, Dynamic: dynamic, Inferred: inferred, Used: !warnUnused})
+	current.put(&symbol{Name: name, Type: declaredType, Kind: kind, Token: node.Name.Token, File: a.file, Dynamic: dynamic, Inferred: inferred, Constant: node.IsConst, Used: !warnUnused})
+}
+
+func (a *Analyzer) validateDeclaredType(declaredType typesystem.Type, token parser.Token, context string) {
+	if token.Literal == "" {
+		return
+	}
+	for _, member := range declaredType.Members() {
+		if member.Kind != typesystem.Class {
+			continue
+		}
+		if _, exists := a.classes[member.Name]; exists {
+			continue
+		}
+		a.add("JOSS-TYPE-009", diagnostics.SeverityError, a.file, token,
+			fmt.Sprintf("Unknown type `%s` in %s.", member.Name, context),
+			"Only canonical primitive types or declared/native class names are valid.",
+			"Use a canonical type name or declare the referenced class.")
+	}
 }
 
 func (a *Analyzer) analyzeMultiDeclaration(node *parser.MultiLetStatement, current *scope, warnUnused bool) {

@@ -30,23 +30,28 @@ func runMigrations() {
 	fmt.Println("Conexión a DB exitosa.")
 
 	// Ensure migration table exists
-	rt.EnsureMigrationTable()
+	if err := rt.EnsureMigrationTable(); err != nil {
+		fmt.Printf("Error creando tabla de migraciones: %v\n", err)
+		os.Exit(1)
+	}
 	rt.EnsureAuthTables()
 
-	performMigrations(rt)
+	if err := performMigrations(rt); err != nil {
+		fmt.Printf("Error ejecutando migraciones: %v\n", err)
+		os.Exit(1)
+	}
 }
 
-func performMigrations(rt *core.Runtime) {
+func performMigrations(rt *core.Runtime) error {
 	// 2. Find migration files
 	files, err := filepath.Glob("app/database/migrations/*.joss")
 	if err != nil {
-		fmt.Printf("Error buscando migraciones: %v\n", err)
-		return
+		return fmt.Errorf("buscando migraciones: %w", err)
 	}
 
 	if len(files) == 0 {
 		fmt.Println("No se encontraron migraciones en app/database/migrations/")
-		return
+		return nil
 	}
 
 	// 3. Get executed migrations
@@ -65,8 +70,7 @@ func performMigrations(rt *core.Runtime) {
 
 		data, err := os.ReadFile(file)
 		if err != nil {
-			fmt.Printf("Error leyendo %s: %v\n", file, err)
-			continue
+			return fmt.Errorf("leyendo %s: %w", file, err)
 		}
 
 		l := parser.NewLexer(string(data))
@@ -74,11 +78,7 @@ func performMigrations(rt *core.Runtime) {
 		program := p.ParseProgram()
 
 		if len(p.Errors()) != 0 {
-			fmt.Printf("Error de parseo en %s:\n", file)
-			for _, msg := range p.Errors() {
-				fmt.Printf("\t%s\n", msg)
-			}
-			continue
+			return fmt.Errorf("parseando %s: %v", file, p.Errors())
 		}
 
 		rt.Execute(program)
@@ -111,11 +111,15 @@ func performMigrations(rt *core.Runtime) {
 				fmt.Printf("Ejecutando up() de %s...\n", migrationClass.Name.Value)
 				rt.CallMethodEvaluated(upMethod, instance, []interface{}{})
 			} else {
-				fmt.Printf("Advertencia: No se encontró el método 'up' en %s\n", migrationClass.Name.Value)
+				return fmt.Errorf("la migracion %s no define up()", filename)
 			}
+		} else {
+			return fmt.Errorf("la migracion %s no define una clase", filename)
 		}
 
-		rt.LogMigration(filename, batch)
+		if err := rt.LogMigration(filename, batch); err != nil {
+			return fmt.Errorf("registrando migracion %s: %w", filename, err)
+		}
 		count++
 	}
 
@@ -124,4 +128,5 @@ func performMigrations(rt *core.Runtime) {
 	} else {
 		fmt.Printf("Migraciones completadas: %d\n", count)
 	}
+	return nil
 }

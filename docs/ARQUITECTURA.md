@@ -20,7 +20,7 @@ fuentes .joss
 | Paquete | Responsabilidad |
 |---|---|
 | `pkg/parser` | Tokens, lexer, precedencias, parser y nodos AST. |
-| `pkg/typesystem` | Nombres canónicos, aliases, inferencia, coerción explícita y compatibilidad de asignación. |
+| `pkg/typesystem` | Nombres canónicos, inferencia, coerción explícita y compatibilidad de asignación. |
 | `pkg/analyzer` | Unidades fuente, scopes, símbolos, inferencia de expresiones, firmas y flujo alcanzable. No depende del runtime. |
 | `pkg/diagnostics` | Modelo común: código, severidad, mensaje, archivo, rango, explicación y sugerencia. |
 | `pkg/core` | Adaptación de catálogos reales al analizador, intérprete y primitivas integradas. |
@@ -33,8 +33,8 @@ fuentes .joss
 
 - Keywords: `pkg/parser/token.go`; `parser.KeywordNames()` es la proyección para tooling.
 - Tipos y compatibilidad: `pkg/typesystem`.
-- Built-ins globales: `pkg/core/builtins.go`. El dispatcher rechaza nombres fuera de ese catálogo.
-- Clases/métodos nativos: llamadas a `registerNative` dentro de `Runtime.RegisterNativeClasses()`.
+- Built-ins globales: nombres en `pkg/core/builtins.go`, retornos en `pkg/core/native_signatures.go`. El dispatcher rechaza nombres fuera del catálogo.
+- Clases/métodos nativos: llamadas a `registerNative` dentro de `Runtime.RegisterNativeClasses()`; sus retornos se tipan en `pkg/core/native_signatures.go`.
 - Símbolos de plugins: `pluginpkg.SymbolIndex` incluido en cada `.jp`.
 - Diagnósticos: `pkg/diagnostics.Diagnostic` y códigos emitidos por `pkg/analyzer`.
 - Catálogo de VS Code: `vscode-joss/src/server/generated/languageCatalog.json`, generado mediante `go run ./tools/cataloggen`.
@@ -49,10 +49,13 @@ CI ejecuta `go run ./tools/cataloggen --check`; editar a mano el catálogo gener
 - El binding de `foreach` puede reutilizarse en otro loop; el runtime lo trata como asignación.
 - Las clases y funciones top-level se resuelven a nivel de proyecto.
 - Los globals nativos y símbolos de plugins se inyectan mediante `analyzer.Environment`.
+- Una función con nombre no hereda variables fuente del caller ni variables top-level: recibe parámetros, locales, `this` y bindings del host/plugin. Una closure sí captura léxicamente.
 
 ## Build y ejecución
 
-El modo de desarrollo interpreta el AST. `pkg/bytecode` codifica el AST con `gob` y compresión. Los builds nativos empaquetan ese bytecode junto con el runner Go; actualmente no existe un backend LLVM/Cranelift ni traducción AOT del programa Joss a código máquina. El compilador de plugins sí posee un IR JPBC separado; no debe confundirse con el pipeline del lenguaje principal.
+El modo de desarrollo interpreta el AST. Cada invocación de callable crea un frame léxico independiente; no existe scope dinámico entre caller y callee. Esto evita que una llamada recursiva lea o sobrescriba locales del caller. El runtime limita la profundidad a 1024 frames por defecto y las closures escriben únicamente sobre su entorno capturado. Los tipos de retorno anotados se validan en analyzer/runtime y el analyzer exige terminación exhaustiva demostrable.
+
+`pkg/bytecode` codifica el AST con `gob` y compresión bajo la única cabecera aceptada `JOSSBC2Z`. Los builds nativos empaquetan ese bytecode junto con el runner Go; actualmente no existe un backend LLVM/Cranelift ni traducción AOT del programa Joss a código máquina. El compilador de plugins sí posee un IR JPBC separado; no debe confundirse con el pipeline del lenguaje principal.
 
 ## Regla de dependencia
 

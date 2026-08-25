@@ -2,12 +2,11 @@ package typesystem
 
 import "testing"
 
-func TestCanonicalAliasesAndCompatibility(t *testing.T) {
-	if got := Parse("integer"); got.Kind != Int {
-		t.Fatalf("integer alias = %s, want int", got.String())
-	}
-	if got := Parse("boolean"); got.Kind != Bool {
-		t.Fatalf("boolean alias = %s, want bool", got.String())
+func TestCanonicalNamesAndCompatibility(t *testing.T) {
+	for _, removedAlias := range []string{"integer", "double", "boolean", "dynamic", "any", "list"} {
+		if got := Parse(removedAlias); got.Kind != Class {
+			t.Fatalf("removed alias %q resolved as %s, want unresolved class type", removedAlias, got.String())
+		}
 	}
 	if !Assignable(Type{Kind: Float}, Type{Kind: Int}) {
 		t.Fatal("int should be assignable to float")
@@ -42,5 +41,21 @@ func TestTypedStringCoercionIsLossless(t *testing.T) {
 	}
 	if value, ok := CoerceString(Type{Kind: Int}, "9223372036854775808"); ok {
 		t.Fatalf("overflowing integer was accepted as %v", value)
+	}
+}
+
+func TestUnionAndNullableCompatibility(t *testing.T) {
+	nullable := Parse("int?")
+	if nullable.Kind != Union || nullable.String() != "int|null" {
+		t.Fatalf("nullable type = %#v", nullable)
+	}
+	if !Assignable(nullable, Type{Kind: Int}) || !Assignable(nullable, Type{Kind: Null}) {
+		t.Fatal("nullable int must accept int and null")
+	}
+	if Assignable(nullable, Type{Kind: String}) {
+		t.Fatal("nullable int must reject string")
+	}
+	if !Assignable(Parse("int|string"), Parse("int|string")) || Assignable(Parse("int"), Parse("int|string")) {
+		t.Fatal("union source compatibility is not sound")
 	}
 }

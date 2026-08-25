@@ -1,4 +1,4 @@
-# Documentación de Joss 3.6
+# Documentación de Joss 3.6.7.2
 
 Esta referencia describe el comportamiento implementado en el repositorio. Las APIs de plugins no se presentan como parte del núcleo. La documentación publicada está en [joss.red/docs](https://joss.red/docs) y el registro en [joss.red/pub](https://joss.red/pub).
 
@@ -6,6 +6,7 @@ Esta referencia describe el comportamiento implementado en el repositorio. Las A
 
 - [Sintaxis](SINTAXIS.md)
 - [Sistema de tipos e inferencia](SISTEMA_TIPOS.md)
+- [Funciones recursivas](RECURSION.md)
 - [Arquitectura del lenguaje](ARQUITECTURA.md)
 - [Módulos, archivos e imports](MODULOS_IMPORTS.md)
 - [Concurrencia](CONCURRENCIA.md)

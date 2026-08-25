@@ -7,8 +7,7 @@ Joss permite ejecutar bloques de código de forma asíncrona en goroutines nativ
 ```joss
 // Lanzar una goroutine en segundo plano
 async {
-    $downloader = new DocDownloader()
-    $downloader->sync(false)
+    System::log("tarea asincrona iniciada")
 }
 
 // O capturar el resultado en un Future para await

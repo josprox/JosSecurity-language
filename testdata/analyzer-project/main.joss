@@ -1,10 +1,28 @@
-func total(int $base, int $extra = 1) {
+func total(int $base, int $extra = 1): int {
     return $base + $extra
+}
+
+func factorial(int $value): int {
+    ($value <= 1) ? {
+        return 1
+    } : {
+        return $value * factorial($value - 1)
+    }
+}
+
+func optionalTotal(bool $available): int? {
+    $available ? {
+        return total(2, 3)
+    } : {
+        return null
+    }
 }
 
 class Main {
     Init main() {
         $value = total(2, 3)
         echo $value
+        echo factorial(5)
+        echo optionalTotal(true)
     }
 }

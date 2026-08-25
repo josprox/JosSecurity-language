@@ -26,17 +26,16 @@ func (r *Runtime) EnsureCronTable() {
 		return
 	}
 
-	r.executeSchemaMethod(nil, "create", []interface{}{
-		"cron",
-		map[string]interface{}{
-			"id":          "increments",
-			"name":        "string(255)|unique",
-			"schedule":    "string(255)",
-			"last_run_at": "timestamp|nullable",
-			"is_running":  "boolean|default(0)",
-			"status":      "string(50)|nullable",
-		},
-	})
+	if err := r.ensureInternalSchemaTable("cron", []schemaColumn{
+		{name: "id", definition: "increments"},
+		{name: "name", definition: "string(255)|unique"},
+		{name: "schedule", definition: "string(255)"},
+		{name: "last_run_at", definition: "timestamp|nullable"},
+		{name: "is_running", definition: "boolean|default(0)"},
+		{name: "status", definition: "string(50)|nullable"},
+	}); err != nil {
+		fmt.Printf("[Cron] Error creando tabla interna: %v\n", err)
+	}
 }
 
 // StartCronTicker starts the background evaluation loop

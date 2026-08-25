@@ -340,7 +340,7 @@ func buildPackage(pkgPath string) {
 		fmt.Printf("Error: entry.main sale del paquete: %s\n", entry)
 		return
 	}
-	program, err := compilePluginProgram(pkgPath, filepath.Join(pkgPath, cleanEntry), make(map[string]int))
+	program, err := compilePluginProgram(pkgPath, filepath.Join(pkgPath, cleanEntry))
 	if err != nil {
 		fmt.Printf("Error compilando entry.main '%s': %v\n", entry, err)
 		return
@@ -596,7 +596,7 @@ func packageManifestSection(content, section string) map[string]string {
 	return values
 }
 
-func compilePluginProgram(root, filename string, state map[string]int) (*parser.Program, error) {
+func compilePluginProgram(root, filename string) (*parser.Program, error) {
 	absRoot, err := filepath.Abs(root)
 	if err != nil {
 		return nil, err
@@ -607,15 +607,8 @@ func compilePluginProgram(root, filename string, state map[string]int) (*parser.
 	}
 	rel, err := filepath.Rel(absRoot, absFile)
 	if err != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
-		return nil, fmt.Errorf("import fuera del paquete: %s", filename)
+		return nil, fmt.Errorf("archivo de entrada fuera del paquete: %s", filename)
 	}
-	switch state[absFile] {
-	case 1:
-		return nil, fmt.Errorf("ciclo de imports locales en %s", filepath.ToSlash(rel))
-	case 2:
-		return &parser.Program{}, nil
-	}
-	state[absFile] = 1
 	data, err := os.ReadFile(absFile)
 	if err != nil {
 		return nil, err
@@ -625,19 +618,5 @@ func compilePluginProgram(root, filename string, state map[string]int) (*parser.
 	if errs := p.Errors(); len(errs) > 0 {
 		return nil, fmt.Errorf("%s: %s", filepath.ToSlash(rel), strings.Join(errs, "; "))
 	}
-	linked := make([]parser.Statement, 0, len(program.Statements))
-	for _, statement := range program.Statements {
-		importStatement, ok := statement.(*parser.ImportStatement)
-		if !ok || strings.HasPrefix(importStatement.Path, "package:") || importStatement.Path == "global" {
-			linked = append(linked, statement)
-			continue
-		}
-		imported, err := compilePluginProgram(absRoot, filepath.Join(filepath.Dir(absFile), filepath.FromSlash(importStatement.Path)), state)
-		if err != nil {
-			return nil, err
-		}
-		linked = append(linked, imported.Statements...)
-	}
-	state[absFile] = 2
-	return &parser.Program{Statements: linked}, nil
+	return program, nil
 }

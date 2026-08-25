@@ -14,6 +14,7 @@ func runSource(source string) {
 	rt := &Runtime{
 		Variables:         make(map[string]interface{}),
 		VarTypes:          make(map[string]string),
+		Constants:         make(map[string]bool),
 		Classes:           make(map[string]*parser.ClassStatement),
 		Functions:         make(map[string]*parser.MethodStatement),
 		Routes:            make(map[string]map[string]interface{}),
@@ -22,7 +23,6 @@ func runSource(source string) {
 		NativeHandlers:    make(map[string]NativeHandler),
 		NativePlugins:     make(map[string]*NativePluginDefinition),
 		NativeDrivers:     make(map[string]*NativeDriverDefinition),
-		importedFiles:     make(map[string]bool),
 		Env:               make(map[string]string),
 	}
 	rt.Execute(program)

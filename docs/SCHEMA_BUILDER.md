@@ -18,23 +18,10 @@ Schema::create("products", func($table) {
 })
 ```
 
-También admite la sintaxis declarativa concisa basada en mapas:
-```joss
-Schema::create("users", {
-    "id": "increments",
-    "email": "string(191)|unique",
-    "password": "string(255)",
-    "role_id": "integer|default(2)",
-    "is_active": "boolean|default(1)",
-    "created_at": "timestamp|nullable",
-    "updated_at": "timestamp|nullable"
-})
-```
-
 ## Schema
 
-- `create($table, func($blueprint))` o `create($table, $columnsMap)`
-- `table($table, func($blueprint))` o `table($table, $columnsMap)`
+- `create($table, func($blueprint))`
+- `table($table, func($blueprint))`
 - `rename($from, $to)`
 - `drop($table)` y `dropIfExists($table)`
 - `hasTable($table)` y `hasColumn($table, $column)`

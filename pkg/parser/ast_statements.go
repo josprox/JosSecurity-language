@@ -10,6 +10,7 @@ type LetStatement struct {
 	Token      Token // The token.IDENT (e.g. string, int, public, private)
 	Name       *Identifier
 	Value      Expression
+	IsConst    bool
 	Visibility string // "public", "private", "protected"
 	IsStatic   bool
 }
@@ -24,7 +25,12 @@ func (ls *LetStatement) String() string {
 	if ls.IsStatic {
 		out.WriteString("static ")
 	}
-	out.WriteString(ls.Token.Literal + " ")
+	if ls.IsConst {
+		out.WriteString("const ")
+	}
+	if !ls.IsConst || ls.Token.Literal != "var" {
+		out.WriteString(ls.Token.Literal + " ")
+	}
 	out.WriteString(ls.Name.String())
 	out.WriteString(" = ")
 	if ls.Value != nil {
@@ -174,25 +180,11 @@ func (fs *ForeachStatement) String() string {
 	return out.String()
 }
 
-type ImportStatement struct {
-	Token Token // IMPORT
-	Path  string
-}
-
-func (is *ImportStatement) statementNode()       {}
-func (is *ImportStatement) TokenLiteral() string { return is.Token.Literal }
-func (is *ImportStatement) String() string {
-	var out bytes.Buffer
-	out.WriteString("Import \"")
-	out.WriteString(is.Path)
-	out.WriteString("\"")
-	return out.String()
-}
-
 type MethodStatement struct {
 	Token      Token // FUNCTION
 	Name       *Identifier
 	Parameters []*Parameter
+	ReturnType Token // optional type after ':'
 	Body       *BlockStatement
 	Visibility string // "public", "private", "protected"
 	IsStatic   bool
@@ -216,7 +208,11 @@ func (ms *MethodStatement) String() string {
 		params = append(params, p.String())
 	}
 	out.WriteString(strings.Join(params, ", "))
-	out.WriteString(") ")
+	out.WriteString(")")
+	if ms.ReturnType.Literal != "" {
+		out.WriteString(": " + ms.ReturnType.Literal)
+	}
+	out.WriteString(" ")
 	out.WriteString(ms.Body.String())
 	return out.String()
 }

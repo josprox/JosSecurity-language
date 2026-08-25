@@ -33,8 +33,8 @@
 
 ### Changed
 
-- `func` is the canonical function keyword; `function` remains a compatibility alias.
-- Dependencies declared in `joss.yaml` autoload without requiring `use`.
+- `func` is the only function keyword; the former `function` spelling is rejected with a migration diagnostic.
+- Dependencies declared in `joss.yaml` autoload; source-level `import`, `use` and namespace statements have been removed.
 - Documentation now describes the actual parser, runtime, CLI, server, views, database, plugins and known limits.
 
 ### Fixed

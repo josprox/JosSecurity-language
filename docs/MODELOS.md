@@ -89,7 +89,7 @@ $db->where("id", 1)->decrement("credits", 5)
 $db->where("id", 1)->touch()
 
 // Transacciones Atómicas (Commit automático y Rollback ante excepciones)
-GranDB::transaction(function($db) {
+GranDB::transaction(func($db) {
     GranDB::table("wallets")->where("user_id", 1)->decrement("balance", 50)
     GranDB::table("wallets")->where("user_id", 2)->increment("balance", 50)
 })

@@ -7,6 +7,14 @@ import (
 )
 
 func (r *Runtime) evaluateAssign(ae *parser.AssignExpression) interface{} {
+	if ident, ok := ae.Left.(*parser.Identifier); ok && r.Constants[ident.Value] {
+		panic(&JossError{
+			Type:    "ConstantAssignment",
+			Message: fmt.Sprintf("La constante '%s' no puede reasignarse", ident.Value),
+			File:    r.CurrentFile,
+			Line:    ident.Token.Line,
+		})
+	}
 	val := r.evaluateExpression(ae.Value)
 
 	if ident, ok := ae.Left.(*parser.Identifier); ok {
@@ -29,8 +37,7 @@ func (r *Runtime) evaluateAssign(ae *parser.AssignExpression) interface{} {
 	if member, ok := ae.Left.(*parser.MemberExpression); ok {
 		left := r.evaluateExpression(member.Left)
 		if instance, ok := left.(*Instance); ok {
-			instance.Fields[member.Property.Value] = val
-			return val
+			return r.setInstanceField(instance, member.Property.Value, val, member.Property.Token.Line)
 		}
 		fmt.Printf("Error: Asignación a miembro de no-instancia: %v\n", left)
 		return nil
@@ -160,10 +167,58 @@ func (r *Runtime) updateVariable(exp parser.Expression, newVal interface{}) inte
 	if member, ok := exp.(*parser.MemberExpression); ok {
 		left := r.evaluateExpression(member.Left)
 		if instance, ok := left.(*Instance); ok {
-			instance.Fields[member.Property.Value] = newVal
-			return newVal
+			return r.setInstanceField(instance, member.Property.Value, newVal, member.Property.Token.Line)
 		}
 	}
 	fmt.Println("Error: No se puede actualizar la variable (expresión no soportada)")
+	return nil
+}
+
+func (r *Runtime) setInstanceField(instance *Instance, name string, value interface{}, line int) interface{} {
+	if instance.Constants != nil && instance.Constants[name] {
+		panic(&JossError{
+			Type:    "ConstantAssignment",
+			Message: fmt.Sprintf("La propiedad constante '%s' no puede reasignarse", name),
+			File:    r.CurrentFile,
+			Line:    line,
+		})
+	}
+	if declaration := r.lookupInstanceField(instance, name); declaration != nil {
+		declaredType := declaration.Token.Literal
+		if declaredType != "" && declaredType != "var" && declaredType != "mixed" {
+			value = r.coerceToTypedValue(value, declaredType)
+			if !r.checkType(value, declaredType) {
+				panic(&JossError{
+					Type:    "PropertyTypeError",
+					Message: fmt.Sprintf("La propiedad '%s' requiere %s", name, declaredType),
+					File:    r.CurrentFile,
+					Line:    line,
+				})
+			}
+		}
+	}
+	instance.Fields[name] = value
+	return value
+}
+
+func (r *Runtime) lookupInstanceField(instance *Instance, name string) *parser.LetStatement {
+	if instance == nil {
+		return nil
+	}
+	visited := map[string]bool{}
+	for class := instance.Class; class != nil && class.Name != nil && !visited[class.Name.Value]; {
+		visited[class.Name.Value] = true
+		if class.Body != nil {
+			for _, statement := range class.Body.Statements {
+				if declaration, ok := statement.(*parser.LetStatement); ok && declaration.Name != nil && declaration.Name.Value == name {
+					return declaration
+				}
+			}
+		}
+		if class.SuperClass == nil {
+			break
+		}
+		class = r.Classes[class.SuperClass.Value]
+	}
 	return nil
 }

@@ -35,7 +35,7 @@ func (b *NativeWasmBackend) Compile(wasmPath string, manifestName, version strin
 		fn := &ir.IRFunction{
 			Name:       exp,
 			Params:     make([]ir.IRField, 0),
-			ReturnType: "dynamic",
+			ReturnType: "mixed",
 			IsExported: true,
 			Blocks: []*ir.IRBlock{
 				{

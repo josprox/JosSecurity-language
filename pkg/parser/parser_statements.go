@@ -3,18 +3,25 @@ package parser
 import "fmt"
 
 func (p *Parser) parseStatement() Statement {
+	if msg, removed := removedKeywordMessage(p.curToken); removed {
+		p.addError(p.curToken, msg)
+		for p.curToken.Type != SEMICOLON && p.curToken.Type != NEWLINE && p.curToken.Type != EOF {
+			p.nextToken()
+		}
+		return nil
+	}
 	// Syntax Guard: Intercept unsupported control flow keywords from other languages
 	lit := p.curToken.Literal
 	if lit == "if" || lit == "else" || lit == "elif" {
-		p.errors = append(p.errors, fmt.Sprintf("Línea %d: La estructura '%s' no existe en Joss. Joss no utiliza 'if/else/elif'. Para condicionales utiliza expresiones ternarias ($cond ? $val1 : $val2) o la estructura 'match ($val) { ... }'.", p.curToken.Line, lit))
+		p.addError(p.curToken, fmt.Sprintf("La estructura '%s' no existe en Joss. Para condicionales utiliza expresiones ternarias ($cond ? $val1 : $val2) o 'match ($val) { ... }'.", lit))
 		return nil
 	}
 	if lit == "switch" {
-		p.errors = append(p.errors, fmt.Sprintf("Línea %d: La estructura 'switch' no existe en Joss. Utiliza 'match ($val) { case $x: ... default: ... }' en su lugar.", p.curToken.Line))
+		p.addError(p.curToken, "La estructura 'switch' no existe en Joss. Utiliza 'match ($val) { case $x: ... default: ... }' en su lugar.")
 		return nil
 	}
 	if lit == "for" {
-		p.errors = append(p.errors, fmt.Sprintf("Línea %d: El bucle 'for' no existe en Joss. Utiliza 'foreach ($array as $item)' o 'while ($cond) { ... }' en su lugar.", p.curToken.Line))
+		p.addError(p.curToken, "El bucle 'for' no existe en Joss. Utiliza 'foreach ($array as $item)' o 'while ($cond) { ... }' en su lugar.")
 		return nil
 	}
 
@@ -104,12 +111,6 @@ func (p *Parser) parseStatement() Statement {
 	if p.curToken.Type == FUNCTION {
 		return p.parseMethodStatement()
 	}
-	if p.curToken.Type == IMPORT {
-		return p.parseImportStatement()
-	}
-	if p.curToken.Type == USE {
-		return p.parseUseStatement()
-	}
 	if p.curToken.Type == ECHO || p.curToken.Type == PRINT {
 		return p.parseEchoStatement()
 	}
@@ -138,6 +139,9 @@ func (p *Parser) parseStatement() Statement {
 	if p.curToken.Type == ASYNC {
 		return p.parseAsyncStatement()
 	}
+	if p.curToken.Type == CONST {
+		return p.parseConstStatement()
+	}
 	// Check for 'let' keyword variable declaration: let int $x = 10, let $x = 10
 	if p.curToken.Type == LET || p.curToken.Literal == "let" {
 		if p.peekToken.Type == IDENT {
@@ -165,7 +169,7 @@ func (p *Parser) parseStatement() Statement {
 		}
 	}
 	// Check for typed variable declaration: type $name = value
-	if p.curToken.Type == IDENT && p.peekToken.Type == VAR {
+	if isTypeStart(p.curToken) && (p.peekToken.Type == VAR || isTypeContinuation(p.peekToken.Type)) {
 		return p.parseLetStatement()
 	}
 	// Check for Increment: $i++
@@ -200,6 +204,29 @@ func (p *Parser) parseStatement() Statement {
 	// I can register `INCREMENT` as infix, and the parse function will return `PostfixExpression`.
 
 	return p.parseExpressionStatement()
+}
+
+func (p *Parser) parseConstStatement() Statement {
+	constToken := p.curToken
+	typeToken := Token{Type: IDENT, Literal: "var", Line: constToken.Line, Column: constToken.Column}
+	if p.peekToken.Type == IDENT {
+		p.nextToken()
+		typeToken = p.parseTypeReference()
+	}
+	if !p.expectPeek(VAR) || !p.expectPeek(IDENT) {
+		return nil
+	}
+	name := &Identifier{Token: p.curToken, Value: p.curToken.Literal}
+	if !p.expectPeek(ASSIGN) {
+		p.addError(constToken, "Una constante requiere un inicializador.")
+		return nil
+	}
+	p.nextToken()
+	value := p.parseExpression(LOWEST)
+	if p.peekToken.Type == SEMICOLON || p.peekToken.Type == NEWLINE {
+		p.nextToken()
+	}
+	return &LetStatement{Token: typeToken, Name: name, Value: value, IsConst: true}
 }
 
 func (p *Parser) parseReturnStatement() *ReturnStatement {
@@ -333,6 +360,8 @@ func (p *Parser) parseClassBody() *BlockStatement {
 			stmt = p.parseMethodStatement()
 		} else if p.curToken.Type == INIT {
 			stmt = p.parseInitStatement()
+		} else if p.curToken.Type == CONST {
+			stmt = p.parseConstStatement()
 		} else if (p.curToken.Type == LET || p.curToken.Literal == "let") && p.peekToken.Type == IDENT {
 			p.nextToken()
 			stmt = p.parseLetStatement()
@@ -355,7 +384,7 @@ func (p *Parser) parseClassBody() *BlockStatement {
 			if p.peekToken.Type == SEMICOLON || p.peekToken.Type == NEWLINE {
 				p.nextToken()
 			}
-		} else if p.curToken.Type == IDENT && p.peekToken.Type == VAR { // Property: string $x
+		} else if isTypeStart(p.curToken) && (p.peekToken.Type == VAR || isTypeContinuation(p.peekToken.Type)) { // Property: string $x
 			stmt = p.parseLetStatement()
 		} else if p.curToken.Type == VAR { // Property without type: $x = 10
 			name := &Identifier{Token: p.curToken, Value: p.curToken.Literal}
@@ -435,7 +464,7 @@ func (p *Parser) parseBlockStatement() *BlockStatement {
 }
 
 func (p *Parser) parseLetStatement() Statement {
-	typeToken := p.curToken
+	typeToken := p.parseTypeReference()
 
 	if !p.expectPeek(VAR) {
 		return nil
@@ -547,16 +576,6 @@ func (p *Parser) parseForeachStatement() *ForeachStatement {
 	stmt.Body = p.parseBlockStatement()
 
 	return stmt
-}
-
-func (p *Parser) parseImportStatement() Statement {
-	msg := fmt.Sprintf("Error de sintaxis (Línea %d): La instrucción '%s' es obsoleta y fue eliminada en Joss. Los paquetes y plugins declarados en joss.yaml se cargan automáticamente.", p.curToken.Line, p.curToken.Literal)
-	p.errors = append(p.errors, msg)
-
-	for p.curToken.Type != SEMICOLON && p.curToken.Type != NEWLINE && p.curToken.Type != EOF {
-		p.nextToken()
-	}
-	return nil
 }
 
 func (p *Parser) parseEchoStatement() *EchoStatement {
@@ -702,6 +721,7 @@ func (p *Parser) parseMethodStatement() *MethodStatement {
 	}
 
 	stmt.Parameters = p.parseFunctionParameters()
+	stmt.ReturnType = p.parseOptionalReturnType()
 
 	if !p.expectPeek(LBRACE) {
 		return nil
@@ -712,23 +732,13 @@ func (p *Parser) parseMethodStatement() *MethodStatement {
 	return stmt
 }
 
-func (p *Parser) parseUseStatement() Statement {
-	msg := fmt.Sprintf("Error de sintaxis (Línea %d): La instrucción '%s' es obsoleta y fue eliminada en Joss. Los paquetes y plugins declarados en joss.yaml se cargan automáticamente.", p.curToken.Line, p.curToken.Literal)
-	p.errors = append(p.errors, msg)
-
-	for p.curToken.Type != SEMICOLON && p.curToken.Type != NEWLINE && p.curToken.Type != EOF {
-		p.nextToken()
-	}
-	return nil
-}
-
 func (p *Parser) parseAsyncStatement() Statement {
 	tok := p.curToken
 	if p.peekToken.Type == LBRACE {
 		p.nextToken() // move to {
 		block := p.parseBlockStatement()
 		fn := &FunctionLiteral{
-			Token:      Token{Type: FUNCTION, Literal: "function", Line: tok.Line},
+			Token:      Token{Type: FUNCTION, Literal: "func", Line: tok.Line},
 			Parameters: []*Parameter{},
 			Body:       block,
 		}
@@ -740,8 +750,8 @@ func (p *Parser) parseAsyncStatement() Statement {
 		return &ExpressionStatement{Token: tok, Expression: call}
 	}
 	if p.peekToken.Type == LPAREN {
-		msg := fmt.Sprintf("Error de sintaxis (Línea %d): 'async' requiere la sintaxis de bloque 'async { ... }'. 'async(func() ...)' ha sido descontinuado.", tok.Line)
-		p.errors = append(p.errors, msg)
+		msg := "'async' requiere la sintaxis de bloque 'async { ... }'; 'async(func() ...)' fue eliminado."
+		p.addError(tok, msg)
 		return nil
 	}
 	p.nextToken()

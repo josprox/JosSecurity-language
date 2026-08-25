@@ -28,6 +28,13 @@ Antes de los cambios, `go test ./...` y `go build ./...` pasaban; `go vet ./...`
 - Catálogo generado para VS Code, validado por CI.
 - Las firmas ricas del editor se filtran contra ese catálogo; metadatos obsoletos ya no pueden publicar símbolos que el runtime no registra.
 - Binding de métodos unificado en `CallMethodEvaluated`.
+- Frames de invocación aislados, recursión directa/mutua/de método, límite de profundidad y contratos de retorno opcionales.
+- Frames léxicos sin scope dinámico: las funciones con nombre no heredan locales del caller; las closures conservan su captura.
+- Uniones `T|U`, nullable `T?`, retornos exhaustivos demostrables y firmas explícitas de retorno para todo el núcleo nativo.
+- `const` y propiedades tipadas/constantes validadas por analyzer y runtime.
+- Errores del parser almacenados directamente como diagnósticos estructurados; se eliminó la extracción de líneas desde strings.
+- Eliminación física de `ImportStatement`, tablas/tokens de imports, linker textual de plugins y formato bytecode sin compresión.
+- Retiro de APIs de compatibilidad sin consumidores canónicos: rutas crudas, inserts por arrays, Schema por mapas y `where(..., "json")`.
 - Reset completo del registro de plugins al devolver un runtime al pool.
 - Prueba de integración sobre todo JosSecurity.
 - Fixture de proyecto versionado en `testdata/analyzer-project`; JosSecurity permanece como repositorio externo ignorado y su test se omite sólo cuando no está disponible.
@@ -51,22 +58,21 @@ La implementación coincide con la visión ALIM en el runtime integrado, parser 
 
 | Afirmación de la tesis | Estado comprobado del repositorio |
 |---|---|
-| Pipeline incluye type checker | Ahora existe un checker semántico inicial; aún no cubre retornos anotados, taint, escape ni esquemas DB. |
+| Pipeline incluye type checker | Existe un checker semántico inicial con inferencia fija, constantes, firmas/retornos y llamadas recursivas; aún no cubre taint, escape ni esquemas DB. |
 | AOT/LLVM/Cranelift y código máquina | El build principal empaqueta AST serializado y el intérprete Go. LLVM/Cranelift no están implementados. |
 | Lexer/parser en Rust | La implementación actual está en Go. |
 | Inmutabilidad por defecto/ownership | No existe semántica de ownership ni inmutabilidad por defecto. |
-| Imports/módulos con grafo y ciclos | `import`, `use` y `@import` están obsoletos; plugins de `joss.yaml` se cargan automáticamente. No hay grafo de módulos fuente. |
+| Imports/módulos con grafo y ciclos | La sintaxis histórica fue eliminada completamente y no volverá. Plugins y archivos convencionales se cargan automáticamente; Joss adopta deliberadamente un proyecto zero-imports. |
 | Rutas/DB como nodos AST de primer orden | Hoy son llamadas a clases nativas (`Router`, `GranDB`), no nodos específicos. |
 | 1,420 tests y 91.4% de cobertura | El repositorio contiene una suite Go mucho menor. Medición focalizada actual: parser 52.3%, typesystem 44.9%, analyzer 47.7% y core 14.8%; CI valida ejecución y no afirma una cobertura inexistente. |
 | Taint analysis y 83% de vulnerabilidades | Existe un analizador de seguridad heurístico en el LSP, no un taint engine formal en el compilador. |
 
-Estas diferencias no se “corrigieron” inventando características. Deben resolverse en la tesis distinguiendo con claridad implementación validada, sintaxis conceptual y trabajo futuro.
+Estas diferencias no se “corrigieron” inventando características. La propuesta de módulos fuente del capítulo 11 queda expresamente descartada para Joss; la modularidad ALIM se conserva mediante componentes del runtime y plugins aislados. Las demás deben resolverse en la tesis distinguiendo implementación validada, sintaxis conceptual y trabajo futuro.
 
 ## Riesgos pendientes
 
-- La gramática no declara tipos de retorno, nullables, unions ni constantes.
-- El parser todavía expone errores como strings; el loader los adapta al modelo estructurado y sólo garantiza columna para diagnósticos semánticos.
-- El análisis de miembros encadenados pierde tipo cuando las APIs nativas no publican retorno formal.
-- No existe análisis de flujo sensible a ramas, contratos de infraestructura, taint, escape o ciclos de módulos.
+- La recuperación del parser puede producir diagnósticos derivados después del primer token inválido, aunque ahora todos usan el modelo estructurado y conservan columna sin extraerla de mensajes.
+- Los retornos nativos son explícitos, pero muchas APIs conservan parámetros variádicos hasta publicar contratos de aridad confiables.
+- No existe refinamiento sensible a ramas, contratos de infraestructura, taint o escape formal. Los ciclos de módulos no aplican porque no existen módulos fuente.
 - `pkg/core` sigue siendo amplio; dividir subsistemas de infraestructura requiere pruebas específicas y no se realizó sólo por estética.
 - El catálogo de firmas ricas del LSP es metadato manual; la existencia de nombres sí proviene ya del catálogo generado.

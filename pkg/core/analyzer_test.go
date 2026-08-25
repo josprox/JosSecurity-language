@@ -69,7 +69,7 @@ func funcionInexistente() {
 		}
 	}
 	if !hasUnusedVarWarning {
-		t.Errorf("Expected warning for unused variable '$sinUsar', got warnings: %v", report.Warnings)
+		t.Errorf("Expected warning for unused variable '$sinUsar', got diagnostics: %v", report.Diagnostics)
 	}
 
 	// Should report error for $noDeclarada.
@@ -80,6 +80,23 @@ func funcionInexistente() {
 		}
 	}
 	if !hasUndeclaredVarError {
-		t.Errorf("Expected error for undeclared variable '$noDeclarada', got errors: %v", report.Errors)
+		t.Errorf("Expected error for undeclared variable '$noDeclarada', got diagnostics: %v", report.Diagnostics)
+	}
+}
+
+func TestStaticAnalyzerRecognizesImplementedGranDBMethods(t *testing.T) {
+	code := `
+$categories = GranDB::table("products")->distinct()->pluck("category")
+GranDB::transaction(func($db) {
+	return GranDB::table("products")->count()
+})
+`
+	program := parser.NewParser(parser.NewLexer(code)).ParseProgram()
+	report := AnalyzeProgram(program)
+
+	for _, diagnostic := range report.Diagnostics {
+		if diagnostic.Code == "JOSS-MEMBER-001" {
+			t.Fatalf("implemented GranDB API produced an unknown-member diagnostic: %v", report.Diagnostics)
+		}
 	}
 }

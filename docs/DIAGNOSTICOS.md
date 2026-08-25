@@ -28,11 +28,15 @@ error[JOSS-TYPE-001] app/example.joss:3:2: Cannot use `string` as assignment for
 | `JOSS-SYM-003` | Función inexistente. |
 | `JOSS-SYM-004` | Clase inexistente. |
 | `JOSS-SYM-005` | Superclase inexistente. |
+| `JOSS-SYM-006` | Reasignación de una constante. |
 | `JOSS-DECL-001..003` | Declaraciones duplicadas de función, clase o método. |
 | `JOSS-TYPE-001` | Asignación incompatible. |
 | `JOSS-TYPE-002` | Inicializador/default incompatible. |
 | `JOSS-TYPE-003` | Argumento incompatible. |
 | `JOSS-TYPE-004..007` | Operador, clave o índice incompatible. |
+| `JOSS-TYPE-008` | Retorno incompatible con la anotación. |
+| `JOSS-TYPE-009` | Tipo fuente o clase de tipo inexistente. |
+| `JOSS-TYPE-010` | Una función anotada puede terminar sin retornar ni lanzar. |
 | `JOSS-CALL-001` | Aridad incorrecta. |
 | `JOSS-MEMBER-001` | Método inexistente en clase conocida. |
 | `JOSS-FLOW-001` | Código inalcanzable. |
@@ -40,7 +44,7 @@ error[JOSS-TYPE-001] app/example.joss:3:2: Cannot use `string` as assignment for
 
 ## Política contra falsos positivos
 
-`unknown` significa información todavía no inferida; `mixed` significa decisión dinámica explícita. Ninguno es evidencia de invalidez. Las firmas nativas que sólo exponen nombres de método no generan diagnósticos de aridad. `isset` y `empty` son probes de existencia y no reportan una variable ausente. Los errores de miembros sólo se emiten cuando el receptor es una clase conocida y su tabla fue resuelta.
+`unknown` significa información todavía no inferida; `mixed` significa decisión dinámica explícita. Ninguno es evidencia de invalidez. Los retornos core siempre tienen firma explícita; las APIs sin metadatos de parámetros no generan diagnósticos de aridad. `isset` y `empty` son probes de existencia y no reportan una variable ausente. Los errores de miembros sólo se emiten cuando el receptor es una clase conocida y su tabla fue resuelta.
 
 ## Cómo añadir un diagnóstico
 

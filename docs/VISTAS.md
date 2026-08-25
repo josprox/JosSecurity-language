@@ -63,4 +63,3 @@ La notación `$map.key` dentro de expresiones de vista se traduce a `$map->key`.
 ## Datos globales automáticos
 
 El renderizador inyecta automáticamente `auth_check`, `auth_guest`, `auth_user`, `auth_role`, `auth_email`, `csrf_token` y mensajes flash cuando existen.
-

@@ -22,6 +22,7 @@ type SymbolClass struct {
 type SymbolCallable struct {
 	Name       string            `json:"name"`
 	Parameters []SymbolParameter `json:"parameters,omitempty"`
+	ReturnType string            `json:"return_type,omitempty"`
 }
 
 type SymbolParameter struct {
@@ -45,7 +46,7 @@ func BuildSymbolIndex(program *parser.Program, packageName, version string) Symb
 				for _, member := range node.Body.Statements {
 					switch value := member.(type) {
 					case *parser.MethodStatement:
-						class.Methods = append(class.Methods, callableSymbol(value.Name, value.Parameters))
+						class.Methods = append(class.Methods, callableSymbol(value.Name, value.Parameters, value.ReturnType))
 					case *parser.LetStatement:
 						if value.Name != nil {
 							class.Properties = append(class.Properties, identifierValue(value.Name))
@@ -59,14 +60,14 @@ func BuildSymbolIndex(program *parser.Program, packageName, version string) Symb
 			}
 			index.Classes = append(index.Classes, class)
 		case *parser.MethodStatement:
-			index.Functions = append(index.Functions, callableSymbol(node.Name, node.Parameters))
+			index.Functions = append(index.Functions, callableSymbol(node.Name, node.Parameters, node.ReturnType))
 		}
 	}
 	return index
 }
 
-func callableSymbol(name *parser.Identifier, parameters []*parser.Parameter) SymbolCallable {
-	callable := SymbolCallable{Name: identifierValue(name)}
+func callableSymbol(name *parser.Identifier, parameters []*parser.Parameter, returnType parser.Token) SymbolCallable {
+	callable := SymbolCallable{Name: identifierValue(name), ReturnType: returnType.Literal}
 	for _, parameter := range parameters {
 		if parameter == nil || parameter.Name == nil {
 			continue

@@ -1,5 +1,7 @@
 package core
 
+import "fmt"
+
 // EnsureMFATables creates MFA related tables if they don't exist
 func (r *Runtime) EnsureMFATables() {
 	if r.GetDB() == nil {
@@ -7,43 +9,42 @@ func (r *Runtime) EnsureMFATables() {
 	}
 
 	// 1. Create MFA Methods Table
-	r.executeSchemaMethod(nil, "create", []interface{}{
-		"user_mfa_methods",
-		map[string]interface{}{
-			"id":          "increments",
-			"user_id":     "bigInteger",
-			"method_type": "string(50)",
-			"secret":      "text|nullable",
-			"is_active":   "boolean|default(0)",
-			"created_at":  "timestamp|nullable",
-			"updated_at":  "timestamp|nullable",
-		},
-	})
+	if err := r.ensureInternalSchemaTable("user_mfa_methods", []schemaColumn{
+		{name: "id", definition: "increments"},
+		{name: "user_id", definition: "bigInteger"},
+		{name: "method_type", definition: "string(50)"},
+		{name: "secret", definition: "text|nullable"},
+		{name: "is_active", definition: "boolean|default(0)"},
+		{name: "created_at", definition: "timestamp|nullable"},
+		{name: "updated_at", definition: "timestamp|nullable"},
+	}); err != nil {
+		fmt.Printf("[MFA] Error creando user_mfa_methods: %v\n", err)
+		return
+	}
 
 	// 2. Create Recovery Codes Table
-	r.executeSchemaMethod(nil, "create", []interface{}{
-		"user_recovery_codes",
-		map[string]interface{}{
-			"id":         "increments",
-			"user_id":    "bigInteger",
-			"code_hash":  "string(255)",
-			"used":       "boolean|default(0)",
-			"used_at":    "timestamp|nullable",
-			"created_at": "timestamp|nullable",
-			"updated_at": "timestamp|nullable",
-		},
-	})
+	if err := r.ensureInternalSchemaTable("user_recovery_codes", []schemaColumn{
+		{name: "id", definition: "increments"},
+		{name: "user_id", definition: "bigInteger"},
+		{name: "code_hash", definition: "string(255)"},
+		{name: "used", definition: "boolean|default(0)"},
+		{name: "used_at", definition: "timestamp|nullable"},
+		{name: "created_at", definition: "timestamp|nullable"},
+		{name: "updated_at", definition: "timestamp|nullable"},
+	}); err != nil {
+		fmt.Printf("[MFA] Error creando user_recovery_codes: %v\n", err)
+		return
+	}
 
 	// 3. Create Security Logs Table
-	r.executeSchemaMethod(nil, "create", []interface{}{
-		"security_logs",
-		map[string]interface{}{
-			"id":         "increments",
-			"user_id":    "bigInteger|nullable",
-			"event_type": "string(100)",
-			"ip_address": "string(45)|nullable",
-			"user_agent": "text|nullable",
-			"created_at": "timestamp|nullable",
-		},
-	})
+	if err := r.ensureInternalSchemaTable("security_logs", []schemaColumn{
+		{name: "id", definition: "increments"},
+		{name: "user_id", definition: "bigInteger|nullable"},
+		{name: "event_type", definition: "string(100)"},
+		{name: "ip_address", definition: "string(45)|nullable"},
+		{name: "user_agent", definition: "text|nullable"},
+		{name: "created_at", definition: "timestamp|nullable"},
+	}); err != nil {
+		fmt.Printf("[MFA] Error creando security_logs: %v\n", err)
+	}
 }

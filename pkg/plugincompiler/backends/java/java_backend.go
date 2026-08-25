@@ -83,7 +83,7 @@ func (b *JavaBackend) parseClassToIR(module *ir.IRModule, classBytes []byte, fil
 		fn := &ir.IRFunction{
 			Name:       fnName,
 			Params:     make([]ir.IRField, 0),
-			ReturnType: "void",
+			ReturnType: "null",
 			IsExported: true,
 			Blocks: []*ir.IRBlock{
 				{

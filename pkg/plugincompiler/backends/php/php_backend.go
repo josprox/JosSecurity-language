@@ -44,7 +44,7 @@ func (b *PHPBackend) Compile(sourcePath string, manifestName, version string, ex
 		fn := &ir.IRFunction{
 			Name:       exp,
 			Params:     make([]ir.IRField, 0),
-			ReturnType: "dynamic",
+			ReturnType: "mixed",
 			IsExported: true,
 			Blocks: []*ir.IRBlock{
 				{
@@ -64,7 +64,7 @@ func (b *PHPBackend) Compile(sourcePath string, manifestName, version string, ex
 			module.Functions[fnName] = &ir.IRFunction{
 				Name:       fnName,
 				Params:     make([]ir.IRField, 0),
-				ReturnType: "dynamic",
+				ReturnType: "mixed",
 				IsExported: false,
 				Blocks: []*ir.IRBlock{
 					{

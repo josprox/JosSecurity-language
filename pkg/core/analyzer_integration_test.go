@@ -9,6 +9,21 @@ import (
 	semanticanalyzer "github.com/jossecurity/joss/pkg/analyzer"
 )
 
+func TestAnalyzerProjectFixtureHasNoErrors(t *testing.T) {
+	_, currentFile, _, _ := runtime.Caller(0)
+	root := filepath.Clean(filepath.Join(filepath.Dir(currentFile), "..", ".."))
+	project := filepath.Join(root, "testdata", "analyzer-project")
+
+	units, parseDiagnostics := semanticanalyzer.LoadProject(filepath.Join(project, "main.joss"), filepath.Join(project, "app"))
+	if len(parseDiagnostics) != 0 {
+		t.Fatalf("analyzer fixture parse diagnostics: %#v", parseDiagnostics)
+	}
+	report := AnalyzeSourceUnits(units)
+	if report.HasErrors() {
+		t.Fatalf("analyzer fixture analysis errors: %#v", report.Diagnostics)
+	}
+}
+
 func TestJosSecurityProjectHasNoStaticAnalysisErrors(t *testing.T) {
 	_, currentFile, _, _ := runtime.Caller(0)
 	root := filepath.Clean(filepath.Join(filepath.Dir(currentFile), "..", ".."))
@@ -31,6 +46,6 @@ func TestJosSecurityProjectHasNoStaticAnalysisErrors(t *testing.T) {
 	}
 	report := AnalyzeSourceUnits(units)
 	if report.HasErrors() {
-		t.Fatalf("JosSecurity analysis errors: %#v", report.Errors)
+		t.Fatalf("JosSecurity analysis errors: %#v", report.Diagnostics)
 	}
 }

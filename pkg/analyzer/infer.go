@@ -103,7 +103,9 @@ func (a *Analyzer) inferExpression(expression parser.Expression, current *scope)
 	case *parser.CallExpression:
 		return a.inferCall(node, current)
 	case *parser.FunctionLiteral:
-		a.analyzeCallable(node.Parameters, node.Body, current, "")
+		returnType := typeFromToken(node.ReturnType)
+		a.validateDeclaredType(returnType, node.ReturnType, "return annotation")
+		a.analyzeCallable(node.Parameters, node.Body, current, "", returnType)
 		return typesystem.Type{Kind: typesystem.Object}
 	case *parser.IssetExpression:
 		a.suppressUndefined++
@@ -171,9 +173,8 @@ func (a *Analyzer) inferIdentifier(identifier *parser.Identifier, current *scope
 	if _, exists := a.environment.Builtins[name]; exists {
 		return typesystem.Type{Kind: typesystem.Object}
 	}
-	// Constants are resolved by runtime/environment integrations. Until Joss has
-	// an explicit const declaration node, an all-uppercase identifier remains
-	// unknown rather than being misreported as a variable.
+	// Uppercase names can still come from runtime/environment integrations. They
+	// remain unknown unless an explicit const declaration resolved them above.
 	if name != "" && strings.ToUpper(name) == name && len(name) > 1 {
 		return typesystem.Type{Kind: typesystem.Unknown}
 	}
@@ -190,6 +191,12 @@ func (a *Analyzer) inferAssignment(assignment *parser.AssignExpression, current 
 	if identifier, ok := assignment.Left.(*parser.Identifier); ok {
 		name := cleanName(identifier.Value)
 		if existing, exists := current.resolve(name); exists {
+			if existing.Constant {
+				a.add("JOSS-SYM-006", diagnostics.SeverityError, a.file, identifier.Token,
+					fmt.Sprintf("Constant `$%s` cannot be reassigned.", name),
+					"Constants are immutable after their declaration.", "Create a new variable instead of assigning to the constant.")
+				return existing.Type
+			}
 			if existing.Inferred && !existing.Type.IsKnown() {
 				existing.Type = typesystem.MergeInference(existing.Type, valueType)
 			}
@@ -201,6 +208,26 @@ func (a *Analyzer) inferAssignment(assignment *parser.AssignExpression, current 
 		inferredType := typesystem.MergeInference(typesystem.Type{Kind: typesystem.Unknown}, valueType)
 		current.put(&symbol{Name: name, Type: inferredType, Kind: symbolVariable, Token: identifier.Token, File: a.file, Inferred: true})
 		return inferredType
+	}
+	if member, ok := assignment.Left.(*parser.MemberExpression); ok && member.Property != nil {
+		receiver := a.receiverType(member.Left, current)
+		if receiver.Kind == typesystem.Class {
+			if field, exists := a.lookupField(receiver.Name, member.Property.Value); exists {
+				if field.Constant {
+					a.add("JOSS-SYM-006", diagnostics.SeverityError, a.file, member.Property.Token,
+						fmt.Sprintf("Constant property `%s::%s` cannot be reassigned.", receiver.Name, member.Property.Value),
+						"Constant properties are immutable after instance initialization.", "Create a mutable property or assign a different variable.")
+					return field.Type
+				}
+				if field.Type.IsKnown() && !assignableExpression(field.Type, valueType, assignment.Value) {
+					a.add("JOSS-TYPE-001", diagnostics.SeverityError, a.file, member.Property.Token,
+						fmt.Sprintf("Cannot assign `%s` to property `%s::%s` of type `%s`.", valueType.String(), receiver.Name, member.Property.Value, field.Type.String()),
+						"Properties keep their declared type.", "Assign a compatible value or correct the property declaration.")
+				}
+				return field.Type
+			}
+		}
+		return valueType
 	}
 	// Member/index assignment still needs the receiver and index checked.
 	a.inferExpression(assignment.Left, current)
@@ -276,7 +303,13 @@ func (a *Analyzer) inferMember(expression *parser.MemberExpression, current *sco
 	if expression == nil {
 		return typesystem.Type{Kind: typesystem.Unknown}
 	}
-	return a.receiverType(expression.Left, current)
+	receiver := a.receiverType(expression.Left, current)
+	if receiver.Kind == typesystem.Class && expression.Property != nil {
+		if field, exists := a.lookupField(receiver.Name, expression.Property.Value); exists {
+			return field.Type
+		}
+	}
+	return typesystem.Type{Kind: typesystem.Unknown}
 }
 
 func (a *Analyzer) inferCall(call *parser.CallExpression, current *scope) typesystem.Type {
@@ -359,6 +392,22 @@ func (a *Analyzer) lookupMethod(className, methodName string) (Callable, bool) {
 	return Callable{}, false
 }
 
+func (a *Analyzer) lookupField(className, fieldName string) (Field, bool) {
+	visited := map[string]bool{}
+	for className != "" && !visited[className] {
+		visited[className] = true
+		class, exists := a.classes[className]
+		if !exists {
+			return Field{}, false
+		}
+		if field, exists := class.Fields[fieldName]; exists {
+			return field, true
+		}
+		className = class.SuperClass
+	}
+	return Field{}, false
+}
+
 func (a *Analyzer) checkCall(callable Callable, arguments []parser.Expression, current *scope, token parser.Token) {
 	argumentTypes := make([]typesystem.Type, len(arguments))
 	for index, argument := range arguments {
@@ -397,8 +446,20 @@ func isNumeric(valueType typesystem.Type) bool {
 }
 
 func commonType(left, right typesystem.Type) typesystem.Type {
-	if left.Kind == right.Kind && (left.Kind != typesystem.Class || left.Name == right.Name) {
+	if left == right {
 		return left
+	}
+	if left.Kind == typesystem.Mixed || right.Kind == typesystem.Mixed {
+		return typesystem.Type{Kind: typesystem.Mixed}
+	}
+	if left.Kind == typesystem.Unknown || left.Kind == "" {
+		return right
+	}
+	if right.Kind == typesystem.Unknown || right.Kind == "" {
+		return left
+	}
+	if left.Kind == typesystem.Null || right.Kind == typesystem.Null {
+		return typesystem.Parse(left.String() + "|" + right.String())
 	}
 	if !left.IsKnown() {
 		return right
@@ -409,7 +470,7 @@ func commonType(left, right typesystem.Type) typesystem.Type {
 	if isNumeric(left) && isNumeric(right) {
 		return typesystem.Type{Kind: typesystem.Float}
 	}
-	return typesystem.Type{Kind: typesystem.Unknown}
+	return typesystem.Parse(left.String() + "|" + right.String())
 }
 
 func assignableExpression(destination, source typesystem.Type, expression parser.Expression) bool {

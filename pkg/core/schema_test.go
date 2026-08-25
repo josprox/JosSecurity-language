@@ -39,6 +39,68 @@ func TestSchemaCommandsExecuteOnSQLite(t *testing.T) {
 	}
 }
 
+func TestSchemaRejectsRemovedMapDefinition(t *testing.T) {
+	db, err := sql.Open("sqlite", ":memory:")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	r := NewRuntime()
+	r.DB = db
+	r.Env = map[string]string{"DB": "sqlite"}
+
+	result := r.executeSchemaMethod(nil, "create", []interface{}{"removed_shape", map[string]interface{}{"id": "increments"}})
+	if result != nil {
+		t.Fatalf("map schema result = %v, want nil", result)
+	}
+	if exists := r.executeSchemaMethod(nil, "hasTable", []interface{}{"removed_shape"}); exists != false {
+		t.Fatalf("removed map schema unexpectedly created table: %v", exists)
+	}
+}
+
+func TestSchemaTableRejectsRemovedMapDefinition(t *testing.T) {
+	db, err := sql.Open("sqlite", ":memory:")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	if _, err := db.Exec(`CREATE TABLE items (id INTEGER PRIMARY KEY)`); err != nil {
+		t.Fatal(err)
+	}
+	r := NewRuntime()
+	r.DB = db
+	r.Env = map[string]string{"DB": "sqlite", "PREFIX": ""}
+
+	result := r.executeSchemaMethod(nil, "table", []interface{}{"items", map[string]interface{}{"name": "string"}})
+	if result != nil {
+		t.Fatalf("map schema result = %v, want nil", result)
+	}
+	if exists := r.executeSchemaMethod(nil, "hasColumn", []interface{}{"items", "name"}); exists != false {
+		t.Fatalf("removed map schema unexpectedly added column: %v", exists)
+	}
+}
+
+func TestInternalMigrationSchemaUsesHostDefinitions(t *testing.T) {
+	db, err := sql.Open("sqlite", ":memory:")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	r := NewRuntime()
+	r.DB = db
+	r.Env = map[string]string{"DB": "sqlite", "PREFIX": "x_"}
+
+	if err := r.EnsureMigrationTable(); err != nil {
+		t.Fatal(err)
+	}
+	if err := r.LogMigration("001_create_items.joss", 1); err != nil {
+		t.Fatal(err)
+	}
+	if !r.GetExecutedMigrations()["001_create_items.joss"] {
+		t.Fatal("logged migration was not read back")
+	}
+}
+
 func TestBuildCompoundForeignConstraint(t *testing.T) {
 	command := schemaCommand{
 		"type":       "foreign",

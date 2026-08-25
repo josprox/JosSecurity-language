@@ -231,7 +231,7 @@ func (l *Lexer) NextToken() Token {
 			literal := string(ch) + string(l.ch)
 			tok = Token{Type: OR, Literal: literal, Line: l.line, Column: l.column - 1}
 		} else {
-			tok = l.newToken(ILLEGAL, l.ch)
+			tok = l.newToken(TYPE_UNION, l.ch)
 		}
 	default:
 		if isLetter(l.ch) {

@@ -6,6 +6,9 @@ import (
 	"strings"
 	"testing"
 
+	semanticanalyzer "github.com/jossecurity/joss/pkg/analyzer"
+	"github.com/jossecurity/joss/pkg/core"
+	"github.com/jossecurity/joss/pkg/diagnostics"
 	"github.com/jossecurity/joss/pkg/parser"
 )
 
@@ -43,6 +46,23 @@ func TestGeneratedProjectsUseCanonicalParsableJoss(t *testing.T) {
 			})
 			if err != nil {
 				t.Fatal(err)
+			}
+
+			units, parseDiagnostics := semanticanalyzer.LoadProject(filepath.Join(root, "main.joss"), filepath.Join(root, "app"))
+			for _, diagnostic := range parseDiagnostics {
+				if diagnostic.Severity == diagnostics.SeverityError {
+					t.Fatalf("generated project parse diagnostic: %s", diagnostic.String())
+				}
+			}
+			report := core.AnalyzeSourceUnits(units)
+			if report.HasErrors() {
+				t.Fatalf("generated project has semantic errors: %#v", report.Diagnostics)
+			}
+			if tt.name == "console" {
+				runtime := core.NewRuntime()
+				defer runtime.Free()
+				runtime.PreloadAppFiles(filepath.Join(root, "app"))
+				runtime.Execute(units[0].Program)
 			}
 		})
 	}

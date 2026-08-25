@@ -11,16 +11,18 @@ func (r *Runtime) checkType(val interface{}, typeName string) bool {
 	if typesystem.Assignable(destination, source) {
 		return true
 	}
-	if destination.Kind != typesystem.Class {
-		return false
-	}
 	inst, ok := val.(*Instance)
 	if !ok || inst == nil {
 		return false
 	}
+	destinations := destination.Members()
 	for class := inst.Class; class != nil; {
-		if class.Name != nil && class.Name.Value == destination.Name {
-			return true
+		if class.Name != nil {
+			for _, candidate := range destinations {
+				if candidate.Kind == typesystem.Class && class.Name.Value == candidate.Name {
+					return true
+				}
+			}
 		}
 		if class.SuperClass == nil {
 			break
@@ -150,7 +152,19 @@ func (r *Runtime) coerceToTypedValue(val interface{}, typeName string) interface
 // getZeroValue returns the zero/default value for a given type name.
 // Used when a variable is declared without an initializer (e.g., int $x).
 func (r *Runtime) getZeroValue(typeName string) interface{} {
-	switch typesystem.Parse(typeName).Kind {
+	parsed := typesystem.Parse(typeName)
+	if parsed.Kind == typesystem.Union {
+		members := parsed.Members()
+		for _, member := range members {
+			if member.Kind == typesystem.Null {
+				return nil
+			}
+		}
+		if len(members) > 0 {
+			return r.getZeroValue(members[0].String())
+		}
+	}
+	switch parsed.Kind {
 	case typesystem.Int:
 		return int64(0)
 	case typesystem.Float:

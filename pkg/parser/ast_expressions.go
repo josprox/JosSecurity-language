@@ -211,6 +211,7 @@ func (ie *IndexExpression) String() string {
 type FunctionLiteral struct {
 	Token      Token // FUNCTION
 	Parameters []*Parameter
+	ReturnType Token // optional type after ':'
 	Body       *BlockStatement
 }
 
@@ -224,7 +225,11 @@ func (fl *FunctionLiteral) String() string {
 		params = append(params, p.String())
 	}
 	out.WriteString(strings.Join(params, ", "))
-	out.WriteString(") ")
+	out.WriteString(")")
+	if fl.ReturnType.Literal != "" {
+		out.WriteString(": " + fl.ReturnType.Literal)
+	}
+	out.WriteString(" ")
 	out.WriteString(fl.Body.String())
 	return out.String()
 }

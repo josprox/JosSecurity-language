@@ -5,8 +5,7 @@ import (
 	"strings"
 )
 
-// executeInsertMethod handles insert operations for GranDB
-// Supports both array-based and map-based inserts
+// executeInsertMethod handles map-based inserts for GranDB.
 func (r *Runtime) executeInsertMethod(instance *Instance, args []interface{}, returnID bool) interface{} {
 	if r.GetDB() == nil {
 		panic("GranDB Error: No hay conexión a la base de datos configurada")
@@ -14,22 +13,10 @@ func (r *Runtime) executeInsertMethod(instance *Instance, args []interface{}, re
 
 	table := r.getTable(instance)
 
-	// Case 1: Map-based insert (modern approach)
-	// Usage: $model.insert({"name": "John", "email": "john@example.com"})
+	// Usage: $model->insert({"name": "John", "email": "john@example.com"})
 	if len(args) == 1 {
 		if data, ok := args[0].(map[string]interface{}); ok {
 			return r.insertFromMap(table, data, returnID)
-		}
-	}
-
-	// Case 2: Array-based insert (legacy approach)
-	// Usage: $model.insert(["name", "email"], ["John", "john@example.com"])
-	if len(args) == 2 {
-		cols, ok1 := args[0].([]interface{})
-		vals, ok2 := args[1].([]interface{})
-
-		if ok1 && ok2 {
-			return r.insertFromArrays(table, cols, vals, returnID)
 		}
 	}
 
@@ -113,70 +100,6 @@ func (r *Runtime) insertFromMap(table string, data map[string]interface{}, retur
 	result, err := r.GetDB().Exec(query, bindings...)
 	if err != nil {
 		panic(fmt.Sprintf("GranDB Error en insert: %v", err))
-	}
-
-	if returnID {
-		if id, err := result.LastInsertId(); err == nil && id > 0 {
-			return id
-		}
-		return false
-	}
-	return true
-}
-
-// insertFromArrays performs insert using separate arrays for columns and values
-func (r *Runtime) insertFromArrays(table string, cols []interface{}, vals []interface{}, returnID bool) interface{} {
-	if len(cols) != len(vals) {
-		fmt.Println("[GranDB] Error: Column and value count mismatch")
-		return false
-	}
-
-	colNames := []string{}
-	placeholders := []string{}
-	bindings := []interface{}{}
-
-	for _, c := range cols {
-		colNames = append(colNames, quoteIdentifier(fmt.Sprintf("%v", c)))
-		placeholders = append(placeholders, "?")
-	}
-
-	for _, v := range vals {
-		bindings = append(bindings, v)
-	}
-
-	query := fmt.Sprintf("INSERT INTO %s (%s) VALUES (%s)",
-		table,
-		strings.Join(colNames, ", "),
-		strings.Join(placeholders, ", "))
-
-	driver := normalizeDatabaseDriver(r.Env["DB"])
-	if returnID {
-		if driver == "postgres" {
-			var id int64
-			if err := r.GetDB().QueryRow(query+" RETURNING id", bindings...).Scan(&id); err != nil {
-				panic(fmt.Sprintf("GranDB Error en insert from arrays: %v", err))
-			}
-			return id
-		}
-		if driver == "sqlserver" {
-			var id int64
-			outputQuery := strings.Replace(query, " VALUES", " OUTPUT INSERTED.id VALUES", 1)
-			if err := r.GetDB().QueryRow(outputQuery, bindings...).Scan(&id); err == nil && id > 0 {
-				return id
-			}
-			if _, err := r.GetDB().Exec(query, bindings...); err == nil {
-				_ = r.GetDB().QueryRow("SELECT SCOPE_IDENTITY()").Scan(&id)
-				if id > 0 {
-					return id
-				}
-			}
-			return false
-		}
-	}
-
-	result, err := r.GetDB().Exec(query, bindings...)
-	if err != nil {
-		panic(fmt.Sprintf("GranDB Error en insert from arrays: %v", err))
 	}
 
 	if returnID {

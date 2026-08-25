@@ -42,8 +42,9 @@ func (r *Runtime) evaluateNew(ne *parser.NewExpression) interface{} {
 	}
 
 	instance := &Instance{
-		Class:  classStmt,
-		Fields: make(map[string]interface{}),
+		Class:     classStmt,
+		Fields:    make(map[string]interface{}),
+		Constants: make(map[string]bool),
 	}
 
 	// Collect inheritance chain
@@ -64,7 +65,28 @@ func (r *Runtime) evaluateNew(ne *parser.NewExpression) interface{} {
 		cls := chain[i]
 		for _, stmt := range cls.Body.Statements {
 			if let, ok := stmt.(*parser.LetStatement); ok {
-				instance.Fields[let.Name.Value] = r.evaluateExpression(let.Value)
+				var value interface{}
+				if let.Value != nil {
+					value = r.evaluateExpression(let.Value)
+				} else {
+					value = r.getZeroValue(let.Token.Literal)
+				}
+				declaredType := let.Token.Literal
+				if declaredType != "" && declaredType != "var" && declaredType != "mixed" {
+					value = r.coerceToTypedValue(value, declaredType)
+					if !r.checkType(value, declaredType) {
+						panic(&JossError{
+							Type:    "PropertyTypeError",
+							Message: fmt.Sprintf("La propiedad '%s' requiere %s", let.Name.Value, declaredType),
+							File:    r.CurrentFile,
+							Line:    let.Name.Token.Line,
+						})
+					}
+				}
+				instance.Fields[let.Name.Value] = value
+				if let.IsConst {
+					instance.Constants[let.Name.Value] = true
+				}
 			}
 		}
 	}

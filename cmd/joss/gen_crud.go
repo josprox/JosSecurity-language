@@ -10,7 +10,13 @@ import (
 	_ "modernc.org/sqlite"
 )
 
-func createCRUD(tableName string) {
+func createCRUD(tableName string) error {
+	if isConsoleProject() {
+		return fmt.Errorf("make:crud requiere un proyecto web con app/views")
+	}
+	if err := validateDatabaseIdentifier(tableName); err != nil {
+		return err
+	}
 	fmt.Printf("Generating CRUD for table '%s'...\n", tableName)
 
 	// 1. Connect to DB
@@ -18,16 +24,14 @@ func createCRUD(tableName string) {
 	db, err := connectToDB(dbType, readEnvFile(GetEnvFile()))
 
 	if err != nil {
-		fmt.Printf("Error connecting to DB: %v\n", err)
-		return
+		return fmt.Errorf("conectando a la base de datos: %w", err)
 	}
 	defer db.Close()
 
 	// 2. Inspect Schema
 	cols, err := getColumns(db, dbType, tableName)
 	if err != nil {
-		fmt.Printf("Error inspecting table: %v\n", err)
-		return
+		return fmt.Errorf("inspeccionando tabla %s: %w", tableName, err)
 	}
 
 	// If table not found and doesn't start with prefix, try adding prefix
@@ -36,8 +40,7 @@ func createCRUD(tableName string) {
 		fmt.Printf("Table '%s' not found. Trying '%s'...\n", tableName, prefixedName)
 		cols, err = getColumns(db, dbType, prefixedName)
 		if err != nil {
-			fmt.Printf("Error inspecting table: %v\n", err)
-			return
+			return fmt.Errorf("inspeccionando tabla %s: %w", prefixedName, err)
 		}
 		if len(cols) > 0 {
 			tableName = prefixedName
@@ -46,8 +49,7 @@ func createCRUD(tableName string) {
 	}
 
 	if len(cols) == 0 {
-		fmt.Printf("Table '%s' not found or empty.\n", tableName)
-		return
+		return fmt.Errorf("la tabla %q no existe o no tiene columnas", tableName)
 	}
 	// 3. Analyze Relations
 	var relations []Relation
@@ -61,7 +63,14 @@ func createCRUD(tableName string) {
 			relatedTable := prefix + strings.ToLower(pluralize(baseName)) // Convention: js_users
 
 			// Smartly detect display column
-			displayCol := getDisplayColumn(db, dbType, relatedTable)
+			displayCol, exists, displayErr := getDisplayColumn(db, dbType, relatedTable)
+			if displayErr != nil {
+				return fmt.Errorf("inspeccionando relacion %s: %w", relatedTable, displayErr)
+			}
+			if !exists {
+				fmt.Printf("  -> Related table %s not found; treating %s as a regular field.\n", relatedTable, c.Name)
+				continue
+			}
 			fmt.Printf("  -> Detected display column for %s: %s\n", relatedTable, displayCol)
 
 			relations = append(relations, Relation{
@@ -103,14 +112,13 @@ func createCRUD(tableName string) {
 	createCRUDController(modelName, tableName, cols, relations)
 
 	// Views
-	if !isConsoleProject() {
-		createCRUDViews(modelName, cols, relations)
-		updateNavbar(modelName)
-		injectProtectedRoutes(modelName)
-	}
+	createCRUDViews(modelName, cols, relations)
+	updateNavbar(modelName)
+	injectProtectedRoutes(modelName)
+	return nil
 }
 
-func createCRUDController(modelName, tableName string, _ []ColumnSchema, relations []Relation) {
+func createCRUDController(modelName, tableName string, cols []ColumnSchema, relations []Relation) {
 	path := filepath.Join("app", "controllers", modelName+"Controller.joss")
 	os.MkdirAll(filepath.Dir(path), 0755)
 
@@ -165,6 +173,7 @@ func createCRUDController(modelName, tableName string, _ []ColumnSchema, relatio
 		}
 	}
 
+	requestData := generateRequestData(cols)
 	content := fmt.Sprintf(`class %sController {
     
     func index() {
@@ -179,7 +188,7 @@ func createCRUDController(modelName, tableName string, _ []ColumnSchema, relatio
 
     func store() {
         $model = new %s()
-        $data = Request::except(["_token", "_referer", "_method"])
+        $data = %s
         $model->insert($data)
         return redirect("/%s")->with("success", "%s creado correctamente.")
     }
@@ -196,7 +205,7 @@ func createCRUDController(modelName, tableName string, _ []ColumnSchema, relatio
 
     func update($id) {
         $model = new %s()
-        $data = Request::except(["_token", "_referer", "_method"])
+        $data = %s
         $model->where("id", $id)->update($data)
         return redirect("/%s")->with("success", "%s actualizado correctamente.")
     }
@@ -207,12 +216,23 @@ func createCRUDController(modelName, tableName string, _ []ColumnSchema, relatio
         return redirect("/%s")->with("success", "%s eliminado correctamente.")
     }
 }`, modelName, indexLogic, viewPrefix, createLogic, viewPrefix, strings.TrimPrefix(createVars, ", "),
-		modelName, viewPrefix, modelName,
+		modelName, requestData, viewPrefix, modelName,
 		modelName, viewPrefix, createLogic, viewPrefix, createVars,
-		modelName, viewPrefix, modelName,
+		modelName, requestData, viewPrefix, modelName,
 		modelName, viewPrefix, modelName)
 
 	writeGenFile(path, content)
+}
+
+func generateRequestData(cols []ColumnSchema) string {
+	fields := make([]string, 0, len(cols))
+	for _, column := range cols {
+		if column.Name == "id" || column.Name == "created_at" || column.Name == "updated_at" {
+			continue
+		}
+		fields = append(fields, fmt.Sprintf(`"%s": Request::input("%s")`, column.Name, column.Name))
+	}
+	return "{" + strings.Join(fields, ", ") + "}"
 }
 
 func createCRUDViews(modelName string, cols []ColumnSchema, relations []Relation) {
@@ -242,7 +262,10 @@ func createCRUDViews(modelName string, cols []ColumnSchema, relations []Relation
                     %s
                     <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium space-x-2">
                         <a href="/%s/edit/{{ $item.id }}" class="text-blue-500 hover:text-blue-600 transition"><i class="fas fa-edit"></i></a>
-                        <a href="/%s/delete/{{ $item.id }}" class="text-red-500 hover:text-red-650 transition" onclick="return confirm('Are you sure?')"><i class="fas fa-trash"></i></a>
+                        <form action="/%s/delete/{{ $item.id }}" method="POST" class="inline" onsubmit="return confirm('Are you sure?')">
+                            {{ csrf_field() }}
+                            <button type="submit" class="text-red-500 hover:text-red-650 transition"><i class="fas fa-trash"></i></button>
+                        </form>
                     </td>
                 </tr>
                 @endforeach
@@ -399,6 +422,10 @@ func updateNavbar(modelName string) {
 		// Try new Tailwind navbar format first
 		newLink := fmt.Sprintf(`<li><a href="/%s" class="block py-2 px-3 text-gray-300 hover:text-white"><i class="fas fa-circle mr-1 text-xs"></i> %s</a></li>`, strings.ToLower(modelName), modelName)
 		oldLink := fmt.Sprintf(`<li><a href="/%s"><i class="fas fa-circle"></i> %s</a></li>`, strings.ToLower(modelName), modelName)
+		if strings.Contains(html, fmt.Sprintf(`href="/%s"`, strings.ToLower(modelName))) {
+			fmt.Printf("Navbar already contains /%s.\n", strings.ToLower(modelName))
+			return
+		}
 
 		injected := false
 		// Insert before <!-- Injected Links Here --> (both formats)
@@ -436,7 +463,7 @@ func injectProtectedRoutes(modelName string) {
     Router::post("/%s/store", "%sController@store")
     Router::get("/%s/edit/{id}", "%sController@edit")
     Router::post("/%s/update/{id}", "%sController@update")
-    Router::get("/%s/delete/{id}", "%sController@delete")
+    Router::post("/%s/delete/{id}", "%sController@delete")
 `, modelName,
 		strings.ToLower(modelName), modelName,
 		strings.ToLower(modelName), modelName,
@@ -446,6 +473,10 @@ func injectProtectedRoutes(modelName string) {
 		strings.ToLower(modelName), modelName)
 
 	strContent := string(content)
+	if strings.Contains(strContent, fmt.Sprintf("// CRUD Routes for %s", modelName)) {
+		fmt.Printf("Routes for %s already exist.\n", modelName)
+		return
+	}
 
 	// Check if "auth" middleware group exists (Router::middleware("auth") ... Router::end())
 	authMarker := `Router::middleware("auth")`

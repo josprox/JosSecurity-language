@@ -13,6 +13,7 @@ func (r *Runtime) Dispatch(method, path string, reqData, sessData map[string]int
 	// Inject Request and Session
 	r.Variables["$__request"] = &Instance{Class: r.Classes["Request"], Fields: reqData}
 	r.Variables["$__session"] = &Instance{Class: r.Classes["Session"], Fields: sessData}
+	r.markHostGlobals("$__request", "$__session")
 
 	// Match Route
 	var handler interface{}
@@ -26,9 +27,6 @@ func (r *Runtime) Dispatch(method, path string, reqData, sessData map[string]int
 			if mw, ok := routeInfo["middleware"].([]string); ok {
 				middleware = mw
 			}
-		} else if h, ok := r.Routes[method][path]; ok {
-			// Legacy support (just handler)
-			handler = h
 		}
 	}
 
@@ -47,8 +45,6 @@ func (r *Runtime) Dispatch(method, path string, reqData, sessData map[string]int
 						if mw, ok := routeInfo["middleware"].([]string); ok {
 							middleware = mw
 						}
-					} else {
-						handler = routeVal
 					}
 					break
 				}
@@ -296,13 +292,14 @@ func (r *Runtime) Dispatch(method, path string, reqData, sessData map[string]int
 	}
 
 	// Handle FunctionLiteral closures as route handlers
-	// e.g. Router::get("/sound/{id}", function ($id) { return Redirect::to(...) })
+	// e.g. Router::get("/sound/{id}", func ($id) { return Redirect::to(...) })
 	if fn, ok := handler.(*parser.FunctionLiteral); ok {
 		args := r.extractRouteParams(method, path)
 		synth := &parser.MethodStatement{
 			Token:      fn.Token,
 			Name:       &parser.Identifier{Value: "anonymous"},
 			Parameters: fn.Parameters,
+			ReturnType: fn.ReturnType,
 			Body:       fn.Body,
 		}
 		fmt.Printf("[DEBUG] Executing closure handler for %s %s\n", method, path)
@@ -344,6 +341,7 @@ func (r *Runtime) DispatchWebSocket(path string, conn interface{}, reader func()
 			Class:  r.Classes["Session"],
 			Fields: make(map[string]interface{}),
 		}
+		r.markHostGlobals("$__session")
 	}
 
 	// Conn is passed as interface{}, expected to be *websocket.Conn
@@ -356,8 +354,6 @@ func (r *Runtime) DispatchWebSocket(path string, conn interface{}, reader func()
 	if r.Routes["WS"] != nil {
 		if routeInfo, ok := r.Routes["WS"][path].(map[string]interface{}); ok {
 			handler = routeInfo["handler"]
-		} else if h, ok := r.Routes["WS"][path]; ok {
-			handler = h
 		}
 		if handler == nil {
 			for pattern, rawHandler := range r.Routes["WS"] {
@@ -368,8 +364,6 @@ func (r *Runtime) DispatchWebSocket(path string, conn interface{}, reader func()
 				routeParams = params
 				if routeInfo, ok := rawHandler.(map[string]interface{}); ok {
 					handler = routeInfo["handler"]
-				} else {
-					handler = rawHandler
 				}
 				break
 			}
@@ -431,7 +425,7 @@ func (r *Runtime) DispatchWebSocket(path string, conn interface{}, reader func()
 		}
 	}
 	if fn, ok := handler.(*parser.FunctionLiteral); ok {
-		method := &parser.MethodStatement{Token: fn.Token, Name: &parser.Identifier{Value: "anonymous"}, Parameters: fn.Parameters, Body: fn.Body}
+		method := &parser.MethodStatement{Token: fn.Token, Name: &parser.Identifier{Value: "anonymous"}, Parameters: fn.Parameters, ReturnType: fn.ReturnType, Body: fn.Body}
 		callArgs := append([]interface{}{wsInstance}, routeParams...)
 		r.CallMethodEvaluated(method, nil, callArgs)
 		handlerExecuted = true

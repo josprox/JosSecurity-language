@@ -93,6 +93,7 @@ func (cg *CodeGenerator) GenerateBytecode(module *ir.IRModule) ([]byte, []byte, 
 			functions = append(functions, pluginpkg.SymbolCallable{
 				Name:       name,
 				Parameters: params,
+				ReturnType: fn.ReturnType,
 			})
 		}
 		binary.Write(buf, binary.BigEndian, expFlag)

@@ -62,6 +62,12 @@ Conecta a la base de datos configurada en `env.joss`, inspecciona el esquema de 
 4. **Vistas Tailwind CSS`: Genera `app/views/model/index.joss.html`, `create.joss.html` y `edit.joss.html` con formularios dinámicos y menús desplegables `<select>` para relaciones.
 5. **Inyección en Navbar y Rutas**: Inyecta la opción en `app/views/layouts/master.joss.html` e inserta las rutas protegidas dentro del grupo `Router::middleware("auth")` en `routes.joss`.
 
+El comando sólo se admite en proyectos web y requiere que la tabla ya exista.
+Los nombres de tabla/columnas se validan como identificadores antes de consultar
+el esquema. El controlador generado acepta únicamente las columnas editables
+descubiertas (no hace asignación masiva), el borrado usa `POST` con CSRF y volver
+a ejecutar el generador no duplica rutas ni enlaces de navegación.
+
 ### 🗑️ `remove:crud [Tabla]`
 Deshace limpiamente la generación: elimina el controlador, modelo, carpeta de vistas y remueve las rutas inyectadas en `routes.joss` y el enlace del navbar.
 
@@ -80,7 +86,7 @@ joss change db prefix app_
 joss change db migrate --host=HOST --port=3306 --database=DB --user=USER --password=PASS
 ```
 
-- `make:migration`: Genera una nueva migración con timestamp en `app/database/migrations/`.
+- `make:migration`: Genera una nueva migración con timestamp en `app/database/migrations/`. `create_users`, `create_users_table` y `user` se normalizan a la tabla lógica `users`; `make:miggrate` no es un alias y muestra la corrección sugerida.
 - `migrate`: Ejecuta las migraciones pendientes en orden cronológico.
 - `migrate:fresh`: Elimina todas las tablas de la base de datos y vuelve a ejecutar todas las migraciones desde cero.
 - `db:seed`: Ejecuta los seeders pobladores definidos en `app/database/seeders/`.

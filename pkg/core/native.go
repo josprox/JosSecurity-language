@@ -21,7 +21,11 @@ func (r *Runtime) registerNative(name string, methods []string, handler NativeHa
 	// Build MethodStatements
 	stmts := []parser.Statement{}
 	for _, m := range methods {
-		stmts = append(stmts, &parser.MethodStatement{Name: &parser.Identifier{Value: m}})
+		returnType := nativeMethodReturnType(name, m)
+		stmts = append(stmts, &parser.MethodStatement{
+			Name:       &parser.Identifier{Value: m},
+			ReturnType: parser.Token{Type: parser.IDENT, Literal: returnType.String()},
+		})
 	}
 
 	classStmt := &parser.ClassStatement{
@@ -79,7 +83,7 @@ func (r *Runtime) RegisterNativeClasses() {
 
 	// GranDB
 	granDBMethods := []string{
-		"table", "select",
+		"table", "select", "changeDB", "changedb", "connection", "use", "distinct",
 		"where", "orWhere", "orwhere", "whereLike", "wherelike", "orWhereLike", "orwherelike",
 		"whereColumn", "wherecolumn", "orWhereColumn", "orwherecolumn",
 		"whereNot", "wherenot", "orWhereNot", "orwherenot",
@@ -89,14 +93,14 @@ func (r *Runtime) RegisterNativeClasses() {
 		"whereDate", "wheredate", "orWhereDate", "orwheredate", "whereYear", "whereyear", "orWhereYear", "orwhereyear",
 		"whereMonth", "wheremonth", "orWhereMonth", "orwheremonth", "whereDay", "whereday", "orWhereDay", "orwhereday",
 		"whereTime", "wheretime", "orWhereTime", "orwheretime", "whereJsonContains", "wherejsoncontains", "orWhereJsonContains", "orwherejsoncontains",
-		"join", "innerJoin", "leftJoin", "rightJoin",
+		"join", "innerJoin", "leftJoin", "rightJoin", "crossJoin", "crossjoin",
 		"get", "first", "firstOrFail", "firstofail", "firstWhere", "firstwhere", "sole", "find", "findMany", "findmany", "findOrFail", "findorfail",
 		"value", "pluck", "exists", "doesntExist", "paginate", "chunk",
 		"count", "sum", "avg", "min", "max",
 		"insert", "insertGetId", "insertgetid", "update", "updateOrInsert", "updateorinsert", "upsert", "delete", "deleteAll", "truncate", "increment", "decrement", "touch",
 		"orderBy", "orderby", "orderByDesc", "orderbydesc", "orderByAsc", "orderbyasc", "latest", "oldest", "inRandomOrder", "reorder", "limit", "take", "offset", "skip", "forPage", "forpage",
 		"groupBy", "groupby", "having", "orHaving", "orhaving",
-		"when", "unless", "toSql", "tosql", "getBindings", "getbindings", "dump", "dd",
+		"when", "unless", "transaction", "toSql", "tosql", "getBindings", "getbindings", "dump", "dd",
 	}
 	r.registerNative("GranDB", granDBMethods, (*Runtime).executeGranDBMethod)
 

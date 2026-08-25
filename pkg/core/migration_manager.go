@@ -5,20 +5,26 @@ import (
 	"fmt"
 )
 
+func (r *Runtime) migrationTableIdentifier() (string, string, error) {
+	driver := normalizeDatabaseDriver(r.Env["DB"])
+	if driver == "" {
+		driver = "mysql"
+	}
+	table, err := quoteSchemaIdentifier(r.dbPrefix()+"migration", driver)
+	return table, driver, err
+}
+
 // EnsureMigrationTable creates the migration table if it doesn't exist
-func (r *Runtime) EnsureMigrationTable() {
+func (r *Runtime) EnsureMigrationTable() error {
 	if r.GetDB() == nil {
-		return
+		return fmt.Errorf("no hay conexion a la base de datos")
 	}
 
-	r.executeSchemaMethod(nil, "create", []interface{}{
-		"migration",
-		map[string]interface{}{
-			"id":          "increments",
-			"migration":   "string(255)",
-			"batch":       "integer",
-			"executed_at": "timestamp|default(CURRENT_TIMESTAMP)",
-		},
+	return r.ensureInternalSchemaTable("migration", []schemaColumn{
+		{name: "id", definition: "increments"},
+		{name: "migration", definition: "string(255)"},
+		{name: "batch", definition: "integer"},
+		{name: "executed_at", definition: "timestamp|default(CURRENT_TIMESTAMP)"},
 	})
 }
 
@@ -29,8 +35,10 @@ func (r *Runtime) GetExecutedMigrations() map[string]bool {
 		return executed
 	}
 
-	prefix := r.dbPrefix()
-	tableName := prefix + "migration"
+	tableName, _, err := r.migrationTableIdentifier()
+	if err != nil {
+		return executed
+	}
 
 	rows, err := r.GetDB().Query(fmt.Sprintf("SELECT migration FROM %s", tableName))
 	if err != nil {
@@ -53,8 +61,10 @@ func (r *Runtime) GetNextBatch() int {
 		return 1
 	}
 
-	prefix := r.dbPrefix()
-	tableName := prefix + "migration"
+	tableName, _, tableErr := r.migrationTableIdentifier()
+	if tableErr != nil {
+		return 1
+	}
 
 	var maxBatch sql.NullInt64
 	err := r.GetDB().QueryRow(fmt.Sprintf("SELECT MAX(batch) FROM %s", tableName)).Scan(&maxBatch)
@@ -68,18 +78,24 @@ func (r *Runtime) GetNextBatch() int {
 }
 
 // LogMigration logs a successful migration
-func (r *Runtime) LogMigration(migration string, batch int) {
+func (r *Runtime) LogMigration(migration string, batch int) error {
 	if r.GetDB() == nil {
-		return
+		return fmt.Errorf("no hay conexion a la base de datos")
 	}
 
-	prefix := r.dbPrefix()
-	tableName := prefix + "migration"
-
-	_, err := r.GetDB().Exec(fmt.Sprintf("INSERT INTO %s (migration, batch) VALUES (?, ?)", tableName), migration, batch)
+	tableName, driver, err := r.migrationTableIdentifier()
 	if err != nil {
-		fmt.Printf("[Migration] Error registrando migración %s: %v\n", migration, err)
+		return err
 	}
+
+	placeholders := "?, ?"
+	if driver == "postgres" {
+		placeholders = "$1, $2"
+	} else if driver == "sqlserver" {
+		placeholders = "@p1, @p2"
+	}
+	_, err = r.GetDB().Exec(fmt.Sprintf("INSERT INTO %s (migration, batch) VALUES (%s)", tableName, placeholders), migration, batch)
+	return err
 }
 
 // DropAllTables drops all user tables from the database

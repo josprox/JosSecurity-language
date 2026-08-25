@@ -26,10 +26,16 @@ type Callable struct {
 	Variadic   bool
 }
 
+type Field struct {
+	Type     typesystem.Type
+	Constant bool
+}
+
 type Class struct {
 	Name       string
 	SuperClass string
 	Methods    map[string]Callable
+	Fields     map[string]Field
 }
 
 type Environment struct {

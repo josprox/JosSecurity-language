@@ -35,6 +35,8 @@ type Runtime struct {
 	Env               map[string]string
 	Variables         map[string]interface{}
 	VarTypes          map[string]string // For strict typing
+	Constants         map[string]bool
+	HostGlobals       map[string]bool // runtime/plugin bindings visible inside named callables
 	Classes           map[string]*parser.ClassStatement
 	Functions         map[string]*parser.MethodStatement
 	DB                *sql.DB
@@ -45,9 +47,7 @@ type Runtime struct {
 	NativePlugins     map[string]*NativePluginDefinition
 	NativeDrivers     map[string]*NativeDriverDefinition
 	PluginRegistry    *pluginruntime.PluginRegistry
-	importedFiles     map[string]bool // idempotent file imports
 	ProjectRoot       string
-	importBaseDir     string
 
 	// SEO & Sitemap
 	SEO               *SEOData
@@ -56,23 +56,46 @@ type Runtime struct {
 	SitemapExclusions []string
 	CurrentSource     string // "routes", "api", "app", etc.
 	CurrentFile       string // Currently executing file path
+	MaxCallDepth      int    // Guard against unbounded recursive calls
+	callDepth         int
 
 	captureEnvironment *ClosureEnvironment
 }
+
+func (r *Runtime) markCurrentVariablesAsHostGlobals() {
+	if r.HostGlobals == nil {
+		r.HostGlobals = make(map[string]bool)
+	}
+	for name := range r.Variables {
+		r.HostGlobals[name] = true
+	}
+}
+
+func (r *Runtime) markHostGlobals(names ...string) {
+	if r.HostGlobals == nil {
+		r.HostGlobals = make(map[string]bool)
+	}
+	for _, name := range names {
+		r.HostGlobals[name] = true
+	}
+}
+
+const DefaultMaxCallDepth = 1024
 
 // ClosureEnvironment is the shared lexical state of callbacks captured during
 // the same function or method invocation.
 type ClosureEnvironment struct {
 	Variables map[string]interface{}
 	VarTypes  map[string]string
+	Constants map[string]bool
 	mu        sync.Mutex
 }
 
 // CapturedFunction is a function literal paired with the lexical environment
 // that existed when a long-lived callback was registered.
 //
-// Function literals remain parser nodes for backwards compatibility with
-// immediate consumers such as Router and Schema. Native APIs that retain a
+// Function literals remain parser nodes for immediate consumers such as
+// Router and Schema. Native APIs that retain a
 // callback beyond the current call should wrap it with Runtime.captureFunction.
 type CapturedFunction struct {
 	Function    *parser.FunctionLiteral
@@ -103,8 +126,9 @@ type NativeDriverDefinition struct {
 
 // Instance represents an instance of a class
 type Instance struct {
-	Class  *parser.ClassStatement
-	Fields map[string]interface{}
+	Class     *parser.ClassStatement
+	Fields    map[string]interface{}
+	Constants map[string]bool
 }
 
 func (i *Instance) MarshalJSON() ([]byte, error) {

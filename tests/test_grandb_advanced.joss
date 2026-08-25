@@ -6,7 +6,7 @@ print("========================================================\n")
 
 // 1. Cambio dinámico a SQLite local para pruebas inmediatas
 $db_switched = System::change_db("sqlite", {
-    "DB_PATH": "test_grandb.sqlite",
+    "DB_PATH": "file:joss_grandb_advanced?mode=memory&cache=shared",
     "DB_PREFIX": "app_"
 })
 
@@ -18,16 +18,15 @@ $db_switched = System::change_db("sqlite", {
 
 // 2. Creación de tabla con Schema
 Schema::dropIfExists("products")
-Schema::create("products", {
-    "id": "increments",
-    "name": "string(100)",
-    "category": "string(50)",
-    "price": "decimal(10,2)",
-    "stock": "integer|default(0)",
-    "is_active": "boolean|default(1)",
-    "description": "text|nullable",
-    "created_at": "timestamp|nullable",
-    "updated_at": "timestamp|nullable"
+Schema::create("products", func($table) {
+    $table->increments("id")
+    $table->string("name", 100)
+    $table->string("category", 50)
+    $table->decimal("price", 10, 2)
+    $table->integer("stock")->default(0)
+    $table->boolean("is_active")->default(1)
+    $table->text("description")->nullable()
+    $table->timestamps()
 })
 
 $has_table = Schema::hasTable("products")
@@ -94,7 +93,7 @@ $count_after_del = GranDB::table("products")->count()
 print("[13] Total tras borrar p3: " . $count_after_del . "\n")
 
 // 7. Transacciones con GranDB::transaction()
-GranDB::transaction(function($db) {
+GranDB::transaction(func($db) {
     GranDB::table("products")->insert({
         "name": "Teclado Mecánico",
         "category": "Electronics",
@@ -106,9 +105,6 @@ GranDB::transaction(function($db) {
 })
 $count_after_tx = GranDB::table("products")->count()
 print("[14] Conteo tras transacción: " . $count_after_tx . "\n")
-
-// Limpieza de archivo de prueba sqlite
-unlink("test_grandb.sqlite")
 
 print("========================================================\n")
 print("   TODAS LAS PRUEBAS DE GRANDB ORM EXITOSAS\n")

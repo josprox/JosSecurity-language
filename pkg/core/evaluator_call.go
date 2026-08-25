@@ -16,6 +16,10 @@ func (r *Runtime) CallMethod(method *parser.MethodStatement, instance *Instance,
 }
 
 func (r *Runtime) CallMethodEvaluated(method *parser.MethodStatement, instance *Instance, args []interface{}) (res interface{}) {
+	return r.callMethodEvaluated(method, instance, args, nil)
+}
+
+func (r *Runtime) callMethodEvaluated(method *parser.MethodStatement, instance *Instance, args []interface{}, writeBack *ClosureEnvironment) (res interface{}) {
 	// Native Method Support
 	if method.Body == nil {
 		return r.executeNativeMethod(instance, method.Name.Value, args)
@@ -29,47 +33,77 @@ func (r *Runtime) CallMethodEvaluated(method *parser.MethodStatement, instance *
 	if len(args) < required || len(args) > len(method.Parameters) {
 		panic(fmt.Sprintf("Arity Error: %s() espera entre %d y %d argumentos, se recibieron %d", method.Name.Value, required, len(method.Parameters), len(args)))
 	}
+	if r.MaxCallDepth <= 0 {
+		r.MaxCallDepth = DefaultMaxCallDepth
+	}
+	if r.callDepth >= r.MaxCallDepth {
+		panic(&JossError{
+			Type:    "RecursionLimit",
+			Message: fmt.Sprintf("La llamada a '%s' excedió el límite de recursión de %d frames", method.Name.Value, r.MaxCallDepth),
+			File:    r.CurrentFile,
+			Line:    method.Token.Line,
+		})
+	}
+	r.callDepth++
+	defer func() { r.callDepth-- }()
 
-	// Save previous "this" if exists (for nested calls)
-	prevThis := r.Variables["this"]
-	_, previousThisExists := r.Variables["this"]
+	// Named callables see only runtime/plugin globals. Function literals receive
+	// their captured lexical environment through writeBack. This prevents the
+	// accidental dynamic scoping that used to expose caller locals to recursion.
+	parentVariables := r.Variables
+	parentVarTypes := r.VarTypes
+	parentConstants := r.Constants
+	frameVariables := make(map[string]interface{}, len(r.HostGlobals)+len(method.Parameters)+1)
+	frameVarTypes := make(map[string]string, len(parentVarTypes)+len(method.Parameters))
+	frameConstants := make(map[string]bool)
+	for name, value := range parentVariables {
+		if writeBack != nil || r.HostGlobals[name] {
+			frameVariables[name] = value
+			if valueType, exists := parentVarTypes[name]; exists {
+				frameVarTypes[name] = valueType
+			}
+			if parentConstants[name] {
+				frameConstants[name] = true
+			}
+		}
+	}
+	r.Variables = frameVariables
+	r.VarTypes = frameVarTypes
+	r.Constants = frameConstants
+	parameterNames := make(map[string]bool, len(method.Parameters))
+	for _, parameter := range method.Parameters {
+		parameterNames[parameter.Name.Value] = true
+	}
+	defer func() {
+		if writeBack != nil {
+			for name := range writeBack.Variables {
+				if !parameterNames[name] {
+					writeBack.Variables[name] = r.Variables[name]
+				}
+			}
+			for name := range writeBack.VarTypes {
+				if !parameterNames[name] {
+					writeBack.VarTypes[name] = r.VarTypes[name]
+				}
+			}
+			writeBack.Constants = copyBoolMap(r.Constants)
+		}
+		r.Variables = parentVariables
+		r.VarTypes = parentVarTypes
+		r.Constants = parentConstants
+	}()
+
 	if instance != nil {
 		r.Variables["this"] = instance
+	} else {
+		delete(r.Variables, "this")
+		delete(r.VarTypes, "this")
 	}
 	previousCaptureEnvironment := r.captureEnvironment
 	r.captureEnvironment = nil
+	defer func() { r.captureEnvironment = previousCaptureEnvironment }()
 
 	// Bind arguments
-	previousParams := make(map[string]interface{}, len(method.Parameters))
-	previousParamExists := make(map[string]bool, len(method.Parameters))
-	previousParamTypes := make(map[string]string, len(method.Parameters))
-	previousParamTypeExists := make(map[string]bool, len(method.Parameters))
-	for _, param := range method.Parameters {
-		previousParams[param.Name.Value], previousParamExists[param.Name.Value] = r.Variables[param.Name.Value]
-		previousParamTypes[param.Name.Value], previousParamTypeExists[param.Name.Value] = r.VarTypes[param.Name.Value]
-	}
-	defer func() {
-		r.captureEnvironment = previousCaptureEnvironment
-		if instance != nil {
-			if previousThisExists {
-				r.Variables["this"] = prevThis
-			} else {
-				delete(r.Variables, "this")
-			}
-		}
-		for _, param := range method.Parameters {
-			if previousParamExists[param.Name.Value] {
-				r.Variables[param.Name.Value] = previousParams[param.Name.Value]
-			} else {
-				delete(r.Variables, param.Name.Value)
-			}
-			if previousParamTypeExists[param.Name.Value] {
-				r.VarTypes[param.Name.Value] = previousParamTypes[param.Name.Value]
-			} else {
-				delete(r.VarTypes, param.Name.Value)
-			}
-		}
-	}()
 	for i, param := range method.Parameters {
 		declaredType := param.Type.Literal
 		if declaredType == "" {
@@ -105,6 +139,17 @@ func (r *Runtime) CallMethodEvaluated(method *parser.MethodStatement, instance *
 				res = rp.Value
 			} else {
 				panic(p)
+			}
+		}
+		if method.ReturnType.Literal != "" {
+			res = r.coerceToTypedValue(res, method.ReturnType.Literal)
+			if !r.checkType(res, method.ReturnType.Literal) {
+				panic(&JossError{
+					Type:    "ReturnTypeError",
+					Message: fmt.Sprintf("La función '%s' debe retornar %s, recibió %T", method.Name.Value, method.ReturnType.Literal, res),
+					File:    r.CurrentFile,
+					Line:    method.Token.Line,
+				})
 			}
 		}
 	}()
@@ -224,6 +269,7 @@ func (r *Runtime) applyFunction(fn interface{}, args []interface{}) interface{} 
 			Token:      lit.Token,
 			Name:       &parser.Identifier{Value: "anonymous"},
 			Parameters: lit.Parameters,
+			ReturnType: lit.ReturnType,
 			Body:       lit.Body,
 		}
 		return r.CallMethodEvaluated(method, nil, args)

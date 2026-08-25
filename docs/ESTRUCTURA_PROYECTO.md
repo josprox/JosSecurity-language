@@ -4,6 +4,8 @@
 
 `joss new web mi_app` y `joss new mi_app` crean la plantilla web real del paquete `pkg/template/files`.
 
+Las cuatro variantes de `joss new` se validan en CI: web y consola deben parsear y analizar sin errores; consola además debe ejecutar; package y plugin deben compilar a un JP v2 firmado, verificable, con bytecode decodificable e índice de símbolos.
+
 ```text
 mi_app/
 ├── main.joss

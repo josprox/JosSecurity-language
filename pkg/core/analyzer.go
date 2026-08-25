@@ -10,16 +10,26 @@ import (
 	"github.com/jossecurity/joss/pkg/typesystem"
 )
 
-// AnalysisReport is the compatibility facade exposed by core. Diagnostics is
-// canonical; Errors and Warnings remain populated for existing integrations.
+// AnalysisReport exposes the canonical structured diagnostics produced by the
+// semantic analyzer. Consumers must not maintain parallel string lists.
 type AnalysisReport struct {
 	Diagnostics []diagnostics.Diagnostic
-	Errors      []string
-	Warnings    []string
 }
 
 func (ar *AnalysisReport) HasIssues() bool { return len(ar.Diagnostics) > 0 }
-func (ar *AnalysisReport) HasErrors() bool { return len(ar.Errors) > 0 }
+func (ar *AnalysisReport) HasErrors() bool {
+	return ar.Count(diagnostics.SeverityError) > 0
+}
+
+func (ar *AnalysisReport) Count(severity diagnostics.Severity) int {
+	count := 0
+	for _, item := range ar.Diagnostics {
+		if item.Severity == severity {
+			count++
+		}
+	}
+	return count
+}
 
 func (ar *AnalysisReport) PrintReport() {
 	if !ar.HasIssues() {
@@ -35,7 +45,7 @@ func (ar *AnalysisReport) PrintReport() {
 		}
 	}
 	fmt.Println("------------------------------------------------------------")
-	fmt.Printf("%d error(s), %d warning(s)\n", len(ar.Errors), len(ar.Warnings))
+	fmt.Printf("%d error(s), %d warning(s)\n", ar.Count(diagnostics.SeverityError), ar.Count(diagnostics.SeverityWarning))
 }
 
 // AnalyzeProgram analyzes an in-memory program. Project tooling should prefer
@@ -52,16 +62,7 @@ func AnalyzeSourceUnits(units []semanticanalyzer.SourceUnit) *AnalysisReport {
 }
 
 func AnalysisReportFromDiagnostics(items []diagnostics.Diagnostic) *AnalysisReport {
-	report := &AnalysisReport{Diagnostics: items, Errors: []string{}, Warnings: []string{}}
-	for _, item := range items {
-		switch item.Severity {
-		case diagnostics.SeverityError:
-			report.Errors = append(report.Errors, item.String())
-		case diagnostics.SeverityWarning:
-			report.Warnings = append(report.Warnings, item.String())
-		}
-	}
-	return report
+	return &AnalysisReport{Diagnostics: append([]diagnostics.Diagnostic(nil), items...)}
 }
 
 // buildAnalysisEnvironment adapts the runtime's actual registries. It avoids a
@@ -71,7 +72,7 @@ func buildAnalysisEnvironment() semanticanalyzer.Environment {
 	environment := semanticanalyzer.NewEnvironment()
 	for _, name := range GetBuiltinFunctionNames() {
 		environment.Builtins[name] = semanticanalyzer.Callable{
-			Name: name, ReturnType: typesystem.Type{Kind: typesystem.Unknown}, Variadic: true,
+			Name: name, ReturnType: builtinReturnType(name), Variadic: true,
 		}
 	}
 
@@ -84,7 +85,7 @@ func buildAnalysisEnvironment() semanticanalyzer.Environment {
 	sort.Strings(classNames)
 	for _, name := range classNames {
 		classNode := runtime.Classes[name]
-		class := semanticanalyzer.Class{Name: name, Methods: make(map[string]semanticanalyzer.Callable)}
+		class := semanticanalyzer.Class{Name: name, Methods: make(map[string]semanticanalyzer.Callable), Fields: make(map[string]semanticanalyzer.Field)}
 		if classNode != nil && classNode.SuperClass != nil {
 			class.SuperClass = classNode.SuperClass.Value
 		}
@@ -93,11 +94,15 @@ func buildAnalysisEnvironment() semanticanalyzer.Environment {
 				switch method := statement.(type) {
 				case *parser.MethodStatement:
 					if method.Name != nil {
-						class.Methods[method.Name.Value] = analysisCallable(method.Name.Value, method.Parameters, method.Body == nil)
+						class.Methods[method.Name.Value] = analysisCallable(method.Name.Value, method.Parameters, method.ReturnType, method.Body == nil)
 					}
 				case *parser.InitStatement:
 					if method.Name != nil {
-						class.Methods[method.Name.Value] = analysisCallable(method.Name.Value, method.Parameters, method.Body == nil)
+						class.Methods[method.Name.Value] = analysisCallable(method.Name.Value, method.Parameters, parser.Token{}, method.Body == nil)
+					}
+				case *parser.LetStatement:
+					if method.Name != nil {
+						class.Fields[method.Name.Value] = semanticanalyzer.Field{Type: typesystem.Parse(method.Token.Literal), Constant: method.IsConst}
 					}
 				}
 			}
@@ -111,7 +116,7 @@ func buildAnalysisEnvironment() semanticanalyzer.Environment {
 			for _, symbolClass := range plugin.Symbols.Classes {
 				class := environment.Classes[symbolClass.Name]
 				if class.Name == "" {
-					class = semanticanalyzer.Class{Name: symbolClass.Name, Methods: make(map[string]semanticanalyzer.Callable)}
+					class = semanticanalyzer.Class{Name: symbolClass.Name, Methods: make(map[string]semanticanalyzer.Callable), Fields: make(map[string]semanticanalyzer.Field)}
 				}
 				if class.Methods == nil {
 					class.Methods = make(map[string]semanticanalyzer.Callable)
@@ -126,12 +131,20 @@ func buildAnalysisEnvironment() semanticanalyzer.Environment {
 						}
 						parameters = append(parameters, semanticanalyzer.Parameter{Name: parameter.Name, Type: parameterType})
 					}
-					class.Methods[method.Name] = semanticanalyzer.Callable{Name: method.Name, Parameters: parameters, ReturnType: typesystem.Type{Kind: typesystem.Unknown}}
+					returnType := typesystem.Type{Kind: typesystem.Unknown}
+					if method.ReturnType != "" {
+						returnType = typesystem.Parse(method.ReturnType)
+					}
+					class.Methods[method.Name] = semanticanalyzer.Callable{Name: method.Name, Parameters: parameters, ReturnType: returnType}
 				}
 				environment.Classes[class.Name] = class
 			}
 			for _, function := range plugin.Symbols.Functions {
-				environment.Builtins[function.Name] = semanticanalyzer.Callable{Name: function.Name, ReturnType: typesystem.Type{Kind: typesystem.Unknown}, Variadic: true}
+				returnType := typesystem.Type{Kind: typesystem.Unknown}
+				if function.ReturnType != "" {
+					returnType = typesystem.Parse(function.ReturnType)
+				}
+				environment.Builtins[function.Name] = semanticanalyzer.Callable{Name: function.Name, ReturnType: returnType, Variadic: true}
 			}
 		}
 	}
@@ -141,8 +154,12 @@ func buildAnalysisEnvironment() semanticanalyzer.Environment {
 	return environment
 }
 
-func analysisCallable(name string, parameters []*parser.Parameter, signatureUnknown bool) semanticanalyzer.Callable {
-	result := semanticanalyzer.Callable{Name: name, ReturnType: typesystem.Type{Kind: typesystem.Unknown}, Variadic: signatureUnknown}
+func analysisCallable(name string, parameters []*parser.Parameter, returnToken parser.Token, signatureUnknown bool) semanticanalyzer.Callable {
+	returnType := typesystem.Type{Kind: typesystem.Unknown}
+	if returnToken.Literal != "" {
+		returnType = typesystem.Parse(returnToken.Literal)
+	}
+	result := semanticanalyzer.Callable{Name: name, ReturnType: returnType, Variadic: signatureUnknown}
 	for _, parameter := range parameters {
 		if parameter == nil || parameter.Name == nil {
 			continue

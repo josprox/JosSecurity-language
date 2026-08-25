@@ -1,6 +1,7 @@
 package core
 
 import (
+	"database/sql"
 	"testing"
 )
 
@@ -25,6 +26,35 @@ func TestGranDBCallableWhere(t *testing.T) {
 	expected := "SELECT * FROM `js_pub_packages` WHERE `is_deprecated` = ? OR `name` LIKE ?"
 	if sqlStr != expected {
 		t.Errorf("SQL generado incorrecto.\nEsperado: %s\nObtenido: %s", expected, sqlStr)
+	}
+}
+
+func TestGranDBAcceptsCanonicalMapInsertAndRejectsParallelArrays(t *testing.T) {
+	db, err := sql.Open("sqlite", ":memory:")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	if _, err := db.Exec(`CREATE TABLE items (name TEXT, amount INTEGER)`); err != nil {
+		t.Fatal(err)
+	}
+
+	r := NewRuntime()
+	r.DB = db
+	r.Env = map[string]string{"DB": "sqlite", "PREFIX": ""}
+	instance := &Instance{Fields: make(map[string]interface{})}
+	r.executeGranDBMethod(instance, "table", []interface{}{"items"})
+
+	removed := r.executeInsertMethod(instance, []interface{}{[]interface{}{"name", "amount"}, []interface{}{"old", int64(1)}}, false)
+	if removed != false {
+		t.Fatalf("parallel-array insert returned %v, want false", removed)
+	}
+	if inserted := r.executeInsertMethod(instance, []interface{}{map[string]interface{}{"name": "current", "amount": int64(2)}}, false); inserted != true {
+		t.Fatalf("map insert returned %v, want true", inserted)
+	}
+	var count int
+	if err := db.QueryRow(`SELECT COUNT(*) FROM items`).Scan(&count); err != nil || count != 1 {
+		t.Fatalf("row count = %d, err = %v", count, err)
 	}
 }
 

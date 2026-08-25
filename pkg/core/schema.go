@@ -10,6 +10,11 @@ import (
 
 type schemaCommand map[string]interface{}
 
+type schemaColumn struct {
+	name       string
+	definition string
+}
+
 var safeSchemaIdentifier = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*$`)
 
 func quoteSchemaIdentifier(name, driver string) (string, error) {
@@ -62,6 +67,54 @@ func schemaIndexName(table string, columns []string, suffix string) string {
 	return name
 }
 
+// ensureInternalSchemaTable is the host-side counterpart of Schema::create.
+// Runtime infrastructure uses this function instead of feeding legacy maps to
+// the public Joss API, whose only accepted shape is a blueprint callback.
+func (r *Runtime) ensureInternalSchemaTable(table string, columns []schemaColumn) error {
+	driver := normalizeDatabaseDriver(r.Env["DB"])
+	if driver == "" {
+		driver = "mysql"
+	}
+	if prefix := r.dbPrefix(); !strings.HasPrefix(table, prefix) {
+		table = prefix + table
+	}
+	quotedTable, err := quoteSchemaIdentifier(table, driver)
+	if err != nil {
+		return err
+	}
+	definitions := make([]string, 0, len(columns))
+	for _, column := range columns {
+		quotedColumn, quoteErr := quoteSchemaIdentifier(column.name, driver)
+		if quoteErr != nil {
+			return quoteErr
+		}
+		definitions = append(definitions, r.buildColumnDefinition(quotedColumn, column.definition, driver))
+	}
+	_, err = r.GetDB().Exec(fmt.Sprintf("CREATE TABLE IF NOT EXISTS %s (%s)", quotedTable, strings.Join(definitions, ", ")))
+	return err
+}
+
+func (r *Runtime) addInternalSchemaColumn(table string, column schemaColumn) error {
+	driver := normalizeDatabaseDriver(r.Env["DB"])
+	if driver == "" {
+		driver = "mysql"
+	}
+	if prefix := r.dbPrefix(); !strings.HasPrefix(table, prefix) {
+		table = prefix + table
+	}
+	quotedTable, err := quoteSchemaIdentifier(table, driver)
+	if err != nil {
+		return err
+	}
+	quotedColumn, err := quoteSchemaIdentifier(column.name, driver)
+	if err != nil {
+		return err
+	}
+	definition := r.buildColumnDefinition(quotedColumn, column.definition, driver)
+	_, err = r.GetDB().Exec(fmt.Sprintf("ALTER TABLE %s ADD COLUMN %s", quotedTable, definition))
+	return err
+}
+
 // Schema Implementation
 func (r *Runtime) executeSchemaMethod(instance *Instance, method string, args []interface{}) interface{} {
 	if r.GetDB() == nil {
@@ -95,45 +148,28 @@ func (r *Runtime) executeSchemaMethod(instance *Instance, method string, args []
 			var definitions []string
 			var commands []schemaCommand
 
-			// Check if second argument is a function (closure-based approach)
-			if fnLit, ok := args[1].(*parser.FunctionLiteral); ok {
-				blueprint := r.runBlueprint(fnLit)
-				if blueprint == nil {
-					return false
-				}
+			fnLit, ok := args[1].(*parser.FunctionLiteral)
+			if !ok {
+				fmt.Println("[Schema] Error: El segundo argumento debe ser una función de blueprint.")
+				return nil
+			}
+			blueprint := r.runBlueprint(fnLit)
+			if blueprint == nil {
+				return false
+			}
 
-				// Extract column definitions from blueprint
-				if cols, ok := blueprint.Fields["_columns"].([]map[string]string); ok {
-					for _, col := range cols {
-						columnName, quoteErr := quoteSchemaIdentifier(col["name"], dbDriver)
-						if quoteErr != nil {
-							fmt.Printf("[Schema] %v\n", quoteErr)
-							return false
-						}
-						def := r.buildColumnDefinition(columnName, col["type"], dbDriver)
-						definitions = append(definitions, def)
-					}
-				}
-				commands, _ = blueprint.Fields["_commands"].([]schemaCommand)
-			} else {
-				// Map-based approach (legacy)
-				colsMap, ok := args[1].(map[string]interface{})
-				if !ok {
-					fmt.Println("[Schema] Error: El segundo argumento debe ser un mapa de columnas.")
-					return nil
-				}
-
-				for colName, colTypeRaw := range colsMap {
-					colType := colTypeRaw.(string)
-					columnName, quoteErr := quoteSchemaIdentifier(colName, dbDriver)
+			if cols, ok := blueprint.Fields["_columns"].([]map[string]string); ok {
+				for _, col := range cols {
+					columnName, quoteErr := quoteSchemaIdentifier(col["name"], dbDriver)
 					if quoteErr != nil {
 						fmt.Printf("[Schema] %v\n", quoteErr)
 						return false
 					}
-					def := r.buildColumnDefinition(columnName, colType, dbDriver)
+					def := r.buildColumnDefinition(columnName, col["type"], dbDriver)
 					definitions = append(definitions, def)
 				}
 			}
+			commands, _ = blueprint.Fields["_commands"].([]schemaCommand)
 
 			for _, command := range commands {
 				if command["type"] != "foreign" {
@@ -209,39 +245,6 @@ func (r *Runtime) executeSchemaMethod(instance *Instance, method string, args []
 				commands, _ := blueprint.Fields["_commands"].([]schemaCommand)
 				for _, command := range commands {
 					if err := r.executeSchemaCommand(quotedTable, tableName, dbDriver, command); err != nil {
-						fmt.Printf("[Schema] Error: %v\n", err)
-						return false
-					}
-				}
-				return true
-			} else if colsMap, ok := args[1].(map[string]interface{}); ok {
-				for colName, colTypeRaw := range colsMap {
-					colType := fmt.Sprintf("%v", colTypeRaw)
-					columnName, err := quoteSchemaIdentifier(colName, dbDriver)
-					if err != nil {
-						fmt.Printf("[Schema] %v\n", err)
-						return false
-					}
-					def := r.buildColumnDefinition(columnName, colType, dbDriver)
-					query := fmt.Sprintf("ALTER TABLE %s ADD COLUMN %s", quotedTable, def)
-					fmt.Printf("[Schema] Ejecutando: %s\n", query)
-					if _, err := r.GetDB().Exec(query); err != nil {
-						fmt.Printf("[Schema] Error: %v\n", err)
-						return false
-					}
-				}
-				return true
-			} else if colsMapStr, ok := args[1].(map[string]string); ok {
-				for colName, colType := range colsMapStr {
-					columnName, err := quoteSchemaIdentifier(colName, dbDriver)
-					if err != nil {
-						fmt.Printf("[Schema] %v\n", err)
-						return false
-					}
-					def := r.buildColumnDefinition(columnName, colType, dbDriver)
-					query := fmt.Sprintf("ALTER TABLE %s ADD COLUMN %s", quotedTable, def)
-					fmt.Printf("[Schema] Ejecutando: %s\n", query)
-					if _, err := r.GetDB().Exec(query); err != nil {
 						fmt.Printf("[Schema] Error: %v\n", err)
 						return false
 					}

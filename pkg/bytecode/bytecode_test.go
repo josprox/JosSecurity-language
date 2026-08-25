@@ -51,3 +51,13 @@ foreach ([1, 2, 3] as $item) {
 		t.Errorf("Decoded statement count mismatch: got %d, want %d", len(decoded.Statements), len(prog.Statements))
 	}
 }
+
+func TestLegacyUncompressedBytecodeIsRejected(t *testing.T) {
+	legacy := append([]byte{'J', 'O', 'S', 'S', 'B', 'C', '2', 0}, []byte("legacy")...)
+	if IsBytecode(legacy) {
+		t.Fatal("legacy uncompressed bytecode must not be recognized")
+	}
+	if _, err := Decode(legacy); err == nil {
+		t.Fatal("legacy uncompressed bytecode must be rejected")
+	}
+}

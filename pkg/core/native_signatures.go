@@ -1,0 +1,158 @@
+package core
+
+import "github.com/jossecurity/joss/pkg/typesystem"
+
+// nativeMethodReturnType is the return-signature source of truth for core
+// classes. Every registered method receives a declared type; mixed means the
+// API is intentionally value-polymorphic, never that metadata is missing.
+func nativeMethodReturnType(className, methodName string) typesystem.Type {
+	if returnName, exists := preciseNativeReturns[className+"::"+methodName]; exists {
+		return typesystem.Parse(returnName)
+	}
+	if fluentNativeClasses[className] || fluentNativeMethods[className+"::"+methodName] {
+		return typesystem.Type{Kind: typesystem.Class, Name: className}
+	}
+	return typesystem.Type{Kind: typesystem.Mixed}
+}
+
+var fluentNativeClasses = map[string]bool{
+	"Blueprint":   true,
+	"WebResponse": true,
+}
+
+var fluentNativeMethods = nameSet(
+	"AuthLoginResult::require2FA", "AuthLoginResult::onSuccess", "AuthLoginResult::onChallenge", "AuthLoginResult::onFail",
+	"GranDB::table", "GranDB::select", "GranDB::changeDB", "GranDB::changedb", "GranDB::connection", "GranDB::use", "GranDB::distinct",
+	"GranDB::where", "GranDB::orWhere", "GranDB::orwhere", "GranDB::whereLike", "GranDB::wherelike",
+	"GranDB::orWhereLike", "GranDB::orwherelike", "GranDB::whereColumn", "GranDB::wherecolumn", "GranDB::orWhereColumn", "GranDB::orwherecolumn",
+	"GranDB::whereNot", "GranDB::wherenot", "GranDB::orWhereNot", "GranDB::orwherenot", "GranDB::whereIn", "GranDB::wherein",
+	"GranDB::orWhereIn", "GranDB::orwherein", "GranDB::whereNotIn", "GranDB::wherenotin", "GranDB::orWhereNotIn", "GranDB::orwherenotin",
+	"GranDB::whereNull", "GranDB::wherenull", "GranDB::orWhereNull", "GranDB::orwherenull", "GranDB::whereNotNull", "GranDB::wherenotnull",
+	"GranDB::orWhereNotNull", "GranDB::orwherenotnull", "GranDB::whereBetween", "GranDB::wherebetween", "GranDB::orWhereBetween", "GranDB::orwherebetween",
+	"GranDB::whereNotBetween", "GranDB::wherenotbetween", "GranDB::orWhereNotBetween", "GranDB::orwherenotbetween", "GranDB::join", "GranDB::innerJoin",
+	"GranDB::leftJoin", "GranDB::rightJoin", "GranDB::crossJoin", "GranDB::crossjoin", "GranDB::orderBy", "GranDB::orderby", "GranDB::orderByDesc", "GranDB::orderbydesc", "GranDB::orderByAsc",
+	"GranDB::orderbyasc", "GranDB::latest", "GranDB::oldest", "GranDB::inRandomOrder", "GranDB::reorder", "GranDB::limit", "GranDB::take",
+	"GranDB::offset", "GranDB::skip", "GranDB::forPage", "GranDB::forpage", "GranDB::groupBy", "GranDB::groupby", "GranDB::having",
+	"GranDB::orHaving", "GranDB::orhaving", "GranDB::when", "GranDB::unless",
+	"SEO::title", "SEO::description", "SEO::keywords", "SEO::og", "SEO::canonical", "SEO::meta",
+	"Sitemap::add", "Sitemap::provider", "Sitemap::exclude", "Sitemap::xsl",
+	"SmtpClient::auth", "SmtpClient::secure", "SmtpClient::timeout",
+)
+
+var preciseNativeReturns = map[string]string{
+	"Auth::check":                "bool",
+	"Auth::guest":                "bool",
+	"Auth::hasRole":              "bool",
+	"Auth::verify":               "bool",
+	"Cache::has":                 "bool",
+	"GranDB::avg":                "float|null",
+	"GranDB::count":              "int",
+	"GranDB::doesntExist":        "bool",
+	"GranDB::exists":             "bool",
+	"GranDB::get":                "array",
+	"GranDB::getBindings":        "array",
+	"GranDB::getbindings":        "array",
+	"GranDB::max":                "mixed",
+	"GranDB::min":                "mixed",
+	"GranDB::pluck":              "array",
+	"GranDB::sum":                "float",
+	"GranDB::toSql":              "string",
+	"GranDB::tosql":              "string",
+	"JSON::encode":               "string",
+	"JSON::stringify":            "string",
+	"Lang::locale":               "string",
+	"Lang::locales":              "array",
+	"Markdown::readFile":         "string",
+	"Markdown::toHtml":           "string",
+	"Math::ceil":                 "float",
+	"Math::floor":                "float",
+	"Math::random":               "int",
+	"MFA::verifyRecoveryCode":    "bool",
+	"MFA::verifyTOTP":            "bool",
+	"Redirect::to":               "WebResponse",
+	"Request::all":               "map",
+	"Request::except":            "map",
+	"Request::has":               "bool",
+	"Request::hasFile":           "bool",
+	"Request::hasfile":           "bool",
+	"Request::isMethod":          "bool",
+	"Request::ismethod":          "bool",
+	"Request::method":            "string",
+	"Request::path":              "string",
+	"Request::root":              "string",
+	"Request::url":               "string",
+	"Response::back":             "WebResponse",
+	"Response::download":         "WebResponse",
+	"Response::error":            "WebResponse",
+	"Response::json":             "WebResponse",
+	"Response::raw":              "WebResponse",
+	"Response::redirect":         "WebResponse",
+	"Response::stream":           "WebResponse",
+	"Schema::hasColumn":          "bool",
+	"Schema::hasTable":           "bool",
+	"SEO::render":                "string",
+	"Session::all":               "map",
+	"Session::has":               "bool",
+	"Str::contains":              "bool",
+	"Str::indexOf":               "int",
+	"Str::length":                "int",
+	"Str::random":                "string",
+	"Str::replace":               "string",
+	"Str::startsWith":            "bool",
+	"Str::substring":             "string",
+	"Str::trim":                  "string",
+	"System::now":                "int",
+	"Sitemap::generate":          "string",
+	"SmtpClient::lastError":      "string|null",
+	"SmtpClient::send":           "bool",
+	"TwoFactor::required":        "bool",
+	"TwoFactor::verify":          "bool",
+	"UUID::generate":             "string",
+	"UUID::v4":                   "string",
+	"View::exists":               "bool",
+	"View::render":               "string",
+	"WebSocket::subscriberCount": "int",
+}
+
+func builtinReturnType(name string) typesystem.Type {
+	if builtinBoolReturns[name] {
+		return typesystem.Type{Kind: typesystem.Bool}
+	}
+	if builtinIntReturns[name] {
+		return typesystem.Type{Kind: typesystem.Int}
+	}
+	if builtinFloatReturns[name] {
+		return typesystem.Type{Kind: typesystem.Float}
+	}
+	if builtinStringReturns[name] {
+		return typesystem.Type{Kind: typesystem.String}
+	}
+	if builtinArrayReturns[name] {
+		return typesystem.Type{Kind: typesystem.Array}
+	}
+	return typesystem.Type{Kind: typesystem.Mixed}
+}
+
+var builtinBoolReturns = nameSet(
+	"isset", "empty", "is_string", "is_numeric", "is_int", "is_integer", "is_float", "is_double",
+	"is_array", "is_null", "in_array", "array_key_exists", "file_exists", "is_dir", "is_file",
+	"json_verify", "toon_verify", "str_contains", "contains", "str_starts_with", "starts_with", "str_ends_with", "ends_with",
+)
+var builtinIntReturns = nameSet("intval", "boolval", "len", "count", "time", "strlen", "strpos", "rand")
+var builtinFloatReturns = nameSet("floatval", "doubleval", "microtime", "round", "floor", "ceil", "abs")
+var builtinStringReturns = nameSet(
+	"strval", "date", "env", "config", "view", "json", "toon_encode", "json_encode", "html_escape", "__", "csrf_field",
+	"str_replace", "strtolower", "to_lower", "strtoupper", "to_upper", "trim", "ltrim", "rtrim", "substr", "implode", "join",
+	"md5", "sha1", "sha256", "base64_encode", "base64_decode", "ucfirst", "lcfirst", "ucwords", "str_pad", "str_repeat",
+)
+var builtinArrayReturns = nameSet(
+	"keys", "array_keys", "values", "array_values", "explode", "merge", "array_merge", "array_slice", "array_unique", "array_reverse", "array_column",
+)
+
+func nameSet(names ...string) map[string]bool {
+	result := make(map[string]bool, len(names))
+	for _, name := range names {
+		result[name] = true
+	}
+	return result
+}

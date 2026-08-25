@@ -181,32 +181,7 @@ func (r *Runtime) executeGranDBMethod(instance *Instance, method string, args []
 				}
 				return instance
 			}
-
-			format, isStr := args[0].(string)
-			if !isStr {
-				return instance
-			}
-
-			table := r.getTable(instance)
-			col := instance.Fields["comparar"]
-			val := instance.Fields["comparable"]
-
-			if r.GetDB() == nil {
-				return "[]"
-			}
-
-			query := fmt.Sprintf("SELECT * FROM %v WHERE %v = ?", table, col)
-			rows, err := r.GetDB().Query(query, val)
-			if err != nil {
-				fmt.Printf("[GranDB] Error en where: %v\n", err)
-				return "[]"
-			}
-			defer rows.Close()
-
-			if format == "json" {
-				return rowsToJSON(rows)
-			}
-			return rowsToJSON(rows)
+			return instance
 		}
 
 		wheres := instance.Fields["_wheres"].([]string)

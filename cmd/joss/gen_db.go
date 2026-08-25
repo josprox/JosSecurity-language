@@ -3,10 +3,23 @@ package main
 import (
 	"database/sql"
 	"fmt"
+	"regexp"
 	"strings"
 )
 
+var databaseIdentifierPattern = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*$`)
+
+func validateDatabaseIdentifier(name string) error {
+	if !databaseIdentifierPattern.MatchString(name) {
+		return fmt.Errorf("identificador de base de datos invalido: %q", name)
+	}
+	return nil
+}
+
 func getColumns(db *sql.DB, dbType, tableName string) ([]ColumnSchema, error) {
+	if err := validateDatabaseIdentifier(tableName); err != nil {
+		return nil, err
+	}
 	switch dbType {
 	case "sqlite":
 		return getSQLiteColumns(db, tableName)
@@ -18,7 +31,7 @@ func getColumns(db *sql.DB, dbType, tableName string) ([]ColumnSchema, error) {
 }
 
 func getSQLiteColumns(db *sql.DB, tableName string) ([]ColumnSchema, error) {
-	rows, err := db.Query(fmt.Sprintf("PRAGMA table_info(%s)", tableName))
+	rows, err := db.Query(fmt.Sprintf(`PRAGMA table_info("%s")`, tableName))
 	if err != nil {
 		return nil, err
 	}
@@ -34,6 +47,9 @@ func getSQLiteColumns(db *sql.DB, tableName string) ([]ColumnSchema, error) {
 			return nil, err
 		}
 		cols = append(cols, ColumnSchema{Name: name, Type: ctype})
+		if err := validateDatabaseIdentifier(name); err != nil {
+			return nil, err
+		}
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err
@@ -42,7 +58,7 @@ func getSQLiteColumns(db *sql.DB, tableName string) ([]ColumnSchema, error) {
 }
 
 func getPostgresColumns(db *sql.DB, tableName string) ([]ColumnSchema, error) {
-	rows, err := db.Query("SELECT column_name, data_type FROM information_schema.columns WHERE table_schema = current_schema() AND table_name = ? ORDER BY ordinal_position", tableName)
+	rows, err := db.Query("SELECT column_name, data_type FROM information_schema.columns WHERE table_schema = current_schema() AND table_name = $1 ORDER BY ordinal_position", tableName)
 	if err != nil {
 		return nil, err
 	}
@@ -55,6 +71,9 @@ func getPostgresColumns(db *sql.DB, tableName string) ([]ColumnSchema, error) {
 			return nil, err
 		}
 		cols = append(cols, ColumnSchema{Name: field, Type: columnType})
+		if err := validateDatabaseIdentifier(field); err != nil {
+			return nil, err
+		}
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err
@@ -63,7 +82,7 @@ func getPostgresColumns(db *sql.DB, tableName string) ([]ColumnSchema, error) {
 }
 
 func getMySQLColumns(db *sql.DB, tableName string) ([]ColumnSchema, error) {
-	rows, err := db.Query(fmt.Sprintf("DESCRIBE %s", tableName))
+	rows, err := db.Query(fmt.Sprintf("DESCRIBE `%s`", tableName))
 	if err != nil {
 		return nil, err
 	}
@@ -78,6 +97,9 @@ func getMySQLColumns(db *sql.DB, tableName string) ([]ColumnSchema, error) {
 			return nil, err
 		}
 		cols = append(cols, ColumnSchema{Name: field, Type: ctype})
+		if err := validateDatabaseIdentifier(field); err != nil {
+			return nil, err
+		}
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err
@@ -85,17 +107,20 @@ func getMySQLColumns(db *sql.DB, tableName string) ([]ColumnSchema, error) {
 	return cols, nil
 }
 
-func getDisplayColumn(db *sql.DB, dbType, tableName string) string {
+func getDisplayColumn(db *sql.DB, dbType, tableName string) (string, bool, error) {
 	cols, err := getColumns(db, dbType, tableName)
 	if err != nil {
-		return "id"
+		return "", false, err
+	}
+	if len(cols) == 0 {
+		return "", false, nil
 	}
 
 	candidates := []string{"name", "title", "username", "email", "first_name", "last_name", "description", "slug", "code"}
 	for _, candidate := range candidates {
 		for _, col := range cols {
 			if col.Name == candidate {
-				return candidate
+				return candidate, true, nil
 			}
 		}
 	}
@@ -103,9 +128,9 @@ func getDisplayColumn(db *sql.DB, dbType, tableName string) string {
 	for _, col := range cols {
 		lowerType := strings.ToLower(col.Type)
 		if strings.Contains(lowerType, "char") || strings.Contains(lowerType, "text") {
-			return col.Name
+			return col.Name, true, nil
 		}
 	}
 
-	return "id"
+	return "id", true, nil
 }

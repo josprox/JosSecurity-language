@@ -31,18 +31,26 @@ let $value = 20
 $value = "twenty" // válido por decisión explícita
 ```
 
-Una inicialización con `nil` pospone la inferencia hasta el primer valor concreto. `nil` no es asignable a un tipo explícito no-nullable. Joss todavía no implementa tipos unión ni sintaxis nullable.
+Una inicialización inferida con `nil` pospone la inferencia hasta el primer valor concreto. `nil` no es asignable a un tipo explícito no-nullable. Las uniones usan `|` y el atajo postfix `?` se normaliza en el AST:
+
+```joss
+int|null $count = null
+int? $page = null       // exactamente el mismo tipo: int|null
+func find(int|string $id): User|null { return null }
+```
+
+Una fuente unión es asignable a un destino sólo si todas sus alternativas caben en él; un valor concreto cabe en una unión cuando al menos una alternativa lo acepta. Las uniones no convierten una variable en dinámica.
 
 ## Tipos reconocidos
 
-Los tipos fuente canónicos son `int`, `float`, `string`, `bool`, `array`, `map`, `object`, `channel` y nombres de clase. `mixed` es dinámico; `var` solicita inferencia. Los aliases históricos `integer`, `double` y `boolean` se normalizan en `pkg/typesystem`.
+Los tipos fuente canónicos son `int`, `float`, `string`, `bool`, `array`, `map`, `object`, `channel` y nombres de clase declarada/nativa. `mixed` es dinámico; `var` solicita inferencia. Los antiguos aliases `integer`, `double`, `boolean`, `dynamic`, `any` y `list` ya no se normalizan: si no existe una clase con ese nombre, el analyzer emite `JOSS-TYPE-009`.
 
 Compatibilidad relevante:
 
 - Mismo tipo: válido.
 - `int` hacia `float`: válido y sin pérdida.
 - Clase concreta hacia `object`: válido.
-- `mixed` o información desconocida: no genera un error especulativo.
+- `mixed`: contrato dinámico explícito. `unknown`: información aún insuficiente; ninguno genera un error especulativo.
 - Cualquier otro cambio conocido: error antes de ejecutar.
 
 ## Conversión de entrada
@@ -60,16 +68,23 @@ int $port = "nine"   // inválido
 Los parámetros pueden tiparse:
 
 ```joss
-func add(int $a, int $b) {
+func add(int $a, int $b): int {
     return $a + $b
 }
 ```
 
-El analizador valida aridad, defaults y tipos de argumentos cuando la firma es conocida. El runtime aplica la misma validación y conserva el tipo del parámetro durante todo el cuerpo. La gramática actual no incluye anotaciones de tipo de retorno; por ello el analizador inspecciona expresiones de retorno, pero no puede compararlas con una firma declarada.
+El analizador valida aridad, defaults, argumentos, cada `return` y que toda ruta demostrable de una función anotada termine con `return` o `throw`. El runtime repite el contrato como defensa. La anotación posterior a `:` es opcional; sin ella el retorno permanece `unknown` y no se inventa un error. Las firmas se registran antes de analizar cuerpos, por lo que una llamada recursiva o mutuamente recursiva ve su tipo de retorno declarado.
 
 ## Constantes
 
-No existe todavía un nodo o keyword de declaración `const` implementado. Los identificadores en mayúsculas pueden provenir del entorno/runtime y se conservan como tipo desconocido para evitar falsos positivos. No se documenta inmutabilidad de constantes porque el lenguaje aún no la garantiza.
+`const` exige inicializador y puede inferir o declarar su tipo:
+
+```joss
+const $maximum = 10
+const string $application = "Joss"
+```
+
+No puede reasignarse ni con `=`, ni con `++`, ni como propiedad constante de una instancia. El analyzer emite `JOSS-SYM-006` cuando puede resolver el símbolo y el runtime aplica la misma invariante.
 
 ## Accesos e índices
 
@@ -80,4 +95,4 @@ No existe todavía un nodo o keyword de declaración `const` implementado. Los i
 
 ## Fuente canónica
 
-Toda decisión de compatibilidad debe añadirse a `pkg/typesystem` y probarse allí. El analyzer y el runtime no deben crear tablas paralelas de aliases o reglas de asignación.
+Toda decisión de compatibilidad debe añadirse a `pkg/typesystem` y probarse allí. El analyzer y el runtime no deben crear tablas paralelas de tipos o reglas de asignación.

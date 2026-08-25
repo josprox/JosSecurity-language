@@ -197,7 +197,10 @@ func main() {
 			fmt.Println("Uso: joss make:crud [Tabla]")
 			return
 		}
-		createCRUD(os.Args[2])
+		if err := createCRUD(os.Args[2]); err != nil {
+			fmt.Printf("Error: %v\n", err)
+			os.Exit(1)
+		}
 	case "remove:crud":
 		if len(os.Args) < 3 {
 			fmt.Println("Uso: joss remove:crud [Tabla]")
@@ -209,7 +212,10 @@ func main() {
 			fmt.Println("Uso: joss make:migration [Nombre]")
 			return
 		}
-		createMigration(os.Args[2])
+		if err := createMigration(os.Args[2]); err != nil {
+			fmt.Printf("Error: %v\n", err)
+			os.Exit(1)
+		}
 	case "db:seed":
 		runSeeders()
 	case "migrate":
@@ -301,6 +307,9 @@ func main() {
 		printHelp()
 	default:
 		fmt.Printf("Comando desconocido: %s\n", command)
+		if command == "make:miggrate" {
+			fmt.Println("¿Quisiste decir 'joss make:migration [Nombre]'?")
+		}
 		printHelp()
 		os.Exit(1)
 	}
@@ -327,7 +336,7 @@ func analyzeScript(filename string) {
 	report := core.AnalyzeSourceUnits(units)
 	report.PrintReport()
 
-	if len(report.Errors) > 0 {
+	if report.HasErrors() {
 		os.Exit(1)
 	}
 }

@@ -33,6 +33,8 @@ var (
 				Env:               make(map[string]string),
 				Variables:         make(map[string]interface{}),
 				VarTypes:          make(map[string]string),
+				Constants:         make(map[string]bool),
+				HostGlobals:       make(map[string]bool),
 				Classes:           make(map[string]*parser.ClassStatement),
 				Functions:         make(map[string]*parser.MethodStatement),
 				Routes:            make(map[string]map[string]interface{}),
@@ -41,12 +43,13 @@ var (
 				NativeHandlers:    make(map[string]NativeHandler),
 				NativePlugins:     make(map[string]*NativePluginDefinition),
 				NativeDrivers:     make(map[string]*NativeDriverDefinition),
-				importedFiles:     make(map[string]bool),
+				MaxCallDepth:      DefaultMaxCallDepth,
 			}
 			r.Variables["cout"] = &Cout{}
 			r.Variables["cin"] = &Cin{}
 			r.Variables["JOSS_VERSION"] = version.Version
 			r.RegisterNativeClasses()
+			r.markCurrentVariablesAsHostGlobals()
 			return r
 		},
 	}
@@ -63,8 +66,8 @@ func NewRuntime() *Runtime {
 	InitLogger()
 
 	r := runtimePool.Get().(*Runtime)
-	if r.importedFiles == nil {
-		r.importedFiles = make(map[string]bool)
+	if r.Constants == nil {
+		r.Constants = make(map[string]bool)
 	}
 	if r.NativePlugins == nil {
 		r.NativePlugins = make(map[string]*NativePluginDefinition)
@@ -72,18 +75,26 @@ func NewRuntime() *Runtime {
 	if r.NativeDrivers == nil {
 		r.NativeDrivers = make(map[string]*NativeDriverDefinition)
 	}
+	if r.HostGlobals == nil {
+		r.HostGlobals = make(map[string]bool)
+	}
+	if r.MaxCallDepth <= 0 {
+		r.MaxCallDepth = DefaultMaxCallDepth
+	}
 	// Ensure native classes are registered (if recycled)
 	if _, ok := r.Variables["View"]; !ok {
 		r.Variables["cout"] = &Cout{}
 		r.Variables["cin"] = &Cin{}
 		r.Variables["JOSS_VERSION"] = version.Version
 		r.RegisterNativeClasses()
+		r.markCurrentVariablesAsHostGlobals()
 
 		// Initialize GlobalAssetManager once
 		am := GetAssetManager()
 		am.Initialize()
 	}
 	r.AutoloadPlugins(".")
+	r.markCurrentVariablesAsHostGlobals()
 	return r
 }
 
@@ -95,6 +106,12 @@ func (r *Runtime) Free() {
 	}
 	for k := range r.VarTypes {
 		delete(r.VarTypes, k)
+	}
+	for k := range r.Constants {
+		delete(r.Constants, k)
+	}
+	for k := range r.HostGlobals {
+		delete(r.HostGlobals, k)
 	}
 	for k := range r.Classes {
 		delete(r.Classes, k)
@@ -124,13 +141,12 @@ func (r *Runtime) Free() {
 	// Restore standard variables
 	r.Variables["cout"] = &Cout{}
 	r.Variables["cin"] = &Cin{}
+	r.markCurrentVariablesAsHostGlobals()
 
 	r.CurrentMiddleware = r.CurrentMiddleware[:0]
-	for k := range r.importedFiles {
-		delete(r.importedFiles, k)
-	}
 	r.ProjectRoot = ""
-	r.importBaseDir = ""
+	r.callDepth = 0
+	r.MaxCallDepth = DefaultMaxCallDepth
 	r.captureEnvironment = nil
 	r.SitemapEntries = r.SitemapEntries[:0]
 	r.SitemapProviders = r.SitemapProviders[:0]
@@ -152,16 +168,14 @@ func (r *Runtime) Fork() *Runtime {
 		DB:                r.DB, // Share DB Connection (Thread-Safe)
 		Variables:         make(map[string]interface{}),
 		VarTypes:          make(map[string]string),
+		Constants:         copyBoolMap(r.Constants),
+		HostGlobals:       copyBoolMap(r.HostGlobals),
 		NativeHandlers:    copyNativeHandlerMap(r.NativeHandlers),
 		NativePlugins:     copyNativePluginMap(r.NativePlugins),
 		NativeDrivers:     copyNativeDriverMap(r.NativeDrivers),
+		MaxCallDepth:      r.MaxCallDepth,
 		PluginRegistry:    r.PluginRegistry,
-		importedFiles:     make(map[string]bool),
 		ProjectRoot:       r.ProjectRoot,
-		importBaseDir:     r.importBaseDir,
-	}
-	for path, loaded := range r.importedFiles {
-		newR.importedFiles[path] = loaded
 	}
 	// fmt.Println("[RUNTIME] Fork: Maps initialized")
 
@@ -235,6 +249,14 @@ func (r *Runtime) Fork() *Runtime {
 	}
 
 	return newR
+}
+
+func copyBoolMap(source map[string]bool) map[string]bool {
+	result := make(map[string]bool, len(source))
+	for name, value := range source {
+		result[name] = value
+	}
+	return result
 }
 
 func copyClassMap(source map[string]*parser.ClassStatement) map[string]*parser.ClassStatement {
@@ -476,8 +498,9 @@ func (r *Runtime) ChangeDB(driverName string, config ...map[string]string) error
 // NewInstance creates a new instance of a class
 func NewInstance(class *parser.ClassStatement) *Instance {
 	return &Instance{
-		Class:  class,
-		Fields: make(map[string]interface{}),
+		Class:     class,
+		Fields:    make(map[string]interface{}),
+		Constants: make(map[string]bool),
 	}
 }
 
@@ -487,11 +510,15 @@ func (i *Instance) Clone() *Instance {
 		return nil
 	}
 	newI := &Instance{
-		Class:  i.Class,
-		Fields: make(map[string]interface{}),
+		Class:     i.Class,
+		Fields:    make(map[string]interface{}),
+		Constants: make(map[string]bool),
 	}
 	for k, v := range i.Fields {
 		newI.Fields[k] = v
+	}
+	for k, v := range i.Constants {
+		newI.Constants[k] = v
 	}
 	return newI
 }

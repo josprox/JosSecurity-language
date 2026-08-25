@@ -1,6 +1,9 @@
 package parser
 
-import "sort"
+import (
+	"fmt"
+	"sort"
+)
 
 type TokenType string
 
@@ -53,6 +56,7 @@ const (
 	DOT           = "."
 	ARROW         = "->"
 	DOUBLE_COLON  = "::"
+	TYPE_UNION    = "|"
 	PIPE          = "|>"
 	NULL_COALESCE = "??"
 	FAT_ARROW     = "=>"
@@ -65,21 +69,19 @@ const (
 	NULL     = "NULL"
 	NIL      = "NIL"
 
-	RETURN    = "RETURN"
-	PRINT     = "PRINT"
-	ECHO      = "ECHO"
-	CLASS     = "CLASS"
-	INIT      = "INIT"
-	NAMESPACE = "NAMESPACE"
-	IMPORT    = "IMPORT"
-	NEW       = "NEW"
-	FOREACH   = "FOREACH"
-	AS        = "AS"
-	THIS      = "THIS"
-	ISSET     = "ISSET"
-	EMPTY     = "EMPTY"
-	BREAK     = "BREAK"
-	CONTINUE  = "CONTINUE"
+	RETURN   = "RETURN"
+	PRINT    = "PRINT"
+	ECHO     = "ECHO"
+	CLASS    = "CLASS"
+	INIT     = "INIT"
+	NEW      = "NEW"
+	FOREACH  = "FOREACH"
+	AS       = "AS"
+	THIS     = "THIS"
+	ISSET    = "ISSET"
+	EMPTY    = "EMPTY"
+	BREAK    = "BREAK"
+	CONTINUE = "CONTINUE"
 	// Control Structures
 	WHILE   = "WHILE"
 	DO      = "DO"
@@ -91,7 +93,6 @@ const (
 	ELSE    = "ELSE"
 	MATCH   = "MATCH"
 	DEFAULT = "DEFAULT"
-	USE     = "USE"
 	ASYNC   = "ASYNC"
 
 	// Modifiers & Visibility
@@ -99,6 +100,7 @@ const (
 	PRIVATE   = "PRIVATE"
 	PROTECTED = "PROTECTED"
 	LET       = "LET"
+	CONST     = "CONST"
 	STATIC    = "STATIC"
 )
 
@@ -116,15 +118,13 @@ var keywords = map[string]TokenType{
 	"nil":   NIL,
 
 	"let":       LET,
+	"const":     CONST,
 	"return":    RETURN,
 	"class":     CLASS,
 	"Init":      INIT,
-	"Namespace": NAMESPACE,
-	"Import":    IMPORT,
 	"new":       NEW,
 	"foreach":   FOREACH,
 	"as":        AS,
-	"function":  FUNCTION,
 	"func":      FUNCTION,
 	"this":      THIS,
 	"echo":      ECHO,
@@ -139,9 +139,6 @@ var keywords = map[string]TokenType{
 	"catch":     CATCH,
 	"throw":     THROW,
 	"extends":   EXTENDS,
-	"@import":   IMPORT,
-	"import":    IMPORT,
-	"use":       USE,
 	"match":     MATCH,
 	"default":   DEFAULT,
 	"async":     ASYNC,
@@ -151,11 +148,36 @@ var keywords = map[string]TokenType{
 	"static":    STATIC,
 }
 
+var removedKeywords = map[string]string{
+	"function":  "Use `func` for declarations and closures.",
+	"import":    "Source imports were removed; project files and plugins are loaded automatically.",
+	"@import":   "Source imports were removed; project files and plugins are loaded automatically.",
+	"use":       "Plugin namespaces are loaded from `joss.yaml`; `use` is not part of Joss.",
+	"Use":       "Plugin namespaces are loaded from `joss.yaml`; `use` is not part of Joss.",
+	"Import":    "Source imports were removed; project files and plugins are loaded automatically.",
+	"namespace": "Source namespaces were removed; classes and functions use the project symbol table.",
+	"Namespace": "Source namespaces were removed; classes and functions use the project symbol table.",
+}
+
 func LookupIdent(ident string) TokenType {
 	if tok, ok := keywords[ident]; ok {
 		return tok
 	}
+	if _, removed := removedKeywords[ident]; removed {
+		return ILLEGAL
+	}
 	return IDENT
+}
+
+func removedKeywordMessage(token Token) (string, bool) {
+	if token.Type != ILLEGAL {
+		return "", false
+	}
+	suggestion, removed := removedKeywords[token.Literal]
+	if !removed {
+		return "", false
+	}
+	return fmt.Sprintf("La sintaxis eliminada `%s` ya no es válida. %s", token.Literal, suggestion), true
 }
 
 // KeywordNames exposes the lexer registry to tooling generators without

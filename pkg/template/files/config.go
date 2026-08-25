@@ -60,8 +60,8 @@ OCI_PRIVATE_KEY_PATH=""
 OCI_PASSPHRASE=""
 `,
 		filepath.Join(path, "config", "reglas.joss"): fmt.Sprintf(`// Constantes Globales
-const string APP_NAME = "Joss Enterprise"
-const string APP_VERSION = "%s"`, version.Version),
+const string $APP_NAME = "Joss Enterprise"
+const string $APP_VERSION = "%s"`, version.Version),
 		filepath.Join(path, "joss.yaml"): fmt.Sprintf(`name: mi_proyecto
 version: 1.0.0
 environment:

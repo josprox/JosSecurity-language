@@ -1,10 +1,10 @@
 # Estado de implementación
 
-Este documento describe capacidades comprobables del código actual de **Joss v3.6.7**. No mezcla propuestas futuras con funciones terminadas.
+Este documento describe capacidades comprobables del código actual de **Joss v3.6.7.2**. No mezcla propuestas futuras con funciones terminadas.
 
 ## Implementado
 
-- Intérprete Joss, inferencia fija en primera asignación, tipos explícitos, `mixed` explícito mediante `let`, coerción textual sin pérdida, clases, herencia (`extends`), visibilidad, métodos estáticos, funciones `func`, closures, ternarios, `match`, ciclos, excepciones, `async`/`await` y canales.
+- Intérprete Joss, inferencia fija, tipos explícitos y unión/nullable, constantes, retornos anotados y exhaustivos, recursión con frames léxicos aislados, `mixed` explícito mediante `let`, coerción textual sin pérdida, clases, herencia (`extends`), visibilidad, métodos estáticos, funciones `func`, closures, ternarios, `match`, ciclos, excepciones, `async`/`await` y canales.
 - **Analizador semántico (`joss analyze`)**: unidades fuente, scopes por callable, símbolos de proyecto/plugins, inferencia, asignaciones, argumentos, aridad, operadores, índices, miembros conocidos, inalcanzable y diagnósticos estructurados.
 - **Guardias de Sintaxis Educacionales**: Detección amigable de sintaxis foránea (`if`, `else`, `elif`, `switch`, `for`) sugiriendo el operador ternario `$cond ? $a : $b`, `match`, `while` y `foreach`.
 - **Sandbox WASI y Permisos en Plugins (`PermissionGuard`)**: Control granular de permisos para I/O, red y variables de entorno (`http_get`, `file_read`, `env_read`, `db_query`) en la máquina virtual `JPBCVM`.
@@ -19,18 +19,18 @@ Este documento describe capacidades comprobables del código actual de **Joss v3
 - Compilador multilenguaje integrado (`joss plugin compile`): traduce Java, Python, PHP y Rust/Wasm a Bytecode Joss con tree shaking automático y cero dependencias para el usuario final.
 - Distribuciones de Windows, Linux y macOS, SDK y extensión VSIX mediante el script de compilación y workflow manual.
 
-## Compatibilidad, no limitaciones
+## Contratos vigentes
 
-- `func` es la forma canónica. `function` sigue aceptándose para no romper código anterior.
-- Los plugins declarados en `joss.yaml` o presentes en `plugins/` se cargan automáticamente sin necesidad de `use` ni `import`.
+- `func` es la única forma de declarar funciones y closures. `function` produce un error de migración.
+- Los plugins declarados en `joss.yaml` o presentes en `plugins/` se cargan automáticamente. `import`, `@import`, `use` y namespaces fuente fueron eliminados del lexer, parser, AST y runtime.
+- La ausencia de imports es permanente: no existe ni se proyecta sintaxis de módulos fuente, exports o namespaces. La modularidad se obtiene mediante layout, runtime integrado y plugins aislados.
+- GranDB recibe inserts como mapas y Schema Builder recibe una función de blueprint; las variantes históricas con arrays/mapas paralelos fueron retiradas.
 - Los plugins se ejecutan dentro del runtime de Joss con acceso seguro al entorno del proyecto (`r.Env`) y límites de instrucciones para evitar loops infinitos.
 
 ## No implementado todavía
 
-- Declaraciones `const`, tipos nullable/union y anotaciones de retorno.
 - Ownership, inmutabilidad por defecto, taint/escape formal o análisis sensible a ramas.
-- Grafo de imports de fuentes y detección de ciclos; `import`, `use` y `@import` están obsoletos.
 - Backend LLVM/Cranelift o AOT a código máquina para el lenguaje principal. `pkg/bytecode` serializa el AST; JPBC pertenece al pipeline separado de plugins.
-- Firmas nativas completas con tipos de retorno, necesarias para inferir con precisión todas las cadenas de miembros.
+- Metadatos precisos de parámetros para todas las APIs nativas; sus retornos ya son explícitos y usan `mixed` sólo cuando el contrato es polimórfico.
 
 Consulte [Arquitectura](ARQUITECTURA.md), [Sistema de tipos](SISTEMA_TIPOS.md) y [Auditoría técnica](AUDITORIA_TECNICA_2026.md).

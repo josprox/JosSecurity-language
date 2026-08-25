@@ -45,7 +45,7 @@ Joss cuenta con un motor compilador (`joss plugin compile`) que permite desarrol
 2. **Cero Dependencias en el Usuario Final**: El paquete `.jp` resultante (< 1.5 KB a 1 MB) contiene bytecode determinista y optimizado. **El usuario final no requiere tener instalado Java (JVM/JDK), Python, PHP, Node ni compilar nada**.
 3. **Firma Criptográfica Ed25519**: Cada paquete `.jp` es firmado criptográficamente de manera transparente durante la compilación (`~/.joss/keys/<plugin>.ed25519`) para garantizar su integridad y autoría.
 4. **Verificación de Paquetes**: Comando `joss plugin verify mi_plugin.jp` para validar la firma y estructura interna del paquete.
-5. **Índice de Símbolos Estándar (`SymbolIndex`)**: Genera metadatos tipados en `META-INF/joss-symbols.json` para proveer autocompletado nativo en editores e IDEs.
+5. **Índice de Símbolos Estándar (`SymbolIndex`)**: Genera nombres, parámetros y tipos de retorno en `META-INF/joss-symbols.json` para el analyzer y el autocompletado. Paquetes antiguos sin `return_type` conservan retorno `unknown`, no un tipo inventado.
 
 ### Ejemplos de Compilación por Lenguaje:
 

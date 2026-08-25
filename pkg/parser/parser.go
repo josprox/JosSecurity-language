@@ -2,6 +2,8 @@ package parser
 
 import (
 	"fmt"
+
+	"github.com/jossecurity/joss/pkg/diagnostics"
 )
 
 const (
@@ -63,7 +65,7 @@ type Parser struct {
 	l         *Lexer
 	curToken  Token
 	peekToken Token
-	errors    []string
+	issues    []diagnostics.Diagnostic
 
 	prefixParseFns map[TokenType]prefixParseFn
 	infixParseFns  map[TokenType]infixParseFn
@@ -72,7 +74,7 @@ type Parser struct {
 func NewParser(l *Lexer) *Parser {
 	p := &Parser{
 		l:      l,
-		errors: []string{},
+		issues: []diagnostics.Diagnostic{},
 	}
 
 	p.prefixParseFns = make(map[TokenType]prefixParseFn)
@@ -172,24 +174,28 @@ func (p *Parser) curPrecedence() int {
 }
 
 func (p *Parser) noPrefixParseFnError(t TokenType) {
+	if msg, removed := removedKeywordMessage(p.curToken); removed {
+		p.addError(p.curToken, msg)
+		return
+	}
 	lit := p.curToken.Literal
 	if lit == "if" || lit == "else" || lit == "elif" {
-		msg := fmt.Sprintf("Línea %d: La estructura '%s' no existe en Joss. Usa ternarias ($cond ? $a : $b) o 'match ($val) { ... }'.", p.curToken.Line, lit)
-		p.errors = append(p.errors, msg)
+		msg := fmt.Sprintf("La estructura '%s' no existe en Joss. Usa ternarias ($cond ? $a : $b) o 'match ($val) { ... }'.", lit)
+		p.addError(p.curToken, msg)
 		return
 	}
 	if lit == "switch" {
-		msg := fmt.Sprintf("Línea %d: La estructura 'switch' no existe en Joss. Usa 'match ($val) { ... }' en su lugar.", p.curToken.Line)
-		p.errors = append(p.errors, msg)
+		msg := "La estructura 'switch' no existe en Joss. Usa 'match ($val) { ... }' en su lugar."
+		p.addError(p.curToken, msg)
 		return
 	}
 	if lit == "for" {
-		msg := fmt.Sprintf("Línea %d: El bucle 'for' no existe en Joss. Usa 'foreach ($array as $item)' o 'while ($cond) { ... }' en su lugar.", p.curToken.Line)
-		p.errors = append(p.errors, msg)
+		msg := "El bucle 'for' no existe en Joss. Usa 'foreach ($array as $item)' o 'while ($cond) { ... }' en su lugar."
+		p.addError(p.curToken, msg)
 		return
 	}
-	msg := fmt.Sprintf("Línea %d: sintaxis no válida o token '%s' inesperado", p.curToken.Line, p.curToken.Literal)
-	p.errors = append(p.errors, msg)
+	msg := fmt.Sprintf("Sintaxis no válida o token '%s' inesperado.", p.curToken.Literal)
+	p.addError(p.curToken, msg)
 }
 
 func (p *Parser) expectPeek(t TokenType) bool {
@@ -202,12 +208,40 @@ func (p *Parser) expectPeek(t TokenType) bool {
 }
 
 func (p *Parser) peekError(t TokenType) {
-	msg := fmt.Sprintf("line %d: expected next token to be %s, got %s instead", p.peekToken.Line, t, p.peekToken.Type)
-	p.errors = append(p.errors, msg)
+	msg := fmt.Sprintf("Se esperaba el token %s; se encontró %s.", t, p.peekToken.Type)
+	p.addError(p.peekToken, msg)
 }
 
 func (p *Parser) Errors() []string {
-	return p.errors
+	errors := make([]string, 0, len(p.issues))
+	for _, issue := range p.issues {
+		errors = append(errors, issue.Message)
+	}
+	return errors
+}
+
+// Diagnostics returns the parser's canonical structured findings. File is
+// intentionally empty because the parser consumes text; project loaders add it.
+func (p *Parser) Diagnostics() []diagnostics.Diagnostic {
+	result := make([]diagnostics.Diagnostic, len(p.issues))
+	copy(result, p.issues)
+	return result
+}
+
+func (p *Parser) addError(token Token, message string) {
+	endColumn := token.Column
+	if endColumn > 0 && token.Literal != "" {
+		endColumn += len([]rune(token.Literal))
+	}
+	p.issues = append(p.issues, diagnostics.Diagnostic{
+		Code:     "JOSS-PARSE-001",
+		Severity: diagnostics.SeverityError,
+		Message:  message,
+		Range: diagnostics.Range{
+			Start: diagnostics.Position{Line: token.Line, Column: token.Column},
+			End:   diagnostics.Position{Line: token.Line, Column: endColumn},
+		},
+	})
 }
 
 func (p *Parser) peekTokenIs(t TokenType) bool {

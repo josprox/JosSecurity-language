@@ -26,6 +26,7 @@ type symbol struct {
 	Used      bool
 	Dynamic   bool
 	Inferred  bool
+	Constant  bool
 	Synthetic bool
 }
 

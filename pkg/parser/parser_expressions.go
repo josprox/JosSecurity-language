@@ -80,6 +80,7 @@ func (p *Parser) parseFunctionLiteral() Expression {
 	}
 
 	lit.Parameters = p.parseFunctionParameters()
+	lit.ReturnType = p.parseOptionalReturnType()
 
 	if !p.expectPeek(LBRACE) {
 		return nil
@@ -88,6 +89,19 @@ func (p *Parser) parseFunctionLiteral() Expression {
 	lit.Body = p.parseBlockStatement()
 
 	return lit
+}
+
+func (p *Parser) parseOptionalReturnType() Token {
+	if p.peekToken.Type != COLON {
+		return Token{}
+	}
+	p.nextToken() // ':'
+	p.nextToken()
+	if !isTypeStart(p.curToken) {
+		p.addError(p.curToken, "Se esperaba un tipo de retorno después de `:`.")
+		return Token{}
+	}
+	return p.parseTypeReference()
 }
 
 func (p *Parser) parseVarExpression() Expression {
@@ -110,7 +124,7 @@ func (p *Parser) parseIntegerLiteral() Expression {
 	value, err := strconv.ParseInt(p.curToken.Literal, 0, 64)
 	if err != nil {
 		msg := fmt.Sprintf("could not parse %q as integer", p.curToken.Literal)
-		p.errors = append(p.errors, msg)
+		p.addError(p.curToken, msg)
 		return nil
 	}
 
@@ -124,7 +138,7 @@ func (p *Parser) parseFloatLiteral() Expression {
 	value, err := strconv.ParseFloat(p.curToken.Literal, 64)
 	if err != nil {
 		msg := fmt.Sprintf("could not parse %q as float", p.curToken.Literal)
-		p.errors = append(p.errors, msg)
+		p.addError(p.curToken, msg)
 		return nil
 	}
 
@@ -396,8 +410,8 @@ func (p *Parser) parseInfixExpression(left Expression) Expression {
 		if call, ok := expression.Right.(*CallExpression); ok {
 			funcName := call.Function.String()
 			if isBlueprintMethod(funcName) {
-				msg := fmt.Sprintf("Línea %d: Uso de '.' sospechoso para llamar al método '%s'. En JosSecurity, el acceso a métodos de objetos o mapas usa '->' (ej. $objeto->%s())", p.curToken.Line, funcName, funcName)
-				p.errors = append(p.errors, msg)
+				msg := fmt.Sprintf("Uso de '.' sospechoso para llamar al método '%s'. El acceso a métodos de objetos o mapas usa '->' (ej. $objeto->%s()).", funcName, funcName)
+				p.addError(p.curToken, msg)
 			}
 		}
 	}
@@ -537,10 +551,12 @@ func (p *Parser) parseFunctionParameters() []*Parameter {
 func (p *Parser) parseParameter() *Parameter {
 	param := &Parameter{}
 
-	// Optional type: IDENT VAR ($)
-	if p.curToken.Type == IDENT && p.peekToken.Type == VAR {
-		param.Type = p.curToken
-		p.nextToken() // Move to VAR
+	// Optional type: T $value, T|null $value or T? $value.
+	if isTypeStart(p.curToken) && (p.peekToken.Type == VAR || isTypeContinuation(p.peekToken.Type)) {
+		param.Type = p.parseTypeReference()
+		if !p.expectPeek(VAR) {
+			return nil
+		}
 	}
 
 	if p.curToken.Type == VAR {
@@ -738,7 +754,7 @@ func isIdentifierOrKeyword(t TokenType) bool {
 	}
 	switch t {
 	case FUNCTION, VAR, TRUE, FALSE, RETURN, PRINT, ECHO, CLASS, INIT,
-		NAMESPACE, IMPORT, NEW, FOREACH, AS, THIS, ISSET, EMPTY, BREAK,
+		NEW, FOREACH, AS, THIS, ISSET, EMPTY, BREAK,
 		CONTINUE, WHILE, DO, TRY, CATCH, THROW, EXTENDS, IF, ELSE, MATCH, DEFAULT, ASYNC:
 		return true
 	}
@@ -751,7 +767,7 @@ func (p *Parser) parseAsyncExpression() Expression {
 		p.nextToken() // move to {
 		block := p.parseBlockStatement()
 		fn := &FunctionLiteral{
-			Token:      Token{Type: FUNCTION, Literal: "function", Line: tok.Line},
+			Token:      Token{Type: FUNCTION, Literal: "func", Line: tok.Line},
 			Parameters: []*Parameter{},
 			Body:       block,
 		}
@@ -762,8 +778,8 @@ func (p *Parser) parseAsyncExpression() Expression {
 		}
 	}
 	if p.peekToken.Type == LPAREN {
-		msg := fmt.Sprintf("Error de sintaxis (Línea %d): 'async' requiere la sintaxis de bloque 'async { ... }'. 'async(func() ...)' ha sido descontinuado.", tok.Line)
-		p.errors = append(p.errors, msg)
+		msg := "'async' requiere la sintaxis de bloque 'async { ... }'; 'async(func() ...)' fue eliminado."
+		p.addError(tok, msg)
 		return nil
 	}
 	p.nextToken()

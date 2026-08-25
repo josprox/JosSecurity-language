@@ -2,8 +2,6 @@ package core
 
 import (
 	"fmt"
-	"os"
-	"path/filepath"
 
 	"github.com/jossecurity/joss/pkg/parser"
 )
@@ -52,7 +50,7 @@ func (r *Runtime) Execute(program *parser.Program) {
 			}
 		}
 	} else {
-		// Legacy mode (Phase 2 scripts)
+		// Script programs execute their top-level statements directly.
 		for _, stmt := range program.Statements {
 			r.executeStatement(stmt)
 		}
@@ -111,6 +109,12 @@ func (r *Runtime) registerClass(stmt *parser.ClassStatement) {
 func (r *Runtime) executeStatement(stmt parser.Statement) interface{} {
 	switch s := stmt.(type) {
 	case *parser.LetStatement:
+		if r.Constants == nil {
+			r.Constants = make(map[string]bool)
+		}
+		if r.Constants[s.Name.Value] {
+			panic(&JossError{Type: "ConstantAssignment", Message: fmt.Sprintf("La constante '%s' no puede redeclararse", s.Name.Value), File: r.CurrentFile, Line: s.Name.Token.Line})
+		}
 		var val interface{}
 		if s.Value != nil {
 			val = r.evaluateExpression(s.Value)
@@ -132,6 +136,9 @@ func (r *Runtime) executeStatement(stmt parser.Statement) interface{} {
 			panic(fmt.Sprintf("Error de Tipado: Variable '%s' definida como '%s' pero asignada valor incompatible", s.Name.Value, s.Token.Literal))
 		}
 		r.Variables[s.Name.Value] = val
+		if s.IsConst {
+			r.Constants[s.Name.Value] = true
+		}
 	case *parser.MultiLetStatement:
 		// int $a,$b  or  int $a=1,$b=2
 		for _, decl := range s.Declarations {
@@ -160,8 +167,6 @@ func (r *Runtime) executeStatement(stmt parser.Statement) interface{} {
 		return r.evaluateExpression(s.Expression)
 	case *parser.ForeachStatement:
 		return r.executeForeach(s)
-	case *parser.ImportStatement:
-		return r.executeImport(s)
 	case *parser.EchoStatement:
 		val := r.evaluateExpression(s.Value)
 		fmt.Println(val)
@@ -202,74 +207,6 @@ func (r *Runtime) executeBreak(bs *parser.BreakStatement) interface{} {
 
 func (r *Runtime) executeContinue(cs *parser.ContinueStatement) interface{} {
 	panic(&ContinuePanic{})
-}
-
-func (r *Runtime) executeImport(stmt *parser.ImportStatement) interface{} {
-	filename := stmt.Path
-
-	// Handle Global Import
-	if filename == "global" {
-		filename = "config/global.joss"
-		if _, err := os.Stat(filename); os.IsNotExist(err) {
-			// Try looking in parent directories if running from subfolder
-			if _, err := os.Stat("../config/global.joss"); err == nil {
-				filename = "../config/global.joss"
-			} else if _, err := os.Stat("../../config/global.joss"); err == nil {
-				filename = "../../config/global.joss"
-			} else {
-				fmt.Println("Error: @import \"global\" requiere 'config/global.joss'")
-				return nil
-			}
-		}
-	}
-
-	var content []byte
-	var err error
-	resolvedFilename := filename
-	if !filepath.IsAbs(filename) && r.importBaseDir != "" {
-		resolvedFilename = filepath.Join(r.importBaseDir, filename)
-	}
-	resolvedFilename, _ = filepath.Abs(resolvedFilename)
-	resolvedFilename = filepath.Clean(resolvedFilename)
-	if r.importedFiles[resolvedFilename] {
-		return nil
-	}
-	content, err = os.ReadFile(resolvedFilename)
-	if err != nil {
-		panic(&JossError{
-			Type:    "ImportError",
-			Message: fmt.Sprintf("No se pudo importar '%s': %v", resolvedFilename, err),
-			File:    r.CurrentFile,
-		})
-	}
-	r.importedFiles[resolvedFilename] = true
-
-	l := parser.NewLexer(string(content))
-	p := parser.NewParser(l)
-	program := p.ParseProgram()
-
-	if len(p.Errors()) > 0 {
-		errMsg := fmt.Sprintf("Errores de parseo en '%s':\n", filename)
-		for _, msg := range p.Errors() {
-			errMsg += "\t" + msg + "\n"
-		}
-		panic(&JossError{
-			Type:    "ParseError",
-			Message: errMsg,
-			File:    filename,
-		})
-	}
-
-	previousBase := r.importBaseDir
-	r.importBaseDir = filepath.Dir(resolvedFilename)
-	defer func() { r.importBaseDir = previousBase }()
-
-	// Execute imported program in current runtime (shared scope)
-	for _, s := range program.Statements {
-		r.executeStatement(s)
-	}
-
-	return nil
 }
 
 func (r *Runtime) executeForeach(fs *parser.ForeachStatement) interface{} {

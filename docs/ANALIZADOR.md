@@ -15,7 +15,8 @@ El comando devuelve código de salida distinto de cero si hay errores. Los warni
 - Funciones, clases, superclases y métodos inexistentes cuando su receptor es conocido.
 - Scope de parámetros, funciones, métodos, `Init` y closures.
 - Inferencia fija en primera asignación y compatibilidad de reasignaciones.
-- Inicializadores tipados, defaults, argumentos y aridad de funciones Joss.
+- Inicializadores tipados, uniones/nullables, constantes, defaults, argumentos, retornos, rutas exhaustivas y aridad de funciones Joss.
+- Tipos de clase inexistentes en variables, parámetros y retornos.
 - Operadores e índices incompatibles.
 - Código posterior a un `return` incondicional.
 - Declaraciones duplicadas a nivel de proyecto.
@@ -23,7 +24,7 @@ El comando devuelve código de salida distinto de cero si hay errores. Los warni
 
 ## Evidencia e información desconocida
 
-El analizador diferencia `unknown` de inválido. Una API nativa sin firma formal no produce un error de aridad especulativo; un receptor dinámico no produce un error de miembro; `isset` y `empty` pueden consultar una variable ausente. Esta política evita convertir una limitación del checker en un supuesto error del programa.
+El analizador diferencia `unknown` de inválido y de `mixed`. Los retornos de todas las APIs core tienen contrato explícito; `mixed` identifica las genuinamente polimórficas. Una API nativa sin metadatos de parámetros no produce un error de aridad especulativo; un receptor dinámico no produce un error de miembro; `isset` y `empty` pueden consultar una variable ausente.
 
 ## Salida
 
@@ -42,9 +43,10 @@ Consulte [Diagnósticos](DIAGNOSTICOS.md) para códigos y severidades, y [Sistem
 
 ## Límites conocidos
 
-- No hay sintaxis de tipo de retorno, nullable, union o constante.
-- Las firmas nativas no describen todavía tipos de retorno; una cadena de miembros puede perder precisión.
-- No hay análisis sensible a ramas, taint/escape formal, grafo de imports fuente ni contratos de esquema de base de datos.
-- Los errores del parser siguen originándose como strings y el loader los adapta a diagnósticos; su rango es menos preciso que el de errores semánticos.
+- La prueba de retorno exhaustivo cubre bloques, ternarios, `match` con `default` y `try/catch`; no demuestra todavía terminación matemática de loops.
+- Los parámetros de muchas APIs nativas siguen siendo variádicos/desconocidos para evitar errores de aridad; sus retornos sí son explícitos.
+- No hay análisis de refinamiento sensible a ramas, taint/escape formal ni contratos de esquema de base de datos.
+- Joss no tendrá grafo de imports fuente: el proyecto usa carga automática y un espacio único de declaraciones.
+- La recuperación del parser todavía puede emitir más de un diagnóstico derivado tras un token inválido; cada hallazgo conserva ya línea y columna estructuradas desde el token original.
 
 Estas limitaciones no se reportan como errores del usuario.

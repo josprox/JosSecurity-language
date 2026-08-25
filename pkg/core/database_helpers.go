@@ -32,35 +32,6 @@ func rowsToMap(rows *sql.Rows) []map[string]interface{} {
 	return results
 }
 
-// rowsToJSON converts SQL rows to JSON string (legacy support)
-func rowsToJSON(rows *sql.Rows) string {
-	var results []string
-	cols, _ := rows.Columns()
-	vals := make([]interface{}, len(cols))
-	valPtrs := make([]interface{}, len(cols))
-	for i := range cols {
-		valPtrs[i] = &vals[i]
-	}
-
-	for rows.Next() {
-		rows.Scan(valPtrs...)
-		rowStr := "{"
-		for i, colName := range cols {
-			valVal := vals[i]
-			if b, ok := valVal.([]byte); ok {
-				valVal = string(b)
-			}
-			rowStr += fmt.Sprintf("\"%s\": \"%v\"", colName, valVal)
-			if i < len(cols)-1 {
-				rowStr += ", "
-			}
-		}
-		rowStr += "}"
-		results = append(results, rowStr)
-	}
-	return "[" + strings.Join(results, ", ") + "]"
-}
-
 // quoteIdentifier quotes SQL identifiers
 func quoteIdentifier(name string) string {
 	name = strings.TrimSpace(name)

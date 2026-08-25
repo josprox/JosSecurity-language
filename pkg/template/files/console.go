@@ -54,12 +54,12 @@ PREFIX="js_"
 APP_NAME="Joss Console App"
 APP_VERSION="1.0.0"`,
 		filepath.Join(path, "config", "reglas.joss"): `// Constantes Globales para Aplicación de Consola
-const string APP_NAME = "Joss Console"
-const string APP_VERSION = "1.0.0"
+const string $APP_NAME = "Joss Console"
+const string $APP_VERSION = "1.0.0"
 
 // Configuración de la aplicación
-const bool DEBUG_MODE = true
-const int MAX_RETRIES = 3`,
+const bool $DEBUG_MODE = true
+const int $MAX_RETRIES = 3`,
 		filepath.Join(path, ".gitignore"): `plugins/
 env.joss
 env.enc
@@ -188,17 +188,11 @@ class ExampleModel extends GranDB {
     }
     
     func obtenerTodos() {
-        $db = new GranDB()
-        $db->tabla = $this->tabla
-        return $db->clasic("json")
+        return (new GranDB())->table($this->tabla)->get()
     }
     
     func buscarPorId($id) {
-        $db = new GranDB()
-        $db->tabla = $this->tabla
-        $db->comparar = "id"
-        $db->comparable = $id
-        return $db->where("json")
+        return (new GranDB())->table($this->tabla)->where("id", $id)->first()
     }
 }`,
 

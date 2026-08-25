@@ -15,10 +15,12 @@ func (r *Runtime) captureFunction(fn *parser.FunctionLiteral) *CapturedFunction 
 		for name, valueType := range r.VarTypes {
 			varTypes[name] = valueType
 		}
+		constants := copyBoolMap(r.Constants)
 
 		r.captureEnvironment = &ClosureEnvironment{
 			Variables: variables,
 			VarTypes:  varTypes,
+			Constants: constants,
 		}
 	}
 
@@ -35,18 +37,22 @@ func (r *Runtime) callCapturedFunction(closure *CapturedFunction, args []interfa
 
 	previousVariables := r.Variables
 	previousVarTypes := r.VarTypes
+	previousConstants := r.Constants
 	r.Variables = environment.Variables
 	r.VarTypes = environment.VarTypes
+	r.Constants = environment.Constants
 	defer func() {
 		r.Variables = previousVariables
 		r.VarTypes = previousVarTypes
+		r.Constants = previousConstants
 	}()
 
 	method := &parser.MethodStatement{
 		Token:      closure.Function.Token,
 		Name:       &parser.Identifier{Value: "anonymous"},
 		Parameters: closure.Function.Parameters,
+		ReturnType: closure.Function.ReturnType,
 		Body:       closure.Function.Body,
 	}
-	return r.CallMethodEvaluated(method, nil, args)
+	return r.callMethodEvaluated(method, nil, args, environment)
 }

@@ -14,7 +14,6 @@ import (
 const MaxProgramSize = 32 << 20
 
 var (
-	magicLegacy     = []byte{'J', 'O', 'S', 'S', 'B', 'C', '2', 0}
 	magicCompressed = []byte{'J', 'O', 'S', 'S', 'B', 'C', '2', 'Z'}
 	registerOnce    sync.Once
 )
@@ -55,7 +54,7 @@ func Encode(program *parser.Program) ([]byte, error) {
 	return result, nil
 }
 
-// Decode restores a precompiled Joss program from a JP v2 payload (supports both compressed and legacy formats).
+// Decode restores a precompiled Joss program from the current compressed JP v2 payload.
 func Decode(data []byte) (*parser.Program, error) {
 	if len(data) < 8 {
 		return nil, fmt.Errorf("bytecode: payload demasiado corto")
@@ -69,8 +68,6 @@ func Decode(data []byte) (*parser.Program, error) {
 		fr := flate.NewReader(bytes.NewReader(data[8:]))
 		defer fr.Close()
 		reader = fr
-	} else if bytes.Equal(data[:8], magicLegacy) {
-		reader = bytes.NewReader(data[8:])
 	} else {
 		return nil, fmt.Errorf("bytecode: cabecera JP v2 invalida")
 	}
@@ -82,7 +79,7 @@ func Decode(data []byte) (*parser.Program, error) {
 }
 
 func IsBytecode(data []byte) bool {
-	return len(data) >= 8 && (bytes.Equal(data[:8], magicCompressed) || bytes.Equal(data[:8], magicLegacy))
+	return len(data) >= 8 && bytes.Equal(data[:8], magicCompressed)
 }
 
 func registerAST() {
@@ -96,7 +93,6 @@ func registerAST() {
 		gob.Register(&parser.EchoStatement{})
 		gob.Register(&parser.InitStatement{})
 		gob.Register(&parser.ForeachStatement{})
-		gob.Register(&parser.ImportStatement{})
 		gob.Register(&parser.MethodStatement{})
 		gob.Register(&parser.WhileStatement{})
 		gob.Register(&parser.DoWhileStatement{})
