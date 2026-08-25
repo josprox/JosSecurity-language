@@ -15,14 +15,12 @@ YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 NC='\033[0m'
 
-# Configuración que DEBE ser actualizada manualmente en el script
-JOSS_VERSION="3.6.1"
 REPO_OWNER="josprox"
 REPO_NAME="Joss-language"
 
 # Rutas
 INSTALL_DIR="/usr/local/bin"
-SDK_INSTALL_DIR="/usr/local/share/joss/sdk"
+LEGACY_SDK_INSTALL_DIR="/usr/local/share/joss/sdk"
 LOG_FILE="/tmp/jossecurity-action.log"
 TEMP_DIR="/tmp/jossecurity-temp-action"
 REPO_URL="https://api.github.com/repos/$REPO_OWNER/$REPO_NAME/releases/latest"
@@ -93,7 +91,7 @@ get_binary_name() {
 
 # 1. Instalación
 install_jossecurity() {
-    log INFO "[1/3] Installing JosSecurity..."
+    log INFO "[1/2] Installing Joss runtime..."
     
     BINARY_FILE=$(get_binary_name)
     BINARY_PATH=$(find "$TEMP_DIR" -name "$BINARY_FILE" -type f | head -n 1)
@@ -108,6 +106,13 @@ install_jossecurity() {
     if ! run_privileged mkdir -p "$INSTALL_DIR"; then
         log ERROR "[X] Could not create installation directory $INSTALL_DIR."
         return 1
+    fi
+    if [ -d "$LEGACY_SDK_INSTALL_DIR" ]; then
+        if ! run_privileged rm -rf "$LEGACY_SDK_INSTALL_DIR"; then
+            log ERROR "[X] Failed to remove legacy SDK from $LEGACY_SDK_INSTALL_DIR"
+            return 1
+        fi
+        log SUCCESS "[OK] Legacy SDK removed from $LEGACY_SDK_INSTALL_DIR"
     fi
 
     STAGED_BINARY="$INSTALL_DIR/.joss-install-$$"
@@ -126,39 +131,8 @@ install_jossecurity() {
     return 0
 }
 
-install_sdk() {
-    log INFO "[2/3] Installing Joss plugin SDK..."
-
-    SDK_SOURCE="$TEMP_DIR/sdk-package/sdk"
-    if [ ! -d "$SDK_SOURCE" ]; then
-        log ERROR "[X] SDK directory not found in downloaded package."
-        return 1
-    fi
-
-    SDK_PARENT=$(dirname "$SDK_INSTALL_DIR")
-    STAGED_SDK="$SDK_PARENT/.sdk-install-$$"
-    if ! run_privileged mkdir -p "$SDK_PARENT" ||
-       ! run_privileged rm -rf "$STAGED_SDK" ||
-       ! run_privileged mkdir -p "$STAGED_SDK" ||
-       ! run_privileged cp -R "$SDK_SOURCE"/. "$STAGED_SDK"/; then
-        run_privileged rm -rf "$STAGED_SDK" || true
-        log ERROR "[X] SDK staging failed."
-        return 1
-    fi
-
-    if ! run_privileged rm -rf "$SDK_INSTALL_DIR" ||
-       ! run_privileged mv "$STAGED_SDK" "$SDK_INSTALL_DIR"; then
-        run_privileged rm -rf "$STAGED_SDK" || true
-        log ERROR "[X] SDK installation failed."
-        return 1
-    fi
-
-    log SUCCESS "[OK] SDK installed at $SDK_INSTALL_DIR"
-    return 0
-}
-
 install_extension() {
-    log INFO "[3/3] Installing VS Code extension..."
+    log INFO "[2/2] Installing VS Code extension..."
     
     if ! detect_vscode; then
         log WARNING "[SKIP] VS Code not detected. Extension installation skipped."
@@ -197,12 +171,13 @@ uninstall_jossecurity() {
     else
         log INFO "[OK] Binary not found."
     fi
-    if [ -d "$SDK_INSTALL_DIR" ]; then
-        if ! run_privileged rm -rf "$SDK_INSTALL_DIR"; then
-            log ERROR "[X] Failed to remove $SDK_INSTALL_DIR"
+    # Clean installations made by releases that still shipped the legacy SDK.
+    if [ -d "$LEGACY_SDK_INSTALL_DIR" ]; then
+        if ! run_privileged rm -rf "$LEGACY_SDK_INSTALL_DIR"; then
+            log ERROR "[X] Failed to remove $LEGACY_SDK_INSTALL_DIR"
             return 1
         fi
-        log SUCCESS "[OK] SDK removed from $SDK_INSTALL_DIR"
+        log SUCCESS "[OK] Legacy SDK removed from $LEGACY_SDK_INSTALL_DIR"
     fi
 }
 
@@ -223,7 +198,8 @@ check_update() {
     LOCAL_VERSION="0.0.0"
     if command -v joss &> /dev/null; then
         VERSION_OUT=$(joss version 2>&1 || true)
-        if [[ $VERSION_OUT =~ v([0-9]+\.[0-9]+\.[0-9]+) ]]; then
+        local version_pattern='v?([0-9]+\.[0-9]+\.[0-9]+(\.[0-9]+)?)'
+        if [[ $VERSION_OUT =~ $version_pattern ]]; then
             LOCAL_VERSION="${BASH_REMATCH[1]}"
         fi
     fi
@@ -247,7 +223,7 @@ check_update() {
 
 run_update() {
     log INFO "Running update: Download and reinstalling."
-    if install_jossecurity && install_sdk && install_extension; then
+    if install_jossecurity && install_extension; then
         log SUCCESS "Update completed successfully."
         return 0
     fi
@@ -295,7 +271,8 @@ resolve_release_tag() {
     fi
 
     local normalized="${requested#[vV]}"
-    if ! [[ "$normalized" =~ ^[0-9]+\.[0-9]+\.[0-9]+([.-][0-9A-Za-z.-]+)?$ ]]; then
+    local requested_version_pattern='^[0-9]+\.[0-9]+\.[0-9]+(\.[0-9]+)?(-[0-9A-Za-z][0-9A-Za-z.-]*)?$'
+    if ! [[ "$normalized" =~ $requested_version_pattern ]]; then
         return 1
     fi
 
@@ -329,11 +306,9 @@ download_and_extract() {
         OS_ZIP="jossecurity-linux.zip"
     fi
     EXT_ZIP="jossecurity-vscode.zip"
-    SDK_ZIP="joss-plugin-sdk.zip"
 
     BINARY_URL="https://github.com/$REPO_OWNER/$REPO_NAME/releases/download/$RELEASE_TAG/$OS_ZIP"
     EXT_URL="https://github.com/$REPO_OWNER/$REPO_NAME/releases/download/$RELEASE_TAG/$EXT_ZIP"
-    SDK_URL="https://github.com/$REPO_OWNER/$REPO_NAME/releases/download/$RELEASE_TAG/$SDK_ZIP"
     log INFO "Selected release: $RELEASE_TAG"
     
     # 1. Binaries
@@ -351,17 +326,9 @@ download_and_extract() {
         return 1
     fi
 
-    # 3. SDK
-    log INFO "[INIT] Downloading Plugin SDK ($SDK_ZIP)..."
-    if ! curl -fsSL "$SDK_URL" -o "$TEMP_DIR/$SDK_ZIP"; then
-        log ERROR "[X] Failed to download plugin SDK."
-        return 1
-    fi
-    
     log INFO "[INIT] Extracting files..."
     unzip -o "$TEMP_DIR/$OS_ZIP" -d "$TEMP_DIR/runtime"
     unzip -o "$TEMP_DIR/$EXT_ZIP" -d "$TEMP_DIR/extension"
-    unzip -o "$TEMP_DIR/$SDK_ZIP" -d "$TEMP_DIR/sdk-package"
     
     # Check VS Code
     ensure_vscode
@@ -376,10 +343,10 @@ main_menu() {
     echo "======================================="
     echo -e "${NC}"
     echo ""
-    echo "  [1] Install (Joss Binary + SDK + Extension)"
+    echo "  [1] Install (Joss Runtime + VS Code Extension)"
     echo "  [2] Update (Only When a New Version Exists)"
     echo "  [3] Reinstall (Latest or Specific Version)"
-    echo "  [4] Uninstall (Remove Binary + SDK + Extension)"
+    echo "  [4] Uninstall (Remove Runtime + Extension)"
     echo "  [0] Exit"
     echo ""
     read -p "Option: " option < /dev/tty

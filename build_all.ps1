@@ -1,6 +1,5 @@
 [CmdletBinding()]
 param(
-    [switch]$SkipSDKChecks,
     [switch]$SkipVSCode
 )
 
@@ -82,11 +81,7 @@ function Remove-WorkDirectory {
 
 Push-Location $root
 try {
-    if ($SkipSDKChecks) {
-        & (Join-Path $root 'tools/verify-release.ps1') -SkipSDKChecks
-    } else {
-        & (Join-Path $root 'tools/verify-release.ps1')
-    }
+    & (Join-Path $root 'tools/verify-release.ps1')
     if ($LASTEXITCODE -ne 0) { throw 'La verificacion de release fallo' }
 
     Remove-WorkDirectory

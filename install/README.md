@@ -1,6 +1,6 @@
 # Instalación oficial
 
-Los instaladores remotos descargan tres artefactos del último release: el runtime de la plataforma, `joss-plugin-sdk.zip` y `jossecurity-vscode.zip`.
+Los instaladores remotos descargan dos artefactos del último release: el runtime de la plataforma y `jossecurity-vscode.zip`. El SDK multilenguaje legacy ya no forma parte de la distribución.
 
 ## Windows
 
@@ -10,7 +10,7 @@ Ejecuta PowerShell como administrador:
 Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope Process; iwr -useb https://raw.githubusercontent.com/josprox/Joss-language/main/install/remote-install.ps1 | iex
 ```
 
-El runtime y el SDK se instalan en `C:\Program Files\JosSecurity`. El instalador añade esa carpeta al `PATH`. Si `code` está disponible, también instala el VSIX; si VS Code no existe, ofrece instalarlo con Winget.
+El runtime se instala en `C:\Program Files\JosSecurity`. El instalador añade esa carpeta al `PATH`. Si `code` está disponible, también instala el VSIX; si VS Code no existe, ofrece instalarlo con Winget. Al instalar, actualizar o desinstalar también limpia un directorio `sdk` dejado por versiones antiguas.
 
 ## Linux y macOS
 
@@ -18,7 +18,7 @@ El runtime y el SDK se instalan en `C:\Program Files\JosSecurity`. El instalador
 curl -fsSL https://raw.githubusercontent.com/josprox/Joss-language/main/install/remote-install.sh | bash
 ```
 
-El runtime queda en `/usr/local/bin/joss` y el SDK en `/usr/local/share/joss/sdk`. El instalador crea ambas rutas cuando no existen. Si se ejecuta como `root`, realiza las operaciones directamente; para usuarios normales utiliza `sudo` cuando está disponible. Si `code` está en el `PATH`, también instala el VSIX. La ausencia de VS Code no hace fallar la instalación del runtime ni del SDK.
+El runtime queda en `/usr/local/bin/joss`. Si se ejecuta como `root`, realiza las operaciones directamente; para usuarios normales utiliza `sudo` cuando está disponible. Si `code` está en el `PATH`, también instala el VSIX. Al instalar, actualizar o desinstalar también limpia `/usr/local/share/joss/sdk` cuando fue creado por una versión antigua.
 
 Ambos scripts muestran un menú para instalar, buscar una actualización o desinstalar. La descarga requiere `curl` y `unzip` en Linux/macOS; en Windows requiere PowerShell 5.1 o posterior.
 
@@ -32,4 +32,4 @@ Logs: `%TEMP%\jossecurity-action.log` en Windows y `/tmp/jossecurity-action.log`
 
 ## Reinstalar una versión
 
-Selecciona **Reinstall** en el menú. Puedes escribir una versión concreta, por ejemplo `3.6.1`, o dejarla vacía para descargar e instalar nuevamente el release más reciente aunque esa misma versión ya esté instalada. La reinstalación reemplaza el runtime, el SDK de plugins y la extensión de VS Code.
+Selecciona **Reinstall** en el menú. Puedes escribir una versión concreta, por ejemplo `3.6.7.2`, o dejarla vacía para descargar e instalar nuevamente el release más reciente aunque esa misma versión ya esté instalada. La reinstalación reemplaza el runtime y la extensión de VS Code.

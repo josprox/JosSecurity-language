@@ -9,14 +9,12 @@ $ErrorActionPreference = "Stop"
 $Host.UI.RawUI.ForegroundColor = "White"
 
 # --- CONFIGURACIÓN ---
-# Configuración que DEBE ser actualizada manualmente en el script
-$JossVersion = "3.6.1"
 $RepoOwner = "josprox"
 $RepoName = "Joss-language"
 
 # Rutas
 $InstallDir = "C:\Program Files\JosSecurity"
-$SdkInstallDir = "$InstallDir\sdk"
+$LegacySdkInstallDir = "$InstallDir\sdk"
 $LogFile = "$env:TEMP\jossecurity-action.log"
 $TempDir = "$env:TEMP\jossecurity-temp-action"
 $RepoUrl = "https://api.github.com/repos/$RepoOwner/$RepoName/releases/latest"
@@ -117,7 +115,7 @@ function Add-ToPath {
 
 # 1. Instalación
 function Install-JosSecurity {
-    Write-Log "[1/3] Installing JosSecurity..." "INFO"
+    Write-Log "[1/2] Installing Joss runtime..." "INFO"
     
     # 1. Check Administrator Privileges (Enforced)
     if (-not (Test-Administrator)) {
@@ -138,6 +136,10 @@ function Install-JosSecurity {
         # 3. Prepare Directory
         if (-not (Test-Path $InstallDir)) {
             New-Item -ItemType Directory -Path $InstallDir -Force | Out-Null
+        }
+        if (Test-Path -LiteralPath $LegacySdkInstallDir) {
+            Remove-Item -LiteralPath $LegacySdkInstallDir -Recurse -Force
+            Write-Log "[OK] Legacy SDK removed" "SUCCESS"
         }
         
         # El binario de Windows se llama siempre joss.exe en el ZIP.
@@ -171,41 +173,12 @@ function Install-JosSecurity {
     }
 }
 
-function Install-SDK {
-    Write-Log "[2/3] Installing Joss plugin SDK..." "INFO"
-
-    if (-not (Test-Administrator)) {
-        Write-Log "[X] Administrator privileges are required to install the SDK." "ERROR"
-        return $false
-    }
-
-    try {
-        $sdkSource = Join-Path $TempDir "sdk-package\sdk"
-        if (-not (Test-Path -LiteralPath $sdkSource -PathType Container)) {
-            Write-Log "[X] SDK directory not found in downloaded package" "ERROR"
-            return $false
-        }
-
-        if (Test-Path -LiteralPath $SdkInstallDir) {
-            Remove-Item -LiteralPath $SdkInstallDir -Recurse -Force
-        }
-        New-Item -ItemType Directory -Path $SdkInstallDir -Force | Out-Null
-        Copy-Item -Path (Join-Path $sdkSource '*') -Destination $SdkInstallDir -Recurse -Force
-
-        Write-Log "[OK] SDK installed at $SdkInstallDir" "SUCCESS"
-        return $true
-    } catch {
-        Write-Log "[X] SDK installation failed: $($_.Exception.Message)" "ERROR"
-        return $false
-    }
-}
-
 function Install-Extension {
-    Write-Log "[3/3] Installing VS Code extension..." "INFO"
+    Write-Log "[2/2] Installing VS Code extension..." "INFO"
     
     if (-not (Test-VSCode)) {
         Write-Log "[X] VS Code not detected. Skipping extension install." "WARNING"
-        return $false
+        return $true
     }
 
     try {
@@ -252,9 +225,10 @@ function Uninstall-JosSecurity {
             Write-Log "[OK] Binary removed" "SUCCESS"
         }
 
-        if (Test-Path -LiteralPath $SdkInstallDir) {
-            Remove-Item -LiteralPath $SdkInstallDir -Recurse -Force
-            Write-Log "[OK] SDK removed" "SUCCESS"
+        # Clean installations made by releases that still shipped the legacy SDK.
+        if (Test-Path -LiteralPath $LegacySdkInstallDir) {
+            Remove-Item -LiteralPath $LegacySdkInstallDir -Recurse -Force
+            Write-Log "[OK] Legacy SDK removed" "SUCCESS"
         }
         
         # Remover directorio solo si está vacío
@@ -318,18 +292,18 @@ function Test-Update {
     if (Test-Path $InstalledBinary) {
         try {
             $versionOutput = & $InstalledBinary version 2>&1
-            if ($versionOutput -match "v(\d+\.\d+\.\d+)") {
+            if ($versionOutput -match "v?(\d+(?:\.\d+){2,3})") {
                 $LocalVersion = $Matches[1]
             }
         } catch {
-            $LocalVersion = $JossVersion
+            $LocalVersion = "0.0.0"
         }
     } else {
         $cmdJoss = Get-Command joss -ErrorAction SilentlyContinue
         if ($cmdJoss) {
             try {
                 $versionOutput = & joss version 2>&1
-                if ($versionOutput -match "v(\d+\.\d+\.\d+)") {
+                if ($versionOutput -match "v?(\d+(?:\.\d+){2,3})") {
                     $LocalVersion = $Matches[1]
                 }
             } catch {}
@@ -370,9 +344,8 @@ function Run-Update {
 
 function Invoke-InstallComponents {
     $binaryInstalled = Install-JosSecurity
-    $sdkInstalled = Install-SDK
     $extensionInstalled = Install-Extension
-    return $binaryInstalled -and $sdkInstalled -and $extensionInstalled
+    return $binaryInstalled -and $extensionInstalled
 }
 
 # --- FLUJO DE TRABAJO PRINCIPAL ---
@@ -422,8 +395,8 @@ function Get-ReleaseInfo {
     }
 
     $normalized = $Version.Trim() -replace '^[vV]', ''
-    if ($normalized -notmatch '^\d+\.\d+\.\d+([-.][0-9A-Za-z.-]+)?$') {
-        throw "Invalid version '$Version'. Use a value such as 3.6.1."
+    if ($normalized -notmatch '^\d+(?:\.\d+){2,3}(?:-[0-9A-Za-z][0-9A-Za-z.-]*)?$') {
+        throw "Invalid version '$Version'. Use a value such as 3.6.7.2."
     }
 
     $tags = @($Version.Trim(), "v$normalized", "V$normalized") | Select-Object -Unique
@@ -453,13 +426,11 @@ function Download-And-Extract {
 
     $WindowsZip = "jossecurity-windows.zip"
     $ExtensionZip = "jossecurity-vscode.zip"
-    $SdkZip = "joss-plugin-sdk.zip"
 
     try {
         if ($null -eq $Release) { $Release = Get-ReleaseInfo }
         $WindowsUrl = Get-ReleaseAssetUrl -Release $Release -Name $WindowsZip
         $ExtensionUrl = Get-ReleaseAssetUrl -Release $Release -Name $ExtensionZip
-        $SdkUrl = Get-ReleaseAssetUrl -Release $Release -Name $SdkZip
         Write-Log "Selected release: $($Release.tag_name)" "INFO"
     } catch {
         Write-Log "[X] Could not resolve release assets: $($_.Exception.Message)" "ERROR"
@@ -486,15 +457,7 @@ function Download-And-Extract {
     Expand-Archive -Path "$TempDir\$ExtensionZip" -DestinationPath "$TempDir\extension" -Force
     Remove-Item "$TempDir\$ExtensionZip" -Force
 
-    # 3. Download SDK
-    Write-Host "[INIT] Downloading Plugin SDK ($SdkZip)..." -ForegroundColor Cyan
-    if (-not (Download-File -Url $SdkUrl -Dest "$TempDir\$SdkZip")) { return $false }
-
-    Write-Log "[INIT] Extracting Plugin SDK..."
-    Expand-Archive -Path "$TempDir\$SdkZip" -DestinationPath "$TempDir\sdk-package" -Force
-    Remove-Item "$TempDir\$SdkZip" -Force
-    
-    # 4. Check/Install VS Code (Optional but part of flow)
+    # 3. Check/Install VS Code (Optional but part of flow)
     Ensure-VSCode | Out-Null
     
     return $true
@@ -508,10 +471,10 @@ function Show-MainMenu {
     Write-Host ""
     Write-Host "Select an action:" -ForegroundColor Cyan
     Write-Host ""
-    Write-Host "  [1] Install (Joss Binary + SDK + Extension)" -ForegroundColor White
+    Write-Host "  [1] Install (Joss Runtime + VS Code Extension)" -ForegroundColor White
     Write-Host "  [2] Update (Only When a New Version Exists)" -ForegroundColor White
     Write-Host "  [3] Reinstall (Latest or Specific Version)" -ForegroundColor White
-    Write-Host "  [4] Uninstall (Remove Binary + SDK + Extension)" -ForegroundColor White
+    Write-Host "  [4] Uninstall (Remove Runtime + Extension)" -ForegroundColor White
     Write-Host "  [0] Exit" -ForegroundColor White
     Write-Host ""
 

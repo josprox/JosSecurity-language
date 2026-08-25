@@ -1,8 +1,3 @@
-[CmdletBinding()]
-param(
-    [switch]$SkipSDKChecks
-)
-
 $ErrorActionPreference = 'Stop'
 $root = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 $work = Join-Path $root '.joss-release-work'
