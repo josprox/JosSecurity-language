@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	_ "github.com/go-sql-driver/mysql"
+	semanticanalyzer "github.com/jossecurity/joss/pkg/analyzer"
 	_ "modernc.org/sqlite"
 
 	"github.com/jossecurity/joss/pkg/core"
@@ -316,52 +317,14 @@ func analyzeScript(filename string) {
 
 	fmt.Printf("🔍 Analizando proyecto Joss (%s)...\n", filename)
 
-	combinedProgram := &parser.Program{Statements: make([]parser.Statement, 0)}
-	var parseErrors []string
-
-	// 1. Parse entry file
-	if data, err := os.ReadFile(filename); err == nil {
-		l := parser.NewLexer(string(data))
-		p := parser.NewParser(l)
-		prog := p.ParseProgram()
-		if len(p.Errors()) > 0 {
-			parseErrors = append(parseErrors, p.Errors()...)
-		} else if prog != nil {
-			combinedProgram.Statements = append(combinedProgram.Statements, prog.Statements...)
-		}
-	}
-
-	// 2. Preload and parse all .joss files in app/ directory if present
-	if _, err := os.Stat("app"); err == nil {
-		_ = filepath.Walk("app", func(path string, info os.FileInfo, err error) error {
-			if err != nil || info == nil || info.IsDir() {
-				return nil
-			}
-			if strings.HasSuffix(path, ".joss") {
-				if data, err := os.ReadFile(path); err == nil {
-					l := parser.NewLexer(string(data))
-					p := parser.NewParser(l)
-					prog := p.ParseProgram()
-					if len(p.Errors()) > 0 {
-						parseErrors = append(parseErrors, fmt.Sprintf("%s: %s", path, strings.Join(p.Errors(), "; ")))
-					} else if prog != nil {
-						combinedProgram.Statements = append(combinedProgram.Statements, prog.Statements...)
-					}
-				}
-			}
-			return nil
-		})
-	}
-
-	if len(parseErrors) > 0 {
-		fmt.Println("❌ Errores de parseo detectados:")
-		for _, msg := range parseErrors {
-			fmt.Printf("\t%s\n", msg)
-		}
+	units, parseDiagnostics := semanticanalyzer.LoadProject(filename, "app")
+	if len(parseDiagnostics) > 0 {
+		report := core.AnalysisReportFromDiagnostics(parseDiagnostics)
+		report.PrintReport()
 		os.Exit(1)
 	}
 
-	report := core.AnalyzeProgram(combinedProgram)
+	report := core.AnalyzeSourceUnits(units)
 	report.PrintReport()
 
 	if len(report.Errors) > 0 {
@@ -388,10 +351,19 @@ func executeScript(filename string) {
 		os.Exit(1)
 	}
 
-	// Always run static analysis before executing script
-	report := core.AnalyzeProgram(program)
+	// Analyze the same project surface that the runtime will preload. Semantic
+	// errors are blocking; warnings remain visible but do not prevent execution.
+	units, parseDiagnostics := semanticanalyzer.LoadProject(filename, "app")
+	if len(parseDiagnostics) > 0 {
+		core.AnalysisReportFromDiagnostics(parseDiagnostics).PrintReport()
+		os.Exit(1)
+	}
+	report := core.AnalyzeSourceUnits(units)
 	if report.HasIssues() {
 		report.PrintReport()
+	}
+	if report.HasErrors() {
+		os.Exit(1)
 	}
 
 	rt := core.NewRuntime()

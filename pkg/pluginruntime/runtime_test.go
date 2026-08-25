@@ -310,9 +310,9 @@ func TestJPBCVMAllOpCodes(t *testing.T) {
 		Name: "test_object",
 		Instructions: []pluginruntime.JPBCInstruction{
 			{Op: ir.OpNewObject, ConstIdx: 4}, // type "User"
-			{Op: ir.OpConst, ConstIdx: 6},      // "Alice"
-			{Op: ir.OpSetField, ConstIdx: 5},   // obj["name"] = "Alice"
-			{Op: ir.OpGetField, ConstIdx: 5},   // get obj["name"]
+			{Op: ir.OpConst, ConstIdx: 6},     // "Alice"
+			{Op: ir.OpSetField, ConstIdx: 5},  // obj["name"] = "Alice"
+			{Op: ir.OpGetField, ConstIdx: 5},  // get obj["name"]
 			{Op: ir.OpReturn},
 		},
 	}
@@ -321,10 +321,10 @@ func TestJPBCVMAllOpCodes(t *testing.T) {
 	module.Functions["test_branch"] = &pluginruntime.JPBCFunction{
 		Name: "test_branch",
 		Instructions: []pluginruntime.JPBCInstruction{
-			{Op: ir.OpConst, ConstIdx: 2},     // 10
-			{Op: ir.OpBranchIf, ConstIdx: 3},  // if true jump to inst 3
-			{Op: ir.OpConst, ConstIdx: 0},     // dead instruction
-			{Op: ir.OpConst, ConstIdx: 3},     // 20
+			{Op: ir.OpConst, ConstIdx: 2},    // 10
+			{Op: ir.OpBranchIf, ConstIdx: 3}, // if true jump to inst 3
+			{Op: ir.OpConst, ConstIdx: 0},    // dead instruction
+			{Op: ir.OpConst, ConstIdx: 3},    // 20
 			{Op: ir.OpReturn},
 		},
 	}

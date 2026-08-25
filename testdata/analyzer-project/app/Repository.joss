@@ -1,0 +1,10 @@
+class Repository {
+    func find(int $id) {
+        return $id
+    }
+}
+
+func loadRepository() {
+    $repository = new Repository()
+    return $repository->find(1)
+}

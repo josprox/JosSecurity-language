@@ -2,18 +2,23 @@
 
 ## Variables y tipos
 
-Las variables usan `$`. La asignación simple es dinámica; una declaración tipada valida el valor. `function` se acepta por compatibilidad, pero la palabra canónica es `func`.
+Las variables usan `$`. La primera asignación simple infiere un tipo que permanece estable; no convierte la variable en dinámica. `function` se acepta por compatibilidad, pero la palabra canónica es `func`.
 
 ```joss
-$dynamic = 10
-int $age = 25
+$age = 20       // infiere int
+$age = 21       // válido
+var $count = 1  // inferencia explícita
+let $dynamic = 10 // mixed explícito
+int $port = 9000
 string $name = "Ada"
 bool $active = true
 array $items = [1, 2, 3]
 $config = {"port": 8000}
 ```
 
-Los tipos reconocidos por la validación del runtime incluyen `int`, `float`, `string`, `bool`, `array` y `map`. Una variable tipada como número intenta convertir una cadena numérica antes de fallar.
+`$age = "veinte"` es un error porque `$age` ya fue inferida como `int`. Sólo `let $dynamic` permite cambiar de tipo deliberadamente. Los tipos reconocidos incluyen `int`, `float`, `string`, `bool`, `array`, `map`, `object`, `channel` y clases. Una declaración numérica explícita puede convertir una cadena completa y válida antes de fallar; nunca trunca `"20.5"` a `int`.
+
+La gramática actual no implementa declaraciones `const`, nullables, unions ni anotaciones de retorno. Consulte [Sistema de tipos](SISTEMA_TIPOS.md).
 
 ## Operadores y Concatenación
 

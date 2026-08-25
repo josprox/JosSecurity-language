@@ -1,75 +1,69 @@
 package core
 
 import (
-	"fmt"
-	"strings"
-
 	"github.com/jossecurity/joss/pkg/parser"
+	"github.com/jossecurity/joss/pkg/typesystem"
 )
 
 func (r *Runtime) checkType(val interface{}, typeName string) bool {
-	if typeName == "" || typeName == "mixed" {
+	destination := typesystem.Parse(typeName)
+	source := runtimeTypeOf(val)
+	if typesystem.Assignable(destination, source) {
 		return true
 	}
-
-	if val == nil {
-		return false // Or allow null? For now, strict.
+	if destination.Kind != typesystem.Class {
+		return false
 	}
-
-	switch strings.ToLower(typeName) {
-	case "int", "integer":
-		switch v := val.(type) {
-		case int, int32, int64:
-			return true
-		case float64:
-			return v == float64(int64(v))
-		}
+	inst, ok := val.(*Instance)
+	if !ok || inst == nil {
 		return false
-	case "float", "double":
-		switch val.(type) {
-		case float64, float32, int, int64:
+	}
+	for class := inst.Class; class != nil; {
+		if class.Name != nil && class.Name.Value == destination.Name {
 			return true
 		}
-		return false
-	case "string":
-		_, ok := val.(string)
-		return ok
-	case "bool", "boolean":
-		_, ok := val.(bool)
-		return ok
-	case "array":
-		_, ok := val.([]interface{})
-		return ok
-	case "map":
-		_, ok := val.(map[string]interface{})
-		return ok
-	case "channel":
-		_, ok := val.(*Channel)
-		return ok
-	case "object":
-		_, ok := val.(*Instance)
-		return ok
-	default:
-		// Check for specific class instance
-		if inst, ok := val.(*Instance); ok {
-			curr := inst.Class
-			for curr != nil {
-				if curr.Name.Value == typeName {
-					return true
-				}
-				if curr.SuperClass != nil {
-					if super, ok := r.Classes[curr.SuperClass.Value]; ok {
-						curr = super
-					} else {
-						break
-					}
-				} else {
-					break
-				}
-			}
+		if class.SuperClass == nil {
+			break
 		}
+		class = r.Classes[class.SuperClass.Value]
 	}
 	return false
+}
+
+func runtimeTypeOf(value interface{}) typesystem.Type {
+	switch typed := value.(type) {
+	case nil:
+		return typesystem.Type{Kind: typesystem.Null}
+	case int, int8, int16, int32, int64, uint, uint8, uint16, uint32, uint64:
+		return typesystem.Type{Kind: typesystem.Int}
+	case float32, float64:
+		return typesystem.Type{Kind: typesystem.Float}
+	case string:
+		return typesystem.Type{Kind: typesystem.String}
+	case bool:
+		return typesystem.Type{Kind: typesystem.Bool}
+	case []interface{}:
+		return typesystem.Type{Kind: typesystem.Array}
+	case map[string]interface{}:
+		return typesystem.Type{Kind: typesystem.Map}
+	case *Channel:
+		return typesystem.Type{Kind: typesystem.Channel}
+	case *Instance:
+		if typed != nil && typed.Class != nil && typed.Class.Name != nil {
+			return typesystem.Type{Kind: typesystem.Class, Name: typed.Class.Name.Value}
+		}
+		return typesystem.Type{Kind: typesystem.Object}
+	default:
+		return typesystem.Type{Kind: typesystem.Unknown}
+	}
+}
+
+func runtimeTypeName(value interface{}) string {
+	valueType := runtimeTypeOf(value)
+	if !valueType.IsKnown() {
+		return ""
+	}
+	return valueType.String()
 }
 
 func (r *Runtime) checkExistence(exp parser.Expression) bool {
@@ -147,34 +141,8 @@ func (r *Runtime) coerceToTypedValue(val interface{}, typeName string) interface
 	if !isString {
 		return val // Already a non-string, no coercion needed
 	}
-	switch strings.ToLower(typeName) {
-	case "int", "integer":
-		// Try to parse as int
-		var i int64
-		_, err := fmt.Sscanf(strings.TrimSpace(str), "%d", &i)
-		if err == nil {
-			return i
-		}
-		// Try float then truncate
-		var f float64
-		_, err = fmt.Sscanf(strings.TrimSpace(str), "%f", &f)
-		if err == nil {
-			return int64(f)
-		}
-	case "float", "double":
-		var f float64
-		_, err := fmt.Sscanf(strings.TrimSpace(str), "%f", &f)
-		if err == nil {
-			return f
-		}
-	case "bool", "boolean":
-		s := strings.ToLower(strings.TrimSpace(str))
-		if s == "true" || s == "1" || s == "yes" {
-			return true
-		}
-		if s == "false" || s == "0" || s == "no" || s == "" {
-			return false
-		}
+	if coerced, ok := typesystem.CoerceString(typesystem.Parse(typeName), str); ok {
+		return coerced
 	}
 	return val // Return original if no coercion possible
 }
@@ -182,18 +150,18 @@ func (r *Runtime) coerceToTypedValue(val interface{}, typeName string) interface
 // getZeroValue returns the zero/default value for a given type name.
 // Used when a variable is declared without an initializer (e.g., int $x).
 func (r *Runtime) getZeroValue(typeName string) interface{} {
-	switch strings.ToLower(typeName) {
-	case "int", "integer":
+	switch typesystem.Parse(typeName).Kind {
+	case typesystem.Int:
 		return int64(0)
-	case "float", "double":
+	case typesystem.Float:
 		return float64(0.0)
-	case "string":
+	case typesystem.String:
 		return ""
-	case "bool", "boolean":
+	case typesystem.Bool:
 		return false
-	case "array":
+	case typesystem.Array:
 		return []interface{}{}
-	case "map":
+	case typesystem.Map:
 		return map[string]interface{}{}
 	default:
 		return nil

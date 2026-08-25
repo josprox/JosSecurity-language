@@ -1,193 +1,137 @@
-# Contexto para Agentes de IA
+# Guía de arquitectura para agentes
 
-Este documento sirve como memoria persistente para futuros agentes que trabajen en este proyecto.
+Este archivo es una guía operativa del repositorio, no un changelog. Antes de modificar semántica, lea `docs/ARQUITECTURA.md`, `docs/SISTEMA_TIPOS.md`, `docs/DIAGNOSTICOS.md` y los tests del subsistema afectado.
 
-## Lecciones Aprendidas (Sesión 21/12/2025)
+## Pipeline real
 
-### 1. Intérprete JosSecurity - Comportamientos Clave
-- **Retornos Estrictos**: El intérprete detiene la ejecución inmediatamente al encontrar un `ReturnStatement`, incluso dentro de bloques anidados, ternarios o bucles. Esto permite el uso de *Guard Clauses*.
-- **JSON Parsing**: `JSON::parse()` requiere estrictamente un `string`. Si pasas un objeto (como una lista de BD), retornará `nil` o fallará.
-- **Base de Datos**: `GranDB::get()` retorna un `[]map[string]interface{}` (Lista Nativa), NO un string JSON. No es necesario parsearlo.
-- **Concurrencia Aislada**: Las operaciones `async` y WebSockets usan `r.Fork()`, lo que garantiza que tengan su propia copia del mapa de variables, evitando condiciones de carrera.
-
-### 2. Manejo de Archivos y Descargas
-- **Uploads**: Los archivos subidos se encuentran en `$file["content"]`, no en `tmp_name`. El servidor lee el contenido en memoria.
-- **Downloads**: Para descargar archivos binarios sin corrupción:
-  1. Usar `Response::raw($content, $status, $mime, $headers)`.
-  2. Forzar headers: `Content-Disposition: attachment; filename="..."`.
-  3. **IMPORTANTE**: No retornar strings simples para binarios, ya que el servidor podría inyectar scripts (Hot Reload) y corromper el archivo.
-
-### 3. Estructura de Controladores
-- **Sintaxis**: JosSecurity no usa `if/else`, usa ternarios `cond ? { ... } : { ... }`.
-- **Métodos**: Asegurarse de que cada método esté correctamente cerrado con `}`. Un error de anidamiento puede hacer que el Dispatcher no encuentre el método.
-
-### 4. Estilo de Código
-- Usar bloques `{ ... }` explícitos dentro de los ternarios para flujos complejos.
-- Para concatenar strings usar `.`.
-
-### 5. Autenticación y Sesiones (JWT Update)
-- **Stateless**: La autenticación ya no depende de `storage/sessions.json`.
-- **JWT Cookie**: El login exitoso setea una cookie `joss_token` (HTTP-Only).
-- **Validación**: El servidor (`handler.go`) valida el JWT en cada petición y restaura la sesión (`user_id`, `email`, etc.) desde los claims del token.
-- **API**: El endpoint `/api/login` retorna el JWT en el JSON para clientes externos.
-- **Uso**: Usar `Response::redirect(...)->withCookie("joss_token", $token)` en el login.
-- **Gotcha: Roles**: El Token JWT DEBE incluir el rol del usuario (claim `role`). Si no, al restaurar sesión tras un reinicio, se pierden los permisos de admin.
-- **Gotcha: Logout**: `Auth::logout()` solo limpia memoria. Para invalidar realmente la sesión, SE DEBE setear la cookie con valor vacío: `withCookie("joss_token", "")`. El servidor procesará esto (`handler.go`) seteando `MaxAge: -1`.
-
-### 6. Integración Flutter & Backups (Sesión 27/12/2025)
-- **API Standard**: Flutter debe usar siempre el prefijo `/api/` (ej: `/api/listfiles`) y autenticación `Authorization: Bearer <token>`. Headers viejos como `X-JossRed-Auth` son obsoletos.
-- **Backups**:
-  - `listfiles` retorna los paths completos.
-  - Para descargas, el path puede ser de 2 partes (`appName/file`) o 3 partes. El cliente debe manejar ambos casos.
-  - **Borrado**: `UserStorage::delete($token, $path)` funciona correctamente. Se implementó `DELETE /api/backup/{id}`.
-- **Flutter UI**:
-  - Migración de widgets legacy a componentes modernos y aislados (ej: `JossChips`).
-### 7. IA Nativa, WebSockets y CLI (Sesión 28/12/2025)
-- **IA Nativa**:
-  - Implementada abstracción fluida `AI::client()->user(...)->call()`.
-  - Soporte de Streaming Token-by-Token (`streamTo($ws)`).
-  - Documentación en `docs/IA_NATIVA.md`.
-- **WebSockets**:
-  - Implementado `Router::ws("/path", "Controller@method")`.
-  - Manejo de conexiones crudas mediante actualización en `MainHandler`. **Crítico**: Los WebSockets se ejecutan *antes* del middleware de sesión estándar en `handler.go`. Sin embargo, ahora se inyecta una sesión `$__session` vacía a nivel de core; al validar el JWT manualmente en el controlador mediante `Auth::validateToken($token)`, se poblará automáticamente dicha sesión, haciendo que `Auth::user()` y los chequeos de rol como `Auth::hasRole(...)` funcionen correctamente dentro de los callbacks del socket.
-  - El enrutador de WebSockets (`Router::ws`) **solo soporta rutas estáticas y exactas**; no acepta parámetros dinámicos de ruta como `{id}`. Los parámetros específicos de la conexión deben pasarse mediante query params o en el mensaje de inicialización (`init`).
-  - Documentación en `docs/WEBSOCKETS.md`.
-- **Flutter Integration**:
-  - Usar `web_socket_channel` para chat en tiempo real.
-  - El protocolo actual usa JSON events: `{type: "chunk", content: "..."}`.
-- **CLI**:
-  - Nuevos comandos se registran en `cmd/joss/main.go`.
-  - Implementado `joss ai:activate` con prompts interactivos (`bufio`).
-  - **Gotcha Environment**: El Runtime de Joss carga `env.joss` en memoria (`r.Env`). Los módulos nativos deben preferir `r.Env["KEY"]` antes que `os.Getenv("KEY")`, ya que `joss server start` no siempre exporta las variables al entorno del SO.
-  - **Runtime & Deployment**:
-    - **Watchdog**: Se implementó supresión dinámica para WebSockets (`Upgrade: websocket`) y SSE.
-    - **Runtime Noise**: Se parcheó `evaluator_call.go` para ignorar llamadas a funciones `nil` silenciosamente, eliminando errores causados por ambigüedad del parser en código sin `;`.
-    - **Nginx Proxies**: En paneles como HestiaCP, `proxy_hide_header Upgrade;` debe ser ELIMINADO de las plantillas para permitir WebSockets.
-
-### 8. Integración de Servicios Externos y Sintaxis Estricta (Sesión 13/01/2026)
-- **Sintaxis Estricta (CRÍTICO)**:
-  - **Prohibido `if/else`**: El parser NO soporta `if` ni bloques sueltos.
-  - **Ternarios Anidados**: Para flujo complejo, usar ternarios anidados con bloques: `cond ? { ... } : { cond2 ? { ... } : { ... } }`.
-  - **No Chaining**: No usar expresiones encadenadas `(a, b, c)` dentro de los bloques.
-- **Servicios Systemd (Linux)**:
-  - **Permisos de Escritura**: Los servicios corren como usuario `joss` (u otro). Scripts en Python/Node que intenten crear logs o temporales en el directorio del proyecto FALLARÁN si no tienen permisos (Crash al inicio).
-  - **Solución**: Envolver creación de directorios/logs en `try-except` (Python) o verificar permisos. No dejar que un log falle la carga del servicio.
-  - **Networking Local**: Usar SIEMPRE `127.0.0.1` en lugar de `localhost` para llamadas `curl` internas (`System::Run`). `localhost` puede resolver a IPv6 (`::1`) y fallar si el servicio (Flask/Express) solo escucha en IPv4.
-- **JSON Parsing**:
-  - Se robusteció `JSON::parse()` en el núcleo para ignorar BOM y espacios, pero es mejor asegurar que los servicios retornen JSON limpio.
-
-### 9. Arquitectura Robusta y Control de Flujo (Sesión 22/02/2026)
-- **Thread-Safety (Crítico)**:
-  - Se implementó `Runtime.Fork()` con copia profunda de variables e instancias.
-  - El motor ahora es seguro para ejecuciones concurrentes masivas en WebSockets, Cron, Task y `async`.
-- **Propagación de Return (Bubble-Up)**:
-  - El comando `return` ahora burbujea correctamente a través de ternarios anidados y bloques.
-  - No es necesario usar "escaleras de envoltorio" para evitar ejecuciones posteriores; el early exit es confiable.
-- **Async/Await**:
-  - `async` ahora realiza el fork antes de la goroutine, eliminando condiciones de carrera con el hilo padre.
-  - La sintaxis recomendada es `await($future)` (con paréntesis) para asegurar el parsing como CallExpression.
-- **Tipado en Ejecución**:
-  - Se soporta type hinting en parámetros de funciones: `function suma(int $a, int $b)`.
-  - El operador `let` valida tipos estrictamente: `let int $x = 10`.
-
-### 10. Motor de Vistas (view.go) — Arquitectura y Reglas (Sesión 22/02/2026)
-
-**⚠️ CRÍTICO: Orden de procesamiento de plantillas**
-
-El motor de vistas en `pkg/core/view.go` procesa el HTML en este orden **secuencial**:
-
-1. `@extends` / `@yield` (herencia de layout)
-2. `@include` (inclusión de sub-vistas)
-3. **Block Ternaries**: `{{ ($cond) ? { ... } : { ... } }}`  ← **ANTES** de @foreach
-4. **`@foreach($list as $item) ... @endforeach`**
-5. Helpers: `{{ csrf_field() }}`, `{{ __('key') }}`
-6. Simple expressions: `{{ $var }}`, `{{ $expr }}`
-
-**Consecuencia directa**: Cualquier `{{ ($item["key"]) ? {...} : {...} }}` dentro de un bloque `@foreach` **FALLARÁ** porque los Block Ternaries se evalúan **antes** de que el loop inyecte `$item`.
-
-**⚠️ PROHIBICIÓN DE @if**: El motor de vistas **NO SOPORTA** `@if`, `@else` o `@endif`. Estos deben reemplazarse siempre por **Block Ternaries** `{{ ($cond) ? { ... } : { ... } }}`.
-
-**Solución correcta (@foreach)**: Precomputar campos condicionales en el **controller** y pasarlos como campos del item:
-```joss
-// En el controller, ANTES de pasarlos a la vista:
-foreach ($items as $item) {
-    $item["is_online_label"] = ($item["is_online"]) ? "<span class=\"...\">Online</span>" : "<span class=\"...\">Offline</span>"
-}
-```
-Y en la vista usar `{{ $item.is_online_label }}` (dot notation, no bracket dentro de @foreach).
-
-**Notación de acceso en @foreach**: Dentro de @foreach, el motor soporta 3 estilos:
-1. `{{ $item.key }}` — dot notation ✅
-2. `{{ $item['key'] }}` — bracket single quote ✅
-3. `{{ $item["key"] }}` — bracket double quote ✅
-
-**FUERA de @foreach** (en `{{ expr }}`), se usa el evaluador JOSS completo.
-
-### 11. Auth::user() — Tipo de Retorno (Sesión 22/02/2026)
-
-- `Auth::user()` retorna `&Instance{Fields: map[string]interface{}}` — **NO un mapa**.
-- **Acceso correcto**: `$u->id`, `$u->username`, `$u->email`, `$u->role`, `$u->user_token`, `$u->name`, etc.
-- **Acceso INCORRECTO** (causa panic "No se puede indexar"): `$u["id"]`, `$u["username"]`, etc.
-- **Campos disponibles**: `id`, `username`, `first_name`, `last_name`, `full_name`, `email`, `phone`, `role_id`, `role`, `user_token`, `created_at`, `name`.
-- **Para el ID**: preferir `Auth::id()` que es directo y seguro.
-- **En vistas (templates)**: el motor reemplaza `{{ $auth_user }}`, `{{ $auth_role }}`, `{{ $auth_email }}` automáticamente desde la sesión.
-- **⚠️ NUNCA pasar `Auth::user()` directamente a `View::render()`**: el evaluador de plantillas no puede acceder a campos de un `*Instance` con `{{ $user.name }}` — renderiza el puntero Go completo (`&{<nil> map[...]}`). En su lugar, extraer los campos antes:
-
-```joss
-// ❌ MAL — $user es *Instance, {{ $user.name }} falla
-return View::render("dashboard.index", {"user": Auth::user()})
-
-// ✅ CORRECTO — extraer campos individuales
-$u = Auth::user()
-return View::render("dashboard.index", {
-    "user_name":  $u->name,
-    "user_email": $u->email,
-    "role":       $u->role
-})
+```text
+.joss → lexer → parser Pratt → AST → semantic analyzer → diagnostics
+                                      ↓ sin errores
+                                intérprete/runtime Go
 ```
 
-### 12. Declaración de Variables en JOSS (Sesión 22/02/2026)
+- `pkg/parser`: tokens, lexer, parser y AST.
+- `pkg/typesystem`: tipos canónicos, aliases, asignabilidad, inferencia y coerción.
+- `pkg/analyzer`: scopes, símbolos, firmas, inferencia de expresiones y flujo.
+- `pkg/diagnostics`: formato estructurado de errores y warnings.
+- `pkg/core`: intérprete, runtime y clases/built-ins integrados; adapta sus registros al analyzer.
+- `pkg/bytecode`: AST serializado y comprimido, no IR de código máquina.
+- `pkg/pluginruntime`, `pkg/pluginpkg`, `pkg/plugincompiler`: runtime, paquetes y JPBC de plugins.
+- `cmd/joss`: CLI y orquestación del proyecto.
+- `vscode-joss`: LSP; consume el catálogo generado del lenguaje.
 
-- `$x = expr` — **USAR SIEMPRE** para asignación simple (dinámica sin comprobación estricta de tipo).
-- `tipo $x [= expr]` — Declaración tipada (e.g., `int $x = 5`, `string $nom`). Omitir el `=` asigna el valor cero (e.g. `0` para `int`).
-- Multi-declaración separada por comas: `int $a, $b = 5, $c` o `string $x="hola", $y="mundo"`. 
-- **Auto-conversión de Strings:** Si una variable está fuertemente tipada como `int` o `float` y se le asigna un `string` que contiene un número (ej. valores de `Console::input()`), el runtime intentará auto-convertirlo al tipo correcto antes de fallar con un *Error de Tipado*.
-- `var $x = expr` — **EVITAR**: Equivale a tipado estricto pero intenta inferir el tipo y puede causar problemas. No usar en plantillas generadas.
+La dirección de dependencias es `parser/typesystem/diagnostics → analyzer → core adapter`. `pkg/analyzer` no debe importar `pkg/core`.
 
-### 13. Clases Estáticas — Sintaxis (Sesión 22/02/2026)
+## Fuentes de verdad que no deben duplicarse
 
-Todas las llamadas a clases nativas usan `::` nunca `.`:
-- `View::render()`, `Math::ceil()`, `Str::length()`, `JSON::parse()`, `JSON::encode()`, `JSON::stringify()`
-- `UUID::v4()`, `System::env()`, `System::Run()`, `System::log()`
-- `Response::redirect()`, `Response::json()`, `Response::error()`, `Response::raw()`
-- `Auth::user()`, `Auth::id()`, `Auth::check()`, `Auth::guest()`, `Auth::attempt()`
-- `Router::get()`, `Router::post()`, `Router::ws()`, `Router::group()`, `Router::middleware()`
-- `Request::input()`, `Request::file()`, `Request::root()`
+- Keywords: tabla de tokens de `pkg/parser/token.go`, proyectada por `parser.KeywordNames()`.
+- Tipos, aliases y compatibilidad: `pkg/typesystem`.
+- Built-ins globales: `pkg/core/builtins.go`; toda entrada debe tener un caso real en el dispatcher.
+- Clases y métodos nativos: registros ejecutados por `Runtime.RegisterNativeClasses()`; usar `GetNativeClassMethods()` para inspección.
+- Plugins: índice `pluginpkg.SymbolIndex` del paquete `.jp`.
+- Diagnósticos: `diagnostics.Diagnostic` y códigos estables del analyzer.
+- VS Code: `vscode-joss/src/server/generated/languageCatalog.json`, generado por `go run ./tools/cataloggen`; nunca editarlo manualmente.
 
-Instancias en cambio usan `->`: `$model->where()->get()`, `$req->input()`, etc.
+## Semántica de variables y tipos
 
-### 14. Sintaxis de Control de Flujo (Sesión 22/02/2026)
+- `$x = 1`: la primera asignación declara e infiere `int`; las siguientes deben ser compatibles.
+- `var $x = 1`: inferencia explícita, también fija.
+- `int $x = 1` o `let int $x = 1`: tipo explícito.
+- `let $x = 1`: `mixed` explícito; permite cambiar de tipo.
+- Una inicialización `nil` pospone la inferencia hasta un valor concreto.
+- La coerción de string a número/bool debe ser completa y sin pérdida; use `typesystem.CoerceString` tanto en análisis como en runtime.
+- Los parámetros tipados conservan su tipo durante el cuerpo.
+- No existen todavía `const`, nullables, unions ni tipos de retorno declarados.
 
-- **NO usar `if/else`**: JOSS usa **ternarios** para control de flujo: `(cond) ? { ... } : { ... }`
-- **`return` dentro de ternarios** funciona correctamente (bubble-up implementado).
-- **`foreach`** para bucles: `foreach ($list as $item) { ... }`
-- **`empty($x)`** e **`isset($x)`** son funciones builtin válidas en JOSS.
-- **Operador `??`** (null-coalesce) soportado: `$x ?? "default"`.
+No implemente reglas paralelas en parser, CLI o evaluator. Añada primero la regla y tests a `pkg/typesystem`, después consúmala desde analyzer/runtime.
 
-### 15. Rutas con Closures y CORS (Sesión 16/03/2026)
+## Scopes, símbolos y falsos positivos
 
-- **Closures como handlers de ruta**: El dispatcher (`pkg/core/dispatcher.go`) ahora soporta `*parser.FunctionLiteral` como handler de ruta. Los parámetros dinámicos `{id}` se extraen y se pasan como argumentos a la función.
-  ```joss
-  Router::get("/sound/{id}", function ($id) {
-      return Redirect::to("https://music.youtube.com/watch?v=" . $id, 302)
-  })
-  ```
-- **Clase nativa `Redirect`**: Registrada en `native.go` / `response.go`. Alias PHP-style para `Response::redirect()` que acepta status code explícito.
-  - `Redirect::to($url)` → redirect 302
-  - `Redirect::to($url, 301)` → redirect permanente
-- **CORS_WEB**: Variable de entorno en `env.joss` que controla la política CORS en `handler.go`.
-  - `CORS_WEB=*` → permite cualquier origen (sin `Allow-Credentials` por compatibilidad de browsers).
-  - `CORS_WEB=https://a.com,https://b.com` → whitelist, permite `Allow-Credentials`.
-  - **Sin definir** → CORS completamente deshabilitado (no se envían headers).
-- **Redirect status_code**: El `handler.go` ahora respeta el `status_code` del `WebResponse` en redirects (usa helper `resolveRedirectStatus`), no siempre 302.
+- Funciones, métodos, `Init` y closures tienen scope de callable independiente.
+- Las declaraciones top-level se resuelven en dos pasadas a nivel de proyecto.
+- `foreach` puede reutilizar un binding existente; el runtime lo trata como asignación.
+- `isset` y `empty` consultan existencia y no deben acusar una variable ausente.
+- `unknown` representa falta de información; `mixed` representa dinamismo explícito. Ninguno prueba invalidez.
+- No valide aridad de una API nativa si su firma no está publicada.
+- Sólo emita error de miembro cuando el tipo receptor y la tabla de miembros estén resueltos.
 
+## Cómo añadir una característica
+
+1. Defina la semántica y sus invariantes, contrastándolas con la tesis y el comportamiento actual.
+2. Si cambia sintaxis, añada token/lexer/parser/AST y tests positivos y negativos.
+3. Añada tipos/compatibilidad a `pkg/typesystem` cuando corresponda.
+4. Añada resolución y diagnóstico a `pkg/analyzer`, conservando unidad fuente y scope.
+5. Implemente el mismo contrato en `pkg/core`; el runtime es defensa, no el primer detector.
+6. Actualice el catálogo generado si cambia un símbolo compartido.
+7. Añada regresión e integración, documentación y valide JosSecurity.
+
+## Cómo añadir un tipo
+
+1. Incorpore el `Kind` y alias en `pkg/typesystem`.
+2. Defina `Assignable`, inferencia, conversión y tests de bordes.
+3. Enseñe al analyzer a inferir sus literales/operadores.
+4. Enseñe al runtime a reconocer y validar el mismo tipo usando el paquete común.
+5. Actualice parser sólo si requiere sintaxis nueva.
+6. Regenerar: `go run ./tools/cataloggen`.
+
+## Cómo añadir un diagnóstico
+
+1. Use una familia/código estable `JOSS-...`.
+2. Emita `diagnostics.Diagnostic`, no strings ad hoc.
+3. Incluya severidad, archivo, rango, explicación y sugerencia útil.
+4. Exija evidencia suficiente; una limitación del checker no es error del usuario.
+5. Añada un caso inválido y el caso válido vecino que no debe diagnosticarse.
+6. Documente el código en `docs/DIAGNOSTICOS.md`.
+
+## Convenciones del lenguaje que suelen causar errores
+
+- No hay `if/else`; usar ternarios con bloques. `return` burbujea y permite guard clauses.
+- `foreach`, `while` y `match` son las estructuras soportadas; `await($future)` evita ambigüedad.
+- Clases estáticas usan `::`; instancias usan `->`; concatenación usa `.`.
+- `Auth::user()` retorna `*Instance`: acceder con `$u->id`; preferir `Auth::id()`.
+- No pasar `Auth::user()` directamente a vistas; extraer campos escalares.
+- `GranDB::get()` retorna lista nativa, no JSON string.
+- Uploads están en `$file["content"]`. Binarios deben usar `Response::raw` con `Content-Disposition`.
+- El motor de vistas procesa herencia, includes, ternarios de bloque y luego `@foreach`; no usar un ternario de bloque dependiente del item dentro del loop. Precomputar en controller.
+- Las rutas WebSocket son estáticas; autenticar el JWT manualmente antes de usar la sesión.
+- Los módulos nativos deben preferir `r.Env` sobre `os.Getenv`.
+- Servicios locales deben usar `127.0.0.1` para evitar resolución IPv6 inesperada.
+
+## Plugins y lifecycle
+
+Los plugins declarados en `joss.yaml` o presentes en `plugins/` se cargan automáticamente. `Runtime.Free()` debe borrar `PluginRegistry` junto con símbolos/clases: conservar sólo uno de esos estados rompe la reutilización del pool. Los forks comparten recursos inmutables/seguros y copian variables e instancias; cualquier nuevo estado mutable debe tener una decisión explícita de copia o compartición y un test de concurrencia.
+
+## Comandos de validación
+
+Desde la raíz:
+
+```bash
+gofmt -w <archivos-go-modificados>
+go run ./tools/cataloggen --check
+go vet ./...
+go test ./...
+go test -race ./pkg/parser ./pkg/typesystem ./pkg/analyzer ./pkg/core
+go build ./...
+```
+
+Extensión:
+
+```bash
+cd vscode-joss
+npm ci
+npm run compile
+```
+
+Integración real:
+
+```bash
+go build -o <temporal>/joss ./cmd/joss
+cd ejemplos/Joss-Red-JosSecurity
+<temporal>/joss analyze main.joss
+```
+
+`joss analyze` debe finalizar con código 0 cuando sólo haya warnings. No edite JosSecurity para silenciar un diagnóstico sin comprobar el símbolo contra el runtime real. CI en `.github/workflows/ci.yml` ejecuta estas familias en push y pull request.
+
+## Límites que deben declararse con honestidad
+
+El build principal empaqueta AST serializado con el runner Go y continúa interpretándolo; no hay backend LLVM/Cranelift. Tampoco existen todavía ownership, inmutabilidad por defecto, taint/escape formal, grafo de módulos fuente o tipos de retorno. La tesis combina arquitectura objetivo y estado implementado: no documente una propuesta como funcionalidad terminada.

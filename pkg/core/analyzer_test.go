@@ -61,10 +61,10 @@ func funcionInexistente() {
 		t.Errorf("Expected static analysis issues, got none")
 	}
 
-	// Should warn about $sinUsar being unused
+	// Should warn about $sinUsar being unused using the stable diagnostic code.
 	hasUnusedVarWarning := false
-	for _, w := range report.Warnings {
-		if strings.Contains(w, "$sinUsar") && strings.Contains(w, "nunca se utiliza") {
+	for _, diagnostic := range report.Diagnostics {
+		if diagnostic.Code == "JOSS-LINT-001" && strings.Contains(diagnostic.Message, "$sinUsar") {
 			hasUnusedVarWarning = true
 		}
 	}
@@ -72,10 +72,10 @@ func funcionInexistente() {
 		t.Errorf("Expected warning for unused variable '$sinUsar', got warnings: %v", report.Warnings)
 	}
 
-	// Should report error for $noDeclarada
+	// Should report error for $noDeclarada.
 	hasUndeclaredVarError := false
-	for _, e := range report.Errors {
-		if strings.Contains(e, "$noDeclarada") && strings.Contains(e, "sin haber sido declarada") {
+	for _, diagnostic := range report.Diagnostics {
+		if diagnostic.Code == "JOSS-SYM-001" && strings.Contains(diagnostic.Message, "$noDeclarada") {
 			hasUndeclaredVarError = true
 		}
 	}

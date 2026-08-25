@@ -9,17 +9,17 @@ import (
 
 // Hive binary type IDs (from Hive's FrameHelper source)
 const (
-	hiveTypeNull     = 0
-	hiveTypeInt      = 1
-	hiveTypeDouble   = 2
-	hiveTypeBoolTrue = 5
+	hiveTypeNull      = 0
+	hiveTypeInt       = 1
+	hiveTypeDouble    = 2
+	hiveTypeBoolTrue  = 5
 	hiveTypeBoolFalse = 6
-	hiveTypeString   = 7
-	hiveTypeBytes    = 8
-	hiveTypeList     = 9
-	hiveTypeMap      = 10
-	hiveTypeHiveList = 11
-	hiveTypeSmallInt = 16
+	hiveTypeString    = 7
+	hiveTypeBytes     = 8
+	hiveTypeList      = 9
+	hiveTypeMap       = 10
+	hiveTypeHiveList  = 11
+	hiveTypeSmallInt  = 16
 )
 
 type hiveReader struct {

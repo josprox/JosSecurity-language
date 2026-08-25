@@ -17,9 +17,9 @@ joss build native [os] [arch] [--gui]
 ```
 
 - `server start`: Requiere el punto de entrada `main.joss` e inicia el servidor HTTP multinivel de alto rendimiento.
-- `run [archivo]`: Ejecuta un script `.joss`. Ambos comandos (`run` y `server start`) ejecutan un **análisis estático AST previo en milisegundos**.
-- `analyze [archivo]`: Ejecuta únicamente la inspección estática del código del proyecto (por defecto `main.joss`) reportando variables no declaradas o sin uso y funciones inexistentes sin iniciar la aplicación.
-- `build native [os] [arch]`: Compila la aplicación a un binario nativo independiente optimizado (para `windows`, `linux` y `darwin` / macOS). Usa `--gui` para aplicaciones con interfaz de escritorio.
+- `run [archivo]`: Ejecuta un script `.joss` después de analizar el proyecto. Los errores semánticos bloquean la ejecución; los warnings no.
+- `analyze [archivo]`: Analiza la entrada (por defecto `main.joss`) y los `.joss` del proyecto, incluyendo scopes, símbolos, tipos, argumentos, miembros y flujo. Devuelve código distinto de cero si existen errores y conserva archivo/línea/columna. Consulte [ANALIZADOR.md](ANALIZADOR.md).
+- `build native [os] [arch]`: Genera un binario independiente para `windows`, `linux` o `darwin`; empaqueta el AST serializado y el runner Go. No es un backend LLVM/AOT del programa Joss. Usa `--gui` para aplicaciones con interfaz de escritorio.
 - `update`: Busca, descarga y aplica actualizaciones automáticas del CLI, SDK y motor Joss.
 
 ---

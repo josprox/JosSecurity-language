@@ -15,4 +15,3 @@ func singularize(s string) string {
 func isVowel(c byte) bool {
 	return core.IsVowel(c)
 }
-

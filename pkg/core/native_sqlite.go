@@ -8,10 +8,11 @@ import (
 
 // SQLite Native Class Implementation
 // Usage:
-//   $db = new SQLite()
-//   $db->open("temp_backup/song.db")
-//   $songs = $db->query("SELECT * FROM song")
-//   $db->close()
+//
+//	$db = new SQLite()
+//	$db->open("temp_backup/song.db")
+//	$songs = $db->query("SELECT * FROM song")
+//	$db->close()
 func (r *Runtime) executeSQLiteMethod(instance *Instance, method string, args []interface{}) interface{} {
 	if instance == nil {
 		panic("Internal Error: SQLite method called with nil instance")

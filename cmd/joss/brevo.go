@@ -57,4 +57,3 @@ func handleBrevoConfig() {
 		fmt.Println(i18n.Tr("brevoDisabledSuccess"))
 	}
 }
-

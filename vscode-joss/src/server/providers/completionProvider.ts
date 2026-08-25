@@ -6,10 +6,11 @@ import {
 } from 'vscode-languageserver/node';
 import { connection, documents, indexer } from '../server';
 import { nativeCallables, nativeClasses, nativeSignature, NativeCallable } from '../nativeCatalog';
+import languageCatalog from '../generated/languageCatalog.json';
 import { JossSymbol } from '../languageSymbols';
 import { inferReceiverClass } from '../utils/callContext';
 
-const keywords = ['class', 'func', 'return', 'foreach', 'async', 'await', 'try', 'catch', 'throw', 'new', 'let', 'int', 'float', 'string', 'bool', 'array', 'map', 'nil'];
+const keywords = Array.from(new Set([...languageCatalog.keywords, ...languageCatalog.types]));
 
 export function setupCompletionProvider() {
     connection.onCompletion(async (params: TextDocumentPositionParams): Promise<CompletionItem[]> => {

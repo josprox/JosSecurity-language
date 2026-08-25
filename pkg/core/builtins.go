@@ -7,29 +7,30 @@ var (
 	builtinNamesMap  map[string]bool
 )
 
-// builtinList holds all registered Joss built-in functions across date, string, array, async, IO, and web framework helpers.
+// builtinList is the canonical public builtin catalog. Runtime dispatch and
+// static analysis both consult this list; adding a builtin requires adding its
+// implementation and its name here.
 var builtinList = []string{
-	// Output & Execution
-	"echo", "print", "exit", "die", "dump", "dd", "panic", "var_dump", "print_r",
-	// Language constructs & checks
-	"isset", "empty", "len", "is_null", "is_string", "is_numeric", "is_int", "is_bool", "is_object", "is_array", "file_exists",
-	"get_class", "method_exists", "property_exists",
-	// Date & Time
-	"date", "time", "now", "sleep", "microtime", "strtotime",
-	// String functions
-	"str_upper", "str_lower", "str_contains", "str_replace", "str_trim",
-	"str_split", "str_join", "substr", "strlen", "strpos", "sprintf",
-	"strtolower", "strtoupper", "str_ends_with", "str_starts_with", "trim", "md5", "sha1",
-	// Array & Map functions
-	"array_push", "array_pop", "array_shift", "array_unshift",
-	"array_keys", "array_values", "array_merge", "in_array", "count", "intval", "end", "implode", "explode",
-	"head", "tail", "range",
-	// Async & Channels
-	"async", "await", "make_chan", "send", "recv", "close",
-	// IO, HTTP, Web & Framework Utilities
-	"json_encode", "json_decode", "file_get_contents", "file_put_contents",
-	"env", "config", "json", "redirect", "back", "view", "response", "request",
-	"csrf_field", "csrf_token", "route", "url", "asset", "session", "auth",
+	// Arrays, maps and conversion.
+	"isset", "empty", "is_string", "is_numeric", "is_int", "is_integer", "is_float", "is_double",
+	"intval", "floatval", "doubleval", "strval", "boolval", "is_array", "is_null", "len", "count",
+	"keys", "array_keys", "values", "array_values", "explode", "end", "append", "merge", "in_array",
+	"array_key_exists", "array_merge", "array_push", "array_pop", "array_shift", "array_slice", "array_unique",
+	"array_reverse", "array_column",
+	// Async and channels.
+	"async", "await", "make_chan", "close", "send", "recv",
+	// Date and time.
+	"time", "microtime", "date", "strtotime", "now", "sleep", "usleep",
+	// IO, framework helpers and serialization.
+	"env", "config", "view", "json", "back", "response", "request", "session", "redirect", "file_exists",
+	"file_get_contents", "file_put_contents", "unlink", "file_delete", "mkdir", "is_dir", "is_file",
+	"toon_encode", "toon_decode", "toon_verify", "json_encode", "json_decode", "json_verify", "hive_read_box", "run",
+	// Strings, formatting, hashing and numeric helpers.
+	"html_escape", "__", "csrf_field", "print", "echo", "printf", "str_contains", "contains",
+	"str_starts_with", "starts_with", "str_ends_with", "ends_with", "str_replace", "strtolower", "to_lower",
+	"strtoupper", "to_upper", "trim", "ltrim", "rtrim", "substr", "strpos", "implode", "join", "md5", "sha1",
+	"sha256", "base64_encode", "base64_decode", "strlen", "ucfirst", "lcfirst", "ucwords", "str_pad",
+	"str_repeat", "round", "floor", "ceil", "abs", "min", "max", "rand",
 }
 
 func initBuiltinMap() {

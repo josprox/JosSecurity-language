@@ -11,10 +11,15 @@ func (r *Runtime) evaluateAssign(ae *parser.AssignExpression) interface{} {
 
 	if ident, ok := ae.Left.(*parser.Identifier); ok {
 		if expectedType, exists := r.VarTypes[ident.Value]; exists {
-			val = r.coerceToTypedValue(val, expectedType)
-			if !r.checkType(val, expectedType) {
-				fmt.Printf("Error de Tipado: No se puede asignar valor a '%s' (se espera %s)\n", ident.Value, expectedType)
-				return nil
+			if expectedType != "mixed" {
+				val = r.coerceToTypedValue(val, expectedType)
+				if !r.checkType(val, expectedType) {
+					panic(fmt.Sprintf("Error de Tipado: No se puede asignar valor a '%s' (se espera %s)", ident.Value, expectedType))
+				}
+			}
+		} else if _, alreadyExists := r.Variables[ident.Value]; !alreadyExists || r.Variables[ident.Value] == nil {
+			if inferredType := runtimeTypeName(val); inferredType != "" {
+				r.VarTypes[ident.Value] = inferredType
 			}
 		}
 		r.Variables[ident.Value] = val

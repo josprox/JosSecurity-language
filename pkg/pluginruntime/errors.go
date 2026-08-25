@@ -6,12 +6,12 @@ import (
 )
 
 var (
-	ErrInvalidBytecodeHeader = errors.New("pluginruntime: cabecera magica de bytecode no reconocida (esperado JOSSBC2Z o JPBC)")
-	ErrBytecodeTruncated     = errors.New("pluginruntime: archivo de bytecode truncado o incompleto")
-	ErrUnsupportedVersion    = errors.New("pluginruntime: version de formato JPBC no soportada")
-	ErrPluginNotFound        = errors.New("pluginruntime: plugin no encontrado en el registro")
-	ErrFunctionNotFound      = errors.New("pluginruntime: funcion no encontrada en el plugin")
-	ErrPluginAlreadyLoaded   = errors.New("pluginruntime: plugin ya registrado con el mismo nombre y version")
+	ErrInvalidBytecodeHeader  = errors.New("pluginruntime: cabecera magica de bytecode no reconocida (esperado JOSSBC2Z o JPBC)")
+	ErrBytecodeTruncated      = errors.New("pluginruntime: archivo de bytecode truncado o incompleto")
+	ErrUnsupportedVersion     = errors.New("pluginruntime: version de formato JPBC no soportada")
+	ErrPluginNotFound         = errors.New("pluginruntime: plugin no encontrado en el registro")
+	ErrFunctionNotFound       = errors.New("pluginruntime: funcion no encontrada en el plugin")
+	ErrPluginAlreadyLoaded    = errors.New("pluginruntime: plugin ya registrado con el mismo nombre y version")
 	ErrExecutionLimitExceeded = errors.New("pluginruntime: limite de instrucciones excedido (posible bucle infinito)")
 )
 

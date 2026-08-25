@@ -20,7 +20,6 @@ import (
 	"github.com/jossecurity/joss/pkg/pluginpkg"
 )
 
-
 func buildWeb() {
 	fmt.Println("Iniciando compilación WEB de Joss...")
 
@@ -185,7 +184,6 @@ func buildProgram() {
 		fmt.Println("Opción no válida. Cancelando compilación.")
 	}
 }
-
 
 func copyFile(src, dst string) error {
 	in, err := os.Open(src)
@@ -563,7 +561,6 @@ func inspectPackage(filename string) {
 	}
 	fmt.Printf("Archivos internos: %d\n", len(archive.Files))
 }
-
 
 func sortedManifestKeys(values map[string]string) []string {
 	keys := make([]string, 0, len(values))

@@ -100,4 +100,3 @@ func BuildSymbolIndexFromCallables(packageName, version string, classes []Symbol
 		Functions: functions,
 	}
 }
-

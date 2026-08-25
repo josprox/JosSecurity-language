@@ -1,0 +1,91 @@
+name: Joss CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  quality:
+    name: Build, test, vet and analyze
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Check formatting
+        shell: bash
+        run: |
+          files=$(gofmt -l $(find cmd pkg tools -name '*.go' -type f))
+          test -z "$files" || { echo "$files"; exit 1; }
+
+      - name: Check generated language catalog
+        run: go run ./tools/cataloggen --check
+
+      - name: Vet
+        run: go vet ./...
+
+      - name: Test
+        run: go test ./...
+
+      - name: Race-sensitive core tests
+        run: go test -race ./pkg/parser ./pkg/typesystem ./pkg/analyzer ./pkg/core
+
+      - name: Build
+        run: go build ./...
+
+      - name: Analyze committed integration project
+        shell: bash
+        run: |
+          go build -o "$RUNNER_TEMP/joss" ./cmd/joss
+          cd testdata/analyzer-project
+          "$RUNNER_TEMP/joss" analyze
+
+      - name: Analyze external JosSecurity project when available
+        if: ${{ hashFiles('ejemplos/Joss-Red-JosSecurity/main.joss') != '' }}
+        shell: bash
+        run: |
+          cd ejemplos/Joss-Red-JosSecurity
+          "$RUNNER_TEMP/joss" analyze
+
+  windows:
+    name: Windows build and test
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+      - run: go test ./...
+      - run: go build ./...
+
+  vscode:
+    name: VS Code language tooling
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: vscode-joss/package-lock.json
+      - name: Install exact dependencies
+        working-directory: vscode-joss
+        run: npm ci
+      - name: Compile TypeScript
+        working-directory: vscode-joss
+        run: npm run compile

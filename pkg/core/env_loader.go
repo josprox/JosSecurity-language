@@ -194,4 +194,3 @@ func RemoveEnvKey(path, key string) error {
 	}
 	return os.WriteFile(path, []byte(strings.Join(newLines, "\n")), 0644)
 }
-

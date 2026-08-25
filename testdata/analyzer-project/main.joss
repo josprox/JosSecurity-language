@@ -1,0 +1,10 @@
+func total(int $base, int $extra = 1) {
+    return $base + $extra
+}
+
+class Main {
+    Init main() {
+        $value = total(2, 3)
+        echo $value
+    }
+}

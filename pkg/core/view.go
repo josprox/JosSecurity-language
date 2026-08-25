@@ -450,7 +450,7 @@ func (r *Runtime) executeViewMethod(instance *Instance, method string, args []in
 // compileViewToJOSS translates HTML view to JOSS script
 func compileViewToJOSS(htmlStr string) (string, error) {
 	var jossCode strings.Builder
-	
+
 	escapeJossString := func(s string) string {
 		s = strings.ReplaceAll(s, "\\", "\\\\")
 		s = strings.ReplaceAll(s, "\"", "\\\"")
@@ -476,7 +476,7 @@ func compileViewToJOSS(htmlStr string) (string, error) {
 		var code strings.Builder
 		i := 0
 		n := len(str)
-		
+
 		flushText := func(start, end int) {
 			if start >= end {
 				return
@@ -492,11 +492,11 @@ func compileViewToJOSS(htmlStr string) (string, error) {
 			if strings.HasPrefix(str[i:], "@foreach") {
 				if m := reForeachStart.FindStringSubmatch(str[i:]); m != nil {
 					flushText(lastIdx, i)
-					
+
 					listExpr := translateExpr(m[1])
 					itemVar := m[2]
 					fullMatchLen := len(m[0])
-					
+
 					depth := 1
 					j := i + fullMatchLen
 					endIdx := -1
@@ -515,15 +515,15 @@ func compileViewToJOSS(htmlStr string) (string, error) {
 							j++
 						}
 					}
-					
+
 					if endIdx != -1 {
 						innerHtml := str[i+fullMatchLen : endIdx]
 						compiledInner := compileRange(innerHtml)
-						
+
 						code.WriteString(fmt.Sprintf("foreach (%s as $%s) {\n", listExpr, itemVar))
 						code.WriteString(compiledInner)
 						code.WriteString("}\n")
-						
+
 						i = endIdx + 11
 						lastIdx = i
 						continue
@@ -571,17 +571,17 @@ func compileViewToJOSS(htmlStr string) (string, error) {
 												}
 												if closeBraces+1 < n && str[closeBraces] == '}' && str[closeBraces+1] == '}' {
 													flushText(lastIdx, i)
-													
+
 													condExpr := str[condStart:condEnd]
 													trueBody := str[tbStart+1 : tbEnd]
 													falseBody := str[fbStart+1 : fbEnd]
-													
+
 													code.WriteString(fmt.Sprintf("(%s) ? {\n", translateExpr(condExpr)))
 													code.WriteString(compileRange(trueBody))
 													code.WriteString("} : {\n")
 													code.WriteString(compileRange(falseBody))
 													code.WriteString("};\n")
-													
+
 													i = closeBraces + 2
 													lastIdx = i
 													continue
@@ -600,12 +600,12 @@ func compileViewToJOSS(htmlStr string) (string, error) {
 			if strings.HasPrefix(str[i:], "{{!") {
 				if m := reExprRaw.FindStringSubmatch(str[i:]); m != nil {
 					flushText(lastIdx, i)
-					
+
 					expr := strings.TrimSpace(m[1])
 					fullMatchLen := len(m[0])
-					
+
 					code.WriteString(fmt.Sprintf("$__output = $__output . (%s);\n", translateExpr(expr)))
-					
+
 					i += fullMatchLen
 					lastIdx = i
 					continue
@@ -616,12 +616,12 @@ func compileViewToJOSS(htmlStr string) (string, error) {
 			if strings.HasPrefix(str[i:], "{{") {
 				if m := reExprEscaped.FindStringSubmatch(str[i:]); m != nil {
 					flushText(lastIdx, i)
-					
+
 					expr := strings.TrimSpace(m[1])
 					fullMatchLen := len(m[0])
-					
+
 					code.WriteString(fmt.Sprintf("$__output = $__output . html_escape(%s);\n", translateExpr(expr)))
-					
+
 					i += fullMatchLen
 					lastIdx = i
 					continue
@@ -630,7 +630,7 @@ func compileViewToJOSS(htmlStr string) (string, error) {
 
 			i++
 		}
-		
+
 		flushText(lastIdx, n)
 		return code.String()
 	}

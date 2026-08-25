@@ -1,4 +1,7 @@
 import { ParameterInfo } from './languageSymbols';
+import languageCatalog from './generated/languageCatalog.json';
+
+const generatedNativeClasses = languageCatalog.nativeClasses as Record<string, string[]>;
 
 export interface NativeCallable {
     name: string;
@@ -41,7 +44,7 @@ export const nativeCallables: NativeCallable[] = [
     callable('Router', 'put', ['string $path', '$handler'], 'nil', 'Registra una ruta PUT.'),
     callable('Router', 'delete', ['string $path', '$handler'], 'nil', 'Registra una ruta DELETE.'),
     callable('Router', 'match', ['string $methods', 'string $path', '$handler'], 'nil', 'Registra varios métodos HTTP para una ruta.'),
-    callable('Router', 'ws', ['string $path', '$handler'], 'nil', 'Registra una ruta WebSocket; admite parámetros {name}.'),
+    callable('Router', 'ws', ['string $path', '$handler'], 'nil', 'Registra una ruta WebSocket estática; los parámetros deben viajar por query o mensaje inicial.'),
     callable('Router', 'group', ['string $middleware', 'func $callback'], 'nil', 'Ejecuta un grupo de rutas bajo un middleware.'),
     callable('Router', 'middleware', ['string $name'], 'nil', 'Abre un grupo de middleware que se cierra con Router::end().'),
     callable('Router', 'registerMiddleware', ['string $name', 'func $handler'], 'nil', 'Registra un middleware personalizado.'),
@@ -257,32 +260,18 @@ export const nativeCallables: NativeCallable[] = [
     callable('Process', 'stderr_chan', [], 'Channel', 'Devuelve el canal de stderr.', false)
 ];
 
-const registeredNativeMethods: Record<string, string[]> = {
-    Stack: ['push', 'pop', 'peek'], Queue: ['enqueue', 'dequeue', 'peek'],
-    GranDB: ['table', 'select', 'where', 'orWhere', 'whereIn', 'orWhereIn', 'whereNotIn', 'whereNull', 'whereNotNull', 'whereBetween', 'whereNotBetween', 'join', 'innerJoin', 'leftJoin', 'rightJoin', 'get', 'first', 'find', 'value', 'pluck', 'exists', 'doesntExist', 'count', 'sum', 'avg', 'min', 'max', 'insert', 'insertGetId', 'update', 'delete', 'deleteAll', 'truncate', 'orderBy', 'latest', 'oldest', 'inRandomOrder', 'limit', 'offset'],
-    Auth: ['hash', 'complete2FA', 'login', 'create', 'attempt', 'check', 'verify', 'forgotPassword', 'resetPassword', 'resendVerification', 'user', 'guest', 'hasRole', 'id', 'refresh', 'update', 'delete', 'logout', 'validateToken'],
-    AuthLoginResult: ['require2FA', 'onSuccess', 'onChallenge', 'onFail', 'response'],
-    MFA: ['generateTOTP', 'verifyTOTP', 'generateRecoveryCodes', 'verifyRecoveryCode'],
-    TwoFactor: ['verify', 'required'],
-    System: ['env', 'Run', 'load_driver', 'driver_call', 'log', 'sleep', 'now'],
-    Plugin: ['call', 'stream', 'path', 'platform'], Cron: ['schedule'], Task: ['on_request'], View: ['render'],
-    Router: ['get', 'post', 'put', 'delete', 'match', 'api', 'group', 'middleware', 'registerMiddleware', 'end', 'ws'],
-    Redirect: ['to'], Request: ['input', 'post', 'all', 'except', 'root', 'file', 'cookie', 'header'],
-    Response: ['json', 'redirect', 'back', 'error', 'raw', 'stream'], WebResponse: ['with', 'withCookie', 'withHeader', 'status'],
-    WebSocket: ['broadcast', 'send', 'onMessage', 'close'], Schema: ['create', 'table', 'rename', 'drop', 'dropIfExists', 'hasTable', 'hasColumn'],
-    Blueprint: ['id', 'increments', 'integer', 'tinyInteger', 'smallInteger', 'mediumInteger', 'bigInteger', 'unsignedInteger', 'unsignedBigInteger', 'float', 'double', 'decimal', 'char', 'string', 'text', 'mediumText', 'longText', 'date', 'dateTime', 'time', 'timestamp', 'timestamps', 'softDeletes', 'boolean', 'json', 'enum', 'nullable', 'unsigned', 'unique', 'default', 'comment', 'dropColumn', 'renameColumn', 'index', 'uniqueIndex', 'dropIndex', 'foreign', 'references', 'on', 'onDelete', 'onUpdate'],
-    Redis: ['connect', 'set', 'get', 'del'], Migration: [], Middleware: [],
-    Math: ['random', 'floor', 'ceil', 'abs'], Session: ['get', 'put', 'has', 'forget', 'all'], UUID: ['generate', 'v4'],
-    Str: ['length', 'random', 'startsWith', 'substring', 'indexOf', 'contains', 'trim'],
-    UserStorage: ['put', 'get', 'getToFile', 'delete'], SQLite: ['open', 'query', 'close'],
-    Zip: ['extract'], JSON: ['parse', 'stringify', 'decode', 'encode'], Markdown: ['toHtml', 'readFile'],
-    Cache: ['put', 'get', 'has', 'forget'], Stream: ['send', 'close'],
-    Process: ['constructor', 'start', 'wait', 'kill', 'pid', 'stdin', 'stdout_chan', 'stderr_chan'],
-    Server: ['start', 'spawn'], Lang: ['get', 'set', 'locale', 'locales'],
-    SEO: ['title', 'description', 'keywords', 'og', 'canonical', 'meta', 'render'], Sitemap: ['add', 'generate']
-};
+// Signatures enrich the editor, but symbol existence is governed exclusively
+// by the generated runtime catalog. Stale metadata must never expose a method
+// that the current runtime does not register.
+const registeredMetadata = nativeCallables.filter(item => {
+    if (!item.owner) {
+        return languageCatalog.builtins.includes(item.name);
+    }
+    return generatedNativeClasses[item.owner]?.includes(item.name) ?? false;
+});
+nativeCallables.splice(0, nativeCallables.length, ...registeredMetadata);
 
-for (const [owner, methods] of Object.entries(registeredNativeMethods)) {
+for (const [owner, methods] of Object.entries(generatedNativeClasses)) {
     for (const name of methods) {
         if (!nativeCallables.some(item => item.owner === owner && item.name === name)) {
             nativeCallables.push(callable(owner, name, [], 'any', `Método nativo ${owner}::${name}.`));
@@ -290,9 +279,7 @@ for (const [owner, methods] of Object.entries(registeredNativeMethods)) {
     }
 }
 
-const registeredNativeClasses = Object.keys(registeredNativeMethods);
-
-export const nativeClasses = Array.from(new Set([...registeredNativeClasses, ...nativeCallables.map(item => item.owner).filter((owner): owner is string => !!owner)])).sort();
+export const nativeClasses = Object.keys(generatedNativeClasses).sort();
 
 export function nativeSignature(item: NativeCallable): string {
     const owner = item.owner ? `${item.owner}${item.static === false ? '->' : '::'}` : '';

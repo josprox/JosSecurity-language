@@ -1,6 +1,7 @@
 package core
 
 import (
+	"sort"
 	"sync"
 
 	"github.com/jossecurity/joss/pkg/parser"
@@ -36,6 +37,32 @@ func IsNativeClass(name string) bool {
 	nativeClassesMu.RLock()
 	defer nativeClassesMu.RUnlock()
 	return nativeClassesMap[name]
+}
+
+// GetNativeClassMethods returns a detached catalog built by the same
+// registration routine used by Runtime. Tooling generators consume it instead
+// of maintaining a parallel native-class list.
+func GetNativeClassMethods() map[string][]string {
+	runtime := &Runtime{
+		Variables:      make(map[string]interface{}),
+		Classes:        make(map[string]*parser.ClassStatement),
+		NativeHandlers: make(map[string]NativeHandler),
+	}
+	runtime.RegisterNativeClasses()
+	result := make(map[string][]string, len(runtime.Classes))
+	for name, class := range runtime.Classes {
+		methods := []string{}
+		if class != nil && class.Body != nil {
+			for _, statement := range class.Body.Statements {
+				if method, ok := statement.(*parser.MethodStatement); ok && method.Name != nil {
+					methods = append(methods, method.Name.Value)
+				}
+			}
+		}
+		sort.Strings(methods)
+		result[name] = methods
+	}
+	return result
 }
 
 // RegisterNativeClasses injects the native class definitions into the runtime

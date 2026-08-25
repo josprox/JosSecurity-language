@@ -5,6 +5,9 @@ Esta referencia describe el comportamiento implementado en el repositorio. Las A
 ## Lenguaje
 
 - [Sintaxis](SINTAXIS.md)
+- [Sistema de tipos e inferencia](SISTEMA_TIPOS.md)
+- [Arquitectura del lenguaje](ARQUITECTURA.md)
+- [Módulos, archivos e imports](MODULOS_IMPORTS.md)
 - [Concurrencia](CONCURRENCIA.md)
 - [Módulos nativos y builtins](MODULOS_NATIVOS.md)
 - [Estado y límites de implementación](ESTADO_IMPLEMENTACION.md)
@@ -12,6 +15,8 @@ Esta referencia describe el comportamiento implementado en el repositorio. Las A
 ## Desarrollo
 
 - [CLI](CLI.md)
+- [Análisis estático](ANALIZADOR.md) y [diagnósticos](DIAGNOSTICOS.md)
+- [Auditoría técnica y alineación con la tesis](AUDITORIA_TECNICA_2026.md)
 - [Estructura de proyectos](ESTRUCTURA_PROYECTO.md)
 - [Configuración](CONFIGURACION.md)
 - [Controladores y HTTP](CONTROLADORES.md)

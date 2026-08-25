@@ -1,5 +1,7 @@
 package parser
 
+import "sort"
+
 type TokenType string
 
 const (
@@ -21,20 +23,20 @@ const (
 	SLASH    = "/"
 	PERCENT  = "%"
 
-	LT          = "<"
-	GT          = ">"
-	EQ          = "=="
-	NOT_EQ      = "!="
-	STRICT_EQ   = "==="
+	LT            = "<"
+	GT            = ">"
+	EQ            = "=="
+	NOT_EQ        = "!="
+	STRICT_EQ     = "==="
 	STRICT_NOT_EQ = "!=="
-	SPACESHIP   = "<=>"
-	LTE         = "<="
-	GTE         = ">="
-	SHIFT_LEFT  = "<<"
-	SHIFT_RIGHT = ">>"
-	AND         = "&&"
-	OR          = "||"
-	INCREMENT   = "++"
+	SPACESHIP     = "<=>"
+	LTE           = "<="
+	GTE           = ">="
+	SHIFT_LEFT    = "<<"
+	SHIFT_RIGHT   = ">>"
+	AND           = "&&"
+	OR            = "||"
+	INCREMENT     = "++"
 
 	COMMA     = ","
 	SEMICOLON = ";"
@@ -104,6 +106,7 @@ type Token struct {
 	Type    TokenType
 	Literal string
 	Line    int
+	Column  int
 }
 
 var keywords = map[string]TokenType{
@@ -153,4 +156,15 @@ func LookupIdent(ident string) TokenType {
 		return tok
 	}
 	return IDENT
+}
+
+// KeywordNames exposes the lexer registry to tooling generators without
+// requiring another manually maintained keyword list.
+func KeywordNames() []string {
+	result := make([]string, 0, len(keywords))
+	for keyword := range keywords {
+		result = append(result, keyword)
+	}
+	sort.Strings(result)
+	return result
 }

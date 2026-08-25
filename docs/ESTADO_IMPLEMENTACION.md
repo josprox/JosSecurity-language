@@ -4,11 +4,11 @@ Este documento describe capacidades comprobables del código actual de **Joss v3
 
 ## Implementado
 
-- Intérprete Joss, tipos opcionales con coerción automática, clases, herencia (`extends`), modificadores de visibilidad (`public`, `private`, `protected`), métodos estáticos (`static`), funciones `func`, closures, ternarios, `match`, ciclos, excepciones (`try`/`catch`/`throw`), `panic()`, `async`/`await` y canales.
-- **Analizador Estático AST (`joss analyze`)**: Inspección estática automática en `joss run` y `joss server start`, y ejecutable independiente con `joss analyze`.
+- Intérprete Joss, inferencia fija en primera asignación, tipos explícitos, `mixed` explícito mediante `let`, coerción textual sin pérdida, clases, herencia (`extends`), visibilidad, métodos estáticos, funciones `func`, closures, ternarios, `match`, ciclos, excepciones, `async`/`await` y canales.
+- **Analizador semántico (`joss analyze`)**: unidades fuente, scopes por callable, símbolos de proyecto/plugins, inferencia, asignaciones, argumentos, aridad, operadores, índices, miembros conocidos, inalcanzable y diagnósticos estructurados.
 - **Guardias de Sintaxis Educacionales**: Detección amigable de sintaxis foránea (`if`, `else`, `elif`, `switch`, `for`) sugiriendo el operador ternario `$cond ? $a : $b`, `match`, `while` y `foreach`.
 - **Sandbox WASI y Permisos en Plugins (`PermissionGuard`)**: Control granular de permisos para I/O, red y variables de entorno (`http_get`, `file_read`, `env_read`, `db_query`) en la máquina virtual `JPBCVM`.
-- **Registro Centralizado de Builtins (`pkg/core/builtins.go`)**: Registro único y canónico para funciones integradas del lenguaje.
+- **Fuentes canónicas**: built-ins en `pkg/core/builtins.go`, clases desde el registro nativo real, tipos en `pkg/typesystem` y catálogo del editor generado por `tools/cataloggen`.
 - Motor de plantillas y vistas (`View::render`, `View::exists`, `View::share`, directiva `@json()`, `@foreach` anidado sobre arrays asociativos/expresiones complejas, comentarios `{{-- --}}`, layouts con `@extends` y `@yield`).
 - Aplicaciones web y de consola, rutas HTTP y WebSocket dinámicas (`Router::any`, `Router::query`, `Router::match`), respuestas JSON/raw/stream, sesiones persistentes, CSRF, CORS, rate limit configurable y TLS integrado.
 - Cliente HTTP nativo universal (`Http::get`, `Http::post`, `Http::put`, `Http::patch`, `Http::delete`, `Http::head`, `Http::options`, `Http::query`, `Http::json`, `Http::request`).
@@ -24,3 +24,13 @@ Este documento describe capacidades comprobables del código actual de **Joss v3
 - `func` es la forma canónica. `function` sigue aceptándose para no romper código anterior.
 - Los plugins declarados en `joss.yaml` o presentes en `plugins/` se cargan automáticamente sin necesidad de `use` ni `import`.
 - Los plugins se ejecutan dentro del runtime de Joss con acceso seguro al entorno del proyecto (`r.Env`) y límites de instrucciones para evitar loops infinitos.
+
+## No implementado todavía
+
+- Declaraciones `const`, tipos nullable/union y anotaciones de retorno.
+- Ownership, inmutabilidad por defecto, taint/escape formal o análisis sensible a ramas.
+- Grafo de imports de fuentes y detección de ciclos; `import`, `use` y `@import` están obsoletos.
+- Backend LLVM/Cranelift o AOT a código máquina para el lenguaje principal. `pkg/bytecode` serializa el AST; JPBC pertenece al pipeline separado de plugins.
+- Firmas nativas completas con tipos de retorno, necesarias para inferir con precisión todas las cadenas de miembros.
+
+Consulte [Arquitectura](ARQUITECTURA.md), [Sistema de tipos](SISTEMA_TIPOS.md) y [Auditoría técnica](AUDITORIA_TECNICA_2026.md).

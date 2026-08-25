@@ -146,7 +146,10 @@ func (p *Parser) parseStatement() Statement {
 		}
 		if p.peekToken.Type == VAR {
 			typeTok := Token{Type: IDENT, Literal: "mixed", Line: p.curToken.Line}
-			p.nextToken() // move to VAR ($name)
+			p.nextToken() // move to VAR ($)
+			if !p.expectPeek(IDENT) {
+				return nil
+			}
 			name := &Identifier{Token: p.curToken, Value: p.curToken.Literal}
 			var value Expression
 			if p.peekToken.Type == ASSIGN {

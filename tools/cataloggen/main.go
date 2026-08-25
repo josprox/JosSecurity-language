@@ -1,0 +1,54 @@
+package main
+
+import (
+	"encoding/json"
+	"flag"
+	"fmt"
+	"os"
+	"path/filepath"
+	"sort"
+
+	"github.com/jossecurity/joss/pkg/core"
+	"github.com/jossecurity/joss/pkg/parser"
+	"github.com/jossecurity/joss/pkg/typesystem"
+)
+
+type languageCatalog struct {
+	Schema        int                 `json:"schema"`
+	Keywords      []string            `json:"keywords"`
+	Types         []string            `json:"types"`
+	Builtins      []string            `json:"builtins"`
+	NativeClasses map[string][]string `json:"nativeClasses"`
+}
+
+func main() {
+	output := flag.String("output", filepath.FromSlash("vscode-joss/src/server/generated/languageCatalog.json"), "catalog output path")
+	check := flag.Bool("check", false, "fail if the generated catalog differs from disk")
+	flag.Parse()
+
+	builtins := core.GetBuiltinFunctionNames()
+	sort.Strings(builtins)
+	catalog := languageCatalog{
+		Schema: 1, Keywords: parser.KeywordNames(), Types: typesystem.SourceTypeNames(),
+		Builtins: builtins, NativeClasses: core.GetNativeClassMethods(),
+	}
+	encoded, err := json.MarshalIndent(catalog, "", "  ")
+	if err != nil {
+		panic(err)
+	}
+	encoded = append(encoded, '\n')
+	if *check {
+		existing, err := os.ReadFile(*output)
+		if err != nil || string(existing) != string(encoded) {
+			fmt.Fprintf(os.Stderr, "language catalog is stale; run go run ./tools/cataloggen\n")
+			os.Exit(1)
+		}
+		return
+	}
+	if err := os.MkdirAll(filepath.Dir(*output), 0o755); err != nil {
+		panic(err)
+	}
+	if err := os.WriteFile(*output, encoded, 0o644); err != nil {
+		panic(err)
+	}
+}

@@ -8,80 +8,11 @@ import (
 )
 
 func (r *Runtime) CallMethod(method *parser.MethodStatement, instance *Instance, args []parser.Expression) (res interface{}) {
-	// Native Method Support
-	if method.Body == nil {
-		evalArgs := []interface{}{}
-		for _, arg := range args {
-			evalArgs = append(evalArgs, r.evaluateExpression(arg))
-		}
-
-		// Check for Static Class Call
-		if instance == nil {
-			return nil
-		}
-
-		return r.executeNativeMethod(instance, method.Name.Value, evalArgs)
+	evaluated := make([]interface{}, 0, len(args))
+	for _, argument := range args {
+		evaluated = append(evaluated, r.evaluateExpression(argument))
 	}
-
-	// Save previous "this" if exists (for nested calls)
-	prevThis := r.Variables["this"]
-	_, previousThisExists := r.Variables["this"]
-	if instance != nil {
-		r.Variables["this"] = instance
-	}
-	previousCaptureEnvironment := r.captureEnvironment
-	r.captureEnvironment = nil
-
-	// Bind arguments
-	previousParams := make(map[string]interface{}, len(method.Parameters))
-	previousParamExists := make(map[string]bool, len(method.Parameters))
-	for i, param := range method.Parameters {
-		previousParams[param.Name.Value], previousParamExists[param.Name.Value] = r.Variables[param.Name.Value]
-		if i < len(args) {
-			val := r.evaluateExpression(args[i])
-			if param.Type.Literal != "" {
-				val = r.coerceToTypedValue(val, param.Type.Literal)
-				if !r.checkType(val, param.Type.Literal) {
-					panic(fmt.Sprintf("Type Error: El argumento %d ($%s) debe ser de tipo %s, se recibió %T", i+1, param.Name.Value, param.Type.Literal, val))
-				}
-			}
-			r.Variables[param.Name.Value] = val
-		} else if param.DefaultValue != nil {
-			r.Variables[param.Name.Value] = r.evaluateExpression(param.DefaultValue)
-		} else {
-			r.Variables[param.Name.Value] = nil
-		}
-	}
-
-	defer func() {
-		r.captureEnvironment = previousCaptureEnvironment
-		if instance != nil {
-			if previousThisExists {
-				r.Variables["this"] = prevThis
-			} else {
-				delete(r.Variables, "this")
-			}
-		}
-		for _, param := range method.Parameters {
-			if previousParamExists[param.Name.Value] {
-				r.Variables[param.Name.Value] = previousParams[param.Name.Value]
-			} else {
-				delete(r.Variables, param.Name.Value)
-			}
-		}
-	}()
-
-	defer func() {
-		if p := recover(); p != nil {
-			if rp, ok := p.(*ReturnPanic); ok {
-				res = rp.Value
-			} else {
-				panic(p)
-			}
-		}
-	}()
-
-	return r.executeBlock(method.Body)
+	return r.CallMethodEvaluated(method, instance, evaluated)
 }
 
 func (r *Runtime) CallMethodEvaluated(method *parser.MethodStatement, instance *Instance, args []interface{}) (res interface{}) {
@@ -89,6 +20,15 @@ func (r *Runtime) CallMethodEvaluated(method *parser.MethodStatement, instance *
 	if method.Body == nil {
 		return r.executeNativeMethod(instance, method.Name.Value, args)
 	}
+	required := 0
+	for _, parameter := range method.Parameters {
+		if parameter.DefaultValue == nil {
+			required++
+		}
+	}
+	if len(args) < required || len(args) > len(method.Parameters) {
+		panic(fmt.Sprintf("Arity Error: %s() espera entre %d y %d argumentos, se recibieron %d", method.Name.Value, required, len(method.Parameters), len(args)))
+	}
 
 	// Save previous "this" if exists (for nested calls)
 	prevThis := r.Variables["this"]
@@ -102,24 +42,12 @@ func (r *Runtime) CallMethodEvaluated(method *parser.MethodStatement, instance *
 	// Bind arguments
 	previousParams := make(map[string]interface{}, len(method.Parameters))
 	previousParamExists := make(map[string]bool, len(method.Parameters))
-	for i, param := range method.Parameters {
+	previousParamTypes := make(map[string]string, len(method.Parameters))
+	previousParamTypeExists := make(map[string]bool, len(method.Parameters))
+	for _, param := range method.Parameters {
 		previousParams[param.Name.Value], previousParamExists[param.Name.Value] = r.Variables[param.Name.Value]
-		if i < len(args) {
-			val := args[i]
-			if param.Type.Literal != "" {
-				val = r.coerceToTypedValue(val, param.Type.Literal)
-				if !r.checkType(val, param.Type.Literal) {
-					panic(fmt.Sprintf("Type Error: El argumento %d ($%s) debe ser de tipo %s, se recibió %T", i+1, param.Name.Value, param.Type.Literal, val))
-				}
-			}
-			r.Variables[param.Name.Value] = val
-		} else if param.DefaultValue != nil {
-			r.Variables[param.Name.Value] = r.evaluateExpression(param.DefaultValue)
-		} else {
-			r.Variables[param.Name.Value] = nil
-		}
+		previousParamTypes[param.Name.Value], previousParamTypeExists[param.Name.Value] = r.VarTypes[param.Name.Value]
 	}
-
 	defer func() {
 		r.captureEnvironment = previousCaptureEnvironment
 		if instance != nil {
@@ -135,8 +63,41 @@ func (r *Runtime) CallMethodEvaluated(method *parser.MethodStatement, instance *
 			} else {
 				delete(r.Variables, param.Name.Value)
 			}
+			if previousParamTypeExists[param.Name.Value] {
+				r.VarTypes[param.Name.Value] = previousParamTypes[param.Name.Value]
+			} else {
+				delete(r.VarTypes, param.Name.Value)
+			}
 		}
 	}()
+	for i, param := range method.Parameters {
+		declaredType := param.Type.Literal
+		if declaredType == "" {
+			declaredType = "mixed"
+		}
+		r.VarTypes[param.Name.Value] = declaredType
+		var val interface{}
+		if i < len(args) {
+			val = args[i]
+			if param.Type.Literal != "" {
+				val = r.coerceToTypedValue(val, param.Type.Literal)
+				if !r.checkType(val, param.Type.Literal) {
+					panic(fmt.Sprintf("Type Error: El argumento %d ($%s) debe ser de tipo %s, se recibió %T", i+1, param.Name.Value, param.Type.Literal, val))
+				}
+			}
+		} else if param.DefaultValue != nil {
+			val = r.evaluateExpression(param.DefaultValue)
+			if param.Type.Literal != "" {
+				val = r.coerceToTypedValue(val, param.Type.Literal)
+				if !r.checkType(val, param.Type.Literal) {
+					panic(fmt.Sprintf("Type Error: El valor por defecto de $%s debe ser de tipo %s, se recibió %T", param.Name.Value, param.Type.Literal, val))
+				}
+			}
+		} else {
+			val = nil
+		}
+		r.Variables[param.Name.Value] = val
+	}
 
 	defer func() {
 		if p := recover(); p != nil {
@@ -324,6 +285,9 @@ func (r *Runtime) CallFunction(fn interface{}, args []interface{}) interface{} {
 
 // callBuiltin dispatches to domain-specific built-in handlers
 func (r *Runtime) callBuiltin(name string, args []interface{}) (interface{}, bool) {
+	if !IsBuiltin(name) {
+		return nil, false
+	}
 	// 1. Date & Time Builtins
 	if res, ok := r.callBuiltinDate(name, args); ok {
 		return res, true
@@ -349,5 +313,5 @@ func (r *Runtime) callBuiltin(name string, args []interface{}) (interface{}, boo
 		return res, true
 	}
 
-	return nil, false
+	panic(fmt.Sprintf("internal error: builtin %q is catalogued without a runtime handler", name))
 }

@@ -236,4 +236,3 @@ func Tr(key string, args ...map[string]interface{}) string {
 	}
 	return GlobalManager.Get(CurrentLocale, key, arg)
 }
-

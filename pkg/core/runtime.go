@@ -117,14 +117,14 @@ func (r *Runtime) Free() {
 	for k := range r.NativeDrivers {
 		delete(r.NativeDrivers, k)
 	}
+	// PluginRegistry owns symbol tables whose host context is this Runtime.
+	// Keeping it while clearing Variables/Classes makes a recycled runtime skip
+	// plugin registration because the archive still appears to be loaded.
+	r.PluginRegistry = nil
 	// Restore standard variables
 	r.Variables["cout"] = &Cout{}
 	r.Variables["cin"] = &Cin{}
 
-	// Keep Env, Classes, Functions, Routes as they are likely static or re-loaded?
-	// If Routes are dynamic per request (e.g. defined in routes.joss which is parsed every time?), then we should clear them.
-	// But parsing every time is slow.
-	// We should also clear CurrentMiddleware
 	r.CurrentMiddleware = r.CurrentMiddleware[:0]
 	for k := range r.importedFiles {
 		delete(r.importedFiles, k)

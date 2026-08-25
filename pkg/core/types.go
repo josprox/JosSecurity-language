@@ -10,7 +10,6 @@ import (
 )
 
 // NativeHandler is a function that executes a native method
-// NativeHandler is a function that executes a native method
 type NativeHandler func(r *Runtime, instance *Instance, method string, args []interface{}) interface{}
 
 // SEOData stores metadata for search engine optimization

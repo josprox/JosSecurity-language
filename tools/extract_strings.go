@@ -31,17 +31,17 @@ func main() {
 
 	// Target function calls for user-facing output
 	targetFuncs := map[string]bool{
-		"Println":       true,
-		"Printf":        true,
-		"Print":         true,
-		"Errorf":        true,
-		"New":           true,
-		"ReadString":    true,
-		"WriteFile":     true,
-		"Write":         true,
-		"Fatal":         true,
-		"Fatalf":        true,
-		"Fatalln":       true,
+		"Println":    true,
+		"Printf":     true,
+		"Print":      true,
+		"Errorf":     true,
+		"New":        true,
+		"ReadString": true,
+		"WriteFile":  true,
+		"Write":      true,
+		"Fatal":      true,
+		"Fatalf":     true,
+		"Fatalln":    true,
 	}
 
 	reClean := regexp.MustCompile(`[^a-zA-Z0-9]+`)

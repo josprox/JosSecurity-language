@@ -396,4 +396,3 @@ func LoadOrCreateSigningKey(pluginName string) (ed25519.PrivateKey, string, erro
 	}
 	return privateKey, keyPath, nil
 }
-

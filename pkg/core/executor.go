@@ -114,14 +114,21 @@ func (r *Runtime) executeStatement(stmt parser.Statement) interface{} {
 		var val interface{}
 		if s.Value != nil {
 			val = r.evaluateExpression(s.Value)
-			val = r.coerceToTypedValue(val, s.Token.Literal)
+			if s.Token.Literal != "var" {
+				val = r.coerceToTypedValue(val, s.Token.Literal)
+			}
 		} else {
 			val = r.getZeroValue(s.Token.Literal)
 		}
 
-		// Strict Typing: Store type
-		r.VarTypes[s.Name.Value] = s.Token.Literal
-		if !r.checkType(val, s.Token.Literal) {
+		declaredType := s.Token.Literal
+		if declaredType == "var" {
+			declaredType = runtimeTypeName(val)
+		}
+		if declaredType != "" {
+			r.VarTypes[s.Name.Value] = declaredType
+		}
+		if declaredType != "" && !r.checkType(val, declaredType) {
 			panic(fmt.Sprintf("Error de Tipado: Variable '%s' definida como '%s' pero asignada valor incompatible", s.Name.Value, s.Token.Literal))
 		}
 		r.Variables[s.Name.Value] = val
@@ -131,12 +138,20 @@ func (r *Runtime) executeStatement(stmt parser.Statement) interface{} {
 			var val interface{}
 			if decl.Value != nil {
 				val = r.evaluateExpression(decl.Value)
-				val = r.coerceToTypedValue(val, s.TypeToken.Literal)
+				if s.TypeToken.Literal != "var" {
+					val = r.coerceToTypedValue(val, s.TypeToken.Literal)
+				}
 			} else {
 				val = r.getZeroValue(s.TypeToken.Literal)
 			}
-			r.VarTypes[decl.Name.Value] = s.TypeToken.Literal
-			if !r.checkType(val, s.TypeToken.Literal) {
+			declaredType := s.TypeToken.Literal
+			if declaredType == "var" {
+				declaredType = runtimeTypeName(val)
+			}
+			if declaredType != "" {
+				r.VarTypes[decl.Name.Value] = declaredType
+			}
+			if declaredType != "" && !r.checkType(val, declaredType) {
 				panic(fmt.Sprintf("Error de Tipado: Variable '%s' definida como '%s' pero asignada valor incompatible", decl.Name.Value, s.TypeToken.Literal))
 			}
 			r.Variables[decl.Name.Value] = val

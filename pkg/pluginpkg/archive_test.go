@@ -95,7 +95,7 @@ func TestBuildSignedDeterminism(t *testing.T) {
 		"bytecode/main.jbc": []byte("deterministic content A"),
 		SymbolsPath:         []byte(`{"schema":1}`),
 		"joss.yaml":         []byte("name: test/deterministic\nversion: 2.1.0\n"),
-		"README.md":          []byte("# Deterministic Test"),
+		"README.md":         []byte("# Deterministic Test"),
 	}
 
 	build1, err := BuildSigned(metadata, files, privateKey)

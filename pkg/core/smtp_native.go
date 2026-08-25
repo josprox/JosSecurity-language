@@ -109,7 +109,7 @@ func (r *Runtime) sendSmtpClientMail(instance *Instance, to, subject, body strin
 		timeoutSec = t
 	}
 
-	addr := fmt.Sprintf("%s:%s", host, port)
+	addr := net.JoinHostPort(host, port)
 
 	var client *smtp.Client
 	var err error

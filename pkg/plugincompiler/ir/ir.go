@@ -97,7 +97,6 @@ func (m *IRModule) Validate() error {
 	return nil
 }
 
-
 // IRStruct define una estructura/clase en el IR.
 type IRStruct struct {
 	Name   string

@@ -1,0 +1,443 @@
+package analyzer
+
+import (
+	"fmt"
+	"sort"
+	"strings"
+
+	"github.com/jossecurity/joss/pkg/diagnostics"
+	"github.com/jossecurity/joss/pkg/parser"
+	"github.com/jossecurity/joss/pkg/typesystem"
+)
+
+type functionDeclaration struct {
+	callable Callable
+	token    parser.Token
+	file     string
+}
+
+type Analyzer struct {
+	environment       Environment
+	diagnostics       diagnostics.Bag
+	functions         map[string]functionDeclaration
+	classes           map[string]Class
+	classTokens       map[string]functionDeclaration
+	file              string
+	currentClass      string
+	suppressUndefined int
+}
+
+func Analyze(units []SourceUnit, environment Environment) []diagnostics.Diagnostic {
+	a := &Analyzer{
+		environment: environment,
+		functions:   make(map[string]functionDeclaration),
+		classes:     make(map[string]Class),
+		classTokens: make(map[string]functionDeclaration),
+	}
+	for name, class := range environment.Classes {
+		a.classes[name] = class
+	}
+	a.collectDeclarations(units)
+	a.analyzeUnits(units)
+	items := a.diagnostics.Items()
+	sort.SliceStable(items, func(i, j int) bool {
+		if items[i].File != items[j].File {
+			return items[i].File < items[j].File
+		}
+		if items[i].Range.Start.Line != items[j].Range.Start.Line {
+			return items[i].Range.Start.Line < items[j].Range.Start.Line
+		}
+		if items[i].Range.Start.Column != items[j].Range.Start.Column {
+			return items[i].Range.Start.Column < items[j].Range.Start.Column
+		}
+		return items[i].Code < items[j].Code
+	})
+	return items
+}
+
+func (a *Analyzer) collectDeclarations(units []SourceUnit) {
+	for _, unit := range units {
+		if unit.Program == nil {
+			continue
+		}
+		for _, statement := range unit.Program.Statements {
+			switch node := statement.(type) {
+			case *parser.MethodStatement:
+				a.declareFunction(node, unit.Path)
+			case *parser.ClassStatement:
+				a.declareClass(node, unit.Path)
+			}
+		}
+	}
+}
+
+func (a *Analyzer) declareFunction(method *parser.MethodStatement, file string) {
+	if method == nil || method.Name == nil {
+		return
+	}
+	name := method.Name.Value
+	if previous, exists := a.functions[name]; exists {
+		a.add("JOSS-DECL-001", diagnostics.SeverityError, file, method.Name.Token,
+			fmt.Sprintf("Function `%s` is already declared at %s:%d.", name, previous.file, previous.token.Line),
+			"Each project-level function must have a unique name.", "Rename or remove one declaration.")
+		return
+	}
+	a.functions[name] = functionDeclaration{callable: callableFromMethod(method), token: method.Name.Token, file: file}
+}
+
+func (a *Analyzer) declareClass(classNode *parser.ClassStatement, file string) {
+	if classNode == nil || classNode.Name == nil {
+		return
+	}
+	name := classNode.Name.Value
+	if previous, exists := a.classes[name]; exists {
+		where := "the runtime environment"
+		if declaration, ok := a.classTokens[name]; ok {
+			where = fmt.Sprintf("%s:%d", declaration.file, declaration.token.Line)
+		} else if previous.Name != "" {
+			where = "a native or plugin class"
+		}
+		a.add("JOSS-DECL-002", diagnostics.SeverityError, file, classNode.Name.Token,
+			fmt.Sprintf("Class `%s` conflicts with %s.", name, where),
+			"Class names share one project-wide namespace.", "Choose a unique class name.")
+		return
+	}
+	class := Class{Name: name, Methods: make(map[string]Callable)}
+	if classNode.SuperClass != nil {
+		class.SuperClass = classNode.SuperClass.Value
+	}
+	if classNode.Body != nil {
+		for _, member := range classNode.Body.Statements {
+			var methodName string
+			var callable Callable
+			var token parser.Token
+			switch method := member.(type) {
+			case *parser.MethodStatement:
+				if method.Name == nil {
+					continue
+				}
+				methodName, callable, token = method.Name.Value, callableFromMethod(method), method.Name.Token
+			case *parser.InitStatement:
+				if method.Name == nil {
+					continue
+				}
+				methodName = method.Name.Value
+				callable = Callable{Name: methodName, Parameters: parametersFromAST(method.Parameters), ReturnType: typesystem.Type{Kind: typesystem.Unknown}}
+				token = method.Name.Token
+			default:
+				continue
+			}
+			if _, exists := class.Methods[methodName]; exists {
+				a.add("JOSS-DECL-003", diagnostics.SeverityError, file, token,
+					fmt.Sprintf("Method `%s::%s` is declared more than once.", name, methodName),
+					"A class cannot contain duplicate method names.", "Rename or remove one method.")
+				continue
+			}
+			class.Methods[methodName] = callable
+		}
+	}
+	a.classes[name] = class
+	a.classTokens[name] = functionDeclaration{token: classNode.Name.Token, file: file}
+}
+
+func callableFromMethod(method *parser.MethodStatement) Callable {
+	return Callable{
+		Name:       method.Name.Value,
+		Parameters: parametersFromAST(method.Parameters),
+		ReturnType: typesystem.Type{Kind: typesystem.Unknown},
+	}
+}
+
+func parametersFromAST(parameters []*parser.Parameter) []Parameter {
+	result := make([]Parameter, 0, len(parameters))
+	for _, parameter := range parameters {
+		if parameter == nil || parameter.Name == nil {
+			continue
+		}
+		parameterType := typesystem.Type{Kind: typesystem.Mixed}
+		if parameter.Type.Literal != "" && parameter.Type.Type != parser.VAR {
+			parameterType = typesystem.Parse(parameter.Type.Literal)
+		}
+		result = append(result, Parameter{Name: parameter.Name.Value, Type: parameterType, HasDefault: parameter.DefaultValue != nil})
+	}
+	return result
+}
+
+func (a *Analyzer) analyzeUnits(units []SourceUnit) {
+	global := newScope(nil)
+	for name, valueType := range a.environment.Globals {
+		global.put(&symbol{Name: name, Type: valueType, Kind: symbolImplicit, Used: true, Synthetic: true})
+	}
+	for _, unit := range units {
+		if unit.Program == nil {
+			continue
+		}
+		a.file = unit.Path
+		fileScope := newScope(global)
+		for _, statement := range unit.Program.Statements {
+			switch node := statement.(type) {
+			case *parser.ClassStatement:
+				a.analyzeClass(node, global)
+			case *parser.MethodStatement:
+				a.analyzeCallable(node.Parameters, node.Body, global, "")
+			default:
+				a.analyzeStatement(statement, fileScope)
+			}
+		}
+		a.reportUnused(fileScope)
+	}
+}
+
+func (a *Analyzer) analyzeClass(classNode *parser.ClassStatement, global *scope) {
+	if classNode == nil || classNode.Name == nil {
+		return
+	}
+	previousClass := a.currentClass
+	a.currentClass = classNode.Name.Value
+	defer func() { a.currentClass = previousClass }()
+	if classNode.SuperClass != nil {
+		if _, exists := a.classes[classNode.SuperClass.Value]; !exists {
+			a.add("JOSS-SYM-005", diagnostics.SeverityError, a.file, classNode.SuperClass.Token,
+				fmt.Sprintf("Base class `%s` does not exist.", classNode.SuperClass.Value),
+				"Inheritance requires a class known to the project, runtime or loaded plugins.", "Check the class name or plugin configuration.")
+		}
+	}
+	classScope := newScope(global)
+	classScope.put(&symbol{Name: "this", Type: typesystem.Type{Kind: typesystem.Class, Name: classNode.Name.Value}, Kind: symbolImplicit, Used: true, Synthetic: true})
+	if classNode.Body == nil {
+		return
+	}
+	for _, member := range classNode.Body.Statements {
+		switch node := member.(type) {
+		case *parser.MethodStatement:
+			a.analyzeCallable(node.Parameters, node.Body, classScope, classNode.Name.Value)
+		case *parser.InitStatement:
+			a.analyzeCallable(node.Parameters, node.Body, classScope, classNode.Name.Value)
+		case *parser.LetStatement:
+			a.analyzeDeclaration(node, classScope, false)
+		case *parser.MultiLetStatement:
+			a.analyzeMultiDeclaration(node, classScope, false)
+		}
+	}
+}
+
+func (a *Analyzer) analyzeCallable(parameters []*parser.Parameter, body *parser.BlockStatement, parent *scope, className string) {
+	local := newScope(parent)
+	if className != "" {
+		local.put(&symbol{Name: "this", Type: typesystem.Type{Kind: typesystem.Class, Name: className}, Kind: symbolImplicit, Used: true, Synthetic: true})
+	}
+	for _, parameter := range parameters {
+		if parameter == nil || parameter.Name == nil {
+			continue
+		}
+		parameterType := typesystem.Type{Kind: typesystem.Mixed}
+		if parameter.Type.Literal != "" && parameter.Type.Type != parser.VAR {
+			parameterType = typesystem.Parse(parameter.Type.Literal)
+		}
+		if _, exists := local.local(parameter.Name.Value); exists {
+			a.redeclaration(parameter.Name.Value, parameter.Name.Token)
+			continue
+		}
+		local.put(&symbol{Name: parameter.Name.Value, Type: parameterType, Kind: symbolParameter, Token: parameter.Name.Token, File: a.file, Dynamic: parameterType.IsDynamic()})
+		if parameter.DefaultValue != nil {
+			valueType := a.inferExpression(parameter.DefaultValue, local)
+			if !assignableExpression(parameterType, valueType, parameter.DefaultValue) {
+				a.typeMismatch("JOSS-TYPE-002", parameter.Name.Value, parameterType, valueType, parameter.Name.Token, "default value")
+			}
+		}
+	}
+	if body != nil {
+		a.analyzeBlock(body, local)
+	}
+	a.reportUnused(local)
+}
+
+func (a *Analyzer) analyzeBlock(block *parser.BlockStatement, current *scope) bool {
+	terminated := false
+	for _, statement := range block.Statements {
+		if terminated {
+			a.add("JOSS-FLOW-001", diagnostics.SeverityWarning, a.file, tokenOfStatement(statement),
+				"Unreachable statement after an unconditional control-flow exit.",
+				"Execution already returned or threw before this statement.", "Remove the statement or restructure the preceding control flow.")
+			continue
+		}
+		terminated = a.analyzeStatement(statement, current)
+	}
+	return terminated
+}
+
+// analyzeStatement returns true when the statement unconditionally terminates
+// the current block.
+func (a *Analyzer) analyzeStatement(statement parser.Statement, current *scope) bool {
+	if statement == nil {
+		return false
+	}
+	switch node := statement.(type) {
+	case *parser.LetStatement:
+		a.analyzeDeclaration(node, current, true)
+	case *parser.MultiLetStatement:
+		a.analyzeMultiDeclaration(node, current, true)
+	case *parser.ExpressionStatement:
+		a.inferExpression(node.Expression, current)
+	case *parser.EchoStatement:
+		a.inferExpression(node.Value, current)
+	case *parser.ReturnStatement:
+		a.inferExpression(node.ReturnValue, current)
+		return true
+	case *parser.ThrowStatement:
+		a.inferExpression(node.Value, current)
+		return true
+	case *parser.WhileStatement:
+		a.inferExpression(node.Condition, current)
+		if node.Body != nil {
+			a.analyzeBlock(node.Body, current)
+		}
+	case *parser.DoWhileStatement:
+		if node.Body != nil {
+			a.analyzeBlock(node.Body, current)
+		}
+		a.inferExpression(node.Condition, current)
+	case *parser.ForeachStatement:
+		a.inferExpression(node.Iterable, current)
+		name := cleanName(node.Value)
+		if existing, exists := current.local(name); exists {
+			// Reusing the iteration binding in a later foreach is assignment-like
+			// in the runtime and does not redeclare a typed local.
+			existing.Type = typesystem.Type{Kind: typesystem.Unknown}
+			existing.Kind = symbolIteration
+		} else {
+			current.put(&symbol{Name: name, Type: typesystem.Type{Kind: typesystem.Unknown}, Kind: symbolIteration, Token: node.Token, File: a.file, Inferred: true})
+		}
+		if node.Body != nil {
+			a.analyzeBlock(node.Body, current)
+		}
+	case *parser.TryCatchStatement:
+		if node.TryBlock != nil {
+			a.analyzeBlock(node.TryBlock, current)
+		}
+		if node.CatchVar != "" {
+			name := cleanName(node.CatchVar)
+			if _, exists := current.local(name); !exists {
+				current.put(&symbol{Name: name, Type: typesystem.Type{Kind: typesystem.Object}, Kind: symbolCatch, Token: node.CatchToken, File: a.file})
+			}
+		}
+		if node.CatchBlock != nil {
+			a.analyzeBlock(node.CatchBlock, current)
+		}
+	case *parser.BreakStatement, *parser.ContinueStatement:
+		return true
+	}
+	return false
+}
+
+func (a *Analyzer) analyzeDeclaration(node *parser.LetStatement, current *scope, warnUnused bool) {
+	if node == nil || node.Name == nil {
+		return
+	}
+	name := cleanName(node.Name.Value)
+	if _, exists := current.local(name); exists {
+		a.redeclaration(name, node.Name.Token)
+		return
+	}
+	declaredType := typesystem.Parse(node.Token.Literal)
+	inferred := strings.EqualFold(node.Token.Literal, "var")
+	dynamic := declaredType.Kind == typesystem.Mixed
+	valueType := typesystem.Type{Kind: typesystem.Unknown}
+	if node.Value != nil {
+		valueType = a.inferExpression(node.Value, current)
+	}
+	if inferred {
+		declaredType = typesystem.MergeInference(declaredType, valueType)
+	} else if node.Value != nil && !assignableExpression(declaredType, valueType, node.Value) {
+		a.typeMismatch("JOSS-TYPE-002", name, declaredType, valueType, node.Name.Token, "initializer")
+	}
+	kind := symbolVariable
+	if !warnUnused {
+		kind = symbolImplicit
+	}
+	current.put(&symbol{Name: name, Type: declaredType, Kind: kind, Token: node.Name.Token, File: a.file, Dynamic: dynamic, Inferred: inferred, Used: !warnUnused})
+}
+
+func (a *Analyzer) analyzeMultiDeclaration(node *parser.MultiLetStatement, current *scope, warnUnused bool) {
+	if node == nil {
+		return
+	}
+	for _, declaration := range node.Declarations {
+		single := &parser.LetStatement{Token: node.TypeToken, Name: declaration.Name, Value: declaration.Value}
+		a.analyzeDeclaration(single, current, warnUnused)
+	}
+}
+
+func (a *Analyzer) reportUnused(current *scope) {
+	names := make([]string, 0, len(current.symbols))
+	for name := range current.symbols {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	for _, name := range names {
+		value := current.symbols[name]
+		if value.Used || value.Synthetic || value.Kind == symbolParameter || value.Kind == symbolCatch || strings.HasPrefix(name, "_") {
+			continue
+		}
+		a.add("JOSS-LINT-001", diagnostics.SeverityWarning, value.File, value.Token,
+			fmt.Sprintf("Variable `$%s` is declared but never used.", name),
+			"Unused variables often indicate obsolete or incomplete code.", "Remove it or use it; prefix intentionally ignored names with `_`.")
+	}
+}
+
+func (a *Analyzer) redeclaration(name string, token parser.Token) {
+	a.add("JOSS-SYM-002", diagnostics.SeverityError, a.file, token,
+		fmt.Sprintf("Symbol `$%s` is already declared in this scope.", cleanName(name)),
+		"Redeclarations make the inferred or explicit type ambiguous.", "Assign to the existing variable or choose a different name.")
+}
+
+func (a *Analyzer) typeMismatch(code, name string, destination, source typesystem.Type, token parser.Token, context string) {
+	a.add(code, diagnostics.SeverityError, a.file, token,
+		fmt.Sprintf("Cannot use `%s` as %s for `$%s` of type `%s`.", source.String(), context, cleanName(name), destination.String()),
+		"Joss variables keep their explicit or first inferred type.", "Convert the value explicitly or use `let $name` only when dynamic typing is intentional.")
+}
+
+func (a *Analyzer) add(code string, severity diagnostics.Severity, file string, token parser.Token, message, explanation, suggestion string) {
+	a.diagnostics.Add(diagnostics.Diagnostic{
+		Code: code, Severity: severity, File: file, Message: message,
+		Range:       diagnostics.Range{Start: diagnostics.Position{Line: token.Line, Column: token.Column}, End: diagnostics.Position{Line: token.Line, Column: token.Column}},
+		Explanation: explanation, Suggestion: suggestion,
+	})
+}
+
+func tokenOfStatement(statement parser.Statement) parser.Token {
+	switch node := statement.(type) {
+	case *parser.LetStatement:
+		return node.Token
+	case *parser.MultiLetStatement:
+		return node.TypeToken
+	case *parser.ExpressionStatement:
+		return node.Token
+	case *parser.EchoStatement:
+		return node.Token
+	case *parser.ReturnStatement:
+		return node.Token
+	case *parser.ThrowStatement:
+		return node.Token
+	case *parser.WhileStatement:
+		return node.Token
+	case *parser.DoWhileStatement:
+		return node.Token
+	case *parser.ForeachStatement:
+		return node.Token
+	case *parser.TryCatchStatement:
+		return node.Token
+	case *parser.BreakStatement:
+		return node.Token
+	case *parser.ContinueStatement:
+		return node.Token
+	case *parser.ClassStatement:
+		return node.Token
+	case *parser.MethodStatement:
+		return node.Token
+	case *parser.InitStatement:
+		return node.Token
+	default:
+		return parser.Token{}
+	}
+}

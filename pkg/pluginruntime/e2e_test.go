@@ -322,10 +322,10 @@ func TestMultilanguagePluginSizeAndExecution(t *testing.T) {
 	tempDir := t.TempDir()
 
 	languages := []struct {
-		lang      string
-		filename  string
-		content   []byte
-		funcName  string
+		lang       string
+		filename   string
+		content    []byte
+		funcName   string
 		pluginName string
 	}{
 		{

@@ -47,13 +47,13 @@ func TestPublishedJossExamplesParse(t *testing.T) {
 
 func TestDocumentedControlFlowParses(t *testing.T) {
 	examples := map[string]string{
-		"foreach":  "foreach ($items as $item) {\nprint($item)\n}\n",
-		"while":    "while ($pending > 0) {\n$pending++\n}\n",
-		"do":       "do {\n$attempts++\n} while ($attempts < 3)\n",
-		"try":      "try {\nthrow \"fallo\"\n} catch ($error) {\nprint($error)\n}\n",
+		"foreach":   "foreach ($items as $item) {\nprint($item)\n}\n",
+		"while":     "while ($pending > 0) {\n$pending++\n}\n",
+		"do":        "do {\n$attempts++\n} while ($attempts < 3)\n",
+		"try":       "try {\nthrow \"fallo\"\n} catch ($error) {\nprint($error)\n}\n",
 		"let_typed": "let int $counter = 0\nlet string $msg = \"hola\"\n",
 		"let_mixed": "let $counter = 0\nlet $msg = \"hola\"\n",
-		"combined": "foreach ($items as $item) {\nprint($item)\n}\nwhile ($pending > 0) {\n$pending++\n}\ndo {\n$attempts++\n} while ($attempts < 3)\ntry {\nthrow \"fallo\"\n} catch ($error) {\nprint($error)\n}\n",
+		"combined":  "foreach ($items as $item) {\nprint($item)\n}\nwhile ($pending > 0) {\n$pending++\n}\ndo {\n$attempts++\n} while ($attempts < 3)\ntry {\nthrow \"fallo\"\n} catch ($error) {\nprint($error)\n}\n",
 	}
 	for name, source := range examples {
 		t.Run(name, func(t *testing.T) {

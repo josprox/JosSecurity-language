@@ -278,7 +278,6 @@ func connectToDB(driver string, env map[string]string) (*sql.DB, error) {
 	return core.OpenConfiguredDatabase(driver, env)
 }
 
-
 func getTables(db *sql.DB, driver string) ([]string, error) {
 	var query string
 	switch driver {

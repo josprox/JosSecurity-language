@@ -102,7 +102,7 @@ func (r *PluginRegistry) Instantiate(pluginName, className string, args []interf
 			instanceMap := make(map[string]interface{})
 			instanceMap["__type__"] = className
 			instanceMap["__plugin__"] = pluginName
-			
+
 			// Look for and execute constructor if it exists
 			initName := fmt.Sprintf("%s/init", className)
 			if _, exists := plugin.jpbcModule.Functions[initName]; exists {
