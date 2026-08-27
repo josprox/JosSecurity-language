@@ -16,17 +16,17 @@ import (
 func TestNativeJossPluginExecution(t *testing.T) {
 	// 1. Crear código Joss con clase y método
 	jossCode := `
-class MathService {
-    func add($a, $b) {
+public class MathService {
+    public func add(mixed $a, mixed $b) {
         return $a + $b
     }
 
-    func multiply($a, $b) {
+    public func multiply(mixed $a, mixed $b) {
         return $a * $b
     }
 }
 
-func calculate_tax($amount) {
+public func calculate_tax(mixed $amount) {
     return $amount * 0.16
 }
 `

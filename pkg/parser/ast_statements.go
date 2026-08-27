@@ -94,6 +94,9 @@ func (cs *ClassStatement) statementNode()       {}
 func (cs *ClassStatement) TokenLiteral() string { return cs.Token.Literal }
 func (cs *ClassStatement) String() string {
 	var out bytes.Buffer
+	if cs.Visibility != "" {
+		out.WriteString(cs.Visibility + " ")
+	}
 	out.WriteString("class ")
 	out.WriteString(cs.Name.String())
 	if cs.SuperClass != nil {

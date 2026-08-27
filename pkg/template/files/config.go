@@ -9,7 +9,7 @@ import (
 
 func GetConfigFiles(path string) map[string]string {
 	return map[string]string{
-		filepath.Join(path, "main.joss"): `class Main {
+		filepath.Join(path, "main.joss"): `public class Main {
     Init main() {
         print("Iniciando Sistema Joss...")
         Server::start()

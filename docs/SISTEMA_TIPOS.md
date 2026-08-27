@@ -31,12 +31,14 @@ let $value = 20
 $value = "twenty" // válido por decisión explícita
 ```
 
+Joss es fuertemente tipado por defecto; no existe una bandera en `joss.yaml`. Sólo `let $value` y una declaración explícita `mixed $value` crean bindings dinámicos. Los parámetros nunca reciben `mixed` implícitamente: deben declarar un tipo o escribir `mixed` de forma visible.
+
 Una inicialización inferida con `nil` pospone la inferencia hasta el primer valor concreto. `nil` no es asignable a un tipo explícito no-nullable. Las uniones usan `|` y el atajo postfix `?` se normaliza en el AST:
 
 ```joss
 int|null $count = null
 int? $page = null       // exactamente el mismo tipo: int|null
-func find(int|string $id): User|null { return null }
+public func find(int|string $id): User|null { return null }
 ```
 
 Una fuente unión es asignable a un destino sólo si todas sus alternativas caben en él; un valor concreto cabe en una unión cuando al menos una alternativa lo acepta. Las uniones no convierten una variable en dinámica.
@@ -65,13 +67,35 @@ int $port = "nine"   // inválido
 
 ## Funciones
 
-Los parámetros pueden tiparse:
+Los parámetros siempre deben tiparse. `mixed` se permite sólo cuando el contrato realmente es dinámico:
 
 ```joss
-func add(int $a, int $b): int {
+public func add(int $a, int $b): int {
     return $a + $b
 }
+
+public func passthrough(mixed $value): mixed {
+    return $value
+}
 ```
+
+Una firma `func passthrough($value)` es inválida (`JOSS-TYPE-011`).
+
+## Referencias seguras
+
+`ref` permite que una función modifique el binding del llamador sin direcciones de memoria ni desreferenciación manual:
+
+```joss
+public func increment(ref int $value): int {
+    $value = $value + 1
+    return $value
+}
+
+$count = 1
+increment(ref $count)
+```
+
+La referencia es temporal y mutable: requiere una variable no constante, coincidencia exacta e invariante de tipo y la marca `ref` tanto en la firma como en la llamada. No puede guardarse, retornarse, capturarse ni enviarse a una API que no declare un parámetro `ref`. No admite defaults, `nil`, aritmética de punteros ni memoria manual.
 
 El analizador valida aridad, defaults, argumentos, cada `return` y que toda ruta demostrable de una función anotada termine con `return` o `throw`. El runtime repite el contrato como defensa. La anotación posterior a `:` es opcional; sin ella el retorno permanece `unknown` y no se inventa un error. Las firmas se registran antes de analizar cuerpos, por lo que una llamada recursiva o mutuamente recursiva ve su tipo de retorno declarado.
 

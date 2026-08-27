@@ -73,9 +73,9 @@ echo $age`, NewEnvironment())
 }
 
 func TestCallableScopesDoNotLeak(t *testing.T) {
-	items := analyzeSource(t, `class Example {
-  func first($value) { $local = $value echo $local }
-  func second($value) { $local = $value echo $local }
+	items := analyzeSource(t, `public class Example {
+  public func first(mixed $value) { $local = $value echo $local }
+  public func second(mixed $value) { $local = $value echo $local }
 }`, NewEnvironment())
 	if hasCode(items, "JOSS-SYM-002") || hasCode(items, "JOSS-SYM-001") {
 		t.Fatalf("method-local symbols leaked across scopes: %#v", items)
@@ -83,11 +83,19 @@ func TestCallableScopesDoNotLeak(t *testing.T) {
 }
 
 func TestTypedFunctionArgumentsAndArity(t *testing.T) {
-	items := analyzeSource(t, `func add(int $a, int $b) { return $a + $b }
+	items := analyzeSource(t, `public func add(int $a, int $b) { return $a + $b }
 add(1, "two")
 add(1)`, NewEnvironment())
 	if !hasCode(items, "JOSS-TYPE-003") || !hasCode(items, "JOSS-CALL-001") {
 		t.Fatalf("expected argument type and arity diagnostics, got %#v", items)
+	}
+}
+
+func TestParametersRequireExplicitTypeOrMixed(t *testing.T) {
+	items := analyzeSource(t, `public func invalid($value) { return $value }
+public func dynamic(mixed $value) { return $value }`, NewEnvironment())
+	if countCode(items, "JOSS-TYPE-011") != 1 {
+		t.Fatalf("diagnostics = %#v, want one implicit parameter type error", items)
 	}
 }
 
@@ -120,10 +128,10 @@ foreach ($two as $item) { echo $item }`, NewEnvironment())
 }
 
 func TestLocalReceiverShadowsSameNamedClassAndCountsAsUse(t *testing.T) {
-	items := analyzeSource(t, `class repository {
-  func first() { return 1 }
+	items := analyzeSource(t, `public class repository {
+  public func first() { return 1 }
 }
-func load() {
+public func load() {
   $repository = new repository()
   return $repository->first()
 }`, NewEnvironment())
@@ -140,14 +148,14 @@ func TestDiagnosticsRetainFileAndPosition(t *testing.T) {
 }
 
 func TestUnreachableStatementIsWarning(t *testing.T) {
-	items := analyzeSource(t, `func stop() { return 1 echo "never" }`, NewEnvironment())
+	items := analyzeSource(t, `public func stop() { return 1 echo "never" }`, NewEnvironment())
 	if !hasCode(items, "JOSS-FLOW-001") {
 		t.Fatalf("expected unreachable warning, got %#v", items)
 	}
 }
 
 func TestRecursiveFunctionUsesPredeclaredReturnType(t *testing.T) {
-	items := analyzeSource(t, `func factorial(int $n): int {
+	items := analyzeSource(t, `public func factorial(int $n): int {
   ($n <= 1) ? { return 1 } : {}
   return $n * factorial($n - 1)
 }
@@ -159,8 +167,8 @@ echo $result`, NewEnvironment())
 }
 
 func TestRecursiveMethodUsesPredeclaredReturnType(t *testing.T) {
-	items := analyzeSource(t, `class Calculator {
-    func factorial(int $value): int {
+	items := analyzeSource(t, `public class Calculator {
+    public func factorial(int $value): int {
         ($value <= 1) ? { return 1 } : { return $value * $this->factorial($value - 1) }
     }
 }`, NewEnvironment())
@@ -172,14 +180,14 @@ func TestRecursiveMethodUsesPredeclaredReturnType(t *testing.T) {
 }
 
 func TestDeclaredReturnTypeIsChecked(t *testing.T) {
-	items := analyzeSource(t, `func invalid(): int { return "wrong" }`, NewEnvironment())
+	items := analyzeSource(t, `public func invalid(): int { return "wrong" }`, NewEnvironment())
 	if !hasCode(items, "JOSS-TYPE-008") {
 		t.Fatalf("expected return type diagnostic, got %#v", items)
 	}
 }
 
 func TestUnannotatedReturnDoesNotInventATypeContract(t *testing.T) {
-	items := analyzeSource(t, `func flexible() { return "value" }`, NewEnvironment())
+	items := analyzeSource(t, `public func flexible() { return "value" }`, NewEnvironment())
 	if hasCode(items, "JOSS-TYPE-008") {
 		t.Fatalf("unannotated return produced a type error: %#v", items)
 	}
@@ -195,10 +203,10 @@ echo $limit`, NewEnvironment())
 }
 
 func TestConstantAndTypedPropertiesAreChecked(t *testing.T) {
-	items := analyzeSource(t, `class Limits {
-    const int $maximum = 10
-    string $label = "safe"
-    func invalid() {
+	items := analyzeSource(t, `public class Limits {
+    public const int $maximum = 10
+    private string $label = "safe"
+    public func invalid() {
         $this->maximum = 20
         $this->label = false
     }
@@ -210,15 +218,15 @@ func TestConstantAndTypedPropertiesAreChecked(t *testing.T) {
 
 func TestRemovedTypeAliasesAreReportedAsUnknownTypes(t *testing.T) {
 	items := analyzeSource(t, `integer $age = 20
-func enabled(boolean $value): boolean { return $value }`, NewEnvironment())
+public func enabled(boolean $value): boolean { return $value }`, NewEnvironment())
 	if countCode(items, "JOSS-TYPE-009") != 3 {
 		t.Fatalf("diagnostics = %#v, want three JOSS-TYPE-009 errors", items)
 	}
 }
 
 func TestDeclaredClassNamesRemainValidTypes(t *testing.T) {
-	items := analyzeSource(t, `class User {}
-func identity(User $user): User { return $user }`, NewEnvironment())
+	items := analyzeSource(t, `public class User {}
+public func identity(User $user): User { return $user }`, NewEnvironment())
 	if countCode(items, "JOSS-TYPE-009") != 0 {
 		t.Fatalf("declared class type diagnostics = %#v", items)
 	}
@@ -228,7 +236,7 @@ func TestNullableAndUnionAssignments(t *testing.T) {
 	items := analyzeSource(t, `int? $count = null
 $count = 2
 $count = "wrong"
-func normalize(int|string $value): string|null {
+public func normalize(int|string $value): string|null {
     ($value == 0) ? { return null } : { return "ok" }
 }`, NewEnvironment())
 	if countCode(items, "JOSS-TYPE-001") != 1 || hasCode(items, "JOSS-TYPE-008") || hasCode(items, "JOSS-TYPE-010") {
@@ -237,10 +245,10 @@ func normalize(int|string $value): string|null {
 }
 
 func TestDeclaredReturnRequiresEveryPath(t *testing.T) {
-	items := analyzeSource(t, `func incomplete(bool $ok): int {
+	items := analyzeSource(t, `public func incomplete(bool $ok): int {
     $ok ? { return 1 } : {}
 }
-func complete(bool $ok): int {
+public func complete(bool $ok): int {
     $ok ? { return 1 } : { return 2 }
 }`, NewEnvironment())
 	if countCode(items, "JOSS-TYPE-010") != 1 {

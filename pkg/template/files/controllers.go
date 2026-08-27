@@ -4,8 +4,8 @@ import "path/filepath"
 
 func GetControllerFiles(path string) map[string]string {
 	return map[string]string{
-		filepath.Join(path, "app", "controllers", "auth", "ProfileController.joss"): `class ProfileController {
-    func index() {
+		filepath.Join(path, "app", "controllers", "auth", "ProfileController.joss"): `public class ProfileController {
+    public func index() {
         $u = Auth::user()
         $userId = Auth::id()
         $prefix = env("PREFIX", "js_")
@@ -37,7 +37,7 @@ func GetControllerFiles(path string) map[string]string {
         })
     }
 
-    func update() {
+    public func update() {
         $id = Auth::user()->id
         
         $data = {
@@ -53,7 +53,7 @@ func GetControllerFiles(path string) map[string]string {
         return ($success) ? redirect("/profile")->with("success", "Perfil actualizado correctamente.") : back()->with("error", "Error al actualizar el perfil.")
     }
 
-    func activate2FA() {
+    public func activate2FA() {
         $userId = Auth::id()
         $secret = Session::get("temp_2fa_secret")
         $code = Str::trim(request("code"))
@@ -79,14 +79,14 @@ func GetControllerFiles(path string) map[string]string {
         }
     }
 
-    func deactivate2FA() {
+    public func deactivate2FA() {
         $userId = Auth::id()
         $prefix = env("PREFIX", "js_")
         GranDB::table($prefix . "user_mfa_methods")->where("user_id", $userId)->delete()
         return redirect("/profile")->with("success", "Autenticación de dos factores (2FA) desactivada.")
     }
 
-    func delete() {
+    public func delete() {
         $id = Auth::user()->id
         
         // Remove account
@@ -101,8 +101,8 @@ func GetControllerFiles(path string) map[string]string {
     }
 }`,
 
-		filepath.Join(path, "app", "controllers", "web", "HomeController.joss"): `class HomeController {
-    func index() {
+		filepath.Join(path, "app", "controllers", "web", "HomeController.joss"): `public class HomeController {
+    public func index() {
         return view("welcome", {
             "title": "Bienvenido a Joss",
             "version": JOSS_VERSION
@@ -110,27 +110,27 @@ func GetControllerFiles(path string) map[string]string {
     }
 }`,
 
-		filepath.Join(path, "app", "controllers", "auth", "AuthController.joss"): `class AuthController {
-    func showLogin() {
+		filepath.Join(path, "app", "controllers", "auth", "AuthController.joss"): `public class AuthController {
+    public func showLogin() {
         (!Auth::guest()) ? { return redirect("/dashboard") } : {}
         return view("auth.login", {"title": "Iniciar Sesión"})
     }
     
-    func showRegister() {
+    public func showRegister() {
         (!Auth::guest()) ? { return redirect("/dashboard") } : {}
         return view("auth.register", {"title": "Crear Cuenta"})
     }
     
-    func doLogin() {
+    public func doLogin() {
         $email = Str::trim(request("email"))
         $password = request("password")
         
         $loginResult = Auth::login($email, $password)
         $loginResult->require2FA()
         
-        return $loginResult->onSuccess(func($jwt) {
+        return $loginResult->onSuccess(func(mixed $jwt) {
             return redirect("/dashboard")->withCookie("joss_token", $jwt)
-        })->onChallenge(func($tempToken) {
+        })->onChallenge(func(mixed $tempToken) {
             Session::put("temp_2fa_token", $tempToken)
             Session::forget("user_id")
             Session::forget("user_email")
@@ -138,7 +138,7 @@ func GetControllerFiles(path string) map[string]string {
             Session::forget("user_role")
             Session::forget("user_token")
             return redirect("/2fa/verify")
-        })->onFail(func($error) {
+        })->onFail(func(mixed $error) {
             $verificationStatus = Auth::verificationStatus($email)
             ($verificationStatus == "unverified") ? {
                 $newToken = Auth::resendVerification($email)
@@ -153,7 +153,7 @@ func GetControllerFiles(path string) map[string]string {
         })->response()
     }
 
-    func showVerify2FA() {
+    public func showVerify2FA() {
         $tempToken = Session::get("temp_2fa_token")
         (empty($tempToken)) ? { return redirect("/login") } : {}
         
@@ -163,7 +163,7 @@ func GetControllerFiles(path string) map[string]string {
         })
     }
 
-    func doVerify2FA() {
+    public func doVerify2FA() {
         $tempToken = Session::get("temp_2fa_token")
         (empty($tempToken)) ? { return redirect("/login") } : {}
         
@@ -183,7 +183,7 @@ func GetControllerFiles(path string) map[string]string {
         }
     }
 
-    func doRegister() {
+    public func doRegister() {
         $data = {
             "first_name": request("first_name"),
             "last_name":  request("last_name"),
@@ -209,7 +209,7 @@ func GetControllerFiles(path string) map[string]string {
         }
     }
 
-    func verify($token) {
+    public func verify(mixed $token) {
         $verified = Auth::verify($token)
         return ($verified) ? {
             return redirect("/login")->with("success", "Cuenta verificada exitosamente. Ya puedes iniciar sesión.")
@@ -218,13 +218,13 @@ func GetControllerFiles(path string) map[string]string {
         }
     }
 
-    func logout() {
+    public func logout() {
         Auth::logout()
         return redirect("/login")->withCookie("joss_token", "")
     }
     
     // API JWT Login
-    func apiLogin() {
+    public func apiLogin() {
         $email = request("email")
         $password = request("password")
         
@@ -245,8 +245,8 @@ func GetControllerFiles(path string) map[string]string {
     }
 }`,
 
-		filepath.Join(path, "app", "controllers", "api", "ApiController.joss"): `class ApiController {
-    func register() {
+		filepath.Join(path, "app", "controllers", "api", "ApiController.joss"): `public class ApiController {
+    public func register() {
         $data = {
             "first_name": request("first_name"),
             "last_name":  request("last_name"),
@@ -272,7 +272,7 @@ func GetControllerFiles(path string) map[string]string {
         }
     }
 
-    func login() {
+    public func login() {
         $email = request("email")
         $password = request("password")
         
@@ -292,7 +292,7 @@ func GetControllerFiles(path string) map[string]string {
         }
     }
 
-    func refresh() {
+    public func refresh() {
         $user = Auth::user()
         return ($user) ? {
             $newToken = Auth::refresh($user->id)
@@ -305,7 +305,7 @@ func GetControllerFiles(path string) map[string]string {
         }
     }
 
-    func delete() {
+    public func delete() {
         $user = Auth::user()
         return ($user) ? {
             $deleted = Auth::delete($user->id)
@@ -319,7 +319,7 @@ func GetControllerFiles(path string) map[string]string {
         }
     }
 
-    func forgotPassword() {
+    public func forgotPassword() {
         $email = request("email")
         $token = Auth::forgotPassword($email)
         
@@ -340,7 +340,7 @@ func GetControllerFiles(path string) map[string]string {
         }
     }
 
-    func resetPassword() {
+    public func resetPassword() {
         $token = request("token")
         $password = request("password")
 
@@ -360,8 +360,8 @@ func GetControllerFiles(path string) map[string]string {
     }
 }`,
 
-		filepath.Join(path, "app", "controllers", "web", "DashboardController.joss"): `class DashboardController {
-    func index() {
+		filepath.Join(path, "app", "controllers", "web", "DashboardController.joss"): `public class DashboardController {
+    public func index() {
         $u = Auth::user()
         (!$u) ? {
             Auth::logout()
@@ -383,12 +383,12 @@ func GetControllerFiles(path string) map[string]string {
     }
 }`,
 
-		filepath.Join(path, "app", "controllers", "auth", "PasswordController.joss"): `class PasswordController {
-    func showForgot() {
+		filepath.Join(path, "app", "controllers", "auth", "PasswordController.joss"): `public class PasswordController {
+    public func showForgot() {
         return view("auth.forgot", { "title": "Recuperar Contraseña" })
     }
 
-    func sendResetLink() {
+    public func sendResetLink() {
         $email = request("email")
         $token = Auth::forgotPassword($email)
         
@@ -406,12 +406,12 @@ func GetControllerFiles(path string) map[string]string {
         }
     }
 
-    func showReset() {
+    public func showReset() {
         $token = request("token")
         return view("auth.reset", { "token": $token, "title": "Nueva Contraseña" })
     }
 
-    func resetPassword() {
+    public func resetPassword() {
         $token = request("token")
         $password = request("password")
         

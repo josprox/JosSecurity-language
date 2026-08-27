@@ -102,6 +102,7 @@ const (
 	LET       = "LET"
 	CONST     = "CONST"
 	STATIC    = "STATIC"
+	REF       = "REF"
 )
 
 type Token struct {
@@ -146,6 +147,7 @@ var keywords = map[string]TokenType{
 	"private":   PRIVATE,
 	"protected": PROTECTED,
 	"static":    STATIC,
+	"ref":       REF,
 }
 
 var removedKeywords = map[string]string{

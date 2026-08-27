@@ -3,7 +3,7 @@ package parser
 import "testing"
 
 func TestParserNormalizesUnionAndNullableTypes(t *testing.T) {
-	p := NewParser(NewLexer(`func choose(int|string $value): string? { return null }
+	p := NewParser(NewLexer(`public func choose(int|string $value): string? { return null }
 int? $count = null`))
 	program := p.ParseProgram()
 	if errors := p.Errors(); len(errors) > 0 {

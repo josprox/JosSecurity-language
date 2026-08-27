@@ -10,7 +10,7 @@ import (
 func (r *Runtime) CallMethod(method *parser.MethodStatement, instance *Instance, args []parser.Expression) (res interface{}) {
 	evaluated := make([]interface{}, 0, len(args))
 	for _, argument := range args {
-		evaluated = append(evaluated, r.evaluateExpression(argument))
+		evaluated = append(evaluated, r.evaluateCallArgument(argument))
 	}
 	return r.CallMethodEvaluated(method, instance, evaluated)
 }
@@ -26,6 +26,9 @@ func (r *Runtime) callMethodEvaluated(method *parser.MethodStatement, instance *
 	}
 	required := 0
 	for _, parameter := range method.Parameters {
+		if parameter.ByReference && parameter.DefaultValue != nil {
+			panic(&JossError{Type: "ReferenceArgumentError", Message: fmt.Sprintf("El parámetro ref $%s no puede tener valor por defecto", parameter.Name.Value), File: r.CurrentFile, Line: parameter.Name.Token.Line})
+		}
 		if parameter.DefaultValue == nil {
 			required++
 		}
@@ -46,6 +49,11 @@ func (r *Runtime) callMethodEvaluated(method *parser.MethodStatement, instance *
 	}
 	r.callDepth++
 	defer func() { r.callDepth-- }()
+	previousClass := r.currentClass
+	if owner := r.declaringClassOfMethod(method); owner != "" {
+		r.currentClass = owner
+	}
+	defer func() { r.currentClass = previousClass }()
 
 	// Named callables see only runtime/plugin globals. Function literals receive
 	// their captured lexical environment through writeBack. This prevents the
@@ -105,14 +113,28 @@ func (r *Runtime) callMethodEvaluated(method *parser.MethodStatement, instance *
 
 	// Bind arguments
 	for i, param := range method.Parameters {
-		declaredType := param.Type.Literal
-		if declaredType == "" {
-			declaredType = "mixed"
+		if param.Type.Literal == "" || param.Type.Type == parser.VAR {
+			panic(&JossError{Type: "ImplicitMixedParameter", Message: fmt.Sprintf("El parámetro $%s requiere un tipo explícito; usa mixed si el dinamismo es intencional", param.Name.Value), File: r.CurrentFile, Line: param.Name.Token.Line})
 		}
+		declaredType := param.Type.Literal
 		r.VarTypes[param.Name.Value] = declaredType
 		var val interface{}
 		if i < len(args) {
 			val = args[i]
+			if param.ByReference {
+				reference, ok := val.(*VariableReference)
+				if !ok {
+					panic(&JossError{Type: "ReferenceArgumentError", Message: fmt.Sprintf("El argumento %d ($%s) debe pasarse con ref", i+1, param.Name.Value), File: r.CurrentFile, Line: param.Name.Token.Line})
+				}
+				if param.Type.Literal != "" && reference.Type() != param.Type.Literal {
+					panic(&JossError{Type: "ReferenceTypeError", Message: fmt.Sprintf("La referencia $%s es %s; se requiere exactamente %s", param.Name.Value, reference.Type(), param.Type.Literal), File: r.CurrentFile, Line: param.Name.Token.Line})
+				}
+				r.Variables[param.Name.Value] = reference
+				continue
+			}
+			if _, ok := val.(*VariableReference); ok {
+				panic(&JossError{Type: "ReferenceArgumentError", Message: fmt.Sprintf("El parámetro $%s no está declarado con ref", param.Name.Value), File: r.CurrentFile, Line: param.Name.Token.Line})
+			}
 			if param.Type.Literal != "" {
 				val = r.coerceToTypedValue(val, param.Type.Literal)
 				if !r.checkType(val, param.Type.Literal) {
@@ -161,11 +183,14 @@ func (r *Runtime) executeCall(call *parser.CallExpression) interface{} {
 	// 1. Evaluate arguments first
 	args := []interface{}{}
 	for _, arg := range call.Arguments {
-		args = append(args, r.evaluateExpression(arg))
+		args = append(args, r.evaluateCallArgument(arg))
 	}
 
 	// 2. Try Builtin
 	if ident, ok := call.Function.(*parser.Identifier); ok {
+		if hasVariableReference(args) && IsBuiltin(ident.Value) {
+			panic(&JossError{Type: "ReferenceEscape", Message: fmt.Sprintf("La función nativa '%s' no declara parámetros ref", ident.Value), File: r.CurrentFile, Line: ident.Token.Line})
+		}
 		if res, ok := r.callBuiltin(ident.Value, args); ok {
 			return res
 		}
@@ -204,8 +229,29 @@ func (r *Runtime) executeCall(call *parser.CallExpression) interface{} {
 	return r.applyFunction(fn, args)
 }
 
+func (r *Runtime) evaluateCallArgument(argument parser.Expression) interface{} {
+	reference, ok := argument.(*parser.ReferenceExpression)
+	if !ok {
+		return r.evaluateExpression(argument)
+	}
+	identifier, ok := reference.Target.(*parser.Identifier)
+	if !ok {
+		panic(&JossError{Type: "InvalidReference", Message: "ref requiere una variable mutable", File: r.CurrentFile, Line: reference.Token.Line})
+	}
+	if _, exists := r.Variables[identifier.Value]; !exists {
+		panic(&JossError{Type: "UndefinedVariable", Message: fmt.Sprintf("Variable '%s' no definida", identifier.Value), File: r.CurrentFile, Line: identifier.Token.Line})
+	}
+	if r.Constants[identifier.Value] {
+		panic(&JossError{Type: "ConstantAssignment", Message: fmt.Sprintf("La constante '%s' no puede pasarse mediante ref", identifier.Value), File: r.CurrentFile, Line: identifier.Token.Line})
+	}
+	return r.referenceTo(identifier.Value)
+}
+
 func (r *Runtime) applyFunction(fn interface{}, args []interface{}) interface{} {
 	if callable, ok := fn.(*PluginCallable); ok {
+		if hasVariableReference(args) {
+			panic(&JossError{Type: "ReferenceEscape", Message: "Las referencias mutables no pueden cruzar la frontera de plugins", File: r.CurrentFile})
+		}
 		if r.PluginRegistry != nil {
 			if callable.ClassName != "" {
 				res, err := r.PluginRegistry.CallMethod(callable.PluginName, callable.ClassName, callable.Function, nil, args)
@@ -276,6 +322,9 @@ func (r *Runtime) applyFunction(fn interface{}, args []interface{}) interface{} 
 	}
 
 	if handler, ok := fn.(NativeHandler); ok {
+		if hasVariableReference(args) {
+			panic(&JossError{Type: "ReferenceEscape", Message: "Las referencias mutables no pueden pasarse a handlers nativos", File: r.CurrentFile})
+		}
 		return handler(r, nil, "", args)
 	}
 
@@ -322,6 +371,15 @@ func (r *Runtime) applyFunction(fn interface{}, args []interface{}) interface{} 
 		Message: fmt.Sprintf("'%v' (tipo %T) no es una función invocable", fn, fn),
 		File:    r.CurrentFile,
 	})
+}
+
+func hasVariableReference(args []interface{}) bool {
+	for _, argument := range args {
+		if _, ok := argument.(*VariableReference); ok {
+			return true
+		}
+	}
+	return false
 }
 
 // CallFunction is the public API for executing functions

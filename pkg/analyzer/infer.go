@@ -55,6 +55,12 @@ func (a *Analyzer) inferExpression(expression parser.Expression, current *scope)
 			a.invalidOperator(node.Token, node.Operator, valueType, typesystem.Type{})
 		}
 		return valueType
+	case *parser.ReferenceExpression:
+		valueType := a.inferExpression(node.Target, current)
+		a.add("JOSS-REF-005", diagnostics.SeverityError, a.file, node.Token,
+			"A reference cannot escape its call argument.",
+			"Joss references are temporary aliases, not storable or returnable pointer values.", "Use `ref $variable` only in a call to a matching `ref` parameter.")
+		return valueType
 	case *parser.PostfixExpression:
 		valueType := a.inferExpression(node.Left, current)
 		if valueType.IsKnown() && !isNumeric(valueType) {
@@ -213,6 +219,9 @@ func (a *Analyzer) inferAssignment(assignment *parser.AssignExpression, current 
 		receiver := a.receiverType(member.Left, current)
 		if receiver.Kind == typesystem.Class {
 			if field, exists := a.lookupField(receiver.Name, member.Property.Value); exists {
+				if !a.canAccess(field.Visibility, field.Owner) {
+					a.accessError(member.Property.Token, field.Visibility, field.Owner, member.Property.Value)
+				}
 				if field.Constant {
 					a.add("JOSS-SYM-006", diagnostics.SeverityError, a.file, member.Property.Token,
 						fmt.Sprintf("Constant property `%s::%s` cannot be reassigned.", receiver.Name, member.Property.Value),
@@ -293,6 +302,11 @@ func (a *Analyzer) inferNew(expression *parser.NewExpression, current *scope) ty
 			"The class was not found in project sources, native classes or loaded plugin symbols.", "Check the class name and plugin configuration.")
 		return typesystem.Type{Kind: typesystem.Unknown}
 	}
+	if class.Visibility == "private" && class.File != "" && class.File != a.file {
+		a.add("JOSS-ACCESS-001", diagnostics.SeverityError, a.file, expression.Class.Token,
+			fmt.Sprintf("Class `%s` is private to `%s`.", className, class.File),
+			"Private project declarations are visible only in their source file.", "Use a public class or instantiate it from its declaring file.")
+	}
 	if constructor, ok := class.Methods["constructor"]; ok {
 		a.checkCall(constructor, expression.Arguments, current, expression.Class.Token)
 	}
@@ -306,6 +320,9 @@ func (a *Analyzer) inferMember(expression *parser.MemberExpression, current *sco
 	receiver := a.receiverType(expression.Left, current)
 	if receiver.Kind == typesystem.Class && expression.Property != nil {
 		if field, exists := a.lookupField(receiver.Name, expression.Property.Value); exists {
+			if !a.canAccess(field.Visibility, field.Owner) {
+				a.accessError(expression.Property.Token, field.Visibility, field.Owner, expression.Property.Value)
+			}
 			return field.Type
 		}
 	}
@@ -320,6 +337,11 @@ func (a *Analyzer) inferCall(call *parser.CallExpression, current *scope) typesy
 			return builtin.ReturnType
 		}
 		if function, exists := a.functions[name]; exists {
+			if function.callable.Visibility == "private" && function.file != a.file {
+				a.add("JOSS-ACCESS-001", diagnostics.SeverityError, a.file, identifier.Token,
+					fmt.Sprintf("Function `%s` is private to `%s`.", name, function.file),
+					"Private project declarations are visible only in their source file.", "Make the function public or call it from its declaring file.")
+			}
 			a.checkCall(function.callable, call.Arguments, current, identifier.Token)
 			return function.callable.ReturnType
 		}
@@ -342,6 +364,9 @@ func (a *Analyzer) inferCall(call *parser.CallExpression, current *scope) typesy
 		receiver := a.receiverType(member.Left, current)
 		if receiver.Kind == typesystem.Class && member.Property != nil {
 			if callable, exists := a.lookupMethod(receiver.Name, member.Property.Value); exists {
+				if !a.canAccess(callable.Visibility, callable.Owner) {
+					a.accessError(member.Property.Token, callable.Visibility, callable.Owner, member.Property.Value)
+				}
 				a.checkCall(callable, call.Arguments, current, member.Property.Token)
 				return callable.ReturnType
 			}
@@ -359,6 +384,35 @@ func (a *Analyzer) inferCall(call *parser.CallExpression, current *scope) typesy
 		a.inferExpression(argument, current)
 	}
 	return functionType
+}
+
+func (a *Analyzer) canAccess(visibility, owner string) bool {
+	if visibility == "" || visibility == "public" || owner == "" {
+		return true
+	}
+	if a.currentClass == owner {
+		return true
+	}
+	if visibility == "private" || a.currentClass == "" {
+		return false
+	}
+	for className := a.currentClass; className != ""; {
+		class, exists := a.classes[className]
+		if !exists || class.SuperClass == "" {
+			return false
+		}
+		if class.SuperClass == owner {
+			return true
+		}
+		className = class.SuperClass
+	}
+	return false
+}
+
+func (a *Analyzer) accessError(token parser.Token, visibility, owner, member string) {
+	a.add("JOSS-ACCESS-002", diagnostics.SeverityError, a.file, token,
+		fmt.Sprintf("Member `%s::%s` is `%s` and is not accessible here.", owner, member, visibility),
+		"Private members are limited to their class; protected members also allow subclasses.", "Expose a public method or move the access into an allowed class.")
 }
 
 func (a *Analyzer) receiverType(expression parser.Expression, current *scope) typesystem.Type {
@@ -411,7 +465,11 @@ func (a *Analyzer) lookupField(className, fieldName string) (Field, bool) {
 func (a *Analyzer) checkCall(callable Callable, arguments []parser.Expression, current *scope, token parser.Token) {
 	argumentTypes := make([]typesystem.Type, len(arguments))
 	for index, argument := range arguments {
-		argumentTypes[index] = a.inferExpression(argument, current)
+		if reference, ok := argument.(*parser.ReferenceExpression); ok {
+			argumentTypes[index] = a.inferExpression(reference.Target, current)
+		} else {
+			argumentTypes[index] = a.inferExpression(argument, current)
+		}
 	}
 	minimum := 0
 	for _, parameter := range callable.Parameters {
@@ -433,10 +491,58 @@ func (a *Analyzer) checkCall(callable Callable, arguments []parser.Expression, c
 	}
 	for index := 0; index < len(arguments) && index < len(callable.Parameters); index++ {
 		parameter := callable.Parameters[index]
-		if !assignableExpression(parameter.Type, argumentTypes[index], arguments[index]) {
+		reference, argumentIsReference := arguments[index].(*parser.ReferenceExpression)
+		if parameter.ByReference != argumentIsReference {
+			if parameter.ByReference {
+				a.add("JOSS-REF-001", diagnostics.SeverityError, a.file, tokenOfExpression(arguments[index]),
+					fmt.Sprintf("Argument %d to `%s` must be passed with `ref`.", index+1, callable.Name),
+					"Mutable reference parameters require explicit mutation at the call site.", "Pass a mutable variable as `ref $variable`.")
+			} else {
+				a.add("JOSS-REF-001", diagnostics.SeverityError, a.file, tokenOfExpression(arguments[index]),
+					fmt.Sprintf("Argument %d to `%s` is marked `ref`, but the parameter is passed by value.", index+1, callable.Name),
+					"References are accepted only by parameters declared with `ref`.", "Remove `ref` or update the Joss function signature.")
+			}
+			continue
+		}
+		argumentExpression := arguments[index]
+		if parameter.ByReference {
+			identifier, valid := reference.Target.(*parser.Identifier)
+			if !valid {
+				a.add("JOSS-REF-002", diagnostics.SeverityError, a.file, tokenOfExpression(reference.Target),
+					"A mutable reference must target a variable.",
+					"Literals, temporaries, function results, fields and indexes do not have a stable call-scoped binding yet.", "Assign the value to a local variable and pass `ref $variable`.")
+				continue
+			}
+			name := cleanName(identifier.Value)
+			symbol, exists := current.resolve(name)
+			if !exists {
+				// inferExpression already emitted the undefined-symbol diagnostic.
+				continue
+			}
+			if symbol.Constant {
+				a.add("JOSS-REF-003", diagnostics.SeverityError, a.file, identifier.Token,
+					fmt.Sprintf("Constant `$%s` cannot be passed as a mutable reference.", name),
+					"A ref parameter can assign through the caller binding.", "Pass a mutable variable instead.")
+				continue
+			}
+			if parameter.Type != symbol.Type {
+				a.add("JOSS-REF-004", diagnostics.SeverityError, a.file, identifier.Token,
+					fmt.Sprintf("Cannot pass `$%s` of type `%s` as `ref %s`.", name, symbol.Type.String(), parameter.Type.String()),
+					"Mutable references require an exact invariant type match.", "Use a variable with exactly the declared parameter type.")
+			}
+			continue
+		}
+		if !assignableExpression(parameter.Type, argumentTypes[index], argumentExpression) {
 			a.add("JOSS-TYPE-003", diagnostics.SeverityError, a.file, tokenOfExpression(arguments[index]),
 				fmt.Sprintf("Argument %d to `%s` has type `%s`; parameter `$%s` requires `%s`.", index+1, callable.Name, argumentTypes[index].String(), parameter.Name, parameter.Type.String()),
 				"Function arguments follow the same assignment compatibility rules as variables.", "Convert the argument or correct the parameter type.")
+		}
+	}
+	for index := len(callable.Parameters); index < len(arguments); index++ {
+		if _, isReference := arguments[index].(*parser.ReferenceExpression); isReference {
+			a.add("JOSS-REF-001", diagnostics.SeverityError, a.file, tokenOfExpression(arguments[index]),
+				fmt.Sprintf("Argument %d to `%s` is `ref`, but no reference parameter is declared.", index+1, callable.Name),
+				"Variadic or unpublished native arguments never imply mutable reference semantics.", "Remove `ref` or call a Joss function with an explicit matching ref parameter.")
 		}
 	}
 }
@@ -497,6 +603,8 @@ func tokenOfExpression(expression parser.Expression) parser.Token {
 	case *parser.Boolean:
 		return node.Token
 	case *parser.NullLiteral:
+		return node.Token
+	case *parser.ReferenceExpression:
 		return node.Token
 	case *parser.ArrayLiteral:
 		return node.Token

@@ -58,6 +58,7 @@ type Runtime struct {
 	CurrentFile       string // Currently executing file path
 	MaxCallDepth      int    // Guard against unbounded recursive calls
 	callDepth         int
+	currentClass      string
 
 	captureEnvironment *ClosureEnvironment
 }

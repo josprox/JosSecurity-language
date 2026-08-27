@@ -20,7 +20,7 @@ func TestVisibilityAndStaticModifiers(t *testing.T) {
 				return md5($token)
 			}
 
-			protected func handleAuth($user, $code = 200) {
+			protected func handleAuth(mixed $user, mixed $code = 200) {
 				return json($user, $code)
 			}
 		}
@@ -28,19 +28,19 @@ func TestVisibilityAndStaticModifiers(t *testing.T) {
 		`
 		public class BaseController {
 			protected $db
-			func constructor() {
+			public func constructor() {
 				$this->db = new GranDB()
 			}
 		}
 
 		public class UserController extends BaseController {
-			public func index($page = 1, $limit = 10) {
+			public func index(mixed $page = 1, mixed $limit = 10) {
 				return $this->db->table("users")->paginate($limit, $page)
 			}
 		}
 		`,
 		`
-		func calcularTotal(float $precio, int $cantidad = 1, string $moneda = "USD") {
+		public func calcularTotal(float $precio, int $cantidad = 1, string $moneda = "USD") {
 			return $precio * $cantidad
 		}
 		`,
@@ -60,7 +60,7 @@ func TestVisibilityAndStaticModifiers(t *testing.T) {
 
 func TestFunctionDefaultParametersAST(t *testing.T) {
 	src := `
-	func makeUser(string $name, int $roleId = 2, bool $active = true) {
+	public func makeUser(string $name, int $roleId = 2, bool $active = true) {
 		return { "name": $name, "role_id": $roleId, "active": $active }
 	}
 	`

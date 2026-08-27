@@ -1,8 +1,8 @@
-func total(int $base, int $extra = 1): int {
+public func total(int $base, int $extra = 1): int {
     return $base + $extra
 }
 
-func factorial(int $value): int {
+public func factorial(int $value): int {
     ($value <= 1) ? {
         return 1
     } : {
@@ -10,7 +10,7 @@ func factorial(int $value): int {
     }
 }
 
-func optionalTotal(bool $available): int? {
+public func optionalTotal(bool $available): int? {
     $available ? {
         return total(2, 3)
     } : {
@@ -18,7 +18,7 @@ func optionalTotal(bool $available): int? {
     }
 }
 
-class Main {
+public class Main {
     Init main() {
         $value = total(2, 3)
         echo $value

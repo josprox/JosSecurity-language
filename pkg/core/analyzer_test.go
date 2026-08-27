@@ -47,7 +47,7 @@ string $usada = "hola"
 string $sinUsar = "chao"
 echo $usada
 
-func funcionInexistente() {
+public func funcionInexistente() {
 	echo $noDeclarada
 }
 `
@@ -87,7 +87,7 @@ func funcionInexistente() {
 func TestStaticAnalyzerRecognizesImplementedGranDBMethods(t *testing.T) {
 	code := `
 $categories = GranDB::table("products")->distinct()->pluck("category")
-GranDB::transaction(func($db) {
+GranDB::transaction(func(mixed $db) {
 	return GranDB::table("products")->count()
 })
 `

@@ -8,7 +8,7 @@ import (
 func TestRemovedCompatibilitySyntaxIsRejected(t *testing.T) {
 	cases := []string{
 		`function old() {}`,
-		`func current() { $callback = function() {} }`,
+		`public func current() { $callback = function() {} }`,
 		`import "other.joss"`,
 		`@import "global"`,
 		`use Package`,
@@ -25,7 +25,7 @@ func TestRemovedCompatibilitySyntaxIsRejected(t *testing.T) {
 }
 
 func TestCanonicalFuncAndReturnAnnotationParse(t *testing.T) {
-	p := NewParser(NewLexer(`func factorial(int $n): int { return $n }
+	p := NewParser(NewLexer(`public func factorial(int $n): int { return $n }
 $callback = func(string $value): string { return $value }`))
 	program := p.ParseProgram()
 	if errors := p.Errors(); len(errors) > 0 {

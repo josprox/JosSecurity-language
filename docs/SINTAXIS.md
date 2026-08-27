@@ -18,6 +18,8 @@ $config = {"port": 8000}
 
 `$age = "veinte"` es un error porque `$age` ya fue inferida como `int`. Sólo `let $dynamic` permite cambiar de tipo deliberadamente. Los tipos reconocidos incluyen `int`, `float`, `string`, `bool`, `array`, `map`, `object`, `channel` y clases. Una declaración numérica explícita puede convertir una cadena completa y válida antes de fallar; nunca trunca `"20.5"` a `int`.
 
+No existe un modo configurable: el tipado fuerte es la regla normal. Únicamente `let $x` y `mixed $x` son dinámicos.
+
 `const $name = valor` declara una constante inferida y `const Tipo $name = valor` una constante tipada. Las uniones se escriben `int|string`; `int?` es el atajo de `int|null`. Las funciones aceptan retorno opcional (`func name(...): Tipo`) y toda función anotada debe retornar o lanzar en cada ruta demostrable. Consulte [Sistema de tipos](SISTEMA_TIPOS.md).
 
 ## Operadores y Concatenación
@@ -39,7 +41,7 @@ $config = {"port": 8000}
 
 ```joss
 // Funciones globales con tipado y coerción automática inteligente
-func transferir(int $userId, float $monto, string $concepto) {
+public func transferir(int $userId, float $monto, string $concepto) {
     // Si $monto entra como string "150.50", Joss lo convierte limpiamente al tipo float
     return "Transferidos $" . $monto . " al usuario #" . $userId
 }
@@ -49,19 +51,36 @@ $doble = func(int $valor) {
 }
 ```
 
+Todo parámetro necesita tipo. Para un contrato dinámico debe escribirse `mixed $valor`; omitir el tipo ya no equivale a `mixed`.
+
+Las referencias seguras se declaran y pasan explícitamente:
+
+```joss
+public func swap(ref int $left, ref int $right): int {
+    $temporary = $left
+    $left = $right
+    $right = $temporary
+    return $left
+}
+
+$a = 1
+$b = 2
+swap(ref $a, ref $b)
+```
+
 ## Clases, Visibilidad y Herencia
 
-Joss soporta modificadores explícitos de visibilidad (`public`, `private`, `protected`), métodos estáticos (`static`) y herencia entre clases (`extends`):
+Joss exige modificadores explícitos de visibilidad. Clases y funciones globales usan `public` o `private`; métodos y propiedades usan `public`, `private` o `protected`. `static` no implica `public`. `Init` y las closures son construcciones especiales y no llevan visibilidad.
 
 ```joss
 public class BaseController {
-    protected $db
+    protected mixed $db
 
-    func constructor() {
+    public func constructor() {
         $this->db = new GranDB()
     }
 
-    protected func respondJson($data, $code = 200) {
+    protected func respondJson(mixed $data, int $code = 200) {
         return json($data, $code)
     }
 }

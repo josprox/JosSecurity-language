@@ -3,7 +3,7 @@
 Joss admite recursión directa y mutua. Para obtener comprobación estática útil, declare el tipo de retorno:
 
 ```joss
-func factorial(int $n): int {
+public func factorial(int $n): int {
     ($n <= 1) ? {
         return 1
     } : {

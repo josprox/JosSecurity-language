@@ -37,6 +37,10 @@ error[JOSS-TYPE-001] app/example.joss:3:2: Cannot use `string` as assignment for
 | `JOSS-TYPE-008` | Retorno incompatible con la anotación. |
 | `JOSS-TYPE-009` | Tipo fuente o clase de tipo inexistente. |
 | `JOSS-TYPE-010` | Una función anotada puede terminar sin retornar ni lanzar. |
+| `JOSS-TYPE-011` | Parámetro sin tipo explícito; escribir el tipo o `mixed`. |
+| `JOSS-REF-001..006` | Contrato `ref` inválido: marcador, l-value, constante, tipo, escape o default. |
+| `JOSS-ACCESS-001` | Declaración privada usada desde otro archivo. |
+| `JOSS-ACCESS-002` | Miembro privado/protegido inaccesible. |
 | `JOSS-CALL-001` | Aridad incorrecta. |
 | `JOSS-MEMBER-001` | Método inexistente en clase conocida. |
 | `JOSS-FLOW-001` | Código inalcanzable. |

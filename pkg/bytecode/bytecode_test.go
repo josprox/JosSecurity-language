@@ -8,8 +8,8 @@ import (
 
 func TestBytecodeEncodeDecode(t *testing.T) {
 	input := `
-class Calculator {
-    func add(int $a, int $b) {
+public class Calculator {
+    public func add(int $a, int $b) {
         return $a + $b;
     }
 }

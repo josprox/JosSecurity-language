@@ -97,7 +97,7 @@ func TestDefinedVariableWorks(t *testing.T) {
 
 func TestDefinedFunctionWorks(t *testing.T) {
 	mustNotPanic(t, `
-func greet() {
+public func greet() {
 	return "hello"
 }
 $result = greet()
@@ -108,7 +108,7 @@ func TestNullMemberAccessPanics(t *testing.T) {
 	// In Joss, member access uses -> (arrow) syntax.
 	// Accessing a non-existent property on a real instance → UndefinedProperty
 	mustPanicWithType(t, `
-class Foo {}
+public class Foo {}
 $f = new Foo()
 $v = $f->nonExistentProp
 `, "UndefinedProperty")

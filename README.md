@@ -104,8 +104,8 @@ joss run main.joss
 En Joss, la concatenación de cadenas se realiza **estrictamente con el operador punto (`.`)**, mientras que `+` es exclusivo para operaciones matemáticas numéricas.
 
 ```joss
-class SaludoService {
-    func saludar(string $nombre, int $edad) {
+public class SaludoService {
+    public func saludar(string $nombre, int $edad) {
         ($edad < 18) ? {
             return "Acceso restringido para menores"
         } : {

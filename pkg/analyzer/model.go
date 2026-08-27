@@ -14,9 +14,10 @@ type SourceUnit struct {
 }
 
 type Parameter struct {
-	Name       string
-	Type       typesystem.Type
-	HasDefault bool
+	Name        string
+	Type        typesystem.Type
+	HasDefault  bool
+	ByReference bool
 }
 
 type Callable struct {
@@ -24,11 +25,16 @@ type Callable struct {
 	Parameters []Parameter
 	ReturnType typesystem.Type
 	Variadic   bool
+	Visibility string
+	Owner      string
+	File       string
 }
 
 type Field struct {
-	Type     typesystem.Type
-	Constant bool
+	Type       typesystem.Type
+	Constant   bool
+	Visibility string
+	Owner      string
 }
 
 type Class struct {
@@ -36,6 +42,8 @@ type Class struct {
 	SuperClass string
 	Methods    map[string]Callable
 	Fields     map[string]Field
+	Visibility string
+	File       string
 }
 
 type Environment struct {

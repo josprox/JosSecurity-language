@@ -95,6 +95,7 @@ func (r *Runtime) evaluateNew(ne *parser.NewExpression) interface{} {
 	for _, stmt := range classStmt.Body.Statements {
 		if method, ok := stmt.(*parser.MethodStatement); ok {
 			if method.Name.Value == "constructor" || method.Name.Value == "main" {
+				r.requireMemberAccess(method.Visibility, classStmt.Name.Value, method.Name.Value, method.Name.Token.Line)
 				r.CallMethod(method, instance, ne.Arguments)
 				break
 			}
@@ -107,7 +108,12 @@ func (r *Runtime) evaluateNew(ne *parser.NewExpression) interface{} {
 					Parameters: initStmt.Parameters,
 					Body:       initStmt.Body,
 				}
-				r.CallMethod(method, instance, ne.Arguments)
+				func() {
+					previousClass := r.currentClass
+					r.currentClass = classStmt.Name.Value
+					defer func() { r.currentClass = previousClass }()
+					r.CallMethod(method, instance, ne.Arguments)
+				}()
 				break
 			}
 		}
@@ -131,6 +137,7 @@ func (r *Runtime) evaluateMember(me *parser.MemberExpression) interface{} {
 			}
 			for _, stmt := range classStmt.Body.Statements {
 				if method, methodOK := stmt.(*parser.MethodStatement); methodOK && method.Name.Value == me.Property.Value {
+					r.requireMemberAccess(method.Visibility, className, method.Name.Value, method.Name.Token.Line)
 					return &BoundMethod{Method: method, Instance: &Instance{Class: classStmt, Fields: make(map[string]interface{})}}
 				}
 			}
@@ -298,6 +305,9 @@ func (r *Runtime) evaluateMember(me *parser.MemberExpression) interface{} {
 	}
 
 	if val, ok := instance.Fields[propName]; ok {
+		if declaration, owner := r.lookupInstanceFieldOwner(instance, propName); declaration != nil {
+			r.requireMemberAccess(declaration.Visibility, owner, propName, me.Property.Token.Line)
+		}
 		return val
 	}
 
@@ -306,6 +316,7 @@ func (r *Runtime) evaluateMember(me *parser.MemberExpression) interface{} {
 		for _, stmt := range currentClass.Body.Statements {
 			if method, ok := stmt.(*parser.MethodStatement); ok {
 				if method.Name.Value == propName {
+					r.requireMemberAccess(method.Visibility, currentClass.Name.Value, propName, me.Property.Token.Line)
 					return &BoundMethod{Method: method, Instance: instance}
 				}
 			}

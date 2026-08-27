@@ -27,6 +27,7 @@
     "private",
     "protected",
     "public",
+    "ref",
     "return",
     "static",
     "this",

@@ -89,6 +89,22 @@ type PrefixExpression struct {
 	Right    Expression
 }
 
+// ReferenceExpression marks a mutable argument binding. It is deliberately a
+// call-site construct, not a first-class pointer value.
+type ReferenceExpression struct {
+	Token  Token // REF
+	Target Expression
+}
+
+func (re *ReferenceExpression) expressionNode()      {}
+func (re *ReferenceExpression) TokenLiteral() string { return re.Token.Literal }
+func (re *ReferenceExpression) String() string {
+	if re.Target == nil {
+		return "ref"
+	}
+	return "ref " + re.Target.String()
+}
+
 func (pe *PrefixExpression) expressionNode()      {}
 func (pe *PrefixExpression) TokenLiteral() string { return pe.Token.Literal }
 func (pe *PrefixExpression) String() string {

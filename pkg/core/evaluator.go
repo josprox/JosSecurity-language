@@ -31,6 +31,9 @@ func (r *Runtime) evaluateExpression(exp parser.Expression) interface{} {
 			return false
 		}
 		if val, ok := r.Variables[e.Value]; ok {
+			if reference, ok := val.(*VariableReference); ok {
+				return reference.Get()
+			}
 			return val
 		}
 		if classStmt, ok := r.Classes[e.Value]; ok {
@@ -77,6 +80,8 @@ func (r *Runtime) evaluateExpression(exp parser.Expression) interface{} {
 		return r.evaluatePostfix(e)
 	case *parser.MatchExpression:
 		return r.evaluateMatch(e)
+	case *parser.ReferenceExpression:
+		panic(&JossError{Type: "InvalidReference", Message: "`ref` solo puede usarse como argumento de una llamada", File: r.CurrentFile, Line: e.Token.Line})
 	}
 	return nil
 }

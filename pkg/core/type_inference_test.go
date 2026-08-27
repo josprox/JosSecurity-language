@@ -54,7 +54,7 @@ func TestRuntimeKeepsTypedParameterTypeInsideFunction(t *testing.T) {
 			t.Fatalf("expected typed parameter assignment panic, got %v", recovered)
 		}
 	}()
-	executeTypingSource(t, `func change(int $value) { $value = "wrong" }
+	executeTypingSource(t, `public func change(int $value) { $value = "wrong" }
 change(1)`)
 }
 
@@ -65,12 +65,12 @@ func TestRuntimeRejectsWrongFunctionArity(t *testing.T) {
 			t.Fatalf("expected arity panic, got %v", recovered)
 		}
 	}()
-	executeTypingSource(t, `func add(int $a, int $b) { return $a + $b }
+	executeTypingSource(t, `public func add(int $a, int $b) { return $a + $b }
 add(1)`)
 }
 
 func TestRuntimeRestoresParameterStateWhenBindingFails(t *testing.T) {
-	runtime := executeTypingSource(t, `func accept(int $value, string $label) { return $value }`)
+	runtime := executeTypingSource(t, `public func accept(int $value, string $label) { return $value }`)
 	defer runtime.Free()
 	runtime.Variables["value"] = int64(7)
 	runtime.VarTypes["value"] = "int"
@@ -93,7 +93,7 @@ func TestRuntimeRestoresParameterStateWhenBindingFails(t *testing.T) {
 }
 
 func TestRuntimeSupportsDirectRecursion(t *testing.T) {
-	runtime := executeTypingSource(t, `func factorial(int $n): int {
+	runtime := executeTypingSource(t, `public func factorial(int $n): int {
     ($n <= 1) ? { return 1 } : {}
     return $n * factorial($n - 1)
 }
@@ -105,7 +105,7 @@ $result = factorial(5)`)
 }
 
 func TestRuntimeRecursionKeepsIndependentLocals(t *testing.T) {
-	runtime := executeTypingSource(t, `func fibonacci(int $n): int {
+	runtime := executeTypingSource(t, `public func fibonacci(int $n): int {
     ($n <= 1) ? { return $n } : {}
     $left = fibonacci($n - 1)
     $right = fibonacci($n - 2)
@@ -119,11 +119,11 @@ $result = fibonacci(6)`)
 }
 
 func TestRuntimeSupportsMutualRecursion(t *testing.T) {
-	runtime := executeTypingSource(t, `func isEven(int $n): bool {
+	runtime := executeTypingSource(t, `public func isEven(int $n): bool {
     ($n == 0) ? { return true } : {}
     return isOdd($n - 1)
 }
-func isOdd(int $n): bool {
+public func isOdd(int $n): bool {
     ($n == 0) ? { return false } : {}
     return isEven($n - 1)
 }
@@ -135,8 +135,8 @@ $result = isEven(10)`)
 }
 
 func TestRuntimeSupportsRecursiveMethods(t *testing.T) {
-	runtime := executeTypingSource(t, `class Calculator {
-    func factorial(int $value): int {
+	runtime := executeTypingSource(t, `public class Calculator {
+    public func factorial(int $value): int {
         ($value <= 1) ? { return 1 } : { return $value * $this->factorial($value - 1) }
     }
 }
@@ -156,12 +156,12 @@ func TestRuntimeEnforcesDeclaredReturnType(t *testing.T) {
 			t.Fatalf("expected ReturnTypeError, got %v", recovered)
 		}
 	}()
-	executeTypingSource(t, `func invalid(): int { return "wrong" }
+	executeTypingSource(t, `public func invalid(): int { return "wrong" }
 $result = invalid()`)
 }
 
 func TestRuntimeStopsUnboundedRecursion(t *testing.T) {
-	p := parser.NewParser(parser.NewLexer(`func forever(): int { return forever() }`))
+	p := parser.NewParser(parser.NewLexer(`public func forever(): int { return forever() }`))
 	program := p.ParseProgram()
 	if errors := p.Errors(); len(errors) > 0 {
 		t.Fatalf("parse errors: %v", errors)
@@ -201,9 +201,9 @@ func TestRuntimeRejectsConstantPropertyReassignment(t *testing.T) {
 			t.Fatalf("expected ConstantAssignment, got %v", recovered)
 		}
 	}()
-	executeTypingSource(t, `class Limits {
-    const int $maximum = 10
-    func change() { $this->maximum = 20 }
+	executeTypingSource(t, `public class Limits {
+    public const int $maximum = 10
+    public func change() { $this->maximum = 20 }
 }
 $limits = new Limits()
 $limits->change()`)
@@ -217,9 +217,9 @@ func TestRuntimeRejectsTypedPropertyChange(t *testing.T) {
 			t.Fatalf("expected PropertyTypeError, got %v", recovered)
 		}
 	}()
-	executeTypingSource(t, `class Profile {
-    int $age = 20
-    func invalid() { $this->age = "twenty" }
+	executeTypingSource(t, `public class Profile {
+    public int $age = 20
+    public func invalid() { $this->age = "twenty" }
 }
 $profile = new Profile()
 $profile->invalid()`)
@@ -253,6 +253,6 @@ func TestNamedCallableCannotReadCallerLocal(t *testing.T) {
 		}
 	}()
 	executeTypingSource(t, `$secret = "caller-local"
-func leak() { return $secret }
+public func leak() { return $secret }
 $value = leak()`)
 }

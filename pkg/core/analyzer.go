@@ -168,7 +168,7 @@ func analysisCallable(name string, parameters []*parser.Parameter, returnToken p
 		if parameter.Type.Literal != "" && parameter.Type.Type != parser.VAR {
 			parameterType = typesystem.Parse(parameter.Type.Literal)
 		}
-		result.Parameters = append(result.Parameters, semanticanalyzer.Parameter{Name: parameter.Name.Value, Type: parameterType, HasDefault: parameter.DefaultValue != nil})
+		result.Parameters = append(result.Parameters, semanticanalyzer.Parameter{Name: parameter.Name.Value, Type: parameterType, HasDefault: parameter.DefaultValue != nil, ByReference: parameter.ByReference})
 	}
 	return result
 }

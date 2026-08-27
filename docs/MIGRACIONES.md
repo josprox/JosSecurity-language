@@ -13,8 +13,8 @@ El nombre puede escribirse como `create_products`, `create_products_table` o
 El generador crea una clase que extiende `Migration`, con `up()` y `down()`. El runner ejecuta migraciones pendientes en orden de nombre y registra el batch en la tabla de migraciones con el prefijo configurado.
 
 ```joss
-class CreateProductsTable extends Migration {
-    func up() {
+public class CreateProductsTable extends Migration {
+    public func up() {
         Schema::create("products", func($table) {
             $table->id()
             $table->string("name")
@@ -22,7 +22,7 @@ class CreateProductsTable extends Migration {
         })
     }
 
-    func down() {
+    public func down() {
         Schema::drop("products")
     }
 }

@@ -17,17 +17,17 @@ import (
 // TestE2ENativeJossFullFeature verifies comprehensive Joss plugin execution
 func TestE2ENativeJossFullFeature(t *testing.T) {
 	jossCode := `
-class Calculator {
-    func compute($mode, $val) {
+public class Calculator {
+    public func compute(mixed $mode, mixed $val) {
         return $mode == "double" ? $val * 2 : $val + 10
     }
 }
 
-func helper_square($n) {
+public func helper_square(mixed $n) {
     return $n * $n
 }
 
-func process_calculation($x) {
+public func process_calculation(mixed $x) {
     $sq = helper_square($x)
     return $sq + 5
 }
@@ -118,8 +118,8 @@ func process_calculation($x) {
 func TestPluginIsolation(t *testing.T) {
 	// Plugin 1: State A
 	codeA := `
-class Service {
-    func value() {
+public class Service {
+    public func value() {
         return "Service A"
     }
 }
@@ -136,8 +136,8 @@ class Service {
 
 	// Plugin 2: State B (same class name 'Service', different implementation)
 	codeB := `
-class Service {
-    func value() {
+public class Service {
+    public func value() {
         return "Service B"
     }
 }

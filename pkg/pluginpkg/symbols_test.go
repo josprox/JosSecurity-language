@@ -7,8 +7,8 @@ import (
 )
 
 func TestSymbolIndexPublishesCallableReturnTypes(t *testing.T) {
-	p := parser.NewParser(parser.NewLexer(`func lookup(int $id): string|null { return null }
-class Store { func count(): int { return 0 } }`))
+	p := parser.NewParser(parser.NewLexer(`public func lookup(int $id): string|null { return null }
+public class Store { public func count(): int { return 0 } }`))
 	program := p.ParseProgram()
 	if errors := p.Errors(); len(errors) > 0 {
 		t.Fatalf("parse errors: %v", errors)

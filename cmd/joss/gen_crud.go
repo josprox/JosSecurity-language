@@ -174,26 +174,26 @@ func createCRUDController(modelName, tableName string, cols []ColumnSchema, rela
 	}
 
 	requestData := generateRequestData(cols)
-	content := fmt.Sprintf(`class %sController {
+	content := fmt.Sprintf(`public class %sController {
     
-    func index() {
+    public func index() {
         %s
         return view("%s.index", {"items": $data})
     }
 
-    func create() {
+    public func create() {
         %s
         return view("%s.create", {%s})
     }
 
-    func store() {
+    public func store() {
         $model = new %s()
         $data = %s
         $model->insert($data)
         return redirect("/%s")->with("success", "%s creado correctamente.")
     }
 
-    func edit($id) {
+    public func edit(mixed $id) {
         $model = new %s()
         $item = $model->where("id", $id)->first()
         (!$item) ? {
@@ -203,14 +203,14 @@ func createCRUDController(modelName, tableName string, cols []ColumnSchema, rela
         return view("%s.edit", {"item": $item%s})
     }
 
-    func update($id) {
+    public func update(mixed $id) {
         $model = new %s()
         $data = %s
         $model->where("id", $id)->update($data)
         return redirect("/%s")->with("success", "%s actualizado correctamente.")
     }
 
-    func delete($id) {
+    public func delete(mixed $id) {
         $model = new %s()
         $model->where("id", $id)->delete()
         return redirect("/%s")->with("success", "%s eliminado correctamente.")

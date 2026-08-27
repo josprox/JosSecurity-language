@@ -3,13 +3,13 @@
 Un controlador es una clase Joss. El dispatcher resuelve `Controller@method` y también closures de ruta.
 
 ```joss
-class ProductController {
-    func index() {
+public class ProductController {
+    public func index() {
         $products = GranDB::table("products")->get()
         return view("products.index", {"products": $products})
     }
 
-    func store() {
+    public func store() {
         $name = request("name")
         (empty($name)) ? {
             return json({"error": "El nombre es obligatorio"}, 422)

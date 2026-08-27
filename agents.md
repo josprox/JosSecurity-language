@@ -38,6 +38,8 @@ La dirección de dependencias es `parser/typesystem/diagnostics → analyzer →
 - `var $x = 1`: inferencia explícita, también fija.
 - `int $x = 1` o `let int $x = 1`: tipo explícito.
 - `let $x = 1`: `mixed` explícito; permite cambiar de tipo.
+- `mixed $x = 1`: dinamismo explícito equivalente; no existe un modo de tipado en `joss.yaml`.
+- Todo parámetro fuente declara un tipo. Use `mixed $x` explícitamente; `$x` solo ya no conserva compatibilidad legacy.
 - Una inicialización `nil` pospone la inferencia hasta un valor concreto.
 - `T|null` declara una unión nullable; `T?` es sólo su atajo sintáctico y el AST lo normaliza a `T|null`.
 - La coerción de string a número/bool debe ser completa y sin pérdida; use `typesystem.CoerceString` tanto en análisis como en runtime.
@@ -45,6 +47,8 @@ La dirección de dependencias es `parser/typesystem/diagnostics → analyzer →
 - `const $x = ...` infiere un tipo fijo; `const int $x = ...` lo declara. También se protegen propiedades constantes.
 - `func name(...): Type` declara el retorno; analyzer y runtime validan cada retorno explícito y el analyzer exige retorno/throw en todas las rutas demostrables.
 - Cada invocación de función/método usa un frame aislado. Los callables con nombre sólo ven parámetros, locales, `this` y bindings del host/plugin; no heredan locales del caller. Las closures sí conservan su entorno capturado. La recursión está limitada por `Runtime.MaxCallDepth` (1024 por defecto).
+- `ref T $x` y `call(ref $value)` crean una referencia mutable temporal, invariante y no escapable. Sólo acepta variables no constantes; no admite defaults, campos/índices todavía, almacenamiento, retorno ni paso a nativos/async.
+- Clases y funciones globales exigen `public` o `private`; métodos y propiedades exigen `public`, `protected` o `private`. `static` nunca agrega visibilidad implícita. `Init` y closures no llevan modificador.
 
 No implemente reglas paralelas en parser, CLI o evaluator. Añada primero la regla y tests a `pkg/typesystem`, después consúmala desde analyzer/runtime.
 

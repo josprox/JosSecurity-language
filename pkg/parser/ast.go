@@ -42,10 +42,14 @@ type Parameter struct {
 	Type         Token // Optional: string, int, etc.
 	Name         *Identifier
 	DefaultValue Expression // Optional: = 200, = "default", etc.
+	ByReference  bool       // ref T $value; aliases a mutable caller binding
 }
 
 func (p *Parameter) String() string {
 	res := ""
+	if p.ByReference {
+		res += "ref "
+	}
 	if p.Type.Literal != "" && p.Type.Type != VAR { // VAR means $ which is not a type itself here
 		res += p.Type.Literal + " "
 	}

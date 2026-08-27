@@ -550,6 +550,10 @@ func (p *Parser) parseFunctionParameters() []*Parameter {
 
 func (p *Parser) parseParameter() *Parameter {
 	param := &Parameter{}
+	if p.curToken.Type == REF {
+		param.ByReference = true
+		p.nextToken()
+	}
 
 	// Optional type: T $value, T|null $value or T? $value.
 	if isTypeStart(p.curToken) && (p.peekToken.Type == VAR || isTypeContinuation(p.peekToken.Type)) {
@@ -577,6 +581,13 @@ func (p *Parser) parseParameter() *Parameter {
 	}
 
 	return param
+}
+
+func (p *Parser) parseReferenceExpression() Expression {
+	expression := &ReferenceExpression{Token: p.curToken}
+	p.nextToken()
+	expression.Target = p.parseExpression(PREFIX)
+	return expression
 }
 
 func (p *Parser) parseNewExpression() Expression {

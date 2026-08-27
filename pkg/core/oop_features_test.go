@@ -29,8 +29,8 @@ func (e *ScriptParseError) Error() string {
 
 func TestCoreMethodDefaultParameters(t *testing.T) {
 	src := `
-	class OrderCalculator {
-		func calculate(int $amount, float $tax = 0.16, int $discount = 0) {
+	public class OrderCalculator {
+		public func calculate(int $amount, float $tax = 0.16, int $discount = 0) {
 			return $amount + ($amount * $tax) - $discount
 		}
 	}
@@ -87,20 +87,20 @@ func TestCoreTryCatchAndThrow(t *testing.T) {
 
 func TestCoreClassInheritance(t *testing.T) {
 	src := `
-	class Animal {
-		string $species = "unknown"
+	public class Animal {
+		protected string $species = "unknown"
 
-		func speak() {
+		public func speak() {
 			return "Sonido generico de " . $this->species
 		}
 	}
 
-	class Dog extends Animal {
-		func constructor() {
+	public class Dog extends Animal {
+		public func constructor() {
 			$this->species = "canino"
 		}
 
-		func bark() {
+		public func bark() {
 			return "Guau!"
 		}
 	}

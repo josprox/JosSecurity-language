@@ -18,7 +18,7 @@ $db_switched = System::change_db("sqlite", {
 
 // 2. Creación de tabla con Schema
 Schema::dropIfExists("products")
-Schema::create("products", func($table) {
+Schema::create("products", func(mixed $table) {
     $table->increments("id")
     $table->string("name", 100)
     $table->string("category", 50)
@@ -93,7 +93,7 @@ $count_after_del = GranDB::table("products")->count()
 print("[13] Total tras borrar p3: " . $count_after_del . "\n")
 
 // 7. Transacciones con GranDB::transaction()
-GranDB::transaction(func($db) {
+GranDB::transaction(func(mixed $db) {
     GranDB::table("products")->insert({
         "name": "Teclado Mecánico",
         "category": "Electronics",

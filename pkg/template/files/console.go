@@ -8,7 +8,7 @@ func GetConsoleConfigFiles(path string) map[string]string {
 		filepath.Join(path, "main.joss"): `// Aplicación de Consola Joss
 // Entry Point
 
-class Main {
+public class Main {
     Init main() {
         print("=== Aplicación de Consola Joss ===")
         print("")
@@ -156,9 +156,9 @@ func GetConsoleAppFiles(path string) map[string]string {
 
 		// Example controller
 		filepath.Join(path, "app", "controllers", "ExampleController.joss"): `// Controlador de Ejemplo para Consola
-class ExampleController {
+public class ExampleController {
     
-    func ejecutar() {
+    public func ejecutar() {
         print("Ejecutando ExampleController...")
         
         // Tu lógica aquí
@@ -167,7 +167,7 @@ class ExampleController {
         return $resultado
     }
     
-    func procesarDatos() {
+    public func procesarDatos() {
         // Ejemplo de procesamiento
         $datos = ["item1", "item2", "item3"]
         
@@ -181,17 +181,17 @@ class ExampleController {
 
 		// Example model
 		filepath.Join(path, "app", "models", "ExampleModel.joss"): `// Modelo de Ejemplo
-class ExampleModel extends GranDB {
+public class ExampleModel extends GranDB {
     
     Init constructor() {
         $this->tabla = "js_example"
     }
     
-    func obtenerTodos() {
+    public func obtenerTodos() {
         return (new GranDB())->table($this->tabla)->get()
     }
     
-    func buscarPorId($id) {
+    public func buscarPorId(mixed $id) {
         return (new GranDB())->table($this->tabla)->where("id", $id)->first()
     }
 }`,

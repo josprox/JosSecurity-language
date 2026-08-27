@@ -433,8 +433,8 @@ dependencies:
 	pluginContent := fmt.Sprintf(`// plugin.joss
 // Se carga automaticamente al declarar %s en joss.yaml.
 
-class %s {
-    func version() {
+public class %s {
+    public func version() {
         return "1.0.0"
     }
 }

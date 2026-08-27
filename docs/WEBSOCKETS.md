@@ -5,8 +5,8 @@ Las rutas aceptan parámetros dinámicos. El primer argumento del handler es la 
 ```joss
 Router::ws("/rooms/{room}/users/{id}", "ChatController@connect")
 
-class ChatController {
-    func connect($ws, string $room, string $id) {
+public class ChatController {
+    public func connect($ws, string $room, string $id) {
         $ws->onMessage(func($message) {
             $ws->send($message)
         })
@@ -20,7 +20,7 @@ disponibles después de que el handler termina. El estado capturado se conserva
 entre mensajes y sus invocaciones se serializan:
 
 ```joss
-func connect($ws) {
+public func connect($ws) {
     $count = 0
     $ws->onMessage(func($message) {
         $count = $count + 1

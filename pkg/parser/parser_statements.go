@@ -31,7 +31,8 @@ func (p *Parser) parseStatement() Statement {
 		isStatic := false
 		if p.curToken.Type == STATIC {
 			isStatic = true
-			vis = "public"
+			vis = ""
+			p.addError(p.curToken, "`static` no implica visibilidad; escribe `public static`, `protected static` o `private static`.")
 		}
 
 		if p.peekToken.Type == STATIC {
@@ -40,6 +41,9 @@ func (p *Parser) parseStatement() Statement {
 		}
 
 		if p.peekToken.Type == CLASS {
+			if vis == "protected" {
+				p.addError(p.curToken, "Una clase de proyecto sólo puede ser `public` o `private`; `protected` se reserva para miembros.")
+			}
 			p.nextToken() // move to CLASS
 			classStmt := p.parseClassStatement()
 			if classStmt != nil {
@@ -49,6 +53,9 @@ func (p *Parser) parseStatement() Statement {
 		}
 
 		if p.peekToken.Type == FUNCTION {
+			if vis == "protected" {
+				p.addError(p.curToken, "Una función global sólo puede ser `public` o `private`; `protected` se reserva para miembros.")
+			}
 			p.nextToken() // move to FUNCTION
 			methodStmt := p.parseMethodStatement()
 			if methodStmt != nil {
@@ -56,6 +63,16 @@ func (p *Parser) parseStatement() Statement {
 				methodStmt.IsStatic = isStatic
 			}
 			return methodStmt
+		}
+
+		if p.peekToken.Type == CONST {
+			p.nextToken()
+			constant := p.parseConstStatement()
+			if declaration, ok := constant.(*LetStatement); ok {
+				declaration.Visibility = vis
+				declaration.IsStatic = isStatic
+			}
+			return constant
 		}
 
 		// Property: public $x = 1, private string $y
@@ -100,6 +117,7 @@ func (p *Parser) parseStatement() Statement {
 	}
 
 	if p.curToken.Type == CLASS {
+		p.addError(p.curToken, "Las clases requieren visibilidad explícita: `public class`, `protected class` o `private class`.")
 		return p.parseClassStatement()
 	}
 	if p.curToken.Type == INIT {
@@ -109,6 +127,7 @@ func (p *Parser) parseStatement() Statement {
 		return p.parseForeachStatement()
 	}
 	if p.curToken.Type == FUNCTION {
+		p.addError(p.curToken, "Las funciones con nombre requieren visibilidad explícita: `public func`, `protected func` o `private func`.")
 		return p.parseMethodStatement()
 	}
 	if p.curToken.Type == ECHO || p.curToken.Type == PRINT {
@@ -309,7 +328,8 @@ func (p *Parser) parseClassBody() *BlockStatement {
 			isStatic := false
 			if p.curToken.Type == STATIC {
 				isStatic = true
-				vis = "public"
+				vis = ""
+				p.addError(p.curToken, "`static` no implica visibilidad; escribe `public static`, `protected static` o `private static`.")
 			}
 			if p.peekToken.Type == STATIC {
 				isStatic = true
@@ -323,6 +343,13 @@ func (p *Parser) parseClassBody() *BlockStatement {
 					mStmt.Visibility = vis
 					mStmt.IsStatic = isStatic
 					stmt = mStmt
+				}
+			} else if p.peekToken.Type == CONST {
+				p.nextToken()
+				stmt = p.parseConstStatement()
+				if declaration, ok := stmt.(*LetStatement); ok {
+					declaration.Visibility = vis
+					declaration.IsStatic = isStatic
 				}
 			} else if p.peekToken.Type == VAR {
 				p.nextToken() // move to VAR
@@ -357,15 +384,19 @@ func (p *Parser) parseClassBody() *BlockStatement {
 				}
 			}
 		} else if p.curToken.Type == FUNCTION {
+			p.addError(p.curToken, "Los métodos requieren visibilidad explícita: `public func`, `protected func` o `private func`.")
 			stmt = p.parseMethodStatement()
 		} else if p.curToken.Type == INIT {
 			stmt = p.parseInitStatement()
 		} else if p.curToken.Type == CONST {
+			p.addError(p.curToken, "Las propiedades constantes requieren visibilidad explícita: `public const`, `protected const` o `private const`.")
 			stmt = p.parseConstStatement()
 		} else if (p.curToken.Type == LET || p.curToken.Literal == "let") && p.peekToken.Type == IDENT {
+			p.addError(p.curToken, "Las propiedades requieren visibilidad explícita antes de `let`.")
 			p.nextToken()
 			stmt = p.parseLetStatement()
 		} else if (p.curToken.Type == LET || p.curToken.Literal == "let") && p.peekToken.Type == VAR {
+			p.addError(p.curToken, "Las propiedades requieren visibilidad explícita antes de `let`.")
 			typeTok := Token{Type: IDENT, Literal: "mixed", Line: p.curToken.Line}
 			p.nextToken()
 			name := &Identifier{Token: p.curToken, Value: p.curToken.Literal}
@@ -379,14 +410,16 @@ func (p *Parser) parseClassBody() *BlockStatement {
 				Token:      typeTok,
 				Name:       name,
 				Value:      value,
-				Visibility: "public",
+				Visibility: "",
 			}
 			if p.peekToken.Type == SEMICOLON || p.peekToken.Type == NEWLINE {
 				p.nextToken()
 			}
 		} else if isTypeStart(p.curToken) && (p.peekToken.Type == VAR || isTypeContinuation(p.peekToken.Type)) { // Property: string $x
+			p.addError(p.curToken, "Las propiedades requieren visibilidad explícita: `public`, `protected` o `private`.")
 			stmt = p.parseLetStatement()
 		} else if p.curToken.Type == VAR { // Property without type: $x = 10
+			p.addError(p.curToken, "Las propiedades requieren visibilidad explícita: `public`, `protected` o `private`.")
 			name := &Identifier{Token: p.curToken, Value: p.curToken.Literal}
 			var value Expression
 			if p.peekToken.Type == ASSIGN {
@@ -398,7 +431,7 @@ func (p *Parser) parseClassBody() *BlockStatement {
 				Token:      Token{Type: IDENT, Literal: "mixed", Line: p.curToken.Line},
 				Name:       name,
 				Value:      value,
-				Visibility: "public",
+				Visibility: "",
 			}
 			if p.peekToken.Type == SEMICOLON || p.peekToken.Type == NEWLINE {
 				p.nextToken()

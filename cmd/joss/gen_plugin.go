@@ -45,17 +45,17 @@ dependencies:
 	pluginJossContent := fmt.Sprintf(`// src/plugin.joss
 // Clase exportada para interactuar con el plugin %s
 
-class %s {
+public class %s {
     Init constructor() {
         // Acceso directo y automático al entorno (.env) del proyecto
         $this->apiKey = env("%s_API_KEY", "")
     }
 
-    func ping() {
+    public func ping() {
         return "pong desde %s"
     }
 
-    func process($data) {
+    public func process(mixed $data) {
         return {
             "ok": true,
             "plugin": "%s",

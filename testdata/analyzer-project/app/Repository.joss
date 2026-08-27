@@ -1,10 +1,10 @@
-class Repository {
-    func find(int $id) {
+public class Repository {
+    public func find(int $id) {
         return $id
     }
 }
 
-func loadRepository() {
+public func loadRepository() {
     $repository = new Repository()
     return $repository->find(1)
 }

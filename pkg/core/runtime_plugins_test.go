@@ -25,13 +25,13 @@ func runJossCode(r *core.Runtime, code string) {
 func TestJossProgramConsumingNativeJossPlugin(t *testing.T) {
 	// 1. Compilar plugin nativo Joss
 	pluginSource := `
-class TaxService {
-    func calculate($amount) {
+public class TaxService {
+    public func calculate(mixed $amount) {
         return $amount * 0.16
     }
 }
 
-func calculate_discount($price, $pct) {
+public func calculate_discount(mixed $price, mixed $pct) {
     return $price - ($price * ($pct / 100))
 }
 `
@@ -271,8 +271,8 @@ $total = $score . " - OK"
 func TestMultiplePluginIsolationInRuntime(t *testing.T) {
 	// Plugin 1: Math V1
 	codeV1 := `
-class Worker {
-    func run() {
+public class Worker {
+    public func run() {
         return "Worker V1"
     }
 }
@@ -294,8 +294,8 @@ class Worker {
 
 	// Plugin 2: Math V2
 	codeV2 := `
-class Worker {
-    func run() {
+public class Worker {
+    public func run() {
         return "Worker V2"
     }
 }

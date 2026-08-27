@@ -4,7 +4,7 @@ import "path/filepath"
 
 func GetModelFiles(path string) map[string]string {
 	return map[string]string{
-		filepath.Join(path, "app", "models", "auth", "User.joss"): `class User extends GranDB {
+		filepath.Join(path, "app", "models", "auth", "User.joss"): `public class User extends GranDB {
     Init constructor() {
         $this->tabla = "users"
     }

@@ -84,7 +84,9 @@ func (a *Analyzer) declareFunction(method *parser.MethodStatement, file string) 
 			"Each project-level function must have a unique name.", "Rename or remove one declaration.")
 		return
 	}
-	a.functions[name] = functionDeclaration{callable: callableFromMethod(method), token: method.Name.Token, file: file}
+	callable := callableFromMethod(method)
+	callable.File = file
+	a.functions[name] = functionDeclaration{callable: callable, token: method.Name.Token, file: file}
 }
 
 func (a *Analyzer) declareClass(classNode *parser.ClassStatement, file string) {
@@ -104,20 +106,20 @@ func (a *Analyzer) declareClass(classNode *parser.ClassStatement, file string) {
 			"Class names share one project-wide namespace.", "Choose a unique class name.")
 		return
 	}
-	class := Class{Name: name, Methods: make(map[string]Callable), Fields: make(map[string]Field)}
+	class := Class{Name: name, Methods: make(map[string]Callable), Fields: make(map[string]Field), Visibility: classNode.Visibility, File: file}
 	if classNode.SuperClass != nil {
 		class.SuperClass = classNode.SuperClass.Value
 	}
 	if classNode.Body != nil {
 		for _, member := range classNode.Body.Statements {
 			if declaration, ok := member.(*parser.LetStatement); ok && declaration.Name != nil {
-				class.Fields[declaration.Name.Value] = Field{Type: typeFromToken(declaration.Token), Constant: declaration.IsConst}
+				class.Fields[declaration.Name.Value] = Field{Type: typeFromToken(declaration.Token), Constant: declaration.IsConst, Visibility: declaration.Visibility, Owner: name}
 				continue
 			}
 			if declarations, ok := member.(*parser.MultiLetStatement); ok {
 				for _, declaration := range declarations.Declarations {
 					if declaration.Name != nil {
-						class.Fields[declaration.Name.Value] = Field{Type: typeFromToken(declarations.TypeToken)}
+						class.Fields[declaration.Name.Value] = Field{Type: typeFromToken(declarations.TypeToken), Visibility: declarations.Visibility, Owner: name}
 					}
 				}
 				continue
@@ -131,6 +133,8 @@ func (a *Analyzer) declareClass(classNode *parser.ClassStatement, file string) {
 					continue
 				}
 				methodName, callable, token = method.Name.Value, callableFromMethod(method), method.Name.Token
+				callable.Owner = name
+				callable.File = file
 			case *parser.InitStatement:
 				if method.Name == nil {
 					continue
@@ -159,6 +163,7 @@ func callableFromMethod(method *parser.MethodStatement) Callable {
 		Name:       method.Name.Value,
 		Parameters: parametersFromAST(method.Parameters),
 		ReturnType: typeFromToken(method.ReturnType),
+		Visibility: method.Visibility,
 	}
 }
 
@@ -179,7 +184,7 @@ func parametersFromAST(parameters []*parser.Parameter) []Parameter {
 		if parameter.Type.Literal != "" && parameter.Type.Type != parser.VAR {
 			parameterType = typesystem.Parse(parameter.Type.Literal)
 		}
-		result = append(result, Parameter{Name: parameter.Name.Value, Type: parameterType, HasDefault: parameter.DefaultValue != nil})
+		result = append(result, Parameter{Name: parameter.Name.Value, Type: parameterType, HasDefault: parameter.DefaultValue != nil, ByReference: parameter.ByReference})
 	}
 	return result
 }
@@ -258,7 +263,17 @@ func (a *Analyzer) analyzeCallable(parameters []*parser.Parameter, body *parser.
 		if parameter == nil || parameter.Name == nil {
 			continue
 		}
+		if parameter.ByReference && parameter.DefaultValue != nil {
+			a.add("JOSS-REF-006", diagnostics.SeverityError, a.file, parameter.Name.Token,
+				fmt.Sprintf("Reference parameter `$%s` cannot have a default value.", parameter.Name.Value),
+				"A reference must alias a concrete mutable caller binding.", "Remove the default and require an explicit `ref` argument.")
+		}
 		parameterType := typesystem.Type{Kind: typesystem.Mixed}
+		if parameter.Type.Literal == "" || parameter.Type.Type == parser.VAR {
+			a.add("JOSS-TYPE-011", diagnostics.SeverityError, a.file, parameter.Name.Token,
+				fmt.Sprintf("Parameter `$%s` requires an explicit type.", parameter.Name.Value),
+				"Joss does not create implicit `mixed` parameters.", "Declare a concrete/class/union type, or write `mixed` explicitly when dynamism is intentional.")
+		}
 		if parameter.Type.Literal != "" && parameter.Type.Type != parser.VAR {
 			parameterType = typesystem.Parse(parameter.Type.Literal)
 			a.validateDeclaredType(parameterType, parameter.Type, "parameter type")

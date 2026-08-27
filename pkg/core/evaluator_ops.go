@@ -18,6 +18,9 @@ func (r *Runtime) evaluateAssign(ae *parser.AssignExpression) interface{} {
 	val := r.evaluateExpression(ae.Value)
 
 	if ident, ok := ae.Left.(*parser.Identifier); ok {
+		if reference, exists := r.Variables[ident.Value].(*VariableReference); exists {
+			return reference.Set(r, val)
+		}
 		if expectedType, exists := r.VarTypes[ident.Value]; exists {
 			if expectedType != "mixed" {
 				val = r.coerceToTypedValue(val, expectedType)
@@ -183,7 +186,8 @@ func (r *Runtime) setInstanceField(instance *Instance, name string, value interf
 			Line:    line,
 		})
 	}
-	if declaration := r.lookupInstanceField(instance, name); declaration != nil {
+	if declaration, owner := r.lookupInstanceFieldOwner(instance, name); declaration != nil {
+		r.requireMemberAccess(declaration.Visibility, owner, name, line)
 		declaredType := declaration.Token.Literal
 		if declaredType != "" && declaredType != "var" && declaredType != "mixed" {
 			value = r.coerceToTypedValue(value, declaredType)
@@ -202,8 +206,13 @@ func (r *Runtime) setInstanceField(instance *Instance, name string, value interf
 }
 
 func (r *Runtime) lookupInstanceField(instance *Instance, name string) *parser.LetStatement {
+	declaration, _ := r.lookupInstanceFieldOwner(instance, name)
+	return declaration
+}
+
+func (r *Runtime) lookupInstanceFieldOwner(instance *Instance, name string) (*parser.LetStatement, string) {
 	if instance == nil {
-		return nil
+		return nil, ""
 	}
 	visited := map[string]bool{}
 	for class := instance.Class; class != nil && class.Name != nil && !visited[class.Name.Value]; {
@@ -211,7 +220,7 @@ func (r *Runtime) lookupInstanceField(instance *Instance, name string) *parser.L
 		if class.Body != nil {
 			for _, statement := range class.Body.Statements {
 				if declaration, ok := statement.(*parser.LetStatement); ok && declaration.Name != nil && declaration.Name.Value == name {
-					return declaration
+					return declaration, class.Name.Value
 				}
 			}
 		}
@@ -220,5 +229,5 @@ func (r *Runtime) lookupInstanceField(instance *Instance, name string) *parser.L
 		}
 		class = r.Classes[class.SuperClass.Value]
 	}
-	return nil
+	return nil, ""
 }

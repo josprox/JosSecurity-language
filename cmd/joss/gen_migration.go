@@ -40,17 +40,17 @@ func createMigration(name string) error {
 	content := fmt.Sprintf(`// Migration: %s
 // Created at: %s
 
-class Create%sTable extends Migration {
-    func up() {
+public class Create%sTable extends Migration {
+    public func up() {
         // Schema::create automatically handles the prefix defined in env.joss
-        Schema::create("%s", func($table) {
+        Schema::create("%s", func(mixed $table) {
             $table->id()
             $table->string("name")
             $table->timestamps()
         })
     }
 
-    func down() {
+    public func down() {
         Schema::drop("%s")
     }
 }
