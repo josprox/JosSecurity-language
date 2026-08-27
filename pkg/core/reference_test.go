@@ -26,5 +26,5 @@ overwrite(ref $amount)`, "ReferenceTypeError")
 
 func TestMutableReferenceCannotEscapeToNativeFunction(t *testing.T) {
 	mustPanicWithType(t, `$value = 1
-print(ref $value)`, "ReferenceEscape")
+len(ref $value)`, "ReferenceEscape")
 }
