@@ -190,11 +190,12 @@ func (r *Runtime) callBuiltinString(name string, args []interface{}) (interface{
 		if len(args) >= 2 {
 			haystack := fmt.Sprintf("%v", args[0])
 			needle := fmt.Sprintf("%v", args[1])
-			idx := strings.Index(haystack, needle)
-			if idx == -1 {
+			byteIdx := strings.Index(haystack, needle)
+			if byteIdx == -1 {
 				return false, true
 			}
-			return int64(idx), true
+			runeIdx := len([]rune(haystack[:byteIdx]))
+			return int64(runeIdx), true
 		}
 		return false, true
 
