@@ -1,5 +1,13 @@
 # Changelog
 
+## [3.6.4] - 2026-08-30
+
+### Added
+
+- `Redis` native class now supports transparent auto-connection from `REDIS_URL`, `REDIS_HOST`, `REDIS_PORT`, `REDIS_PASSWORD`, `REDIS_USER`, and `REDIS_DB`.
+- Added `Redis::has()`, `Redis::forget()`, `Redis::ttl()`, and `Redis::flush()` methods.
+- Support for URL connection strings (`redis://...`) and separate host/port definitions in web session driver (`SESSION_DRIVER="redis"`).
+
 ## [3.6.3] - 2026-07-28
 
 ### Fixed

@@ -71,9 +71,28 @@ CORS_WEB="https://app.example.com"
 ```
 
 - `file` es el driver de sesión predeterminado y persiste reinicios. `memory` es explícitamente volátil.
-- `SESSION_DRIVER=redis` usa `REDIS_HOST`, `REDIS_PASSWORD` y `REDIS_DB`.
+- `SESSION_DRIVER="redis"` almacena las sesiones web en Redis en lugar de disco.
 - Certificado y llave TLS deben configurarse juntos.
 - `CORS_WEB=*` permite cualquier origen sin credenciales; una lista separada por comas crea una whitelist exacta.
+
+## Redis y Caché Distribuida
+
+Joss incluye un cliente nativo de Redis con auto-conexión y soporte de sesiones:
+
+```env
+# Opción A: URL completa estándar
+REDIS_URL="redis://default:password@127.0.0.1:6379/0"
+
+# Opción B: Variables individuales (puerto 6379 y DB 0 por defecto)
+REDIS_HOST="127.0.0.1"
+REDIS_PORT="6379"
+REDIS_USER="default"
+REDIS_PASSWORD="password"
+REDIS_DB="0"
+```
+
+- Si `REDIS_URL` o `REDIS_HOST` están presentes, la clase `Redis::set()`, `Redis::get()`, etc. se auto-conecta en la primera llamada.
+- `SESSION_DRIVER="redis"` utiliza automáticamente estas credenciales.
 
 ## Procesos y plugins
 

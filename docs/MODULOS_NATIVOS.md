@@ -18,6 +18,7 @@ La tabla enumera la superficie registrada por el runtime. Una llamada estática 
 | `Plugin` | `call`, `stream`, `path`, `platform` |
 | `SEO` | `title`, `description`, `keywords`, `canonical`, `og`, `twitter`, `meta` |
 | Utilidades | `Math`, `Str` (`length`, `random`, `startsWith`, `substring`, `indexOf`, `contains`, `trim`, `replace`), `UUID`, `JSON`, `Markdown`, `Cache`, `Zip`, `Stack`, `Queue` |
+| `Redis` | `connect`, `set`, `get`, `del`, `forget`, `has`, `ttl`, `flush`. Conexión automática desde variables de entorno (`REDIS_URL` o `REDIS_HOST`/`REDIS_PORT`/`REDIS_PASSWORD`). |
 | Procesos | `Process`, `Server`, `Stream` |
 | Aplicación | `View`, `Cron`, `Task`, `Lang`, `SEO`, `Sitemap`, `UserStorage`, `SQLite`, `Redis`, `WebSocket` |
 
@@ -137,8 +138,14 @@ Joss proporciona una amplia biblioteca de funciones globales nativas listas para
 * `back()`: Redirige a la página anterior con soporte de `.with()`.
 * `response(content, [status])`: Emite una respuesta HTTP raw.
 * `request([key], [default])`: Accede a los parámetros y cuerpo de la petición HTTP.
-* `session([key], [value])`: Accede a la sesión de usuario activa.
-* `run(scriptPath, ...args)`: Ejecuta scripts externos (`.py` o `.php`) si `ALLOW_SYSTEM_RUN=true`.
+### 8. Redis y Almacenamiento en Memoria Distribuida
+* `Redis::set(key, value, [ttlSeconds])`: Almacena un valor en Redis con tiempo de expiración opcional en segundos.
+* `Redis::get(key)`: Obtiene el valor asociado a la clave desde Redis (o `null` si no existe o expiró).
+* `Redis::has(key)`: Comprueba si la clave existe en Redis (`true`/`false`).
+* `Redis::del(key)` / `Redis::forget(key)`: Elimina la clave de Redis.
+* `Redis::ttl(key)`: Retorna los segundos restantes de vida de la clave (o `-1` si no expira / `-2` si no existe).
+* `Redis::flush()`: Vacía la base de datos de Redis actual (`FlushDB`).
+* `Redis::connect(host, [password], [db])`: Conexión manual opcional (por defecto se auto-conecta con las variables de entorno).
 
 ---
 
@@ -151,3 +158,4 @@ Joss proporciona una amplia biblioteca de funciones globales nativas listas para
 - `Response::raw($data, $status, $mime, $headers)` evita la transformación HTML y sirve binarios.
 - `Response::error($message, $status)` crea JSON con la clave `error`; el status predeterminado es 400.
 - `System::load_driver($path, $name=nil)` carga una DLL, SO o dylib con la ABI C v1; `driver_call($name, $method, $args=[])` la invoca y decodifica su JSON.
+- `Redis` se inicializa automáticamente si `REDIS_URL` o `REDIS_HOST` están configurados en el archivo `.env` o variables del sistema operativo.
