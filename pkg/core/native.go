@@ -171,7 +171,7 @@ func (r *Runtime) RegisterNativeClasses() {
 	r.registerNative("Blueprint", blueprintMethods, (*Runtime).executeBlueprintMethod)
 
 	// Redis
-	r.registerNative("Redis", []string{"connect", "set", "get", "del"}, (*Runtime).executeRedisMethod)
+	r.registerNative("Redis", []string{"connect", "set", "get", "del", "has", "forget", "ttl", "flush"}, (*Runtime).executeRedisMethod)
 	r.Variables["Redis"] = &Instance{Class: r.Classes["Redis"], Fields: make(map[string]interface{})}
 
 	// Migration
