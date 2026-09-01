@@ -6,7 +6,6 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
-	"strings"
 
 	"github.com/jossecurity/joss/pkg/formatter"
 	"github.com/jossecurity/joss/pkg/parser"
@@ -101,13 +100,12 @@ func (f *Fixer) FixDirectory(dir string) ([]FixResult, error) {
 			return err
 		}
 		if d.IsDir() {
-			name := d.Name()
-			if name == "node_modules" || name == ".git" || name == "vendor" {
+			if parser.IsIgnoredDirectory(d.Name()) {
 				return filepath.SkipDir
 			}
 			return nil
 		}
-		if strings.EqualFold(filepath.Ext(path), ".joss") && !parser.IsIgnoredSourceFile(path) {
+		if parser.IsJossSourceFile(path) {
 			res, fixErr := f.FixFile(path)
 			if fixErr != nil {
 				return fmt.Errorf("failed fixing %s: %w", path, fixErr)

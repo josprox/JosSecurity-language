@@ -344,13 +344,12 @@ func FormatDirectory(root string, write bool, check bool) ([]string, error) {
 			return err
 		}
 		if d.IsDir() {
-			name := d.Name()
-			if name == "node_modules" || name == ".git" || name == "vendor" || name == ".cache" {
+			if parser.IsIgnoredDirectory(d.Name()) {
 				return filepath.SkipDir
 			}
 			return nil
 		}
-		if strings.EqualFold(filepath.Ext(path), ".joss") && !parser.IsIgnoredSourceFile(path) {
+		if parser.IsJossSourceFile(path) {
 			changed, formatErr := FormatFile(path, write)
 			if formatErr != nil {
 				return fmt.Errorf("error formatting %s: %w", path, formatErr)

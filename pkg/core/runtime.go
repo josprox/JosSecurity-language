@@ -562,22 +562,11 @@ func (i *Instance) Clone() *Instance {
 	return newI
 }
 
-// PreloadAppFiles strictly preloads .joss files recursively within domain folders:
-// app/controllers, app/models, app/middleware, app/services, app/database, app/jobs, app/tasks, app/providers.
+// PreloadAppFiles strictly preloads .joss files recursively within domain folders defined in parser.StandardAppDomains.
 func (r *Runtime) PreloadAppFiles(targetPath string) {
 	if targetPath == "" || targetPath == "app" {
-		domains := []string{
-			filepath.Join("app", "controllers"),
-			filepath.Join("app", "models"),
-			filepath.Join("app", "middleware"),
-			filepath.Join("app", "services"),
-			filepath.Join("app", "database"),
-			filepath.Join("app", "jobs"),
-			filepath.Join("app", "tasks"),
-			filepath.Join("app", "providers"),
-		}
-		for _, domain := range domains {
-			r.preloadSingleDir(domain)
+		for _, domain := range parser.StandardAppDomains {
+			r.preloadSingleDir(filepath.FromSlash(domain))
 		}
 		return
 	}
@@ -591,10 +580,16 @@ func (r *Runtime) preloadSingleDir(dirPath string) {
 	}
 
 	_ = filepath.Walk(dirPath, func(path string, info os.FileInfo, err error) error {
-		if err != nil || info.IsDir() {
+		if err != nil {
 			return nil
 		}
-		if strings.HasSuffix(path, ".joss") && !parser.IsIgnoredSourceFile(path) {
+		if info.IsDir() {
+			if parser.IsIgnoredDirectory(info.Name()) {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		if parser.IsJossSourceFile(path) {
 			content, readErr := os.ReadFile(path)
 			if readErr == nil {
 				l := parser.NewLexer(string(content))
@@ -621,7 +616,7 @@ func (r *Runtime) PreloadVFSAppFiles(fs http.FileSystem, targetPath string) {
 		return
 	}
 
-	domains := []string{"app/controllers", "app/models", "app/middleware", "app/services", "app/database", "app/jobs", "app/tasks", "app/providers"}
+	domains := parser.StandardAppDomains
 	if targetPath != "" && targetPath != "app" {
 		domains = []string{filepath.ToSlash(targetPath)}
 	}

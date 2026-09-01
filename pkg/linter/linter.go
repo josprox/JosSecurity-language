@@ -104,13 +104,12 @@ func (l *Linter) LintPath(targetPath string) ([]LintIssue, error) {
 			return err
 		}
 		if d.IsDir() {
-			name := d.Name()
-			if name == "node_modules" || name == ".git" || name == "vendor" {
+			if parser.IsIgnoredDirectory(d.Name()) {
 				return filepath.SkipDir
 			}
 			return nil
 		}
-		if strings.EqualFold(filepath.Ext(path), ".joss") && !parser.IsIgnoredSourceFile(path) {
+		if parser.IsJossSourceFile(path) {
 			data, readErr := os.ReadFile(path)
 			if readErr != nil {
 				return readErr

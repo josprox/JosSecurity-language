@@ -5,7 +5,6 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
-	"strings"
 
 	"github.com/jossecurity/joss/pkg/diagnostics"
 	"github.com/jossecurity/joss/pkg/parser"
@@ -30,9 +29,12 @@ func LoadProject(entrypoint string, sourceDirs ...string) ([]SourceUnit, []diagn
 				return nil
 			}
 			if info.IsDir() {
+				if parser.IsIgnoredDirectory(info.Name()) {
+					return filepath.SkipDir
+				}
 				return nil
 			}
-			if parser.IsIgnoredSourceFile(path) || !strings.EqualFold(filepath.Ext(path), ".joss") {
+			if !parser.IsJossSourceFile(path) {
 				return nil
 			}
 			absolute, err := filepath.Abs(path)
