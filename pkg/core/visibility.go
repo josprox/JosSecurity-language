@@ -18,6 +18,27 @@ func (r *Runtime) declaringClassOfMethod(method *parser.MethodStatement) string 
 			if candidate, ok := statement.(*parser.MethodStatement); ok && candidate == method {
 				return className
 			}
+			if initStmt, ok := statement.(*parser.InitStatement); ok && (initStmt.Body == method.Body || (initStmt.Name != nil && method.Name != nil && initStmt.Name.Value == method.Name.Value)) {
+				return className
+			}
+		}
+	}
+	if r.PluginRegistry != nil {
+		for _, p := range r.PluginRegistry.List() {
+			if prog := p.Program(); prog != nil {
+				for _, stmt := range prog.Statements {
+					if class, ok := stmt.(*parser.ClassStatement); ok && class.Body != nil {
+						for _, statement := range class.Body.Statements {
+							if candidate, ok := statement.(*parser.MethodStatement); ok && candidate == method {
+								return class.Name.Value
+							}
+							if initStmt, ok := statement.(*parser.InitStatement); ok && (initStmt.Body == method.Body || (initStmt.Name != nil && method.Name != nil && initStmt.Name.Value == method.Name.Value)) {
+								return class.Name.Value
+							}
+						}
+					}
+				}
+			}
 		}
 	}
 	return ""

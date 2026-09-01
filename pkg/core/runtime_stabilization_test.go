@@ -40,6 +40,36 @@ $res2 = $add20(5)
 	}
 }
 
+func TestClosureCapturesAndMutatesOuterVariable(t *testing.T) {
+	source := `
+public func makeTracker() {
+    $history = []
+    return func(mixed $msg) {
+        $count = 0
+        foreach ($history as $item) {
+            $count = $count + 1
+        }
+        $history = array_push($history, $msg)
+        return $count
+    }
+}
+$tracker = makeTracker()
+$c0 = $tracker("first")
+$c1 = $tracker("second")
+$c2 = $tracker("third")
+`
+	r := runStabilizationProgram(t, source)
+	if got := r.Variables["c0"]; got != int64(0) && got != 0 {
+		t.Fatalf("c0 = %v, want 0", got)
+	}
+	if got := r.Variables["c1"]; got != int64(1) && got != 1 {
+		t.Fatalf("c1 = %v, want 1", got)
+	}
+	if got := r.Variables["c2"]; got != int64(2) && got != 2 {
+		t.Fatalf("c2 = %v, want 2", got)
+	}
+}
+
 // 2. Test Ref + Slots: Passing references across multiple call levels modifies caller slots in-place.
 func TestRefParametersAcrossMultipleLevels(t *testing.T) {
 	source := `

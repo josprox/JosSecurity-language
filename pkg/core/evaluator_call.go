@@ -3,6 +3,7 @@ package core
 import (
 	"fmt"
 	"reflect"
+	"strings"
 
 	"github.com/jossecurity/joss/pkg/parser"
 	runtimeerrors "github.com/jossecurity/joss/pkg/runtime/errors"
@@ -62,6 +63,18 @@ func (r *Runtime) callMethodEvaluatedWithPlan(method *parser.MethodStatement, in
 	if instance != nil && compiled.ThisSlot >= 0 {
 		callFrame.slots[compiled.ThisSlot].Set(instance)
 	}
+	if writeBack != nil {
+		for index, info := range compiled.Slots {
+			if index >= compiled.ParameterCount {
+				cleanName := strings.TrimPrefix(info.Name, "$")
+				if val, ok := writeBack.Variables[cleanName]; ok {
+					callFrame.slots[index].Set(val)
+				} else if val, ok := writeBack.Variables["$"+cleanName]; ok {
+					callFrame.slots[index].Set(val)
+				}
+			}
+		}
+	}
 
 	previousCaptureEnvironment := r.captureEnvironment
 	r.captureEnvironment = nil
@@ -71,10 +84,14 @@ func (r *Runtime) callMethodEvaluatedWithPlan(method *parser.MethodStatement, in
 		r.currentClass = previousClass
 		if writeBack != nil {
 			for name := range writeBack.Variables {
-				if index, exists := compiled.NameSlots[name]; exists && index >= compiled.ParameterCount {
+				cleanName := strings.TrimPrefix(name, "$")
+				if index, exists := compiled.NameSlots[cleanName]; exists && index >= compiled.ParameterCount {
 					slot := &callFrame.slots[index]
 					if slot.Initialized {
-						writeBack.Variables[name] = slot.Value.Interface()
+						val := slot.Value.Interface()
+						writeBack.Variables[name] = val
+						writeBack.Variables[cleanName] = val
+						writeBack.Variables["$"+cleanName] = val
 						writeBack.VarTypes[name] = slot.TypeName
 						writeBack.Constants[name] = slot.Constant
 					}

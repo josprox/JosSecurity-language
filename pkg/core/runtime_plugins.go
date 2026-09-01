@@ -9,6 +9,7 @@ import (
 	"github.com/jossecurity/joss/pkg/parser"
 	"github.com/jossecurity/joss/pkg/pluginpkg"
 	"github.com/jossecurity/joss/pkg/pluginruntime"
+	"github.com/jossecurity/joss/pkg/typesystem"
 )
 
 // PluginCallable representa una funcion o metodo exportado por un plugin .jp.
@@ -89,11 +90,29 @@ func (e *PluginASTEngine) Instantiate(className string, args []interface{}) (int
 		return nil, fmt.Errorf("clase %s no encontrada en plugin %s", className, e.PluginName)
 	}
 	inst := &Instance{
-		Class:  classStmt,
-		Fields: make(map[string]interface{}),
+		Class:     classStmt,
+		Fields:    make(map[string]interface{}),
+		Constants: make(map[string]bool),
 	}
 	inst.Fields["__plugin__"] = e.PluginName
+
 	if classStmt.Body != nil {
+		for _, member := range classStmt.Body.Statements {
+			if letStmt, ok := member.(*parser.LetStatement); ok && letStmt.Name != nil {
+				var val interface{}
+				if letStmt.Value != nil && e.Runtime != nil {
+					val = e.Runtime.evaluateExpression(letStmt.Value)
+				}
+				if letStmt.Token.Literal != "" && letStmt.Token.Literal != "var" && letStmt.Token.Literal != "mixed" && e.Runtime != nil {
+					val = e.Runtime.coerceToParsedType(val, typesystem.Parse(letStmt.Token.Literal))
+				}
+				inst.Fields[letStmt.Name.Value] = val
+				if letStmt.IsConst {
+					inst.Constants[letStmt.Name.Value] = true
+				}
+			}
+		}
+
 		for _, member := range classStmt.Body.Statements {
 			if initStmt, ok := member.(*parser.InitStatement); ok {
 				method := &parser.MethodStatement{
@@ -103,6 +122,10 @@ func (e *PluginASTEngine) Instantiate(className string, args []interface{}) (int
 					Body:       initStmt.Body,
 				}
 				e.Runtime.CallMethodEvaluated(method, inst, args)
+				break
+			}
+			if methodStmt, ok := member.(*parser.MethodStatement); ok && methodStmt.Name != nil && (methodStmt.Name.Value == "constructor" || methodStmt.Name.Value == "init") {
+				e.Runtime.CallMethodEvaluated(methodStmt, inst, args)
 				break
 			}
 		}

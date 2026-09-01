@@ -70,7 +70,7 @@ func (r *Runtime) planForMethod(method *parser.MethodStatement) *runtimeplan.Cal
 		return compiled
 	}
 	owner := r.declaringClassOfMethod(method)
-	compiled := runtimeplan.CompileMethod(method, owner != "")
+	compiled := runtimeplan.CompileMethod(method, true)
 	compiled.Owner = owner
 	r.callablePlans[method] = compiled
 	return compiled

@@ -183,6 +183,10 @@ func MainHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if r.URL.Path == "/favicon.ico" {
+		if _, err := os.Stat("public/favicon.ico"); err == nil {
+			http.ServeFile(w, r, "public/favicon.ico")
+			return
+		}
 		if _, err := os.Stat("assets/logo.png"); err == nil {
 			http.ServeFile(w, r, "assets/logo.png")
 			return
@@ -881,6 +885,11 @@ func MainHandler(w http.ResponseWriter, r *http.Request) {
 		fmt.Printf("[DEBUG] Dispatch error: %v\n", err)
 	}
 
+	// Try serving static files from public/ directory before 404 (e.g. /ads.txt, /robots.txt, etc.)
+	if servePublicFile(w, r) {
+		return
+	}
+
 	// Fallback / 404
 	if r.URL.Path == "/" {
 		w.Header().Set("Content-Type", "text/html")
@@ -893,6 +902,47 @@ func MainHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	http.NotFound(w, r)
+}
+
+func servePublicFile(w http.ResponseWriter, r *http.Request) bool {
+	if r.Method != "GET" && r.Method != "HEAD" {
+		return false
+	}
+	cleanPath := strings.TrimPrefix(filepath.Clean(r.URL.Path), string(filepath.Separator))
+	cleanPath = strings.TrimPrefix(cleanPath, "/")
+	cleanPath = strings.TrimPrefix(cleanPath, "\\")
+	if cleanPath == "" || cleanPath == "." || strings.Contains(cleanPath, "..") {
+		return false
+	}
+
+	// 1. VFS Mode
+	if GlobalFileSystem != nil {
+		vfsPath := "/public/" + cleanPath
+		f, err := GlobalFileSystem.Open(vfsPath)
+		if err != nil {
+			vfsPath = cleanPath
+			f, err = GlobalFileSystem.Open(vfsPath)
+		}
+		if err == nil {
+			defer f.Close()
+			stat, err := f.Stat()
+			if err == nil && !stat.IsDir() {
+				http.ServeContent(w, r, stat.Name(), stat.ModTime(), f)
+				return true
+			}
+		}
+		return false
+	}
+
+	// 2. Disk Mode
+	diskPath := filepath.Join("public", cleanPath)
+	stat, err := os.Stat(diskPath)
+	if err == nil && !stat.IsDir() {
+		http.ServeFile(w, r, diskPath)
+		return true
+	}
+
+	return false
 }
 
 func getHotReloadScript() string {

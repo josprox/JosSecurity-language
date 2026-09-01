@@ -336,3 +336,87 @@ public class Worker {
 		t.Errorf("plugin_v2 esperado 'Worker V2', obtenido: %v", val2)
 	}
 }
+
+func TestJossProgramConsumingNativePluginWithInitConstructorAndThis(t *testing.T) {
+	pluginSource := `
+public class NotifyService {
+    Init constructor() {
+        $this->app_name = "joss_red"
+        $this->count = 42
+        $this->setup()
+    }
+
+    public func setup() {
+        $this->status = "ready"
+    }
+
+    public func getStatus() {
+        return $this->status
+    }
+
+    public func getAppName() {
+        return $this->app_name
+    }
+
+    public func getCount() {
+        return $this->count
+    }
+}
+`
+	prog := parser.NewParser(parser.NewLexer(pluginSource)).ParseProgram()
+	encodedAST, err := bytecode.Encode(prog)
+	if err != nil {
+		t.Fatalf("error encoding AST: %v", err)
+	}
+
+	metadata := pluginpkg.Metadata{
+		Name:     "joss_notify",
+		Version:  "1.0.0",
+		Language: "joss",
+		Bytecode: "bytecode/main.jbc",
+		Symbols:  pluginpkg.SymbolsPath,
+		Exports:  []string{"NotifyService"},
+	}
+
+	symbolsJSON := []byte(`{
+		"schema": 1,
+		"package": "joss_notify",
+		"version": "1.0.0",
+		"classes": [{"name": "NotifyService", "methods": [{"name": "getStatus"}, {"name": "getAppName"}, {"name": "getCount"}]}]
+	}`)
+
+	files := map[string][]byte{
+		"bytecode/main.jbc":   encodedAST,
+		pluginpkg.SymbolsPath: symbolsJSON,
+		"joss.yaml":           []byte("name: joss_notify\nversion: 1.0.0\n"),
+	}
+
+	key, _, _ := pluginpkg.LoadOrCreateSigningKey("joss_notify")
+	jpBytes, err := pluginpkg.BuildSigned(metadata, files, key)
+	if err != nil {
+		t.Fatalf("error building .jp: %v", err)
+	}
+
+	r := core.NewRuntime()
+	if err := r.LoadPluginBytes(jpBytes); err != nil {
+		t.Fatalf("error cargando .jp en Runtime: %v", err)
+	}
+
+	appCode := `
+$service = new NotifyService()
+$status = $service->getStatus()
+$app = $service->getAppName()
+$count = $service->getCount()
+`
+	runJossCode(r, appCode)
+
+	if r.Variables["status"] != "ready" {
+		t.Errorf("NotifyService.getStatus esperado 'ready', obtenido: %v", r.Variables["status"])
+	}
+	if r.Variables["app"] != "joss_red" {
+		t.Errorf("NotifyService.getAppName esperado 'joss_red', obtenido: %v", r.Variables["app"])
+	}
+	if r.Variables["count"] != int64(42) && r.Variables["count"] != 42 {
+		t.Errorf("NotifyService.getCount esperado 42, obtenido: %v", r.Variables["count"])
+	}
+}
