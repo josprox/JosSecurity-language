@@ -33,6 +33,7 @@ func CreateBibleProject(path string) {
 		filepath.Join(path, "public", "js"),
 		filepath.Join(path, "public", "images"),
 		filepath.Join(path, "storage"),
+		filepath.Join(path, "tests"),
 	}
 
 	for _, dir := range dirs {
@@ -94,6 +95,7 @@ func CreateConsoleProject(path string) {
 		filepath.Join(path, "app", "controllers"),
 		filepath.Join(path, "app", "libs"),
 		filepath.Join(path, "app", "database", "migrations"),
+		filepath.Join(path, "tests"),
 	}
 
 	for _, dir := range dirs {
@@ -120,6 +122,11 @@ func CreateConsoleProject(path string) {
 
 	// Write files
 	for file, content := range allFiles {
+		dir := filepath.Dir(file)
+		if err := os.MkdirAll(dir, 0755); err != nil {
+			fmt.Printf("Error creando directorio %s: %v\n", dir, err)
+			continue
+		}
 		err := os.WriteFile(file, []byte(content), 0644)
 		if err != nil {
 			fmt.Printf("Error creando archivo %s: %v\n", file, err)

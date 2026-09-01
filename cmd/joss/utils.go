@@ -7,7 +7,6 @@ import (
 	"strings"
 
 	"github.com/jossecurity/joss/pkg/core"
-	"github.com/jossecurity/joss/pkg/i18n"
 )
 
 func GetEnvFile() string {
@@ -22,75 +21,163 @@ func updateEnvFile(path, key, value string) {
 	_ = core.UpdateEnvFile(path, key, value)
 }
 
-func printHelp() {
-	// Try to load translations (silently fails if l10n is missing)
-	// Simple locale detection
-	locale := os.Getenv("JOSS_LANG")
-	if locale == "" {
-		// Try to detect from system LANG (Unix/Linux/Mac/GitBash)
-		// Format: en_US.UTF-8, ja_JP, etc.
-		sysLang := os.Getenv("LANG")
-		if sysLang != "" {
-			// Extract first part (e.g., "ja" from "ja_JP.UTF-8")
-			parts := strings.FieldsFunc(sysLang, func(r rune) bool {
-				return r == '_' || r == '.'
-			})
-			if len(parts) > 0 {
-				locale = parts[0]
+func printHelp(topics ...string) {
+	if len(topics) > 0 {
+		if strings.ToLower(topics[0]) == "plugins" || strings.ToLower(topics[0]) == "plugin" {
+			targetPlugin := ""
+			if len(topics) > 1 {
+				targetPlugin = topics[1]
 			}
+			handlePluginHelp(targetPlugin)
+			return
 		}
+		printTopicHelp(topics[0])
+		return
 	}
 
-	if locale == "" {
-		locale = "en" // User requested default
+	fmt.Println("Joss — Lenguaje y Plataforma Moderna de Desarrollo")
+	fmt.Println("Uso: joss <comando> [argumentos] [opciones]")
+	fmt.Println()
+	fmt.Println("EJECUCIÓN Y SERVIDOR:")
+	fmt.Println("  server start                   Inicia el servidor web (requiere main.joss)")
+	fmt.Println("  program start                  Inicia la aplicación en modo escritorio")
+	fmt.Println("  run <archivo.joss>             Ejecuta un script Joss directamente")
+	fmt.Println("  build [web|program|native]     Compila el proyecto para distribución")
+	fmt.Println("    build native [os] [arch] [--gui]")
+	fmt.Println()
+	fmt.Println("CALIDAD DE CÓDIGO Y TOOLING:")
+	fmt.Println("  test [ruta] [--filter=nombre]  Ejecuta la suite de pruebas unitarias (*_test.joss)")
+	fmt.Println("  check [ruta]                   Verificación integral (formato, tipos, sintaxis y lint)")
+	fmt.Println("  format [ruta] [--write|--check] Formatea archivos .joss según el estándar canónico")
+	fmt.Println("  lint [ruta] [--json]           Análisis estático de estilo, tipos y seguridad")
+	fmt.Println("  fix [ruta] [--dry-run]         Aplica correcciones automáticas seguras y formato")
+	fmt.Println("  analyze [archivo]              Análisis semántico del AST (por defecto main.joss)")
+	fmt.Println()
+	fmt.Println("GENERADORES Y ESTRUCTURA (SCAFFOLDING):")
+	fmt.Println("  new [web|console|package|plugin] <ruta>  Crea un nuevo proyecto o módulo")
+	fmt.Println("  make:controller <Nombre>       Genera un controlador web")
+	fmt.Println("  make:model <Nombre>            Genera un modelo de datos")
+	fmt.Println("  make:view <Nombre>             Genera una plantilla de vista")
+	fmt.Println("  make:middleware <Nombre>       Genera un middleware HTTP")
+	fmt.Println("  make:mvc <Nombre>              Genera Modelo, Vista y Controlador en un paso")
+	fmt.Println("  make:crud <Tabla>              Genera CRUD completo con rutas y vistas")
+	fmt.Println("  remove:crud <Tabla>            Elimina un módulo CRUD generado")
+	fmt.Println("  make:migration <Nombre>        Genera un archivo de migración")
+	fmt.Println()
+	fmt.Println("BASE DE DATOS Y STORAGE:")
+	fmt.Println("  migrate                        Aplica migraciones pendientes")
+	fmt.Println("  migrate:fresh                  Restablece y re-ejecuta todas las migraciones")
+	fmt.Println("  db:seed                        Ejecuta seeders de app/database/seeders")
+	fmt.Println("  change db [motor]              Cambia el motor de BD (sqlite, mysql, etc.)")
+	fmt.Println("  change db migrate              Migra la conexión actual a un nuevo MySQL")
+	fmt.Println("  change db prefix <prefijo>     Configura prefijo de tablas")
+	fmt.Println("  userstorage [local|oci]        Configura almacenamiento de archivos")
+	fmt.Println("  userstorage sync-oci|sync-local Sincroniza archivos con Oracle Cloud")
+	fmt.Println()
+	fmt.Println("PAQUETES Y PLUGINS:")
+	fmt.Println("  help plugins [nombre]          Lista comandos y opciones provistos por plugins")
+	fmt.Println("  pub <add|remove|install|publish|search|update>  Gestor de paquetes Joss")
+	fmt.Println("  plugin compile <fuente/dir>    Compila código a paquete binario .jp")
+	fmt.Println("  plugin inspect <archivo.jp>    Inspecciona bytecode y símbolos de un plugin")
+	fmt.Println("  plugin verify <archivo.jp>     Verifica firmas Ed25519 e integridad de un plugin")
+	fmt.Println("  package inspect <archivo.jp>   Inspecciona metadatos y firmas de un paquete")
+	fmt.Println()
+	fmt.Println("SISTEMA Y UTILIDADES:")
+	fmt.Println("  version                        Muestra la versión de Joss instalada")
+	fmt.Println("  update [-f|--canary|--stable]  Actualiza la versión de Joss, SDK y plugins")
+	fmt.Println("  help [comando]                 Muestra ayuda detallada de un comando específico")
+	fmt.Println()
+	fmt.Println("Usa 'joss help <comando>' o 'joss help plugins' para ver opciones y ejemplos.")
+}
+
+func printTopicHelp(cmd string) {
+	switch strings.ToLower(cmd) {
+	case "format":
+		fmt.Println("Uso: joss format [ruta] [opciones]")
+		fmt.Println("Formatea archivos .joss según el estándar canónico del lenguaje.")
+		fmt.Println("\nOpciones:")
+		fmt.Println("  --write, -w    Escribe los cambios en el archivo (por defecto al pasar un archivo)")
+		fmt.Println("  --check, -c    Verifica si los archivos están formateados sin modificarlos (útil en CI)")
+		fmt.Println("\nEjemplos:")
+		fmt.Println("  joss format app/controllers/UserController.joss")
+		fmt.Println("  joss format --write .")
+		fmt.Println("  joss format --check .")
+
+	case "lint":
+		fmt.Println("Uso: joss lint [ruta] [opciones]")
+		fmt.Println("Ejecuta análisis estático y detecta problemas de estilo, tipos y seguridad.")
+		fmt.Println("\nOpciones:")
+		fmt.Println("  --json         Emite el reporte de diagnósticos en formato JSON estructurado")
+		fmt.Println("\nEjemplos:")
+		fmt.Println("  joss lint .")
+		fmt.Println("  joss lint main.joss")
+		fmt.Println("  joss lint --json .")
+
+	case "fix":
+		fmt.Println("Uso: joss fix [ruta] [opciones]")
+		fmt.Println("Aplica correcciones automáticas seguras y formateo canónico.")
+		fmt.Println("\nOpciones:")
+		fmt.Println("  --dry-run, -d  Muestra qué cambios se aplicarían sin modificar los archivos")
+		fmt.Println("\nEjemplos:")
+		fmt.Println("  joss fix .")
+		fmt.Println("  joss fix --dry-run .")
+
+	case "check":
+		fmt.Println("Uso: joss check [ruta]")
+		fmt.Println("Ejecuta una verificación integral de calidad en 1 paso:")
+		fmt.Println("  1. Comprobación de formato canónico")
+		fmt.Println("  2. Chequeo de sintaxis y parseo")
+		fmt.Println("  3. Análisis semántico estricto y tipos")
+		fmt.Println("  4. Reglas de linter y seguridad")
+		fmt.Println("\nEjemplos:")
+		fmt.Println("  joss check .")
+
+	case "test":
+		fmt.Println("Uso: joss test [ruta] [opciones]")
+		fmt.Println("Ejecuta la suite oficial de pruebas unitarias y aserciones (*_test.joss).")
+		fmt.Println("\nOpciones:")
+		fmt.Println("  --filter, -f   Filtra y ejecuta solo las pruebas cuyo nombre contenga el texto")
+		fmt.Println("\nEjemplos:")
+		fmt.Println("  joss test")
+		fmt.Println("  joss test tests/")
+		fmt.Println("  joss test --filter=login")
+
+	case "server":
+		fmt.Println("Uso: joss server start")
+		fmt.Println("Inicia el servidor web ejecutando el punto de entrada 'main.joss'.")
+
+	case "new":
+		fmt.Println("Uso: joss new [web|console|package|plugin] <ruta/nombre>")
+		fmt.Println("Genera una nueva estructura de proyecto.")
+		fmt.Println("\nTipos:")
+		fmt.Println("  web       Proyecto web MVC completo (por defecto)")
+		fmt.Println("  console   Proyecto de consola CLI")
+		fmt.Println("  package   Paquete distribuible para el ecosistema Joss")
+		fmt.Println("  plugin    Plugin nativo con compilación a bytecode .jp")
+
+	case "make:crud":
+		fmt.Println("Uso: joss make:crud <Tabla>")
+		fmt.Println("Genera automáticamente Modelo, Vistas, Controlador y Rutas para una tabla de base de datos.")
+
+	case "migrate":
+		fmt.Println("Uso: joss migrate")
+		fmt.Println("Aplica las migraciones pendientes en app/database/migrations.")
+		fmt.Println("Usa 'joss migrate:fresh' para reiniciar la base de datos y migrar desde cero.")
+
+	case "pub":
+		fmt.Println("Uso: joss pub <subcomando> [paquete]")
+		fmt.Println("Gestor de dependencias y paquetes de Joss.")
+		fmt.Println("\nSubcomandos:")
+		fmt.Println("  add <paquete>      Añade una dependencia a joss.yaml e instálala")
+		fmt.Println("  remove <paquete>   Elimina una dependencia de joss.yaml")
+		fmt.Println("  install            Descarga e instala las dependencias de joss.yaml")
+		fmt.Println("  update             Actualiza las dependencias instaladas")
+		fmt.Println("  publish            Publica tu paquete en el registro oficial")
+
+	default:
+		fmt.Printf("No hay ayuda específica para el comando '%s'.\n\n", cmd)
+		printHelp()
 	}
-
-	// Load all available locales from disk
-	i18n.GlobalManager.Load(nil)
-
-	tr := func(key string) string {
-		return i18n.GlobalManager.Get(locale, key, nil)
-	}
-
-	fmt.Println("Uso: joss [comando] [argumentos]")
-	fmt.Println("Comandos disponibles:")
-	fmt.Printf("  server start            - %s\n", tr("startServerWeb"))
-	fmt.Printf("  program start           - %s\n", tr("startProgramDesktop"))
-	fmt.Printf("  run [archivo]           - %s\n", tr("runJossScript"))
-	fmt.Printf("  analyze [archivo]       - Realiza el análisis estático de código del proyecto sin ejecutarlo (por defecto 'main.joss')\n")
-	fmt.Printf("  build [web|program|native]- %s\n", tr("compileProjectDist"))
-	fmt.Printf("  build native [os] [arch] [--gui] - Compila a ejecutable nativo autoejecutable. Por defecto modo servidor/consola. Usa --gui para activar ventana de escritorio.\n")
-	fmt.Printf("  make:controller [Name]  - %s\n", tr("CreateController"))
-	fmt.Printf("  make:middleware [Name]  - %s\n", tr("CreateMiddleware"))
-	fmt.Printf("  make:model [Name]       - %s\n", tr("CreateModel"))
-	fmt.Printf("  make:view [Name]        - %s\n", tr("CreateView"))
-	fmt.Printf("  make:mvc [Name]         - %s\n", tr("CreateMVC"))
-	fmt.Printf("  make:crud [Tabla]       - %s\n", tr("CreateCRUD"))
-	fmt.Printf("  remove:crud [Tabla]     - %s\n", tr("removeCRUD"))
-	fmt.Printf("  make:migration [Name]   - %s\n", tr("createMigration"))
-	fmt.Printf("  db:seed                 - Ejecuta seeders de app/database/seeders\n")
-	fmt.Printf("  migrate                 - %s\n", tr("exeMigrate"))
-	fmt.Printf("  migrate:fresh           - %s\n", tr("exeMigrateFresh"))
-	fmt.Printf("  new [web|console] [path]- %s\n", tr("createProject"))
-	fmt.Printf("  new plugin [path]       - Crear plantilla de plugin autoejecutable (.jp Bytecode puro) con workflow GitHub\n")
-	fmt.Printf("  change db [motor]       - %s\n", tr("changeDBMotor"))
-	fmt.Printf("  change db migrate       - Migrar conexion actual a un nuevo MySQL\n")
-	fmt.Printf("    --host --port --database --user --password\n")
-	fmt.Printf("  change db prefix [pref] - %s\n", tr("changeDBPrefix"))
-	fmt.Printf("  userstorage [local|oci] - %s (configura proveedor)\n", tr("settingsUserStorage"))
-	fmt.Printf("  userstorage sync-oci    - Sube y sincroniza todos los archivos de almacenamiento local hacia Oracle Cloud (OCI)\n")
-	fmt.Printf("  userstorage sync-local  - Descarga todos los archivos desde Oracle Cloud (OCI) hacia el disco local\n")
-	fmt.Printf("  ai:activate             - %s\n", tr("IaActivate"))
-	fmt.Printf("  brevo:config            - %s\n", tr("brevoConfig"))
-	fmt.Printf("    --enable --api-key / --disable\n")
-	fmt.Printf("  plugin compile [archivo/dir] - Compila archivos fuente (Python/Java/PHP/WASM/Joss) a paquete binario .jp\n")
-	fmt.Printf("  plugin inspect [archivo.jp] - Inspecciona el bytecode, metadatos y tabla de símbolos de un plugin .jp\n")
-	fmt.Printf("  plugin verify [archivo.jp]  - Verifica la firma digital Ed25519 e integridad del archivo binario .jp\n")
-	fmt.Printf("  pub [subcomando]        - Gestionar paquetes y dependencias (add, remove, install, update, publish, search, login)\n")
-	fmt.Printf("  package inspect [jp]    - Inspeccionar bytecode y firmas Ed25519 de un paquete .jp\n")
-	fmt.Printf("  update [-f|--canary|--stable]- Actualiza la versión de Joss, SDK y plugins (-f fuerza re-descarga)\n")
-	fmt.Printf("  version                 - %s\n", tr("version"))
-	fmt.Printf("  help                    - %s\n", tr("helpPrint"))
 }
 
 // readLine reads a line of input from stdin in a platform-independent way, handling \r, \r\n and \n.

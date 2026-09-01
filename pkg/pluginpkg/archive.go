@@ -42,10 +42,11 @@ type Metadata struct {
 	ABI                map[string]string `json:"abi,omitempty"`    // os-arch -> shared library path
 	Protocol           string            `json:"protocol,omitempty"`
 	Symbols            string            `json:"symbols,omitempty"`
-	SignatureAlgorithm string            `json:"signature_algorithm,omitempty"`
-	PublicKey          string            `json:"public_key,omitempty"`
-	KeyID              string            `json:"key_id,omitempty"`
-	Signature          string            `json:"signature,omitempty"`
+	SignatureAlgorithm string                       `json:"signature_algorithm,omitempty"`
+	PublicKey          string                       `json:"public_key,omitempty"`
+	KeyID              string                       `json:"key_id,omitempty"`
+	Signature          string                       `json:"signature,omitempty"`
+	Commands           map[string]CommandDefinition `json:"commands,omitempty"`
 }
 
 type Archive struct {

@@ -1,0 +1,6 @@
+{
+  "name": "types_collections_narrowing",
+  "source": "public class Profile {\n  public string $email = \"admin@jossecurity.org\"\n}\npublic func getProfile(): Profile|null {\n  return new Profile()\n}\npublic func main(): string {\n  Profile|null $p = getProfile()\n  return $p != null ? {\n    return $p->email\n  } : {\n    return \"none\"\n  }\n}",
+  "expected_diagnostics": [],
+  "expected_runtime_string": "admin@jossecurity.org"
+}

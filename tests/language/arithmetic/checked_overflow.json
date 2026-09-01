@@ -1,0 +1,6 @@
+{
+  "name": "arithmetic_large_and_overflow",
+  "source": "public func calculate(): int {\n  return 9007199254740993 + 1\n}\npublic func main(): int {\n  return calculate()\n}",
+  "expected_diagnostics": [],
+  "expected_runtime_int": 9007199254740994
+}

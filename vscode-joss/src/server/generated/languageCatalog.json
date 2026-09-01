@@ -248,6 +248,11 @@
     "Cron": [
       "schedule"
     ],
+    "Exception": [
+      "constructor",
+      "getCode",
+      "getMessage"
+    ],
     "GranDB": [
       "avg",
       "changeDB",
@@ -460,8 +465,12 @@
     "Redis": [
       "connect",
       "del",
+      "flush",
+      "forget",
       "get",
-      "set"
+      "has",
+      "set",
+      "ttl"
     ],
     "Request": [
       "all",

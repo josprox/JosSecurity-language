@@ -469,6 +469,11 @@ func (p *Parser) parseCallExpression(function Expression) Expression {
 func (p *Parser) parseCallArguments() []Expression {
 	args := []Expression{}
 
+	// Allow newline before first argument
+	for p.peekToken.Type == NEWLINE {
+		p.nextToken()
+	}
+
 	if p.peekToken.Type == RPAREN {
 		p.nextToken()
 		return args
@@ -480,30 +485,17 @@ func (p *Parser) parseCallArguments() []Expression {
 	for p.peekToken.Type == COMMA || p.peekToken.Type == NEWLINE {
 		if p.peekToken.Type == NEWLINE {
 			p.nextToken()
-			// Check if we hit RPAREN after newline
-			if p.peekToken.Type == RPAREN {
-				break
-			}
-			// If no comma after newline, we assume comma insertion or just continue if next is expression
-			if p.peekToken.Type != COMMA {
-				// Optional: check if next token is start of expression?
-				// For now, let's assume if it's not comma, it might be next arg (if comma is optional)
-				// But standard Joss requires comma.
-				// However, let's be safe and check for comma.
-				if p.peekToken.Type != COMMA {
-					// If not comma, maybe we should continue loop to let parseExpression handle it?
-					// Or break?
-					// Let's just continue and let the loop condition handle it (it won't match COMMA).
-					// But we are inside the loop.
-				}
-			}
+			continue
 		}
 
 		if p.peekToken.Type == COMMA {
-			p.nextToken()
+			p.nextToken() // consume ','
 			// Allow newline after comma
 			for p.peekToken.Type == NEWLINE {
 				p.nextToken()
+			}
+			if p.peekToken.Type == RPAREN {
+				break
 			}
 			p.nextToken() // Advance to start of expression
 			args = append(args, p.parseExpression(LOWEST))
@@ -520,6 +512,11 @@ func (p *Parser) parseCallArguments() []Expression {
 func (p *Parser) parseFunctionParameters() []*Parameter {
 	parameters := []*Parameter{}
 
+	// Allow newline before first parameter
+	for p.peekToken.Type == NEWLINE {
+		p.nextToken()
+	}
+
 	if p.peekToken.Type == RPAREN {
 		p.nextToken()
 		return parameters
@@ -532,12 +529,25 @@ func (p *Parser) parseFunctionParameters() []*Parameter {
 		parameters = append(parameters, param)
 	}
 
-	for p.peekToken.Type == COMMA {
-		p.nextToken()
-		p.nextToken()
-		param := p.parseParameter()
-		if param != nil {
-			parameters = append(parameters, param)
+	for p.peekToken.Type == COMMA || p.peekToken.Type == NEWLINE {
+		if p.peekToken.Type == NEWLINE {
+			p.nextToken()
+			continue
+		}
+		if p.peekToken.Type == COMMA {
+			p.nextToken() // consume ','
+			// Allow newlines after comma
+			for p.peekToken.Type == NEWLINE {
+				p.nextToken()
+			}
+			if p.peekToken.Type == RPAREN {
+				break // trailing comma
+			}
+			p.nextToken()
+			param := p.parseParameter()
+			if param != nil {
+				parameters = append(parameters, param)
+			}
 		}
 	}
 
@@ -608,7 +618,11 @@ func (p *Parser) parseNewExpression() Expression {
 }
 
 func (p *Parser) parseMemberExpression(left Expression) Expression {
-	exp := &MemberExpression{Token: p.curToken, Left: left}
+	exp := &MemberExpression{
+		Token:    p.curToken,
+		Left:     left,
+		NullSafe: p.curToken.Type == NULL_SAFE_ARROW,
+	}
 
 	if isIdentifierOrKeyword(p.peekToken.Type) {
 		p.nextToken()

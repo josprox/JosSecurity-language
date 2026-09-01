@@ -54,6 +54,59 @@ func (r *Runtime) evaluateInfix(ie *parser.InfixExpression) interface{} {
 		}
 		return r.evaluateExpression(ie.Right)
 	}
+	if ie.Operator == "|>" {
+		leftVal := r.evaluateExpression(ie.Left)
+		switch right := ie.Right.(type) {
+		case *parser.CallExpression:
+			// Prepend leftVal as first argument
+			args := make([]interface{}, 0, len(right.Arguments)+1)
+			args = append(args, leftVal)
+			for _, arg := range right.Arguments {
+				args = append(args, r.evaluateCallArgument(arg))
+			}
+			var fn interface{}
+			if ident, ok := right.Function.(*parser.Identifier); ok {
+				if res, ok := r.callBuiltin(ident.Value, args); ok {
+					return res
+				}
+				if f, ok := r.Functions[ident.Value]; ok {
+					fn = f
+				} else if val, resolved, initialized := r.localValue(ident); resolved && initialized {
+					fn = val
+				} else if v, ok := r.Variables[ident.Value]; ok && r.sourceMapVisible(ident.Value) {
+					fn = v
+				}
+			} else {
+				fn = r.evaluateExpression(right.Function)
+			}
+			if fn == nil {
+				panic(&JossError{Type: "NotCallable", Message: "Función de pipeline no encontrada o nula", File: r.CurrentFile})
+			}
+			return r.applyFunction(fn, args)
+		case *parser.Identifier:
+			if res, ok := r.callBuiltin(right.Value, []interface{}{leftVal}); ok {
+				return res
+			}
+			var fn interface{}
+			if f, ok := r.Functions[right.Value]; ok {
+				fn = f
+			} else if val, resolved, initialized := r.localValue(right); resolved && initialized {
+				fn = val
+			} else if v, ok := r.Variables[right.Value]; ok && r.sourceMapVisible(right.Value) {
+				fn = v
+			}
+			if fn == nil {
+				panic(&JossError{Type: "UndefinedFunction", Message: fmt.Sprintf("Función '%s' no encontrada", right.Value), File: r.CurrentFile, Line: right.Token.Line})
+			}
+			return r.applyFunction(fn, []interface{}{leftVal})
+		case *parser.FunctionLiteral:
+			captured := r.captureFunction(right)
+			return r.callCapturedFunction(captured, []interface{}{leftVal})
+		default:
+			rightVal := r.evaluateExpression(ie.Right)
+			return r.applyFunction(rightVal, []interface{}{leftVal})
+		}
+	}
 	if result, handled := r.evaluateSlotIntegerInfix(ie); handled {
 		return result
 	}

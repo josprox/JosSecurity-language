@@ -1,0 +1,6 @@
+{
+  "name": "ref_by_reference",
+  "source": "public func increment(ref int $n) {\n  $n = $n + 1\n}\npublic func main(): int {\n  int $val = 41\n  increment(ref $val)\n  return $val\n}",
+  "expected_diagnostics": [],
+  "expected_runtime_int": 42
+}

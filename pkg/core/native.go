@@ -249,6 +249,41 @@ func (r *Runtime) RegisterNativeClasses() {
 	// Sitemap
 	r.registerNative("Sitemap", []string{"add", "provider", "exclude", "generate", "xsl"}, (*Runtime).executeSitemapMethod)
 	r.Variables["Sitemap"] = &Instance{Class: r.Classes["Sitemap"], Fields: make(map[string]interface{})}
+
+	// Exception
+	r.registerNative("Exception", []string{"constructor", "getMessage", "getCode"}, (*Runtime).executeExceptionMethod)
+}
+
+func (r *Runtime) executeExceptionMethod(instance *Instance, method string, args []interface{}) interface{} {
+	if instance == nil {
+		return nil
+	}
+	switch method {
+	case "constructor":
+		if len(args) > 0 {
+			instance.Fields["message"] = args[0]
+		} else {
+			instance.Fields["message"] = ""
+		}
+		if len(args) > 1 {
+			instance.Fields["code"] = args[1]
+		} else {
+			instance.Fields["code"] = int64(0)
+		}
+		return instance
+	case "getMessage":
+		if msg, ok := instance.Fields["message"]; ok {
+			return msg
+		}
+		return ""
+	case "getCode":
+		if code, ok := instance.Fields["code"]; ok {
+			return code
+		}
+		return int64(0)
+	default:
+		return nil
+	}
 }
 
 func (r *Runtime) executeNativeMethod(instance *Instance, method string, args []interface{}) interface{} {

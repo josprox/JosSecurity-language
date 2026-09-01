@@ -141,12 +141,59 @@ do {
 } while ($attempts < 3)
 ```
 
-## Manejo de Errores y Panic
+## Ergonomía Moderna de Flujo de Datos
+
+### 1. Operador Pipeline (`|>`)
+Permite encadenar transformaciones de izquierda a derecha de forma expresiva:
 
 ```joss
-// Excepciones estructuradas
+public func doubleIt(int $x): int {
+    return $x * 2
+}
+public func addN(int $x, int $n): int {
+    return $x + $n
+}
+
+// 5 * 2 = 10 -> 10 + 10 = 20
+int $total = 5 |> doubleIt |> addN(10)
+
+// Con closures anónimas:
+int $res = 10 |> func(int $n): int { return $n * 3 }
+```
+
+### 2. Navegación Segura Null-Safe (`?->`)
+Permite acceder a métodos y propiedades de objetos que pueden ser `null` sin disparar errores en tiempo de ejecución:
+
+```joss
+User|null $user = null
+Profile|null $profile = $user?->profile
+string|null $email = $user?->getProfile()?->email
+```
+
+### 3. Trailing Commas Universales
+Se permiten comas finales en firmas de parámetros, llamadas a funciones, listas y mapas multilínea para mantener diffs limpios en Git:
+
+```joss
+public func setup(
+    string $host,
+    int $port,
+): bool {
+    array<int> $ports = [
+        80,
+        443,
+        8080,
+    ]
+    return true
+}
+```
+
+## Manejo de Excepciones
+
+Joss utiliza `try / catch` para captura de errores recuperables:
+
+```joss
 try {
-    throw "Fallo en la operación"
+    $file = file_get_contents("inexistente.txt")
 } catch ($error) {
     print("Error capturado: " . $error)
 }
@@ -154,8 +201,6 @@ try {
 // Aborto irrecuperable
 panic("Error crítico de consistencia")
 ```
-
-`panic()` interrumpe la ejecución del programa con un mensaje de error claro. Para manejo defensivo de errores esperados se utiliza el bloque `try / catch`.
 
 ## Helpers Globales y Entorno
 

@@ -1,0 +1,6 @@
+{
+  "name": "collections_arrays_maps",
+  "source": "public func main(): int {\n  array<int> $items = [10, 20, 30]\n  map $data = {\"key\": 5}\n  return $items[0] + $items[1] + $data[\"key\"]\n}",
+  "expected_diagnostics": [],
+  "expected_runtime_int": 35
+}

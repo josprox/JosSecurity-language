@@ -19,3 +19,8 @@ func StringIndex(text string, index int64) (string, bool) {
 	}
 	return "", false
 }
+
+// StringGraphemeCount returns the number of user-perceived grapheme clusters in text.
+func StringGraphemeCount(text string) int {
+	return uniseg.GraphemeClusterCount(text)
+}

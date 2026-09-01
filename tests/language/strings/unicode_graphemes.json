@@ -1,0 +1,6 @@
+{
+  "name": "strings_unicode_graphemes",
+  "source": "public func main(): string {\n  string $word = \"México\"\n  return $word[1]\n}",
+  "expected_diagnostics": [],
+  "expected_runtime_string": "é"
+}

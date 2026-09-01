@@ -103,6 +103,16 @@ func main() {
 		} else {
 			fmt.Println("Uso: joss program start")
 		}
+	case "format":
+		handleFormatCommand(os.Args[2:])
+	case "lint":
+		handleLintCommand(os.Args[2:])
+	case "fix":
+		handleFixCommand(os.Args[2:])
+	case "test":
+		handleTestCommand(os.Args[2:])
+	case "check":
+		handleCheckCommand(os.Args[2:])
 	case "analyze":
 		filename := "main.joss"
 		if len(os.Args) >= 3 {
@@ -303,9 +313,12 @@ func main() {
 			targetEngine := os.Args[3]
 			changeDatabaseEngine(targetEngine)
 		}
-	case "help":
-		printHelp()
+	case "help", "--help", "-h":
+		printHelp(os.Args[2:]...)
 	default:
+		if tryDispatchPluginCommand(command, os.Args[2:]) {
+			return
+		}
 		fmt.Printf("Comando desconocido: %s\n", command)
 		if command == "make:miggrate" {
 			fmt.Println("¿Quisiste decir 'joss make:migration [Nombre]'?")
@@ -418,7 +431,7 @@ repository: ""
 license: MIT
 type: joss
 environment:
-  joss: ">=3.6.0"
+  joss: ">=3.6.7"
 entry:
   main: src/plugin.joss
 dependencies:
@@ -434,7 +447,7 @@ dependencies:
 // Se carga automaticamente al declarar %s en joss.yaml.
 
 public class %s {
-    public func version() {
+    public func version(): string {
         return "1.0.0"
     }
 }

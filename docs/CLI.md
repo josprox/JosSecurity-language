@@ -130,18 +130,51 @@ Si no se especifica `PUB_REGISTRY_URL`, Pub resuelve las dependencias utilizando
 
 ---
 
-## 7. Almacenamiento y Servicios Integrados (`userstorage`, `brevo`, `ai`)
+## 7. Calidad de Código y Tooling (`check`, `format`, `lint`, `fix`, `test`)
+
+```bash
+joss check [ruta]
+joss format [ruta] [--write|--check]
+joss lint [ruta] [--json]
+joss fix [ruta] [--dry-run]
+joss test [ruta] [--filter=nombre]
+```
+
+- `check`: Pipeline de verificación integral en un solo paso (formato canónico, sintaxis, análisis semántico, verificación estricta de tipos y linter).
+- `format`: Formatea archivos `.joss` según el estándar canónico del lenguaje. `--write` aplica los cambios en disco; `--check` verifica el formato sin mutar archivos (ideal para CI/CD).
+- `lint`: Ejecuta análisis estático con reglas de consistencia de tipos, estilo y detección de secretos o credenciales en código duro (`--json` para integración estructurada).
+- `fix`: Aplica correcciones automáticas seguras (visibilidad requerida, formateo) con soporte para `--dry-run`.
+- `test`: Ejecuta la suite de pruebas unitarias (*_test.joss) con primitivas nativas de aserción (`test`, `assert`, `assertEqual`, `assertTrue`, `assertNull`, `assertThrows`).
+
+---
+
+## 8. Comandos de Plugins y Ayuda Dinámica
+
+```bash
+joss help plugins
+joss help plugins [nombre_plugin]
+joss ai:activate
+joss brevo:config [--enable|--disable] [--api-key=CLAVE]
+joss backup:create [destino]
+joss backup:restore <archivo.zip>
+joss bg:remove <input.jpg> [output.png]
+joss notify:send <canal> <mensaje>
+```
+
+- `help plugins`: Muestra todos los plugins instalados y disponibles junto con sus comandos CLI expuestos y su estado (`[protegido]`).
+- `help plugins [nombre_plugin]`: Muestra la ficha técnica, repositorio, opciones y comandos específicos del plugin seleccionado.
+- **Comandos de plugins**: Los plugins instalados en `plugins/` o declarados en `joss.yaml` pueden registrar y despachar comandos CLI autónomos y protegidos.
+
+---
+
+## 9. Almacenamiento y Servicios en la Nube (`userstorage`)
 
 ```bash
 joss userstorage local
 joss userstorage oci
 joss userstorage sync-oci
 joss userstorage sync-local
-joss brevo:config --enable --api-key=CLAVE
-joss brevo:config --disable
-joss ai:activate
 ```
 
 - `userstorage`: Conmuta el proveedor de almacenamiento entre disco local y **Oracle Cloud Infrastructure (OCI)**, permitiendo sincronización bidireccional mediante `sync-oci` y `sync-local`.
-- `brevo:config`: Configura las credenciales para el servicio transaccional de correo electrónico Brevo.
-- `ai:activate`: Prepara los modelos y configuración para el módulo nativo de Inteligencia Artificial.
+

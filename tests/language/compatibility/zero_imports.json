@@ -1,0 +1,6 @@
+{
+  "name": "compatibility_zero_imports",
+  "source": "public class Helper {\n  public static func greet(string $name): string {\n    return \"Hello, \" . $name\n  }\n}\npublic func main(): string {\n  return Helper::greet(\"Joss\")\n}",
+  "expected_diagnostics": [],
+  "expected_runtime_string": "Hello, Joss"
+}

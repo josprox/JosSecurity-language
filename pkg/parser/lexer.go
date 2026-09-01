@@ -41,6 +41,14 @@ func (l *Lexer) peekChar() byte {
 	return l.input[l.readPosition]
 }
 
+func (l *Lexer) peekAhead(offset int) byte {
+	pos := l.readPosition + offset
+	if pos >= len(l.input) || pos < 0 {
+		return 0
+	}
+	return l.input[pos]
+}
+
 func (l *Lexer) NextToken() Token {
 	var tok Token
 
@@ -93,6 +101,13 @@ func (l *Lexer) NextToken() Token {
 			l.readChar()
 			literal := string(ch) + string(l.ch)
 			tok = Token{Type: NULL_COALESCE, Literal: literal, Line: l.line, Column: l.column - 1}
+		} else if l.peekChar() == '-' && l.peekAhead(1) == '>' {
+			ch := l.ch
+			l.readChar() // '-'
+			ch2 := l.ch
+			l.readChar() // '>'
+			literal := string(ch) + string(ch2) + string(l.ch)
+			tok = Token{Type: NULL_SAFE_ARROW, Literal: literal, Line: l.line, Column: l.column - 2}
 		} else {
 			tok = l.newToken(QUESTION, l.ch)
 		}

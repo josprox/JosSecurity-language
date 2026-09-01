@@ -149,6 +149,9 @@ func (r *Runtime) evaluateMember(me *parser.MemberExpression) interface{} {
 	}
 
 	left := r.evaluateExpression(me.Left)
+	if left == nil && (me.NullSafe || me.Token.Type == parser.NULL_SAFE_ARROW) {
+		return nil
+	}
 
 	// Support Plugin Namespace access (e.g. plugin_name::function or plugin_name.function)
 	if ns, ok := left.(*PluginNamespace); ok {
@@ -243,6 +246,9 @@ func (r *Runtime) evaluateMember(me *parser.MemberExpression) interface{} {
 		}
 
 		if left == nil {
+			if me.NullSafe || me.Token.Type == parser.NULL_SAFE_ARROW {
+				return nil
+			}
 			panic(&JossError{
 				Type:    "NullReference",
 				Message: fmt.Sprintf("Intento de acceder a la propiedad '%s' sobre un valor nulo o no instanciado", me.Property.Value),

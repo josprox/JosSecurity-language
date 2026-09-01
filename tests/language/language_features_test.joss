@@ -1,0 +1,34 @@
+public func multiply(int $a, int $b): int {
+    return $a * $b
+}
+
+public class Profile {
+    public string $bio = "Joss Developer"
+}
+
+public class User {
+    public Profile|null $profile = null
+}
+
+test("Pipeline Operator con funciones y closures", func() {
+    int $doubled = 10 |> func(int $n): int { return $n * 2 }
+    assertEqual($doubled, 20)
+
+    int $product = 5 |> multiply(4)
+    assertEqual($product, 20)
+})
+
+test("Null-safe Navigation Operator ?->", func() {
+    User|null $u = null
+    Profile|null $p = $u?->profile
+    assertNull($p)
+})
+
+test("Trailing Commas en arreglos y llamadas", func() {
+    array<int> $items = [
+        100,
+        200,
+        300,
+    ]
+    assertEqual($items[1], 200)
+})

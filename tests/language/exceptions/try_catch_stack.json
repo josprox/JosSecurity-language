@@ -1,0 +1,6 @@
+{
+  "name": "exceptions_try_catch_stack",
+  "source": "public func fail(): string {\n  throw new Exception(\"boom\")\n}\npublic func main(): string {\n  try {\n    fail()\n    return \"failed to throw\"\n  } catch ($e) {\n    return \"caught error\"\n  }\n}",
+  "expected_diagnostics": [],
+  "expected_runtime_string": "caught error"
+}

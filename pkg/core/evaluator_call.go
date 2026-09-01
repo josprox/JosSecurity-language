@@ -194,6 +194,9 @@ func (r *Runtime) executeCall(call *parser.CallExpression) interface{} {
 	}
 
 	if fn == nil {
+		if mem, ok := call.Function.(*parser.MemberExpression); ok && (mem.NullSafe || mem.Token.Type == parser.NULL_SAFE_ARROW) {
+			return nil
+		}
 		if ident, ok := call.Function.(*parser.Identifier); ok {
 			panic(&JossError{
 				Type:    "UndefinedFunction",
@@ -238,6 +241,10 @@ func (r *Runtime) evaluateCallArgument(argument parser.Expression) interface{} {
 		panic(&JossError{Type: "ConstantAssignment", Message: fmt.Sprintf("La constante '%s' no puede pasarse mediante ref", identifier.Value), File: r.CurrentFile, Line: identifier.Token.Line})
 	}
 	return r.referenceToIdentifier(identifier)
+}
+
+func (r *Runtime) ApplyFunction(fn interface{}, args []interface{}) interface{} {
+	return r.applyFunction(fn, args)
 }
 
 func (r *Runtime) applyFunction(fn interface{}, args []interface{}) interface{} {

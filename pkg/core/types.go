@@ -80,6 +80,10 @@ func (r *Runtime) markCurrentVariablesAsHostGlobals() {
 	}
 }
 
+func (r *Runtime) MarkHostGlobals(names ...string) {
+	r.markHostGlobals(names...)
+}
+
 func (r *Runtime) markHostGlobals(names ...string) {
 	if r.HostGlobals == nil {
 		r.HostGlobals = make(map[string]bool)

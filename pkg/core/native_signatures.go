@@ -45,6 +45,8 @@ var preciseNativeReturns = map[string]string{
 	"Auth::hasRole":              "bool",
 	"Auth::verify":               "bool",
 	"Cache::has":                 "bool",
+	"Exception::getCode":         "int",
+	"Exception::getMessage":      "string",
 	"GranDB::avg":                "float|null",
 	"GranDB::count":              "int",
 	"GranDB::doesntExist":        "bool",

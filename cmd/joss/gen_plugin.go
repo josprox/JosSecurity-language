@@ -37,29 +37,40 @@ type: joss
 description: Plugin oficial en Bytecode JPBC autoejecutable para Joss Language
 author: Developer <dev@example.com>
 license: MIT
+environment:
+  joss: ">=3.6.7"
 entry:
   main: src/plugin.joss
 dependencies:
-`, pluginName)
+
+# Comandos CLI opcionales provistos por el plugin (ej: joss %s:run)
+# commands:
+#   %s:run:
+#     description: "Comando de ejemplo del plugin"
+#     usage: "joss %s:run"
+#     protected: false
+`, pluginName, pluginName, pluginName, pluginName)
 
 	pluginJossContent := fmt.Sprintf(`// src/plugin.joss
 // Clase exportada para interactuar con el plugin %s
 
 public class %s {
-    Init constructor() {
+    public string $apiKey = ""
+
+    public func constructor() {
         // Acceso directo y automático al entorno (.env) del proyecto
         $this->apiKey = env("%s_API_KEY", "")
     }
 
-    public func ping() {
+    public func ping(): string {
         return "pong desde %s"
     }
 
-    public func process(mixed $data) {
+    public func process(mixed $data): map {
         return {
             "ok": true,
             "plugin": "%s",
-            "data": $data
+            "data": $data,
         }
     }
 }

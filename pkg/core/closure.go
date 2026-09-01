@@ -5,50 +5,52 @@ import "github.com/jossecurity/joss/pkg/parser"
 // captureFunction snapshots the current lexical environment for a callback
 // that will run after the registering method has returned.
 func (r *Runtime) captureFunction(fn *parser.FunctionLiteral) *CapturedFunction {
-	if r.captureEnvironment == nil {
-		variables := make(map[string]interface{}, len(r.Variables))
-		for name, value := range r.Variables {
-			if r.sourceMapVisible(name) {
-				variables[name] = value
-			}
+	variables := make(map[string]interface{}, len(r.Variables))
+	for name, value := range r.Variables {
+		if r.sourceMapVisible(name) {
+			variables[name] = value
 		}
+	}
 
-		varTypes := make(map[string]string, len(r.VarTypes))
-		for name, valueType := range r.VarTypes {
-			if r.sourceMapVisible(name) {
-				varTypes[name] = valueType
+	varTypes := make(map[string]string, len(r.VarTypes))
+	for name, valueType := range r.VarTypes {
+		if r.sourceMapVisible(name) {
+			varTypes[name] = valueType
+		}
+	}
+	constants := make(map[string]bool, len(r.Constants))
+	for name, constant := range r.Constants {
+		if constant && r.sourceMapVisible(name) {
+			constants[name] = true
+		}
+	}
+	if r.currentFrame != nil {
+		for index := range r.currentFrame.slots {
+			slot := &r.currentFrame.slots[index]
+			if !slot.Initialized {
+				continue
+			}
+			val := slot.Value.Interface()
+			variables[slot.Name] = val
+			variables["$"+slot.Name] = val
+			varTypes[slot.Name] = slot.TypeName
+			varTypes["$"+slot.Name] = slot.TypeName
+			if slot.Constant {
+				constants[slot.Name] = true
+				constants["$"+slot.Name] = true
 			}
 		}
-		constants := make(map[string]bool, len(r.Constants))
-		for name, constant := range r.Constants {
-			if constant && r.sourceMapVisible(name) {
-				constants[name] = true
-			}
-		}
-		if r.currentFrame != nil {
-			for index := range r.currentFrame.slots {
-				slot := &r.currentFrame.slots[index]
-				if !slot.Initialized {
-					continue
-				}
-				variables[slot.Name] = slot.Value.Interface()
-				varTypes[slot.Name] = slot.TypeName
-				if slot.Constant {
-					constants[slot.Name] = true
-				}
-			}
-		}
+	}
 
-		r.captureEnvironment = &ClosureEnvironment{
-			Variables: variables,
-			VarTypes:  varTypes,
-			Constants: constants,
-		}
+	captureEnv := &ClosureEnvironment{
+		Variables: variables,
+		VarTypes:  varTypes,
+		Constants: constants,
 	}
 
 	return &CapturedFunction{
 		Function:    fn,
-		Environment: r.captureEnvironment,
+		Environment: captureEnv,
 	}
 }
 

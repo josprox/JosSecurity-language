@@ -60,6 +60,11 @@ const string $APP_VERSION = "1.0.0"
 // Configuración de la aplicación
 const bool $DEBUG_MODE = true
 const int $MAX_RETRIES = 3`,
+		filepath.Join(path, "tests", "main_test.joss"): `test("Ejecución de aplicación de consola", func() {
+    string $appName = "Joss Console"
+    assertEqual($appName, "Joss Console")
+    assertTrue(true)
+})`,
 		filepath.Join(path, ".gitignore"): `plugins/
 env.joss
 env.enc

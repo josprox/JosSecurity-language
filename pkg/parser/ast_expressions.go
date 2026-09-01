@@ -273,9 +273,10 @@ func (ne *NewExpression) String() string {
 }
 
 type MemberExpression struct {
-	Token    Token // DOT
+	Token    Token // ARROW, NULL_SAFE_ARROW, DOUBLE_COLON, DOT
 	Left     Expression
 	Property *Identifier
+	NullSafe bool
 }
 
 func (me *MemberExpression) expressionNode()      {}
@@ -283,7 +284,13 @@ func (me *MemberExpression) TokenLiteral() string { return me.Token.Literal }
 func (me *MemberExpression) String() string {
 	var out bytes.Buffer
 	out.WriteString(me.Left.String())
-	out.WriteString(".")
+	if me.NullSafe {
+		out.WriteString("?->")
+	} else if me.Token.Literal != "" {
+		out.WriteString(me.Token.Literal)
+	} else {
+		out.WriteString("->")
+	}
 	out.WriteString(me.Property.String())
 	return out.String()
 }

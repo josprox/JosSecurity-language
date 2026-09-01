@@ -5,11 +5,20 @@ import "github.com/jossecurity/joss/pkg/parser"
 const SymbolSchemaVersion = 1
 
 type SymbolIndex struct {
-	Schema    int              `json:"schema"`
-	Package   string           `json:"package"`
-	Version   string           `json:"version"`
-	Classes   []SymbolClass    `json:"classes,omitempty"`
-	Functions []SymbolCallable `json:"functions,omitempty"`
+	Schema    int                 `json:"schema"`
+	Package   string              `json:"package"`
+	Version   string              `json:"version"`
+	Classes   []SymbolClass       `json:"classes,omitempty"`
+	Functions []SymbolCallable    `json:"functions,omitempty"`
+	Commands  []CommandDefinition `json:"commands,omitempty"`
+}
+
+type CommandDefinition struct {
+	Name        string `json:"name,omitempty" yaml:"name,omitempty"`
+	Description string `json:"description" yaml:"description"`
+	Usage       string `json:"usage,omitempty" yaml:"usage,omitempty"`
+	Protected   bool   `json:"protected,omitempty" yaml:"protected,omitempty"`
+	Handler     string `json:"handler,omitempty" yaml:"handler,omitempty"`
 }
 
 type SymbolClass struct {

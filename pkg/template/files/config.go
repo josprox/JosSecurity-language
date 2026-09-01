@@ -69,6 +69,11 @@ environment:
 
 dependencies:
 `, version.Version, "4.0.0"),
+		filepath.Join(path, "tests", "app_test.joss"): `test("Verificación de arranque del servidor", func() {
+    bool $ready = true
+    assertTrue($ready)
+    assertEqual(1 + 1, 2)
+})`,
 		filepath.Join(path, ".gitignore"): `plugins/
 env.joss
 env.enc

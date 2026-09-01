@@ -28,7 +28,9 @@ func (r *Runtime) callBuiltinAsync(name string, args []interface{}) (interface{}
 					close(future.done)
 				}()
 
-				if fn, ok := argVal.(*parser.FunctionLiteral); ok {
+				if captured, ok := argVal.(*CapturedFunction); ok {
+					future.result = newR.callCapturedFunction(captured, nil)
+				} else if fn, ok := argVal.(*parser.FunctionLiteral); ok {
 					future.result = newR.executeBlock(fn.Body)
 				} else if blk, ok := argVal.(*parser.BlockStatement); ok {
 					future.result = newR.executeBlock(blk)

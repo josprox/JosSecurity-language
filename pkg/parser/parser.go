@@ -51,9 +51,10 @@ var precedences = map[TokenType]int{
 	SHIFT_RIGHT:   SHIFT,
 	LPAREN:        CALL,
 	LBRACKET:      INDEX,
-	ARROW:         INDEX,
-	DOUBLE_COLON:  INDEX,
-	INCREMENT:     INDEX,
+	ARROW:           INDEX,
+	NULL_SAFE_ARROW: INDEX,
+	DOUBLE_COLON:    INDEX,
+	INCREMENT:       INDEX,
 }
 
 type (
@@ -127,6 +128,7 @@ func NewParser(l *Lexer) *Parser {
 	p.registerInfix(NULL_COALESCE, p.parseInfixExpression)
 	p.registerInfix(LBRACKET, p.parseIndexExpression)
 	p.registerInfix(ARROW, p.parseMemberExpression)
+	p.registerInfix(NULL_SAFE_ARROW, p.parseMemberExpression)
 	p.registerInfix(DOUBLE_COLON, p.parseMemberExpression)
 	p.registerInfix(ASSIGN, p.parseAssignExpression)
 	p.registerInfix(INCREMENT, p.parsePostfixExpression)

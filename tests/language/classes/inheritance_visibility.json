@@ -1,0 +1,6 @@
+{
+  "name": "classes_inheritance_visibility",
+  "source": "public class Animal {\n  protected string $species = \"Mammal\"\n  public func getSpecies(): string {\n    return $this->species\n  }\n}\npublic class Dog extends Animal {\n  public func describe(): string {\n    return \"Dog:\" . $this->species\n  }\n}\npublic func main(): string {\n  Dog $d = new Dog()\n  return $d->describe()\n}",
+  "expected_diagnostics": [],
+  "expected_runtime_string": "Dog:Mammal"
+}

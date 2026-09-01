@@ -79,7 +79,7 @@ func (r *Runtime) evaluateExpression(exp parser.Expression) interface{} {
 		// For now, just return the BlockStatement so Task can execute it.
 		return e.Block
 	case *parser.FunctionLiteral:
-		return e
+		return r.captureFunction(e)
 	case *parser.PrefixExpression:
 		return r.evaluatePrefix(e)
 	case *parser.PostfixExpression:
