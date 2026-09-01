@@ -396,6 +396,9 @@ func (r *Runtime) executeViewMethod(instance *Instance, method string, args []in
 
 			var result interface{}
 			func() {
+				previousFrame := r.currentFrame
+				r.currentFrame = nil
+				defer func() { r.currentFrame = previousFrame }()
 				defer func() {
 					if rec := recover(); rec != nil {
 						if rp, ok := rec.(*ReturnPanic); ok {

@@ -107,9 +107,8 @@ type ClosureEnvironment struct {
 // CapturedFunction is a function literal paired with the lexical environment
 // that existed when a long-lived callback was registered.
 //
-// Function literals remain parser nodes for immediate consumers such as
-// Router and Schema. Native APIs that retain a
-// callback beyond the current call should wrap it with Runtime.captureFunction.
+// Function literals evaluate to captured functions so both immediate and
+// deferred native consumers observe the same lexical environment.
 type CapturedFunction struct {
 	Function    *parser.FunctionLiteral
 	Environment *ClosureEnvironment

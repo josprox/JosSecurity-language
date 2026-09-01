@@ -34,11 +34,9 @@ func compileStyles() {
 			return "" // Remove variable definition from output
 		})
 
-		// 2. Replace Variables
-		for k, v := range vars {
-			// Replace $var with value
-			content = strings.ReplaceAll(content, k, v)
-		}
+		// 2. Replace complete variable tokens. Replacing map keys one by one
+		// corrupts names that share a prefix, such as $text and $text-dim.
+		content = replaceSCSSVariables(content, vars)
 		// Optimize CSS (Purge Unused)
 		// content = optimizeCSS(content) // DISABLED: Moving to Dynamic Runtime Delivery
 
@@ -47,6 +45,17 @@ func compileStyles() {
 		os.MkdirAll(filepath.Dir(outFile), 0755)
 		os.WriteFile(outFile, []byte(content), 0644)
 	}
+}
+
+var scssVariableReference = regexp.MustCompile(`\$[a-zA-Z0-9_-]+`)
+
+func replaceSCSSVariables(content string, variables map[string]string) string {
+	return scssVariableReference.ReplaceAllStringFunc(content, func(name string) string {
+		if value, ok := variables[name]; ok {
+			return value
+		}
+		return name
+	})
 }
 
 // optimizeCSS removes CSS blocks that are not used in views

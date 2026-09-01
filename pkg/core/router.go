@@ -244,7 +244,9 @@ func (r *Runtime) executeRouterMethod(instance *Instance, method string, args []
 			}
 			r.CurrentMiddleware = append(r.CurrentMiddleware, mwName)
 
-			if fn, ok := callback.(*parser.FunctionLiteral); ok {
+			if captured, ok := callback.(*CapturedFunction); ok {
+				r.callCapturedFunction(captured, nil)
+			} else if fn, ok := callback.(*parser.FunctionLiteral); ok {
 				r.executeBlock(fn.Body)
 			} else {
 				fmt.Printf("[ERROR] Router.group callback is not a function: %T\n", callback)

@@ -1,6 +1,8 @@
 package linter
 
 import (
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/jossecurity/joss/pkg/diagnostics"
@@ -26,6 +28,37 @@ func TestLinterDetectsUntypedParams(t *testing.T) {
 	}
 	if !found {
 		t.Fatalf("expected JOSS-LINT-002 for untyped param, got: %v", issues)
+	}
+}
+
+func TestLintPathAnalyzesDirectoryAsOneProject(t *testing.T) {
+	project := t.TempDir()
+	files := map[string]string{
+		"Service.joss": `public class Service {
+    public static func value(): string {
+        return "ok"
+    }
+}`,
+		"Controller.joss": `public class Controller {
+    public func index(): string {
+        return Service::value()
+    }
+}`,
+	}
+	for name, source := range files {
+		if err := os.WriteFile(filepath.Join(project, name), []byte(source), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	issues, err := NewLinter().LintPath(project)
+	if err != nil {
+		t.Fatalf("lint directory: %v", err)
+	}
+	for _, issue := range issues {
+		if issue.RuleID == "JOSS-SYM-004" || issue.RuleID == "JOSS-SYM-001" {
+			t.Fatalf("cross-file symbol produced a false positive: %s", issue.String())
+		}
 	}
 }
 

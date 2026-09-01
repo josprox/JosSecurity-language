@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	semanticanalyzer "github.com/jossecurity/joss/pkg/analyzer"
 	"github.com/jossecurity/joss/pkg/core"
 	"github.com/jossecurity/joss/pkg/diagnostics"
 	"github.com/jossecurity/joss/pkg/parser"
@@ -72,21 +73,8 @@ func (l *Linter) LintSource(filename, src string) ([]LintIssue, error) {
 	}
 
 	// 2. Semantic Analysis integration
-	report := core.AnalyzeProgram(prog)
-	for _, diag := range report.Diagnostics {
-		issues = append(issues, LintIssue{
-			RuleID:      diag.Code,
-			Category:    CategoryCorrectness,
-			Severity:    diag.Severity,
-			File:        filename,
-			Line:        diag.Range.Start.Line,
-			Column:      diag.Range.Start.Column,
-			Message:     diag.Message,
-			Explanation: diag.Explanation,
-			Suggestion:  diag.Suggestion,
-			AutoFixable: false,
-		})
-	}
+	report := core.AnalyzeSourceUnits([]semanticanalyzer.SourceUnit{{Path: filename, Program: prog}})
+	issues = append(issues, lintIssuesFromDiagnostics(report.Diagnostics, filename)...)
 
 	// 3. Static AST Lint Rules
 	astIssues := checkASTRules(filename, prog, src)
@@ -101,8 +89,6 @@ func (l *Linter) LintPath(targetPath string) ([]LintIssue, error) {
 		return nil, err
 	}
 
-	var allIssues []LintIssue
-
 	if !info.IsDir() {
 		data, err := os.ReadFile(targetPath)
 		if err != nil {
@@ -111,6 +97,8 @@ func (l *Linter) LintPath(targetPath string) ([]LintIssue, error) {
 		return l.LintSource(targetPath, string(data))
 	}
 
+	var allIssues []LintIssue
+	var units []semanticanalyzer.SourceUnit
 	err = filepath.WalkDir(targetPath, func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return err
@@ -127,16 +115,54 @@ func (l *Linter) LintPath(targetPath string) ([]LintIssue, error) {
 			if readErr != nil {
 				return readErr
 			}
-			issues, lintErr := l.LintSource(path, string(data))
-			if lintErr != nil {
-				return lintErr
+			p := parser.NewParser(parser.NewLexer(string(data)))
+			program := p.ParseProgram()
+			if len(p.Errors()) > 0 {
+				for _, errStr := range p.Errors() {
+					allIssues = append(allIssues, LintIssue{
+						RuleID: "JOSS-SYNTAX-001", Category: CategoryCorrectness,
+						Severity: diagnostics.SeverityError, File: path, Line: 1,
+						Message: errStr,
+					})
+				}
+				return nil
 			}
-			allIssues = append(allIssues, issues...)
+			units = append(units, semanticanalyzer.SourceUnit{Path: path, Program: program})
+			allIssues = append(allIssues, checkASTRules(path, program, string(data))...)
 		}
 		return nil
 	})
+	if err != nil {
+		return nil, err
+	}
 
-	return allIssues, err
+	report := core.AnalyzeSourceUnits(units)
+	allIssues = append(lintIssuesFromDiagnostics(report.Diagnostics, targetPath), allIssues...)
+
+	return allIssues, nil
+}
+
+func lintIssuesFromDiagnostics(items []diagnostics.Diagnostic, fallbackFile string) []LintIssue {
+	issues := make([]LintIssue, 0, len(items))
+	for _, diag := range items {
+		filename := diag.File
+		if filename == "" || filename == "<memory>" {
+			filename = fallbackFile
+		}
+		issues = append(issues, LintIssue{
+			RuleID:      diag.Code,
+			Category:    CategoryCorrectness,
+			Severity:    diag.Severity,
+			File:        filename,
+			Line:        diag.Range.Start.Line,
+			Column:      diag.Range.Start.Column,
+			Message:     diag.Message,
+			Explanation: diag.Explanation,
+			Suggestion:  diag.Suggestion,
+			AutoFixable: false,
+		})
+	}
+	return issues
 }
 
 func checkASTRules(filename string, prog *parser.Program, src string) []LintIssue {
