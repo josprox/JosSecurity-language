@@ -594,7 +594,7 @@ func (r *Runtime) preloadSingleDir(dirPath string) {
 		if err != nil || info.IsDir() {
 			return nil
 		}
-		if strings.HasSuffix(path, ".joss") {
+		if strings.HasSuffix(path, ".joss") && !parser.IsIgnoredSourceFile(path) {
 			content, readErr := os.ReadFile(path)
 			if readErr == nil {
 				l := parser.NewLexer(string(content))

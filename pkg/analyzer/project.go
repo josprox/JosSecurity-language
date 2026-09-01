@@ -32,7 +32,7 @@ func LoadProject(entrypoint string, sourceDirs ...string) ([]SourceUnit, []diagn
 			if info.IsDir() {
 				return nil
 			}
-			if !strings.EqualFold(filepath.Ext(path), ".joss") {
+			if parser.IsIgnoredSourceFile(path) || !strings.EqualFold(filepath.Ext(path), ".joss") {
 				return nil
 			}
 			absolute, err := filepath.Abs(path)

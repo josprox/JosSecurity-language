@@ -110,7 +110,7 @@ func (l *Linter) LintPath(targetPath string) ([]LintIssue, error) {
 			}
 			return nil
 		}
-		if strings.EqualFold(filepath.Ext(path), ".joss") {
+		if strings.EqualFold(filepath.Ext(path), ".joss") && !parser.IsIgnoredSourceFile(path) {
 			data, readErr := os.ReadFile(path)
 			if readErr != nil {
 				return readErr

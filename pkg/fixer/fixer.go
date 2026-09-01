@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/jossecurity/joss/pkg/formatter"
+	"github.com/jossecurity/joss/pkg/parser"
 )
 
 type FixResult struct {
@@ -106,7 +107,7 @@ func (f *Fixer) FixDirectory(dir string) ([]FixResult, error) {
 			}
 			return nil
 		}
-		if strings.EqualFold(filepath.Ext(path), ".joss") {
+		if strings.EqualFold(filepath.Ext(path), ".joss") && !parser.IsIgnoredSourceFile(path) {
 			res, fixErr := f.FixFile(path)
 			if fixErr != nil {
 				return fmt.Errorf("failed fixing %s: %w", path, fixErr)

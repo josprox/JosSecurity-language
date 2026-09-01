@@ -350,7 +350,7 @@ func FormatDirectory(root string, write bool, check bool) ([]string, error) {
 			}
 			return nil
 		}
-		if strings.EqualFold(filepath.Ext(path), ".joss") {
+		if strings.EqualFold(filepath.Ext(path), ".joss") && !parser.IsIgnoredSourceFile(path) {
 			changed, formatErr := FormatFile(path, write)
 			if formatErr != nil {
 				return fmt.Errorf("error formatting %s: %w", path, formatErr)
