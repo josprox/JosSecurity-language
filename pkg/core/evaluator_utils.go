@@ -6,7 +6,34 @@ import (
 )
 
 func (r *Runtime) checkType(val interface{}, typeName string) bool {
-	destination := typesystem.Parse(typeName)
+	return r.checkParsedType(val, typesystem.Parse(typeName))
+}
+
+func (r *Runtime) checkParsedType(val interface{}, destination typesystem.Type) bool {
+	if destination.Kind == typesystem.Array && destination.Element != nil {
+		list, ok := val.([]interface{})
+		if !ok {
+			return false
+		}
+		for _, item := range list {
+			if !r.checkParsedType(item, *destination.Element) {
+				return false
+			}
+		}
+		return true
+	}
+	if destination.Kind == typesystem.Map && destination.Element != nil {
+		m, ok := val.(map[string]interface{})
+		if !ok {
+			return false
+		}
+		for _, v := range m {
+			if !r.checkParsedType(v, *destination.Element) {
+				return false
+			}
+		}
+		return true
+	}
 	source := runtimeTypeOf(val)
 	if typesystem.Assignable(destination, source) {
 		return true
@@ -71,6 +98,12 @@ func runtimeTypeName(value interface{}) string {
 func (r *Runtime) checkExistence(exp parser.Expression) bool {
 	switch e := exp.(type) {
 	case *parser.Identifier:
+		if exists, initialized := r.localBindingExists(e); exists {
+			return initialized
+		}
+		if !r.sourceMapVisible(e.Value) {
+			return false
+		}
 		_, ok := r.Variables[e.Value]
 		return ok
 	case *parser.IndexExpression:
@@ -136,6 +169,10 @@ func isTruthy(val interface{}) bool {
 // coerceToTypedValue attempts to cast val to the declared type when val is a string.
 // This allows Console::input() (which returns string) to work with int/float declarations.
 func (r *Runtime) coerceToTypedValue(val interface{}, typeName string) interface{} {
+	return r.coerceToParsedType(val, typesystem.Parse(typeName))
+}
+
+func (r *Runtime) coerceToParsedType(val interface{}, destination typesystem.Type) interface{} {
 	if val == nil {
 		return val
 	}
@@ -143,7 +180,7 @@ func (r *Runtime) coerceToTypedValue(val interface{}, typeName string) interface
 	if !isString {
 		return val // Already a non-string, no coercion needed
 	}
-	if coerced, ok := typesystem.CoerceString(typesystem.Parse(typeName), str); ok {
+	if coerced, ok := typesystem.CoerceString(destination, str); ok {
 		return coerced
 	}
 	return val // Return original if no coercion possible

@@ -59,3 +59,59 @@ func TestUnionAndNullableCompatibility(t *testing.T) {
 		t.Fatal("union source compatibility is not sound")
 	}
 }
+
+func TestCheckedIntegerArithmeticRejectsOverflow(t *testing.T) {
+	if _, fault := CheckedIntBinary("+", 9223372036854775807, 1); fault != ArithmeticOverflow {
+		t.Fatalf("MAX_INT + 1 fault = %q", fault)
+	}
+	if _, fault := CheckedIntBinary("-", -9223372036854775807, 2); fault != ArithmeticOverflow {
+		t.Fatalf("integer subtraction fault = %q", fault)
+	}
+	if _, fault := CheckedIntBinary("*", 9223372036854775807, 2); fault != ArithmeticOverflow {
+		t.Fatalf("integer multiplication fault = %q", fault)
+	}
+	if _, fault := CheckedIntBinary("%", 1, 0); fault != ArithmeticDivisionByZero {
+		t.Fatalf("modulo by zero fault = %q", fault)
+	}
+}
+
+func TestCheckedIntegerArithmeticPreservesLargeIntegerPrecision(t *testing.T) {
+	value, fault := CheckedIntBinary("+", 9007199254740993, 1)
+	if fault != ArithmeticOK || value != 9007199254740994 {
+		t.Fatalf("large integer result = %d, %q", value, fault)
+	}
+}
+
+func TestTypedCollectionsAndNarrowing(t *testing.T) {
+	arrInt := Parse("array<int>")
+	if arrInt.Kind != Array || arrInt.Element == nil || arrInt.Element.Kind != Int || arrInt.String() != "array<int>" {
+		t.Fatalf("unexpected arrInt: %#v (%s)", arrInt, arrInt.String())
+	}
+
+	mapStrUser := Parse("map<string, User>")
+	if mapStrUser.Kind != Map || mapStrUser.Key == nil || mapStrUser.Element == nil || mapStrUser.Element.Kind != Class || mapStrUser.Element.Name != "User" {
+		t.Fatalf("unexpected mapStrUser: %#v (%s)", mapStrUser, mapStrUser.String())
+	}
+
+	arrNullable := Parse("array<string>?")
+	if arrNullable.Kind != Union || arrNullable.String() != "array<string>|null" {
+		t.Fatalf("unexpected arrNullable: %#v (%s)", arrNullable, arrNullable.String())
+	}
+
+	if !Assignable(Parse("array<int>"), Parse("array<int>")) {
+		t.Fatal("array<int> must be assignable to array<int>")
+	}
+	if Assignable(Parse("array<int>"), Parse("array<string>")) {
+		t.Fatal("array<string> must NOT be assignable to array<int>")
+	}
+	if !Assignable(Parse("array"), Parse("array<int>")) {
+		t.Fatal("array<int> must be assignable to untyped array")
+	}
+
+	unionType := Parse("User|null")
+	narrowed := unionType.Without(Null)
+	if narrowed.Kind != Class || narrowed.Name != "User" {
+		t.Fatalf("narrowed User|null without null = %s, want User", narrowed.String())
+	}
+}
+

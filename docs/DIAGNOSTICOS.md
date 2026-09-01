@@ -45,6 +45,10 @@ error[JOSS-TYPE-001] app/example.joss:3:2: Cannot use `string` as assignment for
 | `JOSS-MEMBER-001` | Método inexistente en clase conocida. |
 | `JOSS-FLOW-001` | Código inalcanzable. |
 | `JOSS-LINT-001` | Variable local sin uso. |
+| `JOSS-ARITH-001` | Una operación entera desborda el rango signed de 64 bits. |
+| `JOSS-ARITH-002` | División o módulo entre cero. |
+| `JOSS-INDEX-001` | Índice negativo o fuera de rango. |
+| `JOSS-INDEX-002` | Tipo de índice incompatible con la colección/string. |
 
 ## Política contra falsos positivos
 

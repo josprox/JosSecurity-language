@@ -8,14 +8,36 @@ func (r *Runtime) captureFunction(fn *parser.FunctionLiteral) *CapturedFunction 
 	if r.captureEnvironment == nil {
 		variables := make(map[string]interface{}, len(r.Variables))
 		for name, value := range r.Variables {
-			variables[name] = value
+			if r.sourceMapVisible(name) {
+				variables[name] = value
+			}
 		}
 
 		varTypes := make(map[string]string, len(r.VarTypes))
 		for name, valueType := range r.VarTypes {
-			varTypes[name] = valueType
+			if r.sourceMapVisible(name) {
+				varTypes[name] = valueType
+			}
 		}
-		constants := copyBoolMap(r.Constants)
+		constants := make(map[string]bool, len(r.Constants))
+		for name, constant := range r.Constants {
+			if constant && r.sourceMapVisible(name) {
+				constants[name] = true
+			}
+		}
+		if r.currentFrame != nil {
+			for index := range r.currentFrame.slots {
+				slot := &r.currentFrame.slots[index]
+				if !slot.Initialized {
+					continue
+				}
+				variables[slot.Name] = slot.Value.Interface()
+				varTypes[slot.Name] = slot.TypeName
+				if slot.Constant {
+					constants[slot.Name] = true
+				}
+			}
+		}
 
 		r.captureEnvironment = &ClosureEnvironment{
 			Variables: variables,
@@ -54,5 +76,5 @@ func (r *Runtime) callCapturedFunction(closure *CapturedFunction, args []interfa
 		ReturnType: closure.Function.ReturnType,
 		Body:       closure.Function.Body,
 	}
-	return r.callMethodEvaluated(method, nil, args, environment)
+	return r.callMethodEvaluatedWithPlan(method, nil, args, environment, r.planForFunction(closure.Function))
 }

@@ -114,8 +114,21 @@ No puede reasignarse ni con `=`, ni con `++`, ni como propiedad constante de una
 
 - `array` y `string` requieren índice `int`.
 - `map` requiere índice `string`.
+- `string[index]` cuenta _extended grapheme clusters_ de Unicode (caracteres
+  percibidos), no bytes ni code points aislados. Acentos combinados, flags y
+  emojis unidos por ZWJ se retornan completos.
+- Un índice negativo o fuera de rango produce `JOSS-INDEX-001`; nunca retorna
+  bytes UTF-8 parciales ni continúa silenciosamente con `nil`.
 - Cuando el receptor es `mixed` o desconocido, el analizador no acusa un error sin evidencia.
 - Cuando una clase está resuelta, las llamadas a métodos inexistentes producen `JOSS-MEMBER-001`.
+
+## Aritmética entera
+
+Los enteros Joss son valores signed de 64 bits. `+`, `-`, `*`, `%`, negación y
+`++` se evalúan de forma exacta. Un resultado fuera de rango produce
+`JOSS-ARITH-001`; división o módulo entre cero produce `JOSS-ARITH-002`. No hay
+wrapping ni saturación implícitos. `/` conserva el resultado `float` histórico,
+pero también rechaza divisor cero.
 
 ## Fuente canónica
 

@@ -14,6 +14,7 @@ require (
 	github.com/microsoft/go-mssqldb v1.10.0
 	github.com/oracle/oci-go-sdk/v65 v65.123.1
 	github.com/redis/go-redis/v9 v9.22.0
+	github.com/rivo/uniseg v0.4.7
 	golang.org/x/crypto v0.55.0
 	golang.org/x/sys v0.47.0
 	golang.org/x/term v0.45.0

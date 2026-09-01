@@ -24,6 +24,8 @@ fuentes .joss
 | `pkg/analyzer` | Unidades fuente, scopes, símbolos, inferencia de expresiones, firmas y flujo alcanzable. No depende del runtime. |
 | `pkg/diagnostics` | Modelo común: código, severidad, mensaje, archivo, rango, explicación y sugerencia. |
 | `pkg/core` | Adaptación de catálogos reales al analizador, intérprete y primitivas integradas. |
+| `pkg/runtime/errors` | Error runtime estructurado y frames de stack Joss, sin dependencias de framework. |
+| `pkg/runtime/value` | Semántica de valores independiente del evaluator, incluida indexación Unicode. |
 | `pkg/pluginruntime`, `pkg/pluginpkg` | Carga aislada, verificación y resolución de símbolos de plugins JP v2. |
 | `pkg/bytecode` | Serialización comprimida del AST. No es código máquina ni LLVM IR. |
 | `cmd/joss` | CLI, análisis de proyecto, ejecución, build y administración. |

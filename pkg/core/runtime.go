@@ -16,6 +16,7 @@ import (
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/jossecurity/joss/pkg/i18n"
 	"github.com/jossecurity/joss/pkg/parser"
+	runtimeplan "github.com/jossecurity/joss/pkg/runtime/plan"
 	"github.com/jossecurity/joss/pkg/version"
 	_ "modernc.org/sqlite"
 )
@@ -42,8 +43,11 @@ var (
 				CustomMiddlewares: make(map[string]interface{}),
 				NativeHandlers:    make(map[string]NativeHandler),
 				NativePlugins:     make(map[string]*NativePluginDefinition),
-				NativeDrivers:     make(map[string]*NativeDriverDefinition),
-				MaxCallDepth:      DefaultMaxCallDepth,
+				NativeDrivers:      make(map[string]*NativeDriverDefinition),
+				callablePlans:      make(map[*parser.MethodStatement]*runtimeplan.Callable),
+				functionPlans:      make(map[*parser.FunctionLiteral]*runtimeplan.Callable),
+				classMetadataCache: make(map[string]*classMetadata),
+				MaxCallDepth:       DefaultMaxCallDepth,
 			}
 			r.Variables["cout"] = &Cout{}
 			r.Variables["cin"] = &Cin{}
@@ -77,6 +81,15 @@ func NewRuntime() *Runtime {
 	}
 	if r.HostGlobals == nil {
 		r.HostGlobals = make(map[string]bool)
+	}
+	if r.callablePlans == nil {
+		r.callablePlans = make(map[*parser.MethodStatement]*runtimeplan.Callable)
+	}
+	if r.functionPlans == nil {
+		r.functionPlans = make(map[*parser.FunctionLiteral]*runtimeplan.Callable)
+	}
+	if r.classMetadataCache == nil {
+		r.classMetadataCache = make(map[string]*classMetadata)
 	}
 	if r.MaxCallDepth <= 0 {
 		r.MaxCallDepth = DefaultMaxCallDepth
@@ -134,6 +147,12 @@ func (r *Runtime) Free() {
 	for k := range r.NativeDrivers {
 		delete(r.NativeDrivers, k)
 	}
+	for method := range r.callablePlans {
+		delete(r.callablePlans, method)
+	}
+	for function := range r.functionPlans {
+		delete(r.functionPlans, function)
+	}
 	// PluginRegistry owns symbol tables whose host context is this Runtime.
 	// Keeping it while clearing Variables/Classes makes a recycled runtime skip
 	// plugin registration because the archive still appears to be loaded.
@@ -146,6 +165,8 @@ func (r *Runtime) Free() {
 	r.CurrentMiddleware = r.CurrentMiddleware[:0]
 	r.ProjectRoot = ""
 	r.callDepth = 0
+	r.callStack = r.callStack[:0]
+	r.currentFrame = nil
 	r.MaxCallDepth = DefaultMaxCallDepth
 	r.captureEnvironment = nil
 	r.SitemapEntries = r.SitemapEntries[:0]
@@ -173,6 +194,8 @@ func (r *Runtime) Fork() *Runtime {
 		NativeHandlers:    copyNativeHandlerMap(r.NativeHandlers),
 		NativePlugins:     copyNativePluginMap(r.NativePlugins),
 		NativeDrivers:     copyNativeDriverMap(r.NativeDrivers),
+		callablePlans:     copyCallablePlanMap(r.callablePlans),
+		functionPlans:     copyFunctionPlanMap(r.functionPlans),
 		MaxCallDepth:      r.MaxCallDepth,
 		PluginRegistry:    r.PluginRegistry,
 		ProjectRoot:       r.ProjectRoot,
@@ -295,6 +318,22 @@ func copyNativeDriverMap(source map[string]*NativeDriverDefinition) map[string]*
 	result := make(map[string]*NativeDriverDefinition, len(source))
 	for key, value := range source {
 		result[key] = value
+	}
+	return result
+}
+
+func copyCallablePlanMap(source map[*parser.MethodStatement]*runtimeplan.Callable) map[*parser.MethodStatement]*runtimeplan.Callable {
+	result := make(map[*parser.MethodStatement]*runtimeplan.Callable, len(source))
+	for method, compiled := range source {
+		result[method] = compiled
+	}
+	return result
+}
+
+func copyFunctionPlanMap(source map[*parser.FunctionLiteral]*runtimeplan.Callable) map[*parser.FunctionLiteral]*runtimeplan.Callable {
+	result := make(map[*parser.FunctionLiteral]*runtimeplan.Callable, len(source))
+	for function, compiled := range source {
+		result[function] = compiled
 	}
 	return result
 }

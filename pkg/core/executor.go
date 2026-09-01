@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/jossecurity/joss/pkg/parser"
+	runtimeplan "github.com/jossecurity/joss/pkg/runtime/plan"
 )
 
 // Execute runs the parsed program
@@ -20,6 +21,7 @@ func (r *Runtime) Execute(program *parser.Program) {
 		}
 		if methodStmt, ok := stmt.(*parser.MethodStatement); ok {
 			r.Functions[methodStmt.Name.Value] = methodStmt
+			r.planForMethod(methodStmt)
 		}
 	}
 
@@ -104,11 +106,28 @@ func (r *Runtime) executeBlock(block *parser.BlockStatement) interface{} {
 
 func (r *Runtime) registerClass(stmt *parser.ClassStatement) {
 	r.Classes[stmt.Name.Value] = stmt
+	if stmt.Body != nil {
+		for _, member := range stmt.Body.Statements {
+			if method, ok := member.(*parser.MethodStatement); ok && method.Body != nil {
+				r.planForMethod(method)
+			}
+		}
+	}
 }
 
 func (r *Runtime) executeStatement(stmt parser.Statement) interface{} {
 	switch s := stmt.(type) {
 	case *parser.LetStatement:
+		if _, resolved := r.slotForIdentifier(s.Name); resolved {
+			var value interface{}
+			if s.Value != nil {
+				value = r.evaluateExpression(s.Value)
+			} else {
+				value = r.getZeroValue(s.Token.Literal)
+			}
+			r.assignLocal(s.Name, value, true)
+			return nil
+		}
 		if r.Constants == nil {
 			r.Constants = make(map[string]bool)
 		}
@@ -151,6 +170,10 @@ func (r *Runtime) executeStatement(stmt parser.Statement) interface{} {
 			} else {
 				val = r.getZeroValue(s.TypeToken.Literal)
 			}
+			if _, resolved := r.slotForIdentifier(decl.Name); resolved {
+				r.assignLocal(decl.Name, val, true)
+				continue
+			}
 			declaredType := s.TypeToken.Literal
 			if declaredType == "var" {
 				declaredType = runtimeTypeName(val)
@@ -164,6 +187,9 @@ func (r *Runtime) executeStatement(stmt parser.Statement) interface{} {
 			r.Variables[decl.Name.Value] = val
 		}
 	case *parser.ExpressionStatement:
+		if postfix, ok := s.Expression.(*parser.PostfixExpression); ok && r.executePostfixStatement(postfix) {
+			return nil
+		}
 		return r.evaluateExpression(s.Expression)
 	case *parser.ForeachStatement:
 		return r.executeForeach(s)
@@ -186,6 +212,7 @@ func (r *Runtime) executeStatement(stmt parser.Statement) interface{} {
 		return r.executeContinue(s)
 	case *parser.MethodStatement:
 		r.Functions[s.Name.Value] = s
+		r.planForMethod(s)
 	case *parser.ClassStatement:
 		r.registerClass(s)
 
@@ -212,20 +239,23 @@ func (r *Runtime) executeContinue(cs *parser.ContinueStatement) interface{} {
 func (r *Runtime) executeForeach(fs *parser.ForeachStatement) interface{} {
 	iterable := r.evaluateExpression(fs.Iterable)
 
+	slot := -1
+	if r.currentFrame != nil && r.currentFrame.plan != nil {
+		if s, exists := r.currentFrame.plan.ForeachSlots[fs]; exists {
+			slot = s
+		}
+	}
+	hasControl := r.blockHasControl(fs.Body)
+
 	executeIter := func(item interface{}) (shouldBreak bool) {
-		defer func() {
-			if err := recover(); err != nil {
-				switch err.(type) {
-				case *BreakPanic:
-					shouldBreak = true
-				case *ContinuePanic:
-					// Just return from this closure, which continues the loop
-				default:
-					panic(err) // Bubble up Returns and others
-				}
-			}
-		}()
-		r.Variables[fs.Value] = item
+		if slot >= 0 {
+			r.bindSlot(slot, item)
+		} else {
+			r.Variables[fs.Value] = item
+		}
+		if hasControl {
+			return r.executeLoopBodyProtected(fs.Body)
+		}
 		r.executeBlock(fs.Body)
 		return false
 	}
@@ -255,65 +285,74 @@ func (r *Runtime) executeForeach(fs *parser.ForeachStatement) interface{} {
 }
 
 func (r *Runtime) executeWhile(ws *parser.WhileStatement) interface{} {
+	hasControl := r.blockHasControl(ws.Body)
 	for {
-		cond := r.evaluateExpression(ws.Condition)
-		if !isTruthy(cond) {
+		if !r.evaluateCondition(ws.Condition) {
 			break
 		}
-
-		shouldBreak := false
-		func() {
-			defer func() {
-				if err := recover(); err != nil {
-					switch err.(type) {
-					case *BreakPanic:
-						shouldBreak = true
-					case *ContinuePanic:
-						// Skip
-					default:
-						panic(err)
-					}
-				}
-			}()
+		if hasControl {
+			if r.executeLoopBodyProtected(ws.Body) {
+				break
+			}
+		} else {
 			r.executeBlock(ws.Body)
-		}()
-
-		if shouldBreak {
-			break
 		}
 	}
 	return nil
 }
 
 func (r *Runtime) executeDoWhile(dws *parser.DoWhileStatement) interface{} {
+	hasControl := r.blockHasControl(dws.Body)
 	for {
-		shouldBreak := false
-		func() {
-			defer func() {
-				if err := recover(); err != nil {
-					switch err.(type) {
-					case *BreakPanic:
-						shouldBreak = true
-					case *ContinuePanic:
-						// Skip
-					default:
-						panic(err)
-					}
-				}
-			}()
+		if hasControl {
+			if r.executeLoopBodyProtected(dws.Body) {
+				break
+			}
+		} else {
 			r.executeBlock(dws.Body)
-		}()
-
-		if shouldBreak {
-			break
 		}
-
-		cond := r.evaluateExpression(dws.Condition)
-		if !isTruthy(cond) {
+		if !r.evaluateCondition(dws.Condition) {
 			break
 		}
 	}
 	return nil
+}
+
+func (r *Runtime) executeLoopBodyProtected(body *parser.BlockStatement) (shouldBreak bool) {
+	defer func() {
+		if err := recover(); err != nil {
+			switch err.(type) {
+			case *BreakPanic:
+				shouldBreak = true
+			case *ContinuePanic:
+				// Skip
+			default:
+				panic(err)
+			}
+		}
+	}()
+	r.executeBlock(body)
+	return false
+}
+
+func (r *Runtime) blockHasControl(body *parser.BlockStatement) bool {
+	if r.currentFrame != nil && r.currentFrame.plan != nil && r.currentFrame.plan.LoopControl != nil {
+		if has, ok := r.currentFrame.plan.LoopControl[body]; ok {
+			return has
+		}
+	}
+	return runtimeplan.BlockHasBreakOrContinue(body)
+}
+
+func (r *Runtime) evaluateCondition(expression parser.Expression) bool {
+	if infix, ok := expression.(*parser.InfixExpression); ok {
+		if result, handled := r.evaluateSlotIntegerInfix(infix); handled {
+			if b, ok := result.(bool); ok {
+				return b
+			}
+		}
+	}
+	return isTruthy(r.evaluateExpression(expression))
 }
 
 func (r *Runtime) executeTryCatch(tcs *parser.TryCatchStatement) (result interface{}) {
@@ -343,7 +382,15 @@ func (r *Runtime) executeTryCatch(tcs *parser.TryCatchStatement) (result interfa
 			}
 
 			// Bind error variable
-			r.Variables[tcs.CatchVar] = errVal
+			if r.currentFrame != nil {
+				if slot, exists := r.currentFrame.plan.CatchSlots[tcs]; exists {
+					r.bindSlot(slot, errVal)
+				} else {
+					r.Variables[tcs.CatchVar] = errVal
+				}
+			} else {
+				r.Variables[tcs.CatchVar] = errVal
+			}
 
 			// Execute catch block
 			result = r.executeBlock(tcs.CatchBlock)

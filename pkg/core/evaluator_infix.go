@@ -3,7 +3,10 @@ package core
 import (
 	"fmt"
 
+	"github.com/jossecurity/joss/pkg/diagnostics"
 	"github.com/jossecurity/joss/pkg/parser"
+	runtimeframe "github.com/jossecurity/joss/pkg/runtime/frame"
+	"github.com/jossecurity/joss/pkg/typesystem"
 )
 
 func (r *Runtime) evaluateTernary(te *parser.TernaryExpression) interface{} {
@@ -50,6 +53,9 @@ func (r *Runtime) evaluateInfix(ie *parser.InfixExpression) interface{} {
 			return left
 		}
 		return r.evaluateExpression(ie.Right)
+	}
+	if result, handled := r.evaluateSlotIntegerInfix(ie); handled {
+		return result
 	}
 
 	left := r.evaluateExpression(ie.Left)
@@ -175,7 +181,39 @@ func (r *Runtime) evaluateInfix(ie *parser.InfixExpression) interface{} {
 		}
 	}
 
-	// Smart Numerics: Auto-promote to float if needed
+	// Preserve exact integer semantics. Float promotion is used only when at
+	// least one operand is actually a float.
+	leftInt, leftIsInt := runtimeInteger(left)
+	rightInt, rightIsInt := runtimeInteger(right)
+	if leftIsInt && rightIsInt {
+		switch ie.Operator {
+		case "+", "-", "*", "%":
+			result, fault := typesystem.CheckedIntBinary(ie.Operator, leftInt, rightInt)
+			if fault != typesystem.ArithmeticOK {
+				panic(r.integerArithmeticError(ie, fault, leftInt, rightInt))
+			}
+			return result
+		case "/":
+			if rightInt == 0 {
+				panic(r.integerArithmeticError(ie, typesystem.ArithmeticDivisionByZero, leftInt, rightInt))
+			}
+			return float64(leftInt) / float64(rightInt)
+		case "<":
+			return leftInt < rightInt
+		case ">":
+			return leftInt > rightInt
+		case ">=":
+			return leftInt >= rightInt
+		case "<=":
+			return leftInt <= rightInt
+		case "==":
+			return leftInt == rightInt
+		case "!=":
+			return leftInt != rightInt
+		}
+	}
+
+	// Mixed int/float operations promote to float.
 	toFloat := func(val interface{}) (float64, bool) {
 		if i, ok := val.(int64); ok {
 			return float64(i), true
@@ -194,10 +232,18 @@ func (r *Runtime) evaluateInfix(ie *parser.InfixExpression) interface{} {
 
 	if lIsNum && rIsNum {
 		if ie.Operator == "/" {
+			if rFloat == 0 {
+				panic(&JossError{Code: diagnostics.CodeDivisionByZero, Type: "ArithmeticError", Message: "División entre cero", File: r.CurrentFile, Line: ie.Token.Line, Column: ie.Token.Column})
+			}
 			return lFloat / rFloat
 		}
 		if ie.Operator == "%" {
-			return int64(lFloat) % int64(rFloat)
+			leftModulo, rightModulo := int64(lFloat), int64(rFloat)
+			result, fault := typesystem.CheckedIntBinary("%", leftModulo, rightModulo)
+			if fault != typesystem.ArithmeticOK {
+				panic(r.integerArithmeticError(ie, fault, leftModulo, rightModulo))
+			}
+			return result
 		}
 
 		isFloatOp := false
@@ -309,6 +355,77 @@ func (r *Runtime) evaluateInfix(ie *parser.InfixExpression) interface{} {
 	return nil
 }
 
+func (r *Runtime) evaluateSlotIntegerInfix(expression *parser.InfixExpression) (interface{}, bool) {
+	left, leftOK := r.slotIntegerOperand(expression.Left)
+	right, rightOK := r.slotIntegerOperand(expression.Right)
+	if !leftOK || !rightOK {
+		return nil, false
+	}
+	switch expression.Operator {
+	case "+", "-", "*", "%":
+		result, fault := typesystem.CheckedIntBinary(expression.Operator, left, right)
+		if fault != typesystem.ArithmeticOK {
+			panic(r.integerArithmeticError(expression, fault, left, right))
+		}
+		return result, true
+	case "/":
+		if right == 0 {
+			panic(r.integerArithmeticError(expression, typesystem.ArithmeticDivisionByZero, left, right))
+		}
+		return float64(left) / float64(right), true
+	case "<":
+		return left < right, true
+	case ">":
+		return left > right, true
+	case ">=":
+		return left >= right, true
+	case "<=":
+		return left <= right, true
+	case "==", "===":
+		return left == right, true
+	case "!=", "!==":
+		return left != right, true
+	default:
+		return nil, false
+	}
+}
+
+func (r *Runtime) slotIntegerOperand(expression parser.Expression) (int64, bool) {
+	switch node := expression.(type) {
+	case *parser.IntegerLiteral:
+		return node.Value, true
+	case *parser.Identifier:
+		slot, resolved := r.slotForIdentifier(node)
+		if !resolved || !slot.Initialized || slot.Value.Kind != runtimeframe.Int {
+			return 0, false
+		}
+		return slot.Value.Integer, true
+	default:
+		return 0, false
+	}
+}
+
+func runtimeInteger(value interface{}) (int64, bool) {
+	switch number := value.(type) {
+	case int64:
+		return number, true
+	case int:
+		return int64(number), true
+	default:
+		return 0, false
+	}
+}
+
+func (r *Runtime) integerArithmeticError(expression *parser.InfixExpression, fault typesystem.ArithmeticFault, left, right int64) *JossError {
+	code := diagnostics.CodeArithmeticOverflow
+	message := fmt.Sprintf("Overflow entero en %d %s %d", left, expression.Operator, right)
+	if fault == typesystem.ArithmeticDivisionByZero {
+		code = diagnostics.CodeDivisionByZero
+		message = fmt.Sprintf("División entre cero en %d %s %d", left, expression.Operator, right)
+	}
+	return &JossError{Code: code, Type: "ArithmeticError", Message: message, File: r.CurrentFile, Line: expression.Token.Line, Column: expression.Token.Column}
+}
+
 func (r *Runtime) evaluatePrefix(pe *parser.PrefixExpression) interface{} {
 	right := r.evaluateExpression(pe.Right)
 
@@ -318,7 +435,11 @@ func (r *Runtime) evaluatePrefix(pe *parser.PrefixExpression) interface{} {
 
 	if pe.Operator == "-" {
 		if i, ok := right.(int64); ok {
-			return -i
+			value, fault := typesystem.CheckedIntNegate(i)
+			if fault != typesystem.ArithmeticOK {
+				panic(&JossError{Code: diagnostics.CodeArithmeticOverflow, Type: "ArithmeticError", Message: fmt.Sprintf("Overflow entero al negar %d", i), File: r.CurrentFile, Line: pe.Token.Line, Column: pe.Token.Column})
+			}
+			return value
 		}
 		if f, ok := right.(float64); ok {
 			return -f
@@ -330,11 +451,18 @@ func (r *Runtime) evaluatePrefix(pe *parser.PrefixExpression) interface{} {
 
 func (r *Runtime) evaluatePostfix(pe *parser.PostfixExpression) interface{} {
 	if pe.Operator == "++" {
+		if value, handled := r.updatePostfixSlot(pe, true); handled {
+			return value
+		}
 		val := r.evaluateExpression(pe.Left)
 
 		var newVal interface{}
 		if i, ok := val.(int64); ok {
-			newVal = i + 1
+			value, fault := typesystem.CheckedIntBinary("+", i, 1)
+			if fault != typesystem.ArithmeticOK {
+				panic(&JossError{Code: diagnostics.CodeArithmeticOverflow, Type: "ArithmeticError", Message: fmt.Sprintf("Overflow entero al incrementar %d", i), File: r.CurrentFile, Line: pe.Token.Line, Column: pe.Token.Column})
+			}
+			newVal = value
 		} else if f, ok := val.(float64); ok {
 			newVal = f + 1.0
 		} else {
@@ -346,6 +474,47 @@ func (r *Runtime) evaluatePostfix(pe *parser.PostfixExpression) interface{} {
 		return val
 	}
 	return nil
+}
+
+func (r *Runtime) executePostfixStatement(expression *parser.PostfixExpression) bool {
+	_, handled := r.updatePostfixSlot(expression, false)
+	return handled
+}
+
+func (r *Runtime) updatePostfixSlot(expression *parser.PostfixExpression, returnOld bool) (interface{}, bool) {
+	identifier, ok := expression.Left.(*parser.Identifier)
+	if !ok || expression.Operator != "++" {
+		return nil, false
+	}
+	slot, resolved := r.slotForIdentifier(identifier)
+	if !resolved || !slot.Initialized || slot.ByReference {
+		return nil, false
+	}
+	if slot.Constant {
+		panic(&JossError{Type: "ConstantAssignment", Message: fmt.Sprintf("La constante '%s' no puede incrementarse", slot.Name), File: r.CurrentFile, Line: expression.Token.Line, Column: expression.Token.Column})
+	}
+	switch slot.Value.Kind {
+	case runtimeframe.Int:
+		old := slot.Value.Integer
+		updated, fault := typesystem.CheckedIntBinary("+", old, 1)
+		if fault != typesystem.ArithmeticOK {
+			panic(&JossError{Code: diagnostics.CodeArithmeticOverflow, Type: "ArithmeticError", Message: fmt.Sprintf("Overflow entero al incrementar %d", old), File: r.CurrentFile, Line: expression.Token.Line, Column: expression.Token.Column})
+		}
+		slot.Value.Integer = updated
+		if returnOld {
+			return old, true
+		}
+		return nil, true
+	case runtimeframe.Float:
+		old := slot.Value.Float
+		slot.Value.Float = old + 1
+		if returnOld {
+			return old, true
+		}
+		return nil, true
+	default:
+		return nil, false
+	}
 }
 
 func (r *Runtime) evaluateMatch(me *parser.MatchExpression) interface{} {

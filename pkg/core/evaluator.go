@@ -30,7 +30,13 @@ func (r *Runtime) evaluateExpression(exp parser.Expression) interface{} {
 		if e.Value == "false" {
 			return false
 		}
-		if val, ok := r.Variables[e.Value]; ok {
+		if value, resolved, initialized := r.localValue(e); resolved {
+			if !initialized {
+				panic(&JossError{Type: "UndefinedVariable", Message: fmt.Sprintf("Variable '%s' usada antes de inicializar", e.Value), File: r.CurrentFile, Line: e.Token.Line, Column: e.Token.Column})
+			}
+			return value
+		}
+		if val, ok := r.Variables[e.Value]; ok && r.sourceMapVisible(e.Value) {
 			if reference, ok := val.(*VariableReference); ok {
 				return reference.Get()
 			}

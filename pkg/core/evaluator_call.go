@@ -5,6 +5,9 @@ import (
 	"reflect"
 
 	"github.com/jossecurity/joss/pkg/parser"
+	runtimeerrors "github.com/jossecurity/joss/pkg/runtime/errors"
+	runtimeplan "github.com/jossecurity/joss/pkg/runtime/plan"
+	"github.com/jossecurity/joss/pkg/typesystem"
 )
 
 func (r *Runtime) CallMethod(method *parser.MethodStatement, instance *Instance, args []parser.Expression) (res interface{}) {
@@ -20,21 +23,19 @@ func (r *Runtime) CallMethodEvaluated(method *parser.MethodStatement, instance *
 }
 
 func (r *Runtime) callMethodEvaluated(method *parser.MethodStatement, instance *Instance, args []interface{}, writeBack *ClosureEnvironment) (res interface{}) {
+	return r.callMethodEvaluatedWithPlan(method, instance, args, writeBack, r.planForMethod(method))
+}
+
+func (r *Runtime) callMethodEvaluatedWithPlan(method *parser.MethodStatement, instance *Instance, args []interface{}, writeBack *ClosureEnvironment, compiled *runtimeplan.Callable) (res interface{}) {
 	// Native Method Support
 	if method.Body == nil {
 		return r.executeNativeMethod(instance, method.Name.Value, args)
 	}
-	required := 0
-	for _, parameter := range method.Parameters {
-		if parameter.ByReference && parameter.DefaultValue != nil {
-			panic(&JossError{Type: "ReferenceArgumentError", Message: fmt.Sprintf("El parámetro ref $%s no puede tener valor por defecto", parameter.Name.Value), File: r.CurrentFile, Line: parameter.Name.Token.Line})
-		}
-		if parameter.DefaultValue == nil {
-			required++
-		}
+	if compiled == nil {
+		compiled = runtimeplan.CompileMethod(method, instance != nil)
 	}
-	if len(args) < required || len(args) > len(method.Parameters) {
-		panic(fmt.Sprintf("Arity Error: %s() espera entre %d y %d argumentos, se recibieron %d", method.Name.Value, required, len(method.Parameters), len(args)))
+	if len(args) < compiled.RequiredCount || len(args) > compiled.ParameterCount {
+		panic(fmt.Sprintf("Arity Error: %s() espera entre %d y %d argumentos, se recibieron %d", method.Name.Value, compiled.RequiredCount, compiled.ParameterCount, len(args)))
 	}
 	if r.MaxCallDepth <= 0 {
 		r.MaxCallDepth = DefaultMaxCallDepth
@@ -48,127 +49,62 @@ func (r *Runtime) callMethodEvaluated(method *parser.MethodStatement, instance *
 		})
 	}
 	r.callDepth++
-	defer func() { r.callDepth-- }()
 	previousClass := r.currentClass
-	if owner := r.declaringClassOfMethod(method); owner != "" {
-		r.currentClass = owner
+	if compiled.Owner != "" {
+		r.currentClass = compiled.Owner
 	}
-	defer func() { r.currentClass = previousClass }()
+	frame := runtimeerrors.Frame{Function: method.Name.Value, Class: r.currentClass, File: r.CurrentFile, Line: method.Token.Line, Column: method.Token.Column}
+	r.callStack = append(r.callStack, frame)
 
-	// Named callables see only runtime/plugin globals. Function literals receive
-	// their captured lexical environment through writeBack. This prevents the
-	// accidental dynamic scoping that used to expose caller locals to recursion.
-	parentVariables := r.Variables
-	parentVarTypes := r.VarTypes
-	parentConstants := r.Constants
-	frameVariables := make(map[string]interface{}, len(r.HostGlobals)+len(method.Parameters)+1)
-	frameVarTypes := make(map[string]string, len(parentVarTypes)+len(method.Parameters))
-	frameConstants := make(map[string]bool)
-	for name, value := range parentVariables {
-		if writeBack != nil || r.HostGlobals[name] {
-			frameVariables[name] = value
-			if valueType, exists := parentVarTypes[name]; exists {
-				frameVarTypes[name] = valueType
-			}
-			if parentConstants[name] {
-				frameConstants[name] = true
-			}
-		}
+	parentFrame := r.currentFrame
+	callFrame := acquireExecutionFrame(compiled, writeBack != nil)
+	r.currentFrame = callFrame
+	if instance != nil && compiled.ThisSlot >= 0 {
+		callFrame.slots[compiled.ThisSlot].Set(instance)
 	}
-	r.Variables = frameVariables
-	r.VarTypes = frameVarTypes
-	r.Constants = frameConstants
-	parameterNames := make(map[string]bool, len(method.Parameters))
-	for _, parameter := range method.Parameters {
-		parameterNames[parameter.Name.Value] = true
-	}
-	defer func() {
-		if writeBack != nil {
-			for name := range writeBack.Variables {
-				if !parameterNames[name] {
-					writeBack.Variables[name] = r.Variables[name]
-				}
-			}
-			for name := range writeBack.VarTypes {
-				if !parameterNames[name] {
-					writeBack.VarTypes[name] = r.VarTypes[name]
-				}
-			}
-			writeBack.Constants = copyBoolMap(r.Constants)
-		}
-		r.Variables = parentVariables
-		r.VarTypes = parentVarTypes
-		r.Constants = parentConstants
-	}()
 
-	if instance != nil {
-		r.Variables["this"] = instance
-	} else {
-		delete(r.Variables, "this")
-		delete(r.VarTypes, "this")
-	}
 	previousCaptureEnvironment := r.captureEnvironment
 	r.captureEnvironment = nil
-	defer func() { r.captureEnvironment = previousCaptureEnvironment }()
-
-	// Bind arguments
-	for i, param := range method.Parameters {
-		if param.Type.Literal == "" || param.Type.Type == parser.VAR {
-			panic(&JossError{Type: "ImplicitMixedParameter", Message: fmt.Sprintf("El parámetro $%s requiere un tipo explícito; usa mixed si el dinamismo es intencional", param.Name.Value), File: r.CurrentFile, Line: param.Name.Token.Line})
-		}
-		declaredType := param.Type.Literal
-		r.VarTypes[param.Name.Value] = declaredType
-		var val interface{}
-		if i < len(args) {
-			val = args[i]
-			if param.ByReference {
-				reference, ok := val.(*VariableReference)
-				if !ok {
-					panic(&JossError{Type: "ReferenceArgumentError", Message: fmt.Sprintf("El argumento %d ($%s) debe pasarse con ref", i+1, param.Name.Value), File: r.CurrentFile, Line: param.Name.Token.Line})
-				}
-				if param.Type.Literal != "" && reference.Type() != param.Type.Literal {
-					panic(&JossError{Type: "ReferenceTypeError", Message: fmt.Sprintf("La referencia $%s es %s; se requiere exactamente %s", param.Name.Value, reference.Type(), param.Type.Literal), File: r.CurrentFile, Line: param.Name.Token.Line})
-				}
-				r.Variables[param.Name.Value] = reference
-				continue
-			}
-			if _, ok := val.(*VariableReference); ok {
-				panic(&JossError{Type: "ReferenceArgumentError", Message: fmt.Sprintf("El parámetro $%s no está declarado con ref", param.Name.Value), File: r.CurrentFile, Line: param.Name.Token.Line})
-			}
-			if param.Type.Literal != "" {
-				val = r.coerceToTypedValue(val, param.Type.Literal)
-				if !r.checkType(val, param.Type.Literal) {
-					panic(fmt.Sprintf("Type Error: El argumento %d ($%s) debe ser de tipo %s, se recibió %T", i+1, param.Name.Value, param.Type.Literal, val))
-				}
-			}
-		} else if param.DefaultValue != nil {
-			val = r.evaluateExpression(param.DefaultValue)
-			if param.Type.Literal != "" {
-				val = r.coerceToTypedValue(val, param.Type.Literal)
-				if !r.checkType(val, param.Type.Literal) {
-					panic(fmt.Sprintf("Type Error: El valor por defecto de $%s debe ser de tipo %s, se recibió %T", param.Name.Value, param.Type.Literal, val))
-				}
-			}
-		} else {
-			val = nil
-		}
-		r.Variables[param.Name.Value] = val
-	}
 
 	defer func() {
+		r.callDepth--
+		r.currentClass = previousClass
+		if writeBack != nil {
+			for name := range writeBack.Variables {
+				if index, exists := compiled.NameSlots[name]; exists && index >= compiled.ParameterCount {
+					slot := &callFrame.slots[index]
+					if slot.Initialized {
+						writeBack.Variables[name] = slot.Value.Interface()
+						writeBack.VarTypes[name] = slot.TypeName
+						writeBack.Constants[name] = slot.Constant
+					}
+				}
+			}
+		}
+		r.currentFrame = parentFrame
+		releaseExecutionFrame(callFrame)
+		r.captureEnvironment = previousCaptureEnvironment
+
 		if p := recover(); p != nil {
 			if rp, ok := p.(*ReturnPanic); ok {
 				res = rp.Value
+				r.callStack = r.callStack[:len(r.callStack)-1]
 			} else {
+				if runtimeError, ok := p.(*JossError); ok {
+					runtimeError.AttachStack(r.callStack)
+				}
+				r.callStack = r.callStack[:len(r.callStack)-1]
 				panic(p)
 			}
+		} else {
+			r.callStack = r.callStack[:len(r.callStack)-1]
 		}
-		if method.ReturnType.Literal != "" {
-			res = r.coerceToTypedValue(res, method.ReturnType.Literal)
-			if !r.checkType(res, method.ReturnType.Literal) {
+		if compiled.ReturnTypeName != "" {
+			res = r.coerceToParsedType(res, compiled.ReturnType)
+			if !r.checkParsedType(res, compiled.ReturnType) {
 				panic(&JossError{
 					Type:    "ReturnTypeError",
-					Message: fmt.Sprintf("La función '%s' debe retornar %s, recibió %T", method.Name.Value, method.ReturnType.Literal, res),
+					Message: fmt.Sprintf("La función '%s' debe retornar %s, recibió %T", method.Name.Value, compiled.ReturnTypeName, res),
 					File:    r.CurrentFile,
 					Line:    method.Token.Line,
 				})
@@ -176,14 +112,59 @@ func (r *Runtime) callMethodEvaluated(method *parser.MethodStatement, instance *
 		}
 	}()
 
+	for index, param := range method.Parameters {
+		if param.Type.Literal == "" || param.Type.Type == parser.VAR {
+			panic(&JossError{Type: "ImplicitMixedParameter", Message: fmt.Sprintf("El parámetro $%s requiere un tipo explícito; usa mixed si el dinamismo es intencional", param.Name.Value), File: r.CurrentFile, Line: param.Name.Token.Line})
+		}
+		if param.ByReference && param.DefaultValue != nil {
+			panic(&JossError{Type: "ReferenceArgumentError", Message: fmt.Sprintf("El parámetro ref $%s no puede tener valor por defecto", param.Name.Value), File: r.CurrentFile, Line: param.Name.Token.Line})
+		}
+		slot := &callFrame.slots[index]
+		var val interface{}
+		if index < len(args) {
+			val = args[index]
+			if param.ByReference {
+				reference, ok := val.(*VariableReference)
+				if !ok {
+					panic(&JossError{Type: "ReferenceArgumentError", Message: fmt.Sprintf("El argumento %d ($%s) debe pasarse con ref", index+1, param.Name.Value), File: r.CurrentFile, Line: param.Name.Token.Line})
+				}
+				if param.Type.Literal != "" && reference.Type() != param.Type.Literal {
+					panic(&JossError{Type: "ReferenceTypeError", Message: fmt.Sprintf("La referencia $%s es %s; se requiere exactamente %s", param.Name.Value, reference.Type(), param.Type.Literal), File: r.CurrentFile, Line: param.Name.Token.Line})
+				}
+				slot.Set(reference)
+				continue
+			}
+			if _, ok := val.(*VariableReference); ok {
+				panic(&JossError{Type: "ReferenceArgumentError", Message: fmt.Sprintf("El parámetro $%s no está declarado con ref", param.Name.Value), File: r.CurrentFile, Line: param.Name.Token.Line})
+			}
+			if slot.Type.Kind != typesystem.Mixed {
+				val = r.coerceToParsedType(val, slot.Type)
+				if !r.checkParsedType(val, slot.Type) {
+					panic(fmt.Sprintf("Type Error: El argumento %d ($%s) debe ser de tipo %s, se recibió %T", index+1, param.Name.Value, param.Type.Literal, val))
+				}
+			}
+		} else if param.DefaultValue != nil {
+			val = r.evaluateExpression(param.DefaultValue)
+			if slot.Type.Kind != typesystem.Mixed {
+				val = r.coerceToParsedType(val, slot.Type)
+				if !r.checkParsedType(val, slot.Type) {
+					panic(fmt.Sprintf("Type Error: El valor por defecto de $%s debe ser de tipo %s, se recibió %T", param.Name.Value, param.Type.Literal, val))
+				}
+			}
+		} else {
+			val = nil
+		}
+		slot.Set(val)
+	}
+
 	return r.executeBlock(method.Body)
 }
 
 func (r *Runtime) executeCall(call *parser.CallExpression) interface{} {
 	// 1. Evaluate arguments first
-	args := []interface{}{}
-	for _, arg := range call.Arguments {
-		args = append(args, r.evaluateCallArgument(arg))
+	args := make([]interface{}, len(call.Arguments))
+	for index, arg := range call.Arguments {
+		args[index] = r.evaluateCallArgument(arg)
 	}
 
 	// 2. Try Builtin
@@ -202,7 +183,9 @@ func (r *Runtime) executeCall(call *parser.CallExpression) interface{} {
 	if ident, ok := call.Function.(*parser.Identifier); ok {
 		if f, ok := r.Functions[ident.Value]; ok {
 			fn = f
-		} else if v, ok := r.Variables[ident.Value]; ok {
+		} else if value, resolved, initialized := r.localValue(ident); resolved && initialized {
+			fn = value
+		} else if v, ok := r.Variables[ident.Value]; ok && r.sourceMapVisible(ident.Value) {
 			fn = v
 		}
 	} else {
@@ -238,13 +221,23 @@ func (r *Runtime) evaluateCallArgument(argument parser.Expression) interface{} {
 	if !ok {
 		panic(&JossError{Type: "InvalidReference", Message: "ref requiere una variable mutable", File: r.CurrentFile, Line: reference.Token.Line})
 	}
-	if _, exists := r.Variables[identifier.Value]; !exists {
+	if exists, initialized := r.localBindingExists(identifier); exists {
+		if !initialized {
+			panic(&JossError{Type: "UndefinedVariable", Message: fmt.Sprintf("Variable '%s' no inicializada", identifier.Value), File: r.CurrentFile, Line: identifier.Token.Line})
+		}
+		slot, _ := r.slotForIdentifier(identifier)
+		if slot.Constant {
+			panic(&JossError{Type: "ConstantAssignment", Message: fmt.Sprintf("La constante '%s' no puede pasarse mediante ref", identifier.Value), File: r.CurrentFile, Line: identifier.Token.Line})
+		}
+		return r.referenceToIdentifier(identifier)
+	}
+	if _, exists := r.Variables[identifier.Value]; !exists || !r.sourceMapVisible(identifier.Value) {
 		panic(&JossError{Type: "UndefinedVariable", Message: fmt.Sprintf("Variable '%s' no definida", identifier.Value), File: r.CurrentFile, Line: identifier.Token.Line})
 	}
 	if r.Constants[identifier.Value] {
 		panic(&JossError{Type: "ConstantAssignment", Message: fmt.Sprintf("La constante '%s' no puede pasarse mediante ref", identifier.Value), File: r.CurrentFile, Line: identifier.Token.Line})
 	}
-	return r.referenceTo(identifier.Value)
+	return r.referenceToIdentifier(identifier)
 }
 
 func (r *Runtime) applyFunction(fn interface{}, args []interface{}) interface{} {
@@ -318,7 +311,7 @@ func (r *Runtime) applyFunction(fn interface{}, args []interface{}) interface{} 
 			ReturnType: lit.ReturnType,
 			Body:       lit.Body,
 		}
-		return r.CallMethodEvaluated(method, nil, args)
+		return r.callMethodEvaluatedWithPlan(method, nil, args, nil, r.planForFunction(lit))
 	}
 
 	if handler, ok := fn.(NativeHandler); ok {

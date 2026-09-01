@@ -1,6 +1,7 @@
 package core
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/jossecurity/joss/pkg/parser"
@@ -139,4 +140,26 @@ func TestJossErrorFormat(t *testing.T) {
 	if je.Type != "UndefinedVariable" {
 		t.Errorf("unexpected type: %q", je.Type)
 	}
+}
+
+func TestRuntimeErrorIncludesJossStackTrace(t *testing.T) {
+	defer func() {
+		recovered := recover()
+		err, ok := recovered.(*JossError)
+		if !ok {
+			t.Fatalf("expected *JossError, got %#v", recovered)
+		}
+		if len(err.StackTrace) != 2 {
+			t.Fatalf("stack trace = %#v, want two Joss frames", err.StackTrace)
+		}
+		formatted := err.Error()
+		if !strings.Contains(formatted, "at inner") || !strings.Contains(formatted, "at outer") {
+			t.Fatalf("formatted stack does not contain callables:\n%s", formatted)
+		}
+	}()
+	runSource(`
+public func inner() { return $missing }
+public func outer() { return inner() }
+outer()
+`)
 }

@@ -3,21 +3,26 @@ package core
 import (
 	"fmt"
 
+	"github.com/jossecurity/joss/pkg/diagnostics"
 	"github.com/jossecurity/joss/pkg/parser"
+	runtimevalue "github.com/jossecurity/joss/pkg/runtime/value"
 )
 
 func (r *Runtime) evaluateAssign(ae *parser.AssignExpression) interface{} {
-	if ident, ok := ae.Left.(*parser.Identifier); ok && r.Constants[ident.Value] {
-		panic(&JossError{
-			Type:    "ConstantAssignment",
-			Message: fmt.Sprintf("La constante '%s' no puede reasignarse", ident.Value),
-			File:    r.CurrentFile,
-			Line:    ident.Token.Line,
-		})
+	if ident, ok := ae.Left.(*parser.Identifier); ok {
+		if slot, resolved := r.slotForIdentifier(ident); resolved && slot.Constant && slot.Initialized {
+			panic(&JossError{Type: "ConstantAssignment", Message: fmt.Sprintf("La constante '%s' no puede reasignarse", ident.Value), File: r.CurrentFile, Line: ident.Token.Line})
+		}
+		if r.Constants[ident.Value] && r.sourceMapVisible(ident.Value) {
+			panic(&JossError{Type: "ConstantAssignment", Message: fmt.Sprintf("La constante '%s' no puede reasignarse", ident.Value), File: r.CurrentFile, Line: ident.Token.Line})
+		}
 	}
 	val := r.evaluateExpression(ae.Value)
 
 	if ident, ok := ae.Left.(*parser.Identifier); ok {
+		if assigned, resolved := r.assignLocal(ident, val, false); resolved {
+			return assigned
+		}
 		if reference, exists := r.Variables[ident.Value].(*VariableReference); exists {
 			return reference.Set(r, val)
 		}
@@ -112,11 +117,10 @@ func (r *Runtime) evaluateIndex(ie *parser.IndexExpression) interface{} {
 			if idx >= 0 && idx < int64(len(list)) {
 				return list[idx]
 			}
-			fmt.Println("Error: Índice fuera de rango")
+			panic(&JossError{Code: diagnostics.CodeIndexOutOfRange, Type: "IndexError", Message: fmt.Sprintf("Índice %d fuera de rango para array de longitud %d", idx, len(list)), File: r.CurrentFile, Line: ie.Token.Line, Column: ie.Token.Column})
 		} else {
-			fmt.Println("Error: El índice debe ser un entero")
+			panic(&JossError{Code: diagnostics.CodeInvalidIndexType, Type: "TypeError", Message: fmt.Sprintf("El índice de array debe ser int, se recibió %T", index), File: r.CurrentFile, Line: ie.Token.Line, Column: ie.Token.Column})
 		}
-		return nil
 	}
 
 	if m, ok := left.(map[string]interface{}); ok {
@@ -126,22 +130,20 @@ func (r *Runtime) evaluateIndex(ie *parser.IndexExpression) interface{} {
 			}
 			return nil
 		}
-		fmt.Println("Error: El índice de un mapa debe ser string")
-		return nil
+		panic(&JossError{Code: diagnostics.CodeInvalidIndexType, Type: "TypeError", Message: fmt.Sprintf("El índice de map debe ser string, se recibió %T", index), File: r.CurrentFile, Line: ie.Token.Line, Column: ie.Token.Column})
 	}
 
 	if str, ok := left.(string); ok {
 		if idx, ok := index.(int64); ok {
-			if idx >= 0 && idx < int64(len(str)) {
-				return string(str[idx])
+			if character, exists := runtimevalue.StringIndex(str, idx); exists {
+				return character
 			}
-			fmt.Println("Error: Índice de string fuera de rango")
-			return nil
+			panic(&JossError{Code: diagnostics.CodeIndexOutOfRange, Type: "IndexError", Message: fmt.Sprintf("Índice %d fuera de rango para string", idx), File: r.CurrentFile, Line: ie.Token.Line, Column: ie.Token.Column})
 		}
+		panic(&JossError{Code: diagnostics.CodeInvalidIndexType, Type: "TypeError", Message: fmt.Sprintf("El índice de string debe ser int, se recibió %T", index), File: r.CurrentFile, Line: ie.Token.Line, Column: ie.Token.Column})
 	}
 
-	fmt.Println("Error: No se puede indexar algo que no es un array o mapa")
-	return nil
+	panic(&JossError{Code: diagnostics.CodeInvalidIndexType, Type: "TypeError", Message: fmt.Sprintf("No se puede indexar un valor de tipo %T", left), File: r.CurrentFile, Line: ie.Token.Line, Column: ie.Token.Column})
 }
 
 func (r *Runtime) evaluateIsset(ie *parser.IssetExpression) bool {
@@ -164,6 +166,9 @@ func (r *Runtime) evaluateEmpty(ee *parser.EmptyExpression) bool {
 
 func (r *Runtime) updateVariable(exp parser.Expression, newVal interface{}) interface{} {
 	if ident, ok := exp.(*parser.Identifier); ok {
+		if assigned, resolved := r.assignLocal(ident, newVal, false); resolved {
+			return assigned
+		}
 		r.Variables[ident.Value] = newVal
 		return newVal
 	}
@@ -211,23 +216,14 @@ func (r *Runtime) lookupInstanceField(instance *Instance, name string) *parser.L
 }
 
 func (r *Runtime) lookupInstanceFieldOwner(instance *Instance, name string) (*parser.LetStatement, string) {
-	if instance == nil {
+	if instance == nil || instance.Class == nil || instance.Class.Name == nil {
 		return nil, ""
 	}
-	visited := map[string]bool{}
-	for class := instance.Class; class != nil && class.Name != nil && !visited[class.Name.Value]; {
-		visited[class.Name.Value] = true
-		if class.Body != nil {
-			for _, statement := range class.Body.Statements {
-				if declaration, ok := statement.(*parser.LetStatement); ok && declaration.Name != nil && declaration.Name.Value == name {
-					return declaration, class.Name.Value
-				}
-			}
+	meta := r.lookupClassMetadata(instance.Class.Name.Value)
+	if meta != nil {
+		if field, ok := meta.Fields[name]; ok {
+			return field.Declaration, field.OwnerClass
 		}
-		if class.SuperClass == nil {
-			break
-		}
-		class = r.Classes[class.SuperClass.Value]
 	}
 	return nil, ""
 }

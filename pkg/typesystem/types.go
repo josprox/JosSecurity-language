@@ -3,12 +3,24 @@
 package typesystem
 
 import (
+	"fmt"
 	"math"
 	"strconv"
 	"strings"
 )
 
 type Kind string
+
+// ArithmeticFault identifies a safety failure in canonical integer
+// operations. Analyzer constant evaluation and runtime execution use the same
+// implementation so overflow semantics cannot drift.
+type ArithmeticFault string
+
+const (
+	ArithmeticOK             ArithmeticFault = ""
+	ArithmeticOverflow       ArithmeticFault = "overflow"
+	ArithmeticDivisionByZero ArithmeticFault = "division_by_zero"
+)
 
 const (
 	Unknown Kind = "unknown"
@@ -28,13 +40,27 @@ const (
 
 // Type represents a semantic type. Name is populated for class types.
 type Type struct {
-	Kind Kind
-	Name string
+	Kind    Kind
+	Name    string
+	Element *Type
+	Key     *Type
 }
 
 func (t Type) String() string {
 	if (t.Kind == Class || t.Kind == Union) && t.Name != "" {
 		return t.Name
+	}
+	if t.Kind == Array {
+		if t.Element != nil {
+			return fmt.Sprintf("array<%s>", t.Element.String())
+		}
+		return string(Array)
+	}
+	if t.Kind == Map {
+		if t.Key != nil && t.Element != nil {
+			return fmt.Sprintf("map<%s, %s>", t.Key.String(), t.Element.String())
+		}
+		return string(Map)
 	}
 	if t.Kind == "" {
 		return string(Unknown)
@@ -48,18 +74,58 @@ func (t Type) IsKnown() bool {
 func (t Type) IsDynamic() bool { return t.Kind == Mixed }
 
 // Members returns the normalized alternatives of a union. Non-union types
-// return themselves as a single member. Type intentionally remains comparable;
-// the canonical union spelling is stored in Name rather than a slice.
+// return themselves as a single member.
 func (t Type) Members() []Type {
 	if t.Kind != Union {
 		return []Type{t}
 	}
-	parts := strings.Split(t.Name, "|")
+	parts := splitUnion(t.Name)
 	result := make([]Type, 0, len(parts))
 	for _, part := range parts {
 		result = append(result, Parse(part))
 	}
 	return result
+}
+
+// Without returns a type with the given Kind removed from union alternatives.
+func (t Type) Without(remove Kind) Type {
+	if t.Kind != Union {
+		if t.Kind == remove {
+			return Type{Kind: Unknown}
+		}
+		return t
+	}
+	members := t.Members()
+	remaining := make([]string, 0, len(members))
+	for _, m := range members {
+		if m.Kind != remove {
+			remaining = append(remaining, m.String())
+		}
+	}
+	if len(remaining) == 0 {
+		return Type{Kind: Unknown}
+	}
+	if len(remaining) == 1 {
+		return Parse(remaining[0])
+	}
+	return Type{Kind: Union, Name: strings.Join(remaining, "|")}
+}
+
+// Only returns the member matching keep Kind, or Unknown if not found.
+func (t Type) Only(keep Kind) Type {
+	if t.Kind != Union {
+		if t.Kind == keep {
+			return t
+		}
+		return Type{Kind: Unknown}
+	}
+	members := t.Members()
+	for _, m := range members {
+		if m.Kind == keep {
+			return m
+		}
+	}
+	return Type{Kind: Unknown}
 }
 
 // Parse returns the canonical meaning of a source-level type name.
@@ -68,10 +134,11 @@ func Parse(name string) Type {
 	if strings.HasSuffix(name, "?") {
 		name = strings.TrimSpace(strings.TrimSuffix(name, "?")) + "|null"
 	}
-	if strings.Contains(name, "|") {
+	unionParts := splitUnion(name)
+	if len(unionParts) > 1 {
 		seen := make(map[string]bool)
 		members := make([]string, 0)
-		for _, part := range strings.Split(name, "|") {
+		for _, part := range unionParts {
 			member := Parse(part)
 			for _, flattened := range member.Members() {
 				canonical := flattened.String()
@@ -87,7 +154,25 @@ func Parse(name string) Type {
 		}
 		return Type{Kind: Union, Name: strings.Join(members, "|")}
 	}
-	switch strings.ToLower(name) {
+
+	lower := strings.ToLower(name)
+	if strings.HasPrefix(lower, "array<") && strings.HasSuffix(name, ">") {
+		inner := strings.TrimSpace(name[6 : len(name)-1])
+		elem := Parse(inner)
+		return Type{Kind: Array, Element: &elem}
+	}
+	if strings.HasPrefix(lower, "map<") && strings.HasSuffix(name, ">") {
+		inner := strings.TrimSpace(name[4 : len(name)-1])
+		parts := splitGenericArgs(inner)
+		if len(parts) == 2 {
+			k := Parse(parts[0])
+			v := Parse(parts[1])
+			return Type{Kind: Map, Key: &k, Element: &v}
+		}
+		return Type{Kind: Map}
+	}
+
+	switch lower {
 	case "", "unknown", "var":
 		return Type{Kind: Unknown}
 	case "mixed":
@@ -115,6 +200,52 @@ func Parse(name string) Type {
 	}
 }
 
+func splitUnion(s string) []string {
+	parts := []string{}
+	depth := 0
+	start := 0
+	for i := 0; i < len(s); i++ {
+		switch s[i] {
+		case '<':
+			depth++
+		case '>':
+			depth--
+		case '|':
+			if depth == 0 {
+				parts = append(parts, strings.TrimSpace(s[start:i]))
+				start = i + 1
+			}
+		}
+	}
+	if start < len(s) {
+		parts = append(parts, strings.TrimSpace(s[start:]))
+	}
+	return parts
+}
+
+func splitGenericArgs(s string) []string {
+	parts := []string{}
+	depth := 0
+	start := 0
+	for i := 0; i < len(s); i++ {
+		switch s[i] {
+		case '<':
+			depth++
+		case '>':
+			depth--
+		case ',':
+			if depth == 0 {
+				parts = append(parts, strings.TrimSpace(s[start:i]))
+				start = i + 1
+			}
+		}
+	}
+	if start < len(s) {
+		parts = append(parts, strings.TrimSpace(s[start:]))
+	}
+	return parts
+}
+
 // Assignable reports whether a value of source type can be assigned to a
 // destination. Unknown is deliberately non-accusatory: lack of information is
 // not evidence of invalid user code.
@@ -139,7 +270,22 @@ func Assignable(destination, source Type) bool {
 		return false
 	}
 	if destination.Kind == source.Kind {
-		return destination.Kind != Class || destination.Name == source.Name
+		if destination.Kind == Class {
+			return destination.Name == source.Name
+		}
+		if destination.Kind == Array {
+			if destination.Element == nil || source.Element == nil {
+				return true
+			}
+			return Assignable(*destination.Element, *source.Element)
+		}
+		if destination.Kind == Map {
+			if destination.Key == nil || destination.Element == nil || source.Key == nil || source.Element == nil {
+				return true
+			}
+			return Assignable(*destination.Key, *source.Key) && Assignable(*destination.Element, *source.Element)
+		}
+		return true
 	}
 	// Integer values are losslessly accepted by float variables, matching the
 	// runtime's existing numeric compatibility rule.
@@ -202,6 +348,62 @@ func CoerceString(destination Type, value string) (interface{}, bool) {
 		}
 	}
 	return value, false
+}
+
+// CheckedIntBinary evaluates an integer operator without silent overflow.
+// Division is included for zero checking even though the Joss `/` operator
+// returns float at runtime.
+func CheckedIntBinary(operator string, left, right int64) (int64, ArithmeticFault) {
+	switch operator {
+	case "+":
+		if (right > 0 && left > math.MaxInt64-right) || (right < 0 && left < math.MinInt64-right) {
+			return 0, ArithmeticOverflow
+		}
+		return left + right, ArithmeticOK
+	case "-":
+		if (right < 0 && left > math.MaxInt64+right) || (right > 0 && left < math.MinInt64+right) {
+			return 0, ArithmeticOverflow
+		}
+		return left - right, ArithmeticOK
+	case "*":
+		if left == 0 || right == 0 {
+			return 0, ArithmeticOK
+		}
+		if (left == math.MinInt64 && right == -1) || (right == math.MinInt64 && left == -1) {
+			return 0, ArithmeticOverflow
+		}
+		result := left * right
+		if result/right != left {
+			return 0, ArithmeticOverflow
+		}
+		return result, ArithmeticOK
+	case "/":
+		if right == 0 {
+			return 0, ArithmeticDivisionByZero
+		}
+		if left == math.MinInt64 && right == -1 {
+			return 0, ArithmeticOverflow
+		}
+		return left / right, ArithmeticOK
+	case "%":
+		if right == 0 {
+			return 0, ArithmeticDivisionByZero
+		}
+		if left == math.MinInt64 && right == -1 {
+			return 0, ArithmeticOK
+		}
+		return left % right, ArithmeticOK
+	default:
+		return 0, ArithmeticOK
+	}
+}
+
+// CheckedIntNegate implements the unary-minus overflow rule.
+func CheckedIntNegate(value int64) (int64, ArithmeticFault) {
+	if value == math.MinInt64 {
+		return 0, ArithmeticOverflow
+	}
+	return -value, ArithmeticOK
 }
 
 // SourceTypeNames returns the supported source-level type spellings used by

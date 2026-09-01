@@ -27,8 +27,20 @@ func (a *Analyzer) inferExpression(expression parser.Expression, current *scope)
 	case *parser.Identifier:
 		return a.inferIdentifier(node, current)
 	case *parser.ArrayLiteral:
+		var elemType *typesystem.Type
 		for _, element := range node.Elements {
-			a.inferExpression(element, current)
+			t := a.inferExpression(element, current)
+			if t.IsKnown() {
+				if elemType == nil {
+					elemCopy := t
+					elemType = &elemCopy
+				} else if *elemType != t {
+					elemType = nil
+				}
+			}
+		}
+		if elemType != nil {
+			return typesystem.Type{Kind: typesystem.Array, Element: elemType}
 		}
 		return typesystem.Type{Kind: typesystem.Array}
 	case *parser.MapLiteral:
@@ -69,37 +81,50 @@ func (a *Analyzer) inferExpression(expression parser.Expression, current *scope)
 		return valueType
 	case *parser.TernaryExpression:
 		a.inferExpression(node.Condition, current)
-		trueType := a.inferExpression(node.True, current)
+		trueScope, falseScope := a.narrowScopeFromCondition(node.Condition, current)
+		trueType := a.inferExpression(node.True, trueScope)
 		if node.True == nil {
-			trueType = a.inferExpression(node.Condition, current)
+			trueType = a.inferExpression(node.Condition, trueScope)
 		}
-		falseType := a.inferExpression(node.False, current)
+		falseType := a.inferExpression(node.False, falseScope)
 		return commonType(trueType, falseType)
 	case *parser.IndexExpression:
 		containerType := a.inferExpression(node.Left, current)
 		indexType := a.inferExpression(node.Index, current)
 		if containerType.IsKnown() {
 			switch containerType.Kind {
-			case typesystem.Array, typesystem.String:
+			case typesystem.Array:
 				if indexType.IsKnown() && indexType.Kind != typesystem.Int {
 					a.add("JOSS-TYPE-006", diagnostics.SeverityError, a.file, node.Token,
 						fmt.Sprintf("`%s` values require an `int` index, got `%s`.", containerType.String(), indexType.String()),
 						"Index type is known before execution.", "Use an integer index.")
 				}
+				if containerType.Element != nil {
+					return *containerType.Element
+				}
+				return typesystem.Type{Kind: typesystem.Unknown}
+			case typesystem.String:
+				if indexType.IsKnown() && indexType.Kind != typesystem.Int {
+					a.add("JOSS-TYPE-006", diagnostics.SeverityError, a.file, node.Token,
+						fmt.Sprintf("`%s` values require an `int` index, got `%s`.", containerType.String(), indexType.String()),
+						"Index type is known before execution.", "Use an integer index.")
+				}
+				return typesystem.Type{Kind: typesystem.String}
 			case typesystem.Map:
 				if indexType.IsKnown() && indexType.Kind != typesystem.String {
 					a.add("JOSS-TYPE-006", diagnostics.SeverityError, a.file, node.Token,
 						fmt.Sprintf("`map` values require a `string` index, got `%s`.", indexType.String()),
 						"Map keys are strings in the Joss runtime.", "Use a string key.")
 				}
+				if containerType.Element != nil {
+					return *containerType.Element
+				}
+				return typesystem.Type{Kind: typesystem.Unknown}
 			default:
 				a.add("JOSS-TYPE-007", diagnostics.SeverityError, a.file, node.Token,
 					fmt.Sprintf("Values of type `%s` cannot be indexed.", containerType.String()),
 					"Only arrays, maps and strings support index access.", "Check the value or use member access.")
 			}
-		}
-		if containerType.Kind == typesystem.String {
-			return typesystem.Type{Kind: typesystem.String}
 		}
 		return typesystem.Type{Kind: typesystem.Unknown}
 	case *parser.NewExpression:
@@ -246,6 +271,7 @@ func (a *Analyzer) inferAssignment(assignment *parser.AssignExpression, current 
 func (a *Analyzer) inferInfix(expression *parser.InfixExpression, current *scope) typesystem.Type {
 	left := a.inferExpression(expression.Left, current)
 	right := a.inferExpression(expression.Right, current)
+	a.checkConstantIntegerOperation(expression)
 	switch expression.Operator {
 	case ".":
 		return typesystem.Type{Kind: typesystem.String}
@@ -275,6 +301,51 @@ func (a *Analyzer) inferInfix(expression *parser.InfixExpression, current *scope
 		return typesystem.Type{Kind: typesystem.Unknown}
 	default:
 		return typesystem.Type{Kind: typesystem.Unknown}
+	}
+}
+
+func (a *Analyzer) checkConstantIntegerOperation(expression *parser.InfixExpression) {
+	left, leftOK := constantInteger(expression.Left)
+	right, rightOK := constantInteger(expression.Right)
+	if !leftOK || !rightOK {
+		return
+	}
+	var fault typesystem.ArithmeticFault
+	if expression.Operator == "/" {
+		if right == 0 {
+			fault = typesystem.ArithmeticDivisionByZero
+		}
+	} else {
+		_, fault = typesystem.CheckedIntBinary(expression.Operator, left, right)
+	}
+	switch fault {
+	case typesystem.ArithmeticOverflow:
+		a.add(diagnostics.CodeArithmeticOverflow, diagnostics.SeverityError, a.file, expression.Token,
+			fmt.Sprintf("Integer expression `%d %s %d` overflows `int`.", left, expression.Operator, right),
+			"Joss integer arithmetic never wraps silently.", "Reduce the value, use a float deliberately, or handle the boundary before this operation.")
+	case typesystem.ArithmeticDivisionByZero:
+		a.add(diagnostics.CodeDivisionByZero, diagnostics.SeverityError, a.file, expression.Token,
+			fmt.Sprintf("Integer expression `%d %s %d` divides by zero.", left, expression.Operator, right),
+			"Division and modulo by zero are arithmetic errors.", "Ensure the divisor is non-zero before evaluating this expression.")
+	}
+}
+
+func constantInteger(expression parser.Expression) (int64, bool) {
+	switch node := expression.(type) {
+	case *parser.IntegerLiteral:
+		return node.Value, true
+	case *parser.PrefixExpression:
+		if node.Operator != "-" {
+			return 0, false
+		}
+		value, ok := constantInteger(node.Right)
+		if !ok {
+			return 0, false
+		}
+		negated, fault := typesystem.CheckedIntNegate(value)
+		return negated, fault == typesystem.ArithmeticOK
+	default:
+		return 0, false
 	}
 }
 
@@ -642,3 +713,55 @@ func tokenOfExpression(expression parser.Expression) parser.Token {
 		return parser.Token{}
 	}
 }
+
+func (a *Analyzer) narrowScopeFromCondition(condition parser.Expression, current *scope) (*scope, *scope) {
+	trueScope := newScope(current)
+	falseScope := newScope(current)
+	if infix, ok := condition.(*parser.InfixExpression); ok {
+		var ident *parser.Identifier
+		var isNullCheck bool
+		if id, ok := infix.Left.(*parser.Identifier); ok && isNullLiteral(infix.Right) {
+			ident = id
+			isNullCheck = true
+		} else if id, ok := infix.Right.(*parser.Identifier); ok && isNullLiteral(infix.Left) {
+			ident = id
+			isNullCheck = true
+		}
+		if isNullCheck && ident != nil {
+			if sym, ok := current.resolve(ident.Value); ok && sym.Type.Kind == typesystem.Union {
+				if infix.Operator == "!=" || infix.Operator == "!==" {
+					narrowed := sym.Type.Without(typesystem.Null)
+					trueScope.put(&symbol{
+						Name: sym.Name, Type: narrowed, Kind: sym.Kind, Token: sym.Token, File: sym.File, Dynamic: sym.Dynamic, Inferred: sym.Inferred, Constant: sym.Constant, Synthetic: true,
+					})
+					falseScope.put(&symbol{
+						Name: sym.Name, Type: typesystem.Type{Kind: typesystem.Null}, Kind: sym.Kind, Token: sym.Token, File: sym.File, Dynamic: sym.Dynamic, Inferred: sym.Inferred, Constant: sym.Constant, Synthetic: true,
+					})
+				} else if infix.Operator == "==" || infix.Operator == "===" {
+					narrowed := sym.Type.Without(typesystem.Null)
+					falseScope.put(&symbol{
+						Name: sym.Name, Type: narrowed, Kind: sym.Kind, Token: sym.Token, File: sym.File, Dynamic: sym.Dynamic, Inferred: sym.Inferred, Constant: sym.Constant, Synthetic: true,
+					})
+					trueScope.put(&symbol{
+						Name: sym.Name, Type: typesystem.Type{Kind: typesystem.Null}, Kind: sym.Kind, Token: sym.Token, File: sym.File, Dynamic: sym.Dynamic, Inferred: sym.Inferred, Constant: sym.Constant, Synthetic: true,
+					})
+				}
+			}
+		}
+	}
+	return trueScope, falseScope
+}
+
+func isNullLiteral(expr parser.Expression) bool {
+	if expr == nil {
+		return false
+	}
+	switch e := expr.(type) {
+	case *parser.NullLiteral:
+		return true
+	case *parser.Identifier:
+		return e.Value == "null" || e.Value == "nil"
+	}
+	return false
+}
+

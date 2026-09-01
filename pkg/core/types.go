@@ -7,6 +7,8 @@ import (
 
 	"github.com/jossecurity/joss/pkg/parser"
 	"github.com/jossecurity/joss/pkg/pluginruntime"
+	runtimeerrors "github.com/jossecurity/joss/pkg/runtime/errors"
+	runtimeplan "github.com/jossecurity/joss/pkg/runtime/plan"
 )
 
 // NativeHandler is a function that executes a native method
@@ -59,6 +61,12 @@ type Runtime struct {
 	MaxCallDepth      int    // Guard against unbounded recursive calls
 	callDepth         int
 	currentClass      string
+	callStack         []runtimeerrors.Frame
+	callablePlans      map[*parser.MethodStatement]*runtimeplan.Callable
+	functionPlans      map[*parser.FunctionLiteral]*runtimeplan.Callable
+	classMetadataCache map[string]*classMetadata
+	currentFrame       *executionFrame
+	planMu             sync.Mutex
 
 	captureEnvironment *ClosureEnvironment
 }

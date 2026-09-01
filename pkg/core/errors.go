@@ -2,46 +2,14 @@ package core
 
 import (
 	"fmt"
-	"strings"
+
+	runtimeerrors "github.com/jossecurity/joss/pkg/runtime/errors"
 )
 
-// JossError represents a structured runtime error in Joss.
-// It carries source location information for precise error reporting.
-type JossError struct {
-	Type    string // "UndefinedVariable", "UndefinedFunction", "UndefinedClass", etc.
-	Message string
-	File    string
-	Line    int
-	Column  int
-	Source  string // Source line content for snippet display
-}
-
-// Error implements the error interface with a detailed, structured output.
-func (e *JossError) Error() string {
-	var b strings.Builder
-
-	b.WriteString(fmt.Sprintf("Error: %s\n", e.Message))
-
-	if e.File != "" {
-		b.WriteString(fmt.Sprintf("\nFile: %s\n", e.File))
-	}
-	if e.Line > 0 {
-		b.WriteString(fmt.Sprintf("Line: %d\n", e.Line))
-	}
-	if e.Column > 0 {
-		b.WriteString(fmt.Sprintf("Column: %d\n", e.Column))
-	}
-
-	if e.Source != "" {
-		b.WriteString(fmt.Sprintf("\n%s\n", e.Source))
-		if e.Column > 0 {
-			b.WriteString(strings.Repeat(" ", e.Column-1))
-			b.WriteString("^\n")
-		}
-	}
-
-	return b.String()
-}
+// JossError remains available from core for compatibility while its
+// implementation lives in the language runtime layer.
+type JossError = runtimeerrors.JossError
+type JossStackFrame = runtimeerrors.Frame
 
 // NewJossError creates a JossError with the given type and message.
 func NewJossError(errType, message, file string, line int) *JossError {
@@ -53,20 +21,19 @@ func NewJossError(errType, message, file string, line int) *JossError {
 	}
 }
 
-// IsJossError checks whether a recovered panic value is a JossError.
-func IsJossError(v interface{}) bool {
-	_, ok := v.(*JossError)
+func IsJossError(value interface{}) bool {
+	_, ok := value.(*JossError)
 	return ok
 }
 
 // FormatPanicAsError converts any panic value to a presentable error string.
 // It preserves JossError formatting and wraps other panic types.
-func FormatPanicAsError(v interface{}) string {
-	if je, ok := v.(*JossError); ok {
-		return je.Error()
+func FormatPanicAsError(value interface{}) string {
+	if err, ok := value.(*JossError); ok {
+		return err.Error()
 	}
-	if err, ok := v.(error); ok {
+	if err, ok := value.(error); ok {
 		return fmt.Sprintf("Error: %s\n", err.Error())
 	}
-	return fmt.Sprintf("Error: %v\n", v)
+	return fmt.Sprintf("Error: %v\n", value)
 }

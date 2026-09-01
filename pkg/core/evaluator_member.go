@@ -47,75 +47,35 @@ func (r *Runtime) evaluateNew(ne *parser.NewExpression) interface{} {
 		Constants: make(map[string]bool),
 	}
 
-	// Collect inheritance chain
-	chain := []*parser.ClassStatement{classStmt}
-	curr := classStmt
-	for curr.SuperClass != nil {
-		parentName := curr.SuperClass.Value
-		if parent, ok := r.Classes[parentName]; ok {
-			chain = append(chain, parent)
-			curr = parent
-		} else {
-			break
+	meta := r.lookupClassMetadata(className)
+	if meta != nil {
+		for _, field := range meta.FieldOrder {
+			var value interface{}
+			if field.Declaration.Value != nil {
+				value = r.evaluateExpression(field.Declaration.Value)
+			} else {
+				value = r.getZeroValue(field.DeclaredType)
+			}
+			if field.DeclaredType != "" && field.DeclaredType != "var" && field.DeclaredType != "mixed" {
+				value = r.coerceToParsedType(value, field.ParsedType)
+				if !r.checkParsedType(value, field.ParsedType) {
+					panic(&JossError{
+						Type:    "PropertyTypeError",
+						Message: fmt.Sprintf("La propiedad '%s' requiere %s", field.Declaration.Name.Value, field.DeclaredType),
+						File:    r.CurrentFile,
+						Line:    field.Declaration.Name.Token.Line,
+					})
+				}
+			}
+			instance.Fields[field.Declaration.Name.Value] = value
+			if field.IsConst {
+				instance.Constants[field.Declaration.Name.Value] = true
+			}
 		}
-	}
 
-	// Initialize properties (Parent -> Child)
-	for i := len(chain) - 1; i >= 0; i-- {
-		cls := chain[i]
-		for _, stmt := range cls.Body.Statements {
-			if let, ok := stmt.(*parser.LetStatement); ok {
-				var value interface{}
-				if let.Value != nil {
-					value = r.evaluateExpression(let.Value)
-				} else {
-					value = r.getZeroValue(let.Token.Literal)
-				}
-				declaredType := let.Token.Literal
-				if declaredType != "" && declaredType != "var" && declaredType != "mixed" {
-					value = r.coerceToTypedValue(value, declaredType)
-					if !r.checkType(value, declaredType) {
-						panic(&JossError{
-							Type:    "PropertyTypeError",
-							Message: fmt.Sprintf("La propiedad '%s' requiere %s", let.Name.Value, declaredType),
-							File:    r.CurrentFile,
-							Line:    let.Name.Token.Line,
-						})
-					}
-				}
-				instance.Fields[let.Name.Value] = value
-				if let.IsConst {
-					instance.Constants[let.Name.Value] = true
-				}
-			}
-		}
-	}
-
-	// Call constructor if exists
-	for _, stmt := range classStmt.Body.Statements {
-		if method, ok := stmt.(*parser.MethodStatement); ok {
-			if method.Name.Value == "constructor" || method.Name.Value == "main" {
-				r.requireMemberAccess(method.Visibility, classStmt.Name.Value, method.Name.Value, method.Name.Token.Line)
-				r.CallMethod(method, instance, ne.Arguments)
-				break
-			}
-		}
-		if initStmt, ok := stmt.(*parser.InitStatement); ok {
-			if initStmt.Name.Value == "constructor" || initStmt.Name.Value == "main" {
-				method := &parser.MethodStatement{
-					Token:      initStmt.Token,
-					Name:       initStmt.Name,
-					Parameters: initStmt.Parameters,
-					Body:       initStmt.Body,
-				}
-				func() {
-					previousClass := r.currentClass
-					r.currentClass = classStmt.Name.Value
-					defer func() { r.currentClass = previousClass }()
-					r.CallMethod(method, instance, ne.Arguments)
-				}()
-				break
-			}
+		if meta.Constructor != nil {
+			r.requireMemberAccess(meta.Constructor.Visibility, className, meta.Constructor.Name.Value, meta.Constructor.Name.Token.Line)
+			r.CallMethod(meta.Constructor, instance, ne.Arguments)
 		}
 	}
 
@@ -135,10 +95,11 @@ func (r *Runtime) evaluateMember(me *parser.MemberExpression) interface{} {
 					StaticClass: className,
 				}
 			}
-			for _, stmt := range classStmt.Body.Statements {
-				if method, methodOK := stmt.(*parser.MethodStatement); methodOK && method.Name.Value == me.Property.Value {
-					r.requireMemberAccess(method.Visibility, className, method.Name.Value, method.Name.Token.Line)
-					return &BoundMethod{Method: method, Instance: &Instance{Class: classStmt, Fields: make(map[string]interface{})}}
+			meta := r.lookupClassMetadata(className)
+			if meta != nil {
+				if methodInfo, ok := meta.Methods[me.Property.Value]; ok {
+					r.requireMemberAccess(methodInfo.Method.Visibility, className, methodInfo.Method.Name.Value, methodInfo.Method.Name.Token.Line)
+					return &BoundMethod{Method: methodInfo.Method, Instance: &Instance{Class: classStmt, Fields: make(map[string]interface{})}}
 				}
 			}
 		}
@@ -311,37 +272,13 @@ func (r *Runtime) evaluateMember(me *parser.MemberExpression) interface{} {
 		return val
 	}
 
-	currentClass := instance.Class
-	for currentClass != nil {
-		for _, stmt := range currentClass.Body.Statements {
-			if method, ok := stmt.(*parser.MethodStatement); ok {
-				if method.Name.Value == propName {
-					r.requireMemberAccess(method.Visibility, currentClass.Name.Value, propName, me.Property.Token.Line)
-					return &BoundMethod{Method: method, Instance: instance}
-				}
+	if instance.Class != nil && instance.Class.Name != nil {
+		meta := r.lookupClassMetadata(instance.Class.Name.Value)
+		if meta != nil {
+			if methodInfo, ok := meta.Methods[propName]; ok {
+				r.requireMemberAccess(methodInfo.Method.Visibility, methodInfo.OwnerClass, propName, me.Property.Token.Line)
+				return &BoundMethod{Method: methodInfo.Method, Instance: instance}
 			}
-			if initStmt, ok := stmt.(*parser.InitStatement); ok {
-				if initStmt.Name.Value == propName {
-					method := &parser.MethodStatement{
-						Token:      initStmt.Token,
-						Name:       initStmt.Name,
-						Parameters: initStmt.Parameters,
-						Body:       initStmt.Body,
-					}
-					return &BoundMethod{Method: method, Instance: instance}
-				}
-			}
-		}
-
-		if currentClass.SuperClass != nil {
-			parentName := currentClass.SuperClass.Value
-			if parent, ok := r.Classes[parentName]; ok {
-				currentClass = parent
-			} else {
-				currentClass = nil
-			}
-		} else {
-			currentClass = nil
 		}
 	}
 
