@@ -381,34 +381,76 @@ func downloadFile(filepath string, url string) error {
 }
 
 func replaceExecutable(currentExe, newExe string) error {
+	// Resolve symlinks to target the real executable file
+	if resolved, err := filepath.EvalSymlinks(currentExe); err == nil && resolved != "" {
+		currentExe = resolved
+	}
+
+	input, err := os.ReadFile(newExe)
+	if err != nil {
+		return fmt.Errorf("no se pudo leer el archivo binario descargado: %w", err)
+	}
+
 	if runtime.GOOS == "windows" {
 		oldExe := currentExe + ".old"
-		os.Remove(oldExe)
+		_ = os.Remove(oldExe)
 
-		// Rename running executable to .old
+		// 1. Rename running executable to .old (Windows allows renaming running binaries, but not overwriting them directly)
 		if err := os.Rename(currentExe, oldExe); err != nil {
-			return fmt.Errorf("no se pudo renombrar ejecutable actual: %w", err)
+			if os.IsPermission(err) || strings.Contains(strings.ToLower(err.Error()), "access is denied") {
+				return fmt.Errorf("permiso denegado al modificar '%s'.\n👉 Ejecuta tu terminal como Administrador (Run as Administrator) para actualizar Joss en este directorio", currentExe)
+			}
+			return fmt.Errorf("no se pudo renombrar el ejecutable actual (%s): %w", currentExe, err)
 		}
 
-		// Copy new executable to currentExe location
-		input, err := os.ReadFile(newExe)
-		if err != nil {
-			return err
-		}
+		// 2. Write new binary in the original location
 		if err := os.WriteFile(currentExe, input, 0755); err != nil {
-			// Rollback
-			os.Rename(oldExe, currentExe)
-			return fmt.Errorf("no se pudo escribir nuevo ejecutable: %w", err)
+			// Rollback if writing fails
+			_ = os.Rename(oldExe, currentExe)
+			if os.IsPermission(err) || strings.Contains(strings.ToLower(err.Error()), "access is denied") {
+				return fmt.Errorf("permiso denegado al escribir en '%s'.\n👉 Ejecuta tu terminal como Administrador (Run as Administrator) para completar la actualización", currentExe)
+			}
+			return fmt.Errorf("no se pudo escribir el nuevo ejecutable (%s): %w", currentExe, err)
 		}
+
+		// Try removing .old (if locked, it's ok, it will be overwritten on next update)
+		_ = os.Remove(oldExe)
 		return nil
 	}
 
-	// Unix-like OS (Linux / macOS)
-	input, err := os.ReadFile(newExe)
-	if err != nil {
-		return err
+	// Unix-like OS (Linux / macOS / BSD):
+	// Direct os.WriteFile() on a running executable yields ETXTBSY ("text file busy").
+	// Standard Unix safe update pattern:
+	// 1. Write the new binary to a temporary file in the same directory.
+	// 2. Set executable permissions (0755).
+	// 3. Atomically rename the temp file over the running target path (POSIX rename unlinks the old inode atomically).
+	targetDir := filepath.Dir(currentExe)
+	tmpFile := filepath.Join(targetDir, fmt.Sprintf(".joss-update-%d.tmp", time.Now().UnixNano()))
+
+	if err := os.WriteFile(tmpFile, input, 0755); err != nil {
+		if os.IsPermission(err) {
+			return fmt.Errorf("permiso denegado al escribir en '%s'.\n👉 Ejecuta 'sudo joss update' para actualizar Joss en este directorio del sistema", targetDir)
+		}
+		return fmt.Errorf("no se pudo crear archivo temporal de actualización en '%s': %w", targetDir, err)
 	}
-	return os.WriteFile(currentExe, input, 0755)
+	defer os.Remove(tmpFile)
+
+	if err := os.Chmod(tmpFile, 0755); err != nil {
+		// Non-fatal if filesystem doesn't support chmod
+	}
+
+	if err := os.Rename(tmpFile, currentExe); err != nil {
+		if os.IsPermission(err) {
+			return fmt.Errorf("permiso denegado al reemplazar '%s'.\n👉 Ejecuta 'sudo joss update' para completar la actualización", currentExe)
+		}
+		// Fallback: attempt unlinking target first
+		_ = os.Remove(currentExe)
+		if retryErr := os.Rename(tmpFile, currentExe); retryErr != nil {
+			return fmt.Errorf("no se pudo reemplazar el binario ejecutable (%s): %w", currentExe, retryErr)
+		}
+	}
+
+	return nil
 }
 
 func cleanVersionTag(v string) string {

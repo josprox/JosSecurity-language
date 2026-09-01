@@ -1,8 +1,8 @@
 .vscode/**
-# out/**
-
 src/**
 .gitignore
+.git/**
+.github/**
 .yarnrc
 webpack.config.js
 vsc-extension-quickstart.md
@@ -10,3 +10,16 @@ vsc-extension-quickstart.md
 **/.eslintrc.json
 **/*.map
 **/*.ts
+**/*.md
+!readme.md
+!changelog.md
+!INSTALL.md
+!LICENSE.txt
+node_modules/**/test/**
+node_modules/**/tests/**
+node_modules/**/Makefile
+node_modules/**/*.md
+node_modules/**/*.d.ts
+node_modules/**/*.map
+node_modules/**/.bin/**
+node_modules/**/.github/**
