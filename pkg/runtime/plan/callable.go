@@ -383,4 +383,3 @@ func statementHasBreakOrContinue(statement parser.Statement) bool {
 	}
 	return false
 }
-

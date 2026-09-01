@@ -57,4 +57,3 @@ func (p *Parser) parseSingleType() string {
 	}
 	return name
 }
-

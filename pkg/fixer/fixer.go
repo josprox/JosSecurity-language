@@ -12,11 +12,11 @@ import (
 )
 
 type FixResult struct {
-	File        string `json:"file"`
-	Changed     bool   `json:"changed"`
-	FixesApplied int   `json:"fixes_applied"`
-	Original    string `json:"original,omitempty"`
-	Fixed       string `json:"fixed,omitempty"`
+	File         string `json:"file"`
+	Changed      bool   `json:"changed"`
+	FixesApplied int    `json:"fixes_applied"`
+	Original     string `json:"original,omitempty"`
+	Fixed        string `json:"fixed,omitempty"`
 }
 
 type Fixer struct {
@@ -32,7 +32,7 @@ var (
 	reFuncVisibility  = regexp.MustCompile(`(?m)^([ \t]*)func\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*\(`)
 	reClassVisibility = regexp.MustCompile(`(?m)^([ \t]*)class\s+([a-zA-Z_][a-zA-Z0-9_]*)`)
 	// Fix missing mixed param type: ($x -> (mixed $x, , $y -> , mixed $y
-	reUntypedParam    = regexp.MustCompile(`([\(,]\s*)\$([a-zA-Z_][a-zA-Z0-9_]*)`)
+	reUntypedParam = regexp.MustCompile(`([\(,]\s*)\$([a-zA-Z_][a-zA-Z0-9_]*)`)
 )
 
 func (f *Fixer) FixSource(src string) (string, int) {

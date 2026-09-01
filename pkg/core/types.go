@@ -52,16 +52,16 @@ type Runtime struct {
 	ProjectRoot       string
 
 	// SEO & Sitemap
-	SEO               *SEOData
-	SitemapEntries    []SitemapEntry
-	SitemapProviders  []*CapturedFunction
-	SitemapExclusions []string
-	CurrentSource     string // "routes", "api", "app", etc.
-	CurrentFile       string // Currently executing file path
-	MaxCallDepth      int    // Guard against unbounded recursive calls
-	callDepth         int
-	currentClass      string
-	callStack         []runtimeerrors.Frame
+	SEO                *SEOData
+	SitemapEntries     []SitemapEntry
+	SitemapProviders   []*CapturedFunction
+	SitemapExclusions  []string
+	CurrentSource      string // "routes", "api", "app", etc.
+	CurrentFile        string // Currently executing file path
+	MaxCallDepth       int    // Guard against unbounded recursive calls
+	callDepth          int
+	currentClass       string
+	callStack          []runtimeerrors.Frame
 	callablePlans      map[*parser.MethodStatement]*runtimeplan.Callable
 	functionPlans      map[*parser.FunctionLiteral]*runtimeplan.Callable
 	classMetadataCache map[string]*classMetadata

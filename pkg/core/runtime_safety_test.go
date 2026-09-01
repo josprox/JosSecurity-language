@@ -98,4 +98,3 @@ public func takeInts(array<int> $items): int {
 	}()
 	runtime.CallMethodEvaluated(fn, nil, []interface{}{[]interface{}{"not an int"}})
 }
-

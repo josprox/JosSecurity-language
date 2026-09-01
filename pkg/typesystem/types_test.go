@@ -114,4 +114,3 @@ func TestTypedCollectionsAndNarrowing(t *testing.T) {
 		t.Fatalf("narrowed User|null without null = %s, want User", narrowed.String())
 	}
 }
-

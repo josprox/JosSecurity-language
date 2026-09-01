@@ -764,4 +764,3 @@ func isNullLiteral(expr parser.Expression) bool {
 	}
 	return false
 }
-

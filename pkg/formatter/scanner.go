@@ -21,10 +21,10 @@ const (
 )
 
 type Token struct {
-	Kind  TokenKind
-	Text  string
-	Line  int
-	Col   int
+	Kind TokenKind
+	Text string
+	Line int
+	Col  int
 }
 
 type Scanner struct {
