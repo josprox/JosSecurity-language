@@ -1,6 +1,9 @@
 package core
 
-import "fmt"
+import (
+	"fmt"
+	"strings"
+)
 
 // executeRequestMethod handles Request methods
 func (r *Runtime) executeRequestMethod(instance *Instance, method string, args []interface{}) interface{} {
@@ -148,6 +151,16 @@ func (r *Runtime) executeRequestMethod(instance *Instance, method string, args [
 							if val, ok := headersMap[key]; ok {
 								return fmt.Sprintf("%v", val)
 							}
+							for hk, hv := range headersMap {
+								if strings.EqualFold(hk, key) {
+									return fmt.Sprintf("%v", hv)
+								}
+							}
+						}
+					}
+					for fk, fv := range reqInstance.Fields {
+						if strings.EqualFold(fk, key) {
+							return fmt.Sprintf("%v", fv)
 						}
 					}
 				}
