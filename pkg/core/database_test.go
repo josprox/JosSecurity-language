@@ -82,3 +82,35 @@ func TestGranDBCountPreservesWhere(t *testing.T) {
 		t.Fatalf("Wheres se borraron tras count! Se esperaban 2, se obtuvieron %d", len(wheres))
 	}
 }
+
+func TestGranDBTableResetsQueryStateForNewQuery(t *testing.T) {
+	r := NewRuntime()
+	inst := &Instance{
+		Class:  nil,
+		Fields: make(map[string]interface{}),
+	}
+
+	// 1st query: sync_change_log with user_id and client_change_id
+	r.executeGranDBMethod(inst, "table", []interface{}{"sync_change_log"})
+	r.executeGranDBMethod(inst, "where", []interface{}{"user_id", 60})
+	r.executeGranDBMethod(inst, "where", []interface{}{"client_change_id", "abc-123"})
+
+	wheres := inst.Fields["_wheres"].([]string)
+	if len(wheres) != 2 {
+		t.Fatalf("Expected 2 where clauses, got %d", len(wheres))
+	}
+
+	// 2nd query: switch table to user_recent_plays
+	r.executeGranDBMethod(inst, "table", []interface{}{"user_recent_plays"})
+	r.executeGranDBMethod(inst, "where", []interface{}{"user_id", 60})
+	r.executeGranDBMethod(inst, "where", []interface{}{"track_id", 79})
+
+	sqlStr, bindings := r.buildSelectQuery(inst, "*")
+	expected := "SELECT * FROM `js_user_recent_plays` WHERE `user_id` = ? AND `track_id` = ?"
+	if sqlStr != expected {
+		t.Errorf("SQL incorrecto tras cambiar de tabla.\nEsperado: %s\nObtenido: %s", expected, sqlStr)
+	}
+	if len(bindings) != 2 || bindings[0] != 60 || bindings[1] != 79 {
+		t.Errorf("Bindings incorrectos tras cambiar de tabla: %v", bindings)
+	}
+}

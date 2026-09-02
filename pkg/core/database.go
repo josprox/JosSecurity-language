@@ -117,10 +117,11 @@ func (r *Runtime) executeGranDBMethod(instance *Instance, method string, args []
 		}
 		return instance
 
-	case "table":
+	case "table", "from":
 		if len(args) > 0 {
 			tableName := fmt.Sprintf("%v", args[0])
 			instance.Fields["_table"] = quoteIdentifier(r.applyTablePrefix(tableName))
+			resetReadState(instance)
 		}
 		return instance
 
