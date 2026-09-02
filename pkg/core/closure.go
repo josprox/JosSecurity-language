@@ -71,6 +71,18 @@ func (r *Runtime) callCapturedFunction(closure *CapturedFunction, args []interfa
 		r.Constants = previousConstants
 	}()
 
+	for name := range r.HostGlobals {
+		if val, ok := previousVariables[name]; ok {
+			r.Variables[name] = val
+		}
+	}
+	if req, ok := previousVariables["$__request"]; ok {
+		r.Variables["$__request"] = req
+	}
+	if sess, ok := previousVariables["$__session"]; ok {
+		r.Variables["$__session"] = sess
+	}
+
 	method := &parser.MethodStatement{
 		Token:      closure.Function.Token,
 		Name:       &parser.Identifier{Value: "anonymous"},

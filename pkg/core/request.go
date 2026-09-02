@@ -230,11 +230,22 @@ func (r *Runtime) executeRequestMethod(instance *Instance, method string, args [
 		}
 		return false
 
-	case "path", "url":
+	case "path", "url", "uri":
 		if reqVal, ok := r.Variables["$__request"]; ok {
 			if reqInstance, ok := reqVal.(*Instance); ok {
-				if p, ok := reqInstance.Fields["_path"].(string); ok {
+				if method == "uri" {
+					if u, ok := reqInstance.Fields["_uri"].(string); ok && u != "" {
+						return u
+					}
+				}
+				if p, ok := reqInstance.Fields["_path"].(string); ok && p != "" {
 					return p
+				}
+				if u, ok := reqInstance.Fields["_url"].(string); ok && u != "" {
+					return u
+				}
+				if u, ok := reqInstance.Fields["_uri"].(string); ok && u != "" {
+					return u
 				}
 			}
 		}

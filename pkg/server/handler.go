@@ -412,6 +412,10 @@ func MainHandler(w http.ResponseWriter, r *http.Request) {
 		reqData["Authorization"] = val
 	}
 	reqData["_method"] = r.Method
+	reqData["_path"] = r.URL.Path
+	reqData["_uri"] = r.URL.RequestURI()
+	reqData["_url"] = r.URL.String()
+	reqData["_ip"] = r.RemoteAddr
 	reqData["_referer"] = r.Referer()
 	// Inject Cookies
 	cookies := make(map[string]interface{})
