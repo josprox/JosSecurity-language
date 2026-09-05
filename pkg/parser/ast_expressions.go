@@ -3,6 +3,8 @@ package parser
 import (
 	"bytes"
 	"strings"
+
+	"github.com/shopspring/decimal"
 )
 
 type Identifier struct {
@@ -167,6 +169,15 @@ type FloatLiteral struct {
 func (fl *FloatLiteral) expressionNode()      {}
 func (fl *FloatLiteral) TokenLiteral() string { return fl.Token.Literal }
 func (fl *FloatLiteral) String() string       { return fl.Token.Literal }
+
+type DecimalLiteral struct {
+	Token Token
+	Value decimal.Decimal
+}
+
+func (dl *DecimalLiteral) expressionNode()      {}
+func (dl *DecimalLiteral) TokenLiteral() string { return dl.Token.Literal }
+func (dl *DecimalLiteral) String() string       { return dl.Token.Literal }
 
 type ArrayLiteral struct {
 	Token    Token // '['

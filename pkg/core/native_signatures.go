@@ -126,6 +126,9 @@ func builtinReturnType(name string) typesystem.Type {
 	if builtinFloatReturns[name] {
 		return typesystem.Type{Kind: typesystem.Float}
 	}
+	if builtinDecimalReturns[name] {
+		return typesystem.Type{Kind: typesystem.Decimal}
+	}
 	if builtinStringReturns[name] {
 		return typesystem.Type{Kind: typesystem.String}
 	}
@@ -136,12 +139,13 @@ func builtinReturnType(name string) typesystem.Type {
 }
 
 var builtinBoolReturns = nameSet(
-	"isset", "empty", "is_string", "is_numeric", "is_int", "is_integer", "is_float", "is_double",
+	"isset", "empty", "is_string", "is_numeric", "is_int", "is_integer", "is_float", "is_double", "is_decimal",
 	"is_array", "is_null", "in_array", "array_key_exists", "file_exists", "is_dir", "is_file",
 	"json_verify", "toon_verify", "str_contains", "contains", "str_starts_with", "starts_with", "str_ends_with", "ends_with",
 )
 var builtinIntReturns = nameSet("intval", "boolval", "len", "count", "time", "strlen", "strpos", "rand")
 var builtinFloatReturns = nameSet("floatval", "doubleval", "microtime", "round", "floor", "ceil", "abs")
+var builtinDecimalReturns = nameSet("decimal")
 var builtinStringReturns = nameSet(
 	"strval", "date", "env", "config", "view", "json", "toon_encode", "json_encode", "html_escape", "__", "csrf_field",
 	"str_replace", "strtolower", "to_lower", "strtoupper", "to_upper", "trim", "ltrim", "rtrim", "substr", "implode", "join",

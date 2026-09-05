@@ -83,6 +83,7 @@ func NewParser(l *Lexer) *Parser {
 	p.registerPrefix(VAR, p.parseVarExpression) // Handle $name
 	p.registerPrefix(INT, p.parseIntegerLiteral)
 	p.registerPrefix(FLOAT, p.parseFloatLiteral)
+	p.registerPrefix(DECIMAL, p.parseDecimalLiteral)
 	p.registerPrefix(STRING, p.parseStringLiteral)
 	p.registerPrefix(TRUE, p.parseBoolean)
 	p.registerPrefix(FALSE, p.parseBoolean)

@@ -12,8 +12,8 @@ var (
 // implementation and its name here.
 var builtinList = []string{
 	// Arrays, maps and conversion.
-	"isset", "empty", "is_string", "is_numeric", "is_int", "is_integer", "is_float", "is_double",
-	"intval", "floatval", "doubleval", "strval", "boolval", "is_array", "is_null", "len", "count",
+	"isset", "empty", "is_string", "is_numeric", "is_int", "is_integer", "is_float", "is_double", "is_decimal",
+	"intval", "floatval", "doubleval", "decimal", "strval", "boolval", "is_array", "is_null", "len", "count",
 	"keys", "array_keys", "values", "array_values", "explode", "end", "append", "merge", "in_array",
 	"array_key_exists", "array_merge", "array_push", "array_pop", "array_shift", "array_slice", "array_unique",
 	"array_reverse", "array_column",

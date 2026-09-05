@@ -267,6 +267,11 @@ func (l *Lexer) NextToken() Token {
 			} else {
 				tok.Type = INT
 			}
+			if l.ch == 'm' || l.ch == 'M' {
+				tok.Type = DECIMAL
+				tok.Literal += string(l.ch)
+				l.readChar()
+			}
 			tok.Line = l.line
 			tok.Column = l.column - len(tok.Literal)
 			if tok.Column < 1 {

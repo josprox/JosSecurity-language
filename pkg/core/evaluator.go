@@ -14,6 +14,8 @@ func (r *Runtime) evaluateExpression(exp parser.Expression) interface{} {
 		return e.Value
 	case *parser.FloatLiteral:
 		return e.Value
+	case *parser.DecimalLiteral:
+		return e.Value
 	case *parser.Boolean:
 		return e.Value
 	case *parser.NullLiteral:

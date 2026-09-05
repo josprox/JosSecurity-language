@@ -11,6 +11,15 @@ func TestCanonicalNamesAndCompatibility(t *testing.T) {
 	if !Assignable(Type{Kind: Float}, Type{Kind: Int}) {
 		t.Fatal("int should be assignable to float")
 	}
+	if !Assignable(Type{Kind: Decimal}, Type{Kind: Int}) {
+		t.Fatal("int should be assignable to decimal")
+	}
+	if !Assignable(Type{Kind: Decimal}, Type{Kind: Float}) {
+		t.Fatal("float should be assignable to decimal")
+	}
+	if Assignable(Type{Kind: Int}, Type{Kind: Decimal}) {
+		t.Fatal("decimal must not be assignable to int")
+	}
 	if Assignable(Type{Kind: Int}, Type{Kind: String}) {
 		t.Fatal("string must not be assignable to int")
 	}
@@ -41,6 +50,9 @@ func TestTypedStringCoercionIsLossless(t *testing.T) {
 	}
 	if value, ok := CoerceString(Type{Kind: Int}, "9223372036854775808"); ok {
 		t.Fatalf("overflowing integer was accepted as %v", value)
+	}
+	if value, ok := CoerceString(Type{Kind: Decimal}, "123.45m"); !ok || value != "123.45" {
+		t.Fatalf("decimal coercion = %v, %v", value, ok)
 	}
 }
 

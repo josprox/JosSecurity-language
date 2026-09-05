@@ -3,6 +3,9 @@ package parser
 import (
 	"fmt"
 	"strconv"
+	"strings"
+
+	"github.com/shopspring/decimal"
 )
 
 func (p *Parser) parseExpression(precedence int) Expression {
@@ -138,6 +141,21 @@ func (p *Parser) parseFloatLiteral() Expression {
 	value, err := strconv.ParseFloat(p.curToken.Literal, 64)
 	if err != nil {
 		msg := fmt.Sprintf("could not parse %q as float", p.curToken.Literal)
+		p.addError(p.curToken, msg)
+		return nil
+	}
+
+	lit.Value = value
+	return lit
+}
+
+func (p *Parser) parseDecimalLiteral() Expression {
+	lit := &DecimalLiteral{Token: p.curToken}
+
+	raw := strings.TrimRight(p.curToken.Literal, "mM")
+	value, err := decimal.NewFromString(raw)
+	if err != nil {
+		msg := fmt.Sprintf("could not parse %q as decimal", p.curToken.Literal)
 		p.addError(p.curToken, msg)
 		return nil
 	}
@@ -410,8 +428,10 @@ func (p *Parser) parseInfixExpression(left Expression) Expression {
 		if call, ok := expression.Right.(*CallExpression); ok {
 			funcName := call.Function.String()
 			if isBlueprintMethod(funcName) {
-				msg := fmt.Sprintf("Uso de '.' sospechoso para llamar al método '%s'. El acceso a métodos de objetos o mapas usa '->' (ej. $objeto->%s()).", funcName, funcName)
-				p.addError(p.curToken, msg)
+				if ident, isIdent := expression.Left.(*Identifier); isIdent && strings.HasPrefix(ident.Value, "$") {
+					msg := fmt.Sprintf("Uso de '.' sospechoso para llamar al método '%s'. El acceso a métodos de objetos o mapas usa '->' (ej. $objeto->%s()).", funcName, funcName)
+					p.addError(p.curToken, msg)
+				}
 			}
 		}
 	}

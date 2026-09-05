@@ -18,3 +18,27 @@ int? $count = null`))
 		t.Fatalf("declaration type = %q", declaration.Token.Literal)
 	}
 }
+
+func TestParserParsesDecimalLiteralsAndDeclarations(t *testing.T) {
+	p := NewParser(NewLexer(`decimal $precio = 0.50m
+$total = 100.25M`))
+	program := p.ParseProgram()
+	if errors := p.Errors(); len(errors) > 0 {
+		t.Fatalf("parse errors: %v", errors)
+	}
+	letStmt := program.Statements[0].(*LetStatement)
+	if letStmt.Token.Literal != "decimal" {
+		t.Fatalf("expected decimal type, got %q", letStmt.Token.Literal)
+	}
+	decLit, ok := letStmt.Value.(*DecimalLiteral)
+	if !ok || decLit.Value.String() != "0.5" {
+		t.Fatalf("expected 0.5 decimal literal, got %v", letStmt.Value)
+	}
+
+	assignStmt := program.Statements[1].(*ExpressionStatement)
+	assignExpr := assignStmt.Expression.(*AssignExpression)
+	decLit2, ok := assignExpr.Value.(*DecimalLiteral)
+	if !ok || decLit2.Value.String() != "100.25" {
+		t.Fatalf("expected 100.25 decimal literal, got %v", assignExpr.Value)
+	}
+}

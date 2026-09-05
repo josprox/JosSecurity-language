@@ -28,6 +28,7 @@ const (
 	Null    Kind = "null"
 	Int     Kind = "int"
 	Float   Kind = "float"
+	Decimal Kind = "decimal"
 	String  Kind = "string"
 	Bool    Kind = "bool"
 	Array   Kind = "array"
@@ -183,6 +184,8 @@ func Parse(name string) Type {
 		return Type{Kind: Int}
 	case "float":
 		return Type{Kind: Float}
+	case "decimal":
+		return Type{Kind: Decimal}
 	case "string":
 		return Type{Kind: String}
 	case "bool":
@@ -292,6 +295,9 @@ func Assignable(destination, source Type) bool {
 	if destination.Kind == Float && source.Kind == Int {
 		return true
 	}
+	if destination.Kind == Decimal && (source.Kind == Int || source.Kind == Float) {
+		return true
+	}
 	if destination.Kind == Object && source.Kind == Class {
 		return true
 	}
@@ -338,6 +344,11 @@ func CoerceString(destination Type, value string) (interface{}, bool) {
 	case Float:
 		if number, err := strconv.ParseFloat(value, 64); err == nil {
 			return number, true
+		}
+	case Decimal:
+		clean := strings.TrimRight(value, "mMdD")
+		if _, err := strconv.ParseFloat(clean, 64); err == nil {
+			return clean, true
 		}
 	case Bool:
 		switch strings.ToLower(value) {
@@ -409,5 +420,5 @@ func CheckedIntNegate(value int64) (int64, ArithmeticFault) {
 // SourceTypeNames returns the supported source-level type spellings used by
 // editor/tooling catalog generation.
 func SourceTypeNames() []string {
-	return []string{"array", "bool", "channel", "float", "int", "map", "mixed", "object", "string", "var"}
+	return []string{"array", "bool", "channel", "decimal", "float", "int", "map", "mixed", "object", "string", "var"}
 }

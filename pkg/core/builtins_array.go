@@ -5,6 +5,8 @@ import (
 	"reflect"
 	"strconv"
 	"strings"
+
+	"github.com/shopspring/decimal"
 )
 
 func (r *Runtime) callBuiltinArray(name string, args []interface{}) (interface{}, bool) {
@@ -57,11 +59,15 @@ func (r *Runtime) callBuiltinArray(name string, args []interface{}) (interface{}
 				return false, true
 			}
 			switch v := args[0].(type) {
-			case int, int32, int64, float64, float32:
+			case int, int32, int64, float64, float32, decimal.Decimal:
 				return true, true
 			case string:
 				vStr := strings.TrimSpace(v)
 				if _, err := strconv.ParseFloat(vStr, 64); err == nil {
+					return true, true
+				}
+				clean := strings.TrimRight(vStr, "mMdD")
+				if _, err := decimal.NewFromString(clean); err == nil {
 					return true, true
 				}
 				return false, true
@@ -87,6 +93,45 @@ func (r *Runtime) callBuiltinArray(name string, args []interface{}) (interface{}
 		}
 		return false, true
 
+	case "is_decimal":
+		if len(args) == 1 {
+			switch args[0].(type) {
+			case decimal.Decimal:
+				return true, true
+			}
+		}
+		return false, true
+
+	case "decimal":
+		if len(args) == 0 || args[0] == nil {
+			return decimal.Zero, true
+		}
+		switch v := args[0].(type) {
+		case decimal.Decimal:
+			return v, true
+		case int:
+			return decimal.NewFromInt(int64(v)), true
+		case int32:
+			return decimal.NewFromInt(int64(v)), true
+		case int64:
+			return decimal.NewFromInt(v), true
+		case float64:
+			return decimal.NewFromFloat(v), true
+		case float32:
+			return decimal.NewFromFloat(float64(v)), true
+		case bool:
+			if v {
+				return decimal.NewFromInt(1), true
+			}
+			return decimal.Zero, true
+		case string:
+			clean := strings.TrimRight(strings.TrimSpace(v), "mMdD")
+			if d, err := decimal.NewFromString(clean); err == nil {
+				return d, true
+			}
+		}
+		return decimal.Zero, true
+
 	case "intval":
 		if len(args) == 0 || args[0] == nil {
 			return int64(0), true
@@ -102,6 +147,8 @@ func (r *Runtime) callBuiltinArray(name string, args []interface{}) (interface{}
 			return int64(v), true
 		case float32:
 			return int64(v), true
+		case decimal.Decimal:
+			return v.IntPart(), true
 		case bool:
 			if v {
 				return int64(1), true
@@ -133,6 +180,9 @@ func (r *Runtime) callBuiltinArray(name string, args []interface{}) (interface{}
 			return float64(v), true
 		case int64:
 			return float64(v), true
+		case decimal.Decimal:
+			f, _ := v.Float64()
+			return f, true
 		case bool:
 			if v {
 				return float64(1.0), true

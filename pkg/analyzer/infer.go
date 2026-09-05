@@ -20,6 +20,8 @@ func (a *Analyzer) inferExpression(expression parser.Expression, current *scope)
 		return typesystem.Type{Kind: typesystem.Int}
 	case *parser.FloatLiteral:
 		return typesystem.Type{Kind: typesystem.Float}
+	case *parser.DecimalLiteral:
+		return typesystem.Type{Kind: typesystem.Decimal}
 	case *parser.Boolean:
 		return typesystem.Type{Kind: typesystem.Bool}
 	case *parser.NullLiteral:
@@ -289,6 +291,9 @@ func (a *Analyzer) inferInfix(expression *parser.InfixExpression, current *scope
 		if right.IsKnown() && !isNumeric(right) {
 			a.invalidOperator(expression.Token, expression.Operator, left, right)
 			return typesystem.Type{Kind: typesystem.Unknown}
+		}
+		if left.Kind == typesystem.Decimal || right.Kind == typesystem.Decimal {
+			return typesystem.Type{Kind: typesystem.Decimal}
 		}
 		if expression.Operator == "/" || left.Kind == typesystem.Float || right.Kind == typesystem.Float {
 			return typesystem.Type{Kind: typesystem.Float}
@@ -619,7 +624,7 @@ func (a *Analyzer) checkCall(callable Callable, arguments []parser.Expression, c
 }
 
 func isNumeric(valueType typesystem.Type) bool {
-	return valueType.Kind == typesystem.Int || valueType.Kind == typesystem.Float
+	return valueType.Kind == typesystem.Int || valueType.Kind == typesystem.Float || valueType.Kind == typesystem.Decimal
 }
 
 func commonType(left, right typesystem.Type) typesystem.Type {
@@ -645,6 +650,9 @@ func commonType(left, right typesystem.Type) typesystem.Type {
 		return left
 	}
 	if isNumeric(left) && isNumeric(right) {
+		if left.Kind == typesystem.Decimal || right.Kind == typesystem.Decimal {
+			return typesystem.Type{Kind: typesystem.Decimal}
+		}
 		return typesystem.Type{Kind: typesystem.Float}
 	}
 	return typesystem.Parse(left.String() + "|" + right.String())
@@ -670,6 +678,8 @@ func tokenOfExpression(expression parser.Expression) parser.Token {
 	case *parser.IntegerLiteral:
 		return node.Token
 	case *parser.FloatLiteral:
+		return node.Token
+	case *parser.DecimalLiteral:
 		return node.Token
 	case *parser.Boolean:
 		return node.Token

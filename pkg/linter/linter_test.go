@@ -87,3 +87,53 @@ func TestLinterDetectsHardcodedSecret(t *testing.T) {
 		t.Fatalf("expected JOSS-SEC-001 for hardcoded secret, got: %v", issues)
 	}
 }
+
+func TestLinterValidatesViewTemplates(t *testing.T) {
+	l := NewLinter()
+
+	// 1. Valid view template
+	validTemplate := `<div class="container">
+		{{ (isset($success) && $success) ? {
+			<div class="alert">{{ $success }}</div>
+		} : {} }}
+		<h1>{{ $title }}</h1>
+	</div>`
+	issues := l.LintViewSource("test.joss.html", validTemplate)
+	for _, issue := range issues {
+		if issue.Severity == diagnostics.SeverityError {
+			t.Fatalf("unexpected error in valid template: %s", issue.Message)
+		}
+	}
+
+	// 2. Syntax error in view expression
+	syntaxErrTemplate := `<div>{{ $foo + }}</div>`
+	issues = l.LintViewSource("syntax_err.joss.html", syntaxErrTemplate)
+	foundSyntaxErr := false
+	for _, issue := range issues {
+		if issue.RuleID == "JOSS-VIEW-SYNTAX" {
+			foundSyntaxErr = true
+			break
+		}
+	}
+	if !foundSyntaxErr {
+		t.Fatalf("expected JOSS-VIEW-SYNTAX error, got: %v", issues)
+	}
+
+	// 3. Raw undeclared variable warning in ternary
+	rawVarTemplate := `<div>
+		{{ ($customVar) ? {
+			<p>{{ $customVar }}</p>
+		} : {} }}
+	</div>`
+	issues = l.LintViewSource("raw_var.joss.html", rawVarTemplate)
+	foundRawVarWarn := false
+	for _, issue := range issues {
+		if issue.RuleID == "JOSS-VIEW-UNDEF" {
+			foundRawVarWarn = true
+			break
+		}
+	}
+	if !foundRawVarWarn {
+		t.Fatalf("expected JOSS-VIEW-UNDEF warning, got: %v", issues)
+	}
+}

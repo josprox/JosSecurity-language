@@ -127,11 +127,18 @@ func (r *Runtime) executeViewMethod(instance *Instance, method string, args []in
 			}
 			fmt.Printf("[View] Rendering %s with data: %v\n", viewName, data)
 
-			// Inject Global Auth Variables
+			// Inject Global Auth & Flash Variables
 			data["auth_check"] = false
 			data["auth_guest"] = true
 			data["auth_user"] = ""
 			data["auth_role"] = ""
+			data["auth_email"] = ""
+			if _, ok := data["error"]; !ok {
+				data["error"] = ""
+			}
+			if _, ok := data["success"]; !ok {
+				data["success"] = ""
+			}
 
 			if sessVal, ok := r.Variables["$__session"]; ok {
 				// fmt.Println("[View DEBUG] Found $__session")
@@ -375,7 +382,7 @@ func (r *Runtime) executeViewMethod(instance *Instance, method string, args []in
 			finalHtml = reCsrfPre.ReplaceAllString(finalHtml, `{{! csrf_field() }}`)
 
 			// Compile HTML to JOSS script
-			jossScript, errCompile := compileViewToJOSS(finalHtml)
+			jossScript, errCompile := CompileViewToJOSS(finalHtml)
 			if errCompile != nil {
 				return fmt.Sprintf("Error compiling view: %v", errCompile)
 			}
@@ -389,9 +396,14 @@ func (r *Runtime) executeViewMethod(instance *Instance, method string, args []in
 				return fmt.Sprintf("Error parsing compiled view JOSS script: %v\nScript:\n%s", p.Errors(), jossScript)
 			}
 
-			// Inject variables from data map
+			// Inject variables from data map (support both raw key and $key)
 			for k, v := range data {
 				r.Variables[k] = v
+				if !strings.HasPrefix(k, "$") {
+					r.Variables["$"+k] = v
+				} else {
+					r.Variables[strings.TrimPrefix(k, "$")] = v
+				}
 			}
 
 			var result interface{}
@@ -404,6 +416,9 @@ func (r *Runtime) executeViewMethod(instance *Instance, method string, args []in
 						if rp, ok := rec.(*ReturnPanic); ok {
 							result = rp.Value
 						} else {
+							if jErr, ok := rec.(*JossError); ok {
+								jErr.Message = fmt.Sprintf("Error en vista '%s': %s", viewName, jErr.Message)
+							}
 							panic(rec) // Bubble up database or other execution panics
 						}
 					}
@@ -450,8 +465,8 @@ func (r *Runtime) executeViewMethod(instance *Instance, method string, args []in
 	return nil
 }
 
-// compileViewToJOSS translates HTML view to JOSS script
-func compileViewToJOSS(htmlStr string) (string, error) {
+// CompileViewToJOSS translates HTML view to JOSS script
+func CompileViewToJOSS(htmlStr string) (string, error) {
 	var jossCode strings.Builder
 
 	escapeJossString := func(s string) string {

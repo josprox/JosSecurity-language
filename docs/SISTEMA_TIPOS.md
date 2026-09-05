@@ -45,24 +45,26 @@ Una fuente unión es asignable a un destino sólo si todas sus alternativas cabe
 
 ## Tipos reconocidos
 
-Los tipos fuente canónicos son `int`, `float`, `string`, `bool`, `array`, `map`, `object`, `channel` y nombres de clase declarada/nativa. `mixed` es dinámico; `var` solicita inferencia. Los antiguos aliases `integer`, `double`, `boolean`, `dynamic`, `any` y `list` ya no se normalizan: si no existe una clase con ese nombre, el analyzer emite `JOSS-TYPE-009`.
+Los tipos fuente canónicos son `int`, `float`, `decimal`, `string`, `bool`, `array`, `map`, `object`, `channel` y nombres de clase declarada/nativa. `mixed` es dinámico; `var` solicita inferencia. Los antiguos aliases `integer`, `double`, `boolean`, `dynamic`, `any` y `list` ya no se normalizan: si no existe una clase con ese nombre, el analyzer emite `JOSS-TYPE-009`.
 
 Compatibilidad relevante:
 
 - Mismo tipo: válido.
 - `int` hacia `float`: válido y sin pérdida.
+- `int` y `float` hacia `decimal`: válido (conversión exacta en base 10).
 - Clase concreta hacia `object`: válido.
 - `mixed`: contrato dinámico explícito. `unknown`: información aún insuficiente; ninguno genera un error especulativo.
 - Cualquier otro cambio conocido: error antes de ejecutar.
 
 ## Conversión de entrada
 
-Para conservar el uso de entradas textuales en declaraciones explícitas, una cadena puede convertirse a `int`, `float` o `bool` sólo si la conversión es completa y no pierde información. La misma función `typesystem.CoerceString` es usada por el analizador y el runtime.
+Para conservar el uso de entradas textuales en declaraciones explícitas, una cadena puede convertirse a `int`, `float`, `decimal` o `bool` sólo si la conversión es completa y no pierde información. La misma función `typesystem.CoerceString` es usada por el analizador y el runtime.
 
 ```joss
-int $port = "9000"   // válido
-int $port = "90.5"   // inválido: no se trunca
-int $port = "nine"   // inválido
+int $port = "9000"       // válido
+decimal $monto = "49.99" // válido
+int $port = "90.5"       // inválido: no se trunca
+int $port = "nine"       // inválido
 ```
 
 ## Funciones
@@ -129,6 +131,51 @@ Los enteros Joss son valores signed de 64 bits. `+`, `-`, `*`, `%`, negación y
 `JOSS-ARITH-001`; división o módulo entre cero produce `JOSS-ARITH-002`. No hay
 wrapping ni saturación implícitos. `/` conserva el resultado `float` histórico,
 pero también rechaza divisor cero.
+
+## Aritmética de punto flotante (`float`) y límites IEEE 754
+
+El tipo `float` en Joss se implementa bajo el estándar IEEE 754 de 64 bits (doble precisión binaria).
+
+Al trabajar en base 2, los números fraccionarios decimales que no son potencias de dos (como `0.1 = 1/10` o `0.2 = 1/5`) no poseen una representación binaria finita y sufren pérdidas residuales por redondeo:
+
+```joss
+float $a = 0.1 + 0.2
+float $b = 0.3
+
+($a == $b) ? {
+    print("Iguales")
+} : {
+    print("Diferentes") // Se ejecuta esta rama: diferencia de 5.551115123125783e-17
+}
+```
+
+**Regla de oro:** No use `float` para montos monetarios, balances bancarios o contabilidad crítica. En comparaciones financieras como `$saldo >= $precio`, pequeñas desviaciones de redondeo pueden producir decisiones erróneas (por ejemplo, con `$saldo = 0.30` y `$precio = 0.10 + 0.20`, Joss evaluará `$precio` como `0.30000000000000004` y la condición `$saldo >= $precio` resultará falsa).
+
+## Precisión fija y transacciones financieras (`decimal`)
+
+Para cálculos monetarios, balances bancarios, liquidación de impuestos o cualquier operación donde las pérdidas por redondeo binario sean inadmisibles, Joss proporciona el tipo nativo `decimal`:
+
+- **Aritmética exacta en Base 10**: Implementado con precisión arbitraria decimal de punto fijo/escala dinámica (respaldado por `shopspring/decimal`).
+- **Sintaxis de literales**: Sufijo `m` o `M` (ej. `0.10m`, `0.20m`, `1500.50M`).
+- **Coerción sin pérdida**: Acepta asignaciones desde enteros, floats o cadenas numéricas (ej. `decimal $saldo = 100` o `decimal $tasa = "0.05"`).
+- **Operaciones completas**: Soporta `+`, `-`, `*`, `/`, `%`, negación unaria `-$d`, operadores relacionales `<`, `>`, `<=`, `>=`, `==`, `!=`, y comparador de nave espacial `<=>`.
+- **Funciones integradas**:
+  - `decimal($val)`: convierte o construye un valor `decimal`.
+  - `is_decimal($val)`: verifica si una variable contiene un valor `decimal`.
+
+```joss
+// Aritmética bancaria exacta
+decimal $saldo = 0.60m
+decimal $precio = 0.10m + 0.20m
+
+// La comparación es 100% exacta: 0.10m + 0.20m da exactamente 0.30m
+($saldo >= $precio) ? {
+    decimal $resto = $saldo - $precio
+    print("Compra exitosa. Saldo restante: " . $resto) // Muestra exactamente: 0.3
+} : {
+    print("Fondos insuficientes")
+}
+```
 
 ## Fuente canónica
 

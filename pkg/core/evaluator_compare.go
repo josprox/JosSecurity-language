@@ -3,6 +3,8 @@ package core
 import (
 	"fmt"
 	"reflect"
+
+	"github.com/shopspring/decimal"
 )
 
 func (r *Runtime) isNativeClass(name string) bool {
@@ -20,6 +22,15 @@ func (r *Runtime) isNativeClass(name string) bool {
 }
 
 func strictCompare(a, b interface{}) bool {
+	if da, ok := a.(decimal.Decimal); ok {
+		if db, ok := b.(decimal.Decimal); ok {
+			return da.Equal(db)
+		}
+		return false
+	}
+	if _, ok := b.(decimal.Decimal); ok {
+		return false
+	}
 	a = normalizeNumber(a)
 	b = normalizeNumber(b)
 	if a == nil || b == nil {
@@ -70,7 +81,20 @@ func spaceshipCompare(left, right interface{}) int64 {
 		return 1
 	}
 	switch aVal := a.(type) {
+	case decimal.Decimal:
+		if bVal, ok := b.(decimal.Decimal); ok {
+			return int64(aVal.Cmp(bVal))
+		}
+		if bVal, ok := b.(int64); ok {
+			return int64(aVal.Cmp(decimal.NewFromInt(bVal)))
+		}
+		if bVal, ok := b.(float64); ok {
+			return int64(aVal.Cmp(decimal.NewFromFloat(bVal)))
+		}
 	case int64:
+		if bVal, ok := b.(decimal.Decimal); ok {
+			return int64(decimal.NewFromInt(aVal).Cmp(bVal))
+		}
 		if bVal, ok := b.(int64); ok {
 			if aVal < bVal {
 				return -1
@@ -91,6 +115,9 @@ func spaceshipCompare(left, right interface{}) int64 {
 			return 0
 		}
 	case float64:
+		if bVal, ok := b.(decimal.Decimal); ok {
+			return int64(decimal.NewFromFloat(aVal).Cmp(bVal))
+		}
 		if bVal, ok := b.(float64); ok {
 			if aVal < bVal {
 				return -1

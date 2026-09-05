@@ -7,6 +7,7 @@ import (
 	"github.com/jossecurity/joss/pkg/parser"
 	runtimeframe "github.com/jossecurity/joss/pkg/runtime/frame"
 	"github.com/jossecurity/joss/pkg/typesystem"
+	"github.com/shopspring/decimal"
 )
 
 func (r *Runtime) evaluateTernary(te *parser.TernaryExpression) interface{} {
@@ -266,6 +267,67 @@ func (r *Runtime) evaluateInfix(ie *parser.InfixExpression) interface{} {
 		}
 	}
 
+	// Decimal operations preserve exact precision.
+	toDecimal := func(val interface{}) (decimal.Decimal, bool) {
+		switch v := val.(type) {
+		case decimal.Decimal:
+			return v, true
+		case int64:
+			return decimal.NewFromInt(v), true
+		case int:
+			return decimal.NewFromInt(int64(v)), true
+		case float64:
+			return decimal.NewFromFloat(v), true
+		case float32:
+			return decimal.NewFromFloat(float64(v)), true
+		default:
+			return decimal.Zero, false
+		}
+	}
+
+	_, leftIsDec := left.(decimal.Decimal)
+	_, rightIsDec := right.(decimal.Decimal)
+	if leftIsDec || rightIsDec {
+		lDec, lOk := toDecimal(left)
+		rDec, rOk := toDecimal(right)
+		if lOk && rOk {
+			switch ie.Operator {
+			case "+":
+				return lDec.Add(rDec)
+			case "-":
+				return lDec.Sub(rDec)
+			case "*":
+				return lDec.Mul(rDec)
+			case "/":
+				if rDec.IsZero() {
+					panic(&JossError{Code: diagnostics.CodeDivisionByZero, Type: "ArithmeticError", Message: "División entre cero", File: r.CurrentFile, Line: ie.Token.Line, Column: ie.Token.Column})
+				}
+				return lDec.Div(rDec)
+			case "%":
+				if rDec.IsZero() {
+					panic(&JossError{Code: diagnostics.CodeDivisionByZero, Type: "ArithmeticError", Message: "División entre cero", File: r.CurrentFile, Line: ie.Token.Line, Column: ie.Token.Column})
+				}
+				return lDec.Mod(rDec)
+			case "<":
+				return lDec.LessThan(rDec)
+			case ">":
+				return lDec.GreaterThan(rDec)
+			case "<=":
+				return lDec.LessThanOrEqual(rDec)
+			case ">=":
+				return lDec.GreaterThanOrEqual(rDec)
+			case "==":
+				return lDec.Equal(rDec)
+			case "!=":
+				return !lDec.Equal(rDec)
+			case "&&":
+				return !lDec.IsZero() && !rDec.IsZero()
+			case "||":
+				return !lDec.IsZero() || !rDec.IsZero()
+			}
+		}
+	}
+
 	// Mixed int/float operations promote to float.
 	toFloat := func(val interface{}) (float64, bool) {
 		if i, ok := val.(int64); ok {
@@ -497,6 +559,9 @@ func (r *Runtime) evaluatePrefix(pe *parser.PrefixExpression) interface{} {
 		if f, ok := right.(float64); ok {
 			return -f
 		}
+		if d, ok := right.(decimal.Decimal); ok {
+			return d.Neg()
+		}
 	}
 
 	return nil
@@ -518,6 +583,8 @@ func (r *Runtime) evaluatePostfix(pe *parser.PostfixExpression) interface{} {
 			newVal = value
 		} else if f, ok := val.(float64); ok {
 			newVal = f + 1.0
+		} else if d, ok := val.(decimal.Decimal); ok {
+			newVal = d.Add(decimal.NewFromInt(1))
 		} else {
 			fmt.Println("Error: Operador ++ solo aplicable a números")
 			return nil

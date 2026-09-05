@@ -5,6 +5,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 
 	semanticanalyzer "github.com/jossecurity/joss/pkg/analyzer"
@@ -94,6 +95,9 @@ func (l *Linter) LintPath(targetPath string) ([]LintIssue, error) {
 		if err != nil {
 			return nil, err
 		}
+		if isViewTemplateFile(targetPath) {
+			return l.LintViewSource(targetPath, string(data)), nil
+		}
 		return l.LintSource(targetPath, string(data))
 	}
 
@@ -107,6 +111,14 @@ func (l *Linter) LintPath(targetPath string) ([]LintIssue, error) {
 			if parser.IsIgnoredDirectory(d.Name()) {
 				return filepath.SkipDir
 			}
+			return nil
+		}
+		if isViewTemplateFile(path) {
+			data, readErr := os.ReadFile(path)
+			if readErr != nil {
+				return readErr
+			}
+			allIssues = append(allIssues, l.LintViewSource(path, string(data))...)
 			return nil
 		}
 		if parser.IsJossSourceFile(path) {
@@ -248,4 +260,145 @@ func checkASTRules(filename string, prog *parser.Program, src string) []LintIssu
 	}
 
 	return issues
+}
+
+func isViewTemplateFile(path string) bool {
+	lower := strings.ToLower(filepath.ToSlash(path))
+	if strings.HasSuffix(lower, ".joss.html") {
+		return true
+	}
+	if strings.HasSuffix(lower, ".html") && (strings.Contains(lower, "/views/") || strings.Contains(lower, "/app/views/")) {
+		return true
+	}
+	return false
+}
+
+func (l *Linter) LintViewSource(filename, content string) []LintIssue {
+	var issues []LintIssue
+
+	// Pre-process Blade comments
+	reBladeComments := regexp.MustCompile(`\{\{--[\s\S]*?--\}\}`)
+	cleanHtml := reBladeComments.ReplaceAllString(content, "")
+
+	// Pre-process @json(expr) directive to raw {{! json_encode(expr) }}
+	reJsonDirective := regexp.MustCompile(`@json\s*\((.*?)\)`)
+	cleanHtml = reJsonDirective.ReplaceAllString(cleanHtml, `{{! json_encode($1) }}`)
+
+	// Pre-process csrf_field() to be raw output
+	reCsrfPre := regexp.MustCompile(`\{\{\s*csrf_field\(\)\s*\}\}`)
+	cleanHtml = reCsrfPre.ReplaceAllString(cleanHtml, `{{! csrf_field() }}`)
+
+	// 1. Check template compilation
+	jossScript, errCompile := core.CompileViewToJOSS(cleanHtml)
+	if errCompile != nil {
+		issues = append(issues, LintIssue{
+			RuleID:      "JOSS-VIEW-001",
+			Category:    CategoryCorrectness,
+			Severity:    diagnostics.SeverityError,
+			File:        filename,
+			Line:        1,
+			Message:     fmt.Sprintf("Error compilando plantilla de vista: %v", errCompile),
+			Explanation: "La plantilla contiene etiquetas o directivas de plantilla mal formadas.",
+			Suggestion:  "Verifica que @foreach, ternarios de bloque {{ (...) ? { ... } : { ... } }} y llaves cierren correctamente.",
+		})
+		return issues
+	}
+
+	// 2. Check script syntax
+	p := parser.NewParser(parser.NewLexer(jossScript))
+	prog := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		for _, errStr := range p.Errors() {
+			issues = append(issues, LintIssue{
+				RuleID:      "JOSS-VIEW-SYNTAX",
+				Category:    CategoryCorrectness,
+				Severity:    diagnostics.SeverityError,
+				File:        filename,
+				Line:        1,
+				Message:     fmt.Sprintf("Error de sintaxis en expresión de vista: %s", errStr),
+				Explanation: "Una expresión incrustada en la plantilla no es código Joss válido.",
+				Suggestion:  "Verifica la sintaxis de las expresiones dentro de {{ ... }} o directivas de la plantilla.",
+			})
+		}
+		return issues
+	}
+
+	// 3. Inspect AST for raw variable evaluation warnings
+	guaranteedGlobals := map[string]bool{
+		"auth_check": true, "auth_guest": true, "auth_user": true, "auth_role": true, "auth_email": true,
+		"csrf_token": true, "success": true, "error": true, "__output": true, "__session": true, "__request": true,
+		"true": true, "false": true, "nil": true, "null": true,
+	}
+
+	walkAST(prog, func(node parser.Node) {
+		if tern, ok := node.(*parser.TernaryExpression); ok {
+			if ident, ok := tern.Condition.(*parser.Identifier); ok {
+				varName := strings.TrimPrefix(ident.Value, "$")
+				if !guaranteedGlobals[varName] && !core.IsNativeClass(ident.Value) && !core.IsNativeClass(varName) {
+					issues = append(issues, LintIssue{
+						RuleID:      "JOSS-VIEW-UNDEF",
+						Category:    CategoryCorrectness,
+						Severity:    diagnostics.SeverityWarning,
+						File:        filename,
+						Line:        ident.Token.Line,
+						Column:      ident.Token.Column,
+						Message:     fmt.Sprintf("La variable '$%s' se evalúa directamente como condición en la vista.", varName),
+						Explanation: fmt.Sprintf("Si el controlador no pasa '$%s' en view(), causará un error 500 en tiempo de ejecución.", varName),
+						Suggestion:  fmt.Sprintf("Usa 'isset($%s)' o '(isset($%s) && $%s)' para verificar su existencia de forma segura.", varName, varName, varName),
+					})
+				}
+			}
+		}
+	})
+
+	return issues
+}
+
+func walkAST(node parser.Node, fn func(parser.Node)) {
+	if node == nil {
+		return
+	}
+	fn(node)
+	switch n := node.(type) {
+	case *parser.Program:
+		for _, stmt := range n.Statements {
+			walkAST(stmt, fn)
+		}
+	case *parser.ExpressionStatement:
+		walkAST(n.Expression, fn)
+	case *parser.BlockStatement:
+		for _, stmt := range n.Statements {
+			walkAST(stmt, fn)
+		}
+	case *parser.TernaryExpression:
+		walkAST(n.Condition, fn)
+		walkAST(n.True, fn)
+		walkAST(n.False, fn)
+	case *parser.ForeachStatement:
+		walkAST(n.Iterable, fn)
+		walkAST(n.Body, fn)
+	case *parser.InfixExpression:
+		walkAST(n.Left, fn)
+		walkAST(n.Right, fn)
+	case *parser.PrefixExpression:
+		walkAST(n.Right, fn)
+	case *parser.CallExpression:
+		walkAST(n.Function, fn)
+		for _, arg := range n.Arguments {
+			walkAST(arg, fn)
+		}
+	case *parser.AssignExpression:
+		walkAST(n.Left, fn)
+		walkAST(n.Value, fn)
+	case *parser.IndexExpression:
+		walkAST(n.Left, fn)
+		walkAST(n.Index, fn)
+	case *parser.MemberExpression:
+		walkAST(n.Left, fn)
+		walkAST(n.Property, fn)
+	case *parser.ReturnStatement:
+		walkAST(n.ReturnValue, fn)
+	case *parser.LetStatement:
+		walkAST(n.Value, fn)
+	}
 }

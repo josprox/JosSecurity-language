@@ -1,8 +1,11 @@
 package core
 
 import (
+	"strings"
+
 	"github.com/jossecurity/joss/pkg/parser"
 	"github.com/jossecurity/joss/pkg/typesystem"
+	"github.com/shopspring/decimal"
 )
 
 func (r *Runtime) checkType(val interface{}, typeName string) bool {
@@ -67,6 +70,8 @@ func runtimeTypeOf(value interface{}) typesystem.Type {
 		return typesystem.Type{Kind: typesystem.Int}
 	case float32, float64:
 		return typesystem.Type{Kind: typesystem.Float}
+	case decimal.Decimal:
+		return typesystem.Type{Kind: typesystem.Decimal}
 	case string:
 		return typesystem.Type{Kind: typesystem.String}
 	case bool:
@@ -147,6 +152,9 @@ func isFalsy(val interface{}) bool {
 	if _, ok := val.(*Instance); ok {
 		return false // Instances are always Truthy
 	}
+	if d, ok := val.(decimal.Decimal); ok {
+		return d.IsZero()
+	}
 	if b, ok := val.(bool); ok {
 		return !b
 	}
@@ -176,9 +184,34 @@ func (r *Runtime) coerceToParsedType(val interface{}, destination typesystem.Typ
 	if val == nil {
 		return val
 	}
+	if destination.Kind == typesystem.Decimal {
+		switch v := val.(type) {
+		case decimal.Decimal:
+			return v
+		case int64:
+			return decimal.NewFromInt(v)
+		case int:
+			return decimal.NewFromInt(int64(v))
+		case float64:
+			return decimal.NewFromFloat(v)
+		case float32:
+			return decimal.NewFromFloat(float64(v))
+		case string:
+			clean := strings.TrimRight(strings.TrimSpace(v), "mMdD")
+			if d, err := decimal.NewFromString(clean); err == nil {
+				return d
+			}
+		}
+	}
 	str, isString := val.(string)
 	if !isString {
 		return val // Already a non-string, no coercion needed
+	}
+	if destination.Kind == typesystem.Decimal {
+		clean := strings.TrimRight(strings.TrimSpace(str), "mMdD")
+		if d, err := decimal.NewFromString(clean); err == nil {
+			return d
+		}
 	}
 	if coerced, ok := typesystem.CoerceString(destination, str); ok {
 		return coerced
@@ -206,6 +239,8 @@ func (r *Runtime) getZeroValue(typeName string) interface{} {
 		return int64(0)
 	case typesystem.Float:
 		return float64(0.0)
+	case typesystem.Decimal:
+		return decimal.Zero
 	case typesystem.String:
 		return ""
 	case typesystem.Bool:
