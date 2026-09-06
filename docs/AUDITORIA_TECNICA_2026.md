@@ -1,5 +1,7 @@
 # Auditoría técnica del núcleo y alineación con la tesis (agosto de 2026)
 
+[Índice](README.md)
+
 ## Línea base
 
 Antes de los cambios, `go test ./...` y `go build ./...` pasaban; `go vet ./...` fallaba por construir manualmente una dirección SMTP incompatible con IPv6. `joss analyze` sobre JosSecurity producía 10 errores falsos y 14 warnings sin archivo: dos nombres built-in implementados pero ausentes del catálogo (`html_escape`, `unlink`) y siete usos de clases exportadas por plugins que el analyzer no consultaba (`BrevoClient`, `Notify`).

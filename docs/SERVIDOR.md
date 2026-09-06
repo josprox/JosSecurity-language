@@ -1,10 +1,16 @@
 # Servidor HTTP
 
+[Índice](README.md) · Antes: [proyecto web](PROYECTO_WEB.md) · Después: [HTTP](CONTROLADORES.md)
+
+El servidor convierte rutas Joss en respuestas HTTP. Requiere un proyecto web
+con `main.joss`, rutas y `Server::start()`.
+
 ```bash
 joss server start
 ```
 
-El puerto predeterminado es 80. Define `PORT` para cambiarlo.
+El puerto predeterminado del runtime es 8000. La plantilla generada escribe
+`PORT="80"` en `env.joss`, por lo que esa aplicación usa 80 hasta que lo cambies.
 
 ## Capacidades
 

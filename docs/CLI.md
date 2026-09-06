@@ -1,6 +1,12 @@
 # CLI de Joss — Referencia Completa de Comandos
 
+[Índice](README.md) · Antes: [primeros pasos](PRIMEROS_PASOS.md) · Después: [analizador](ANALIZADOR.md)
+
 La fuente canónica de comandos es `cmd/joss/main.go`. `joss help` muestra la ayuda interactiva instalada y `joss version` la versión actual del runtime.
+
+La CLI es el programa que recibe comandos en la terminal. Actualmente no hay
+un comando REPL interactivo ni debugger integrado. `pub` sí es el gestor de
+paquetes; sus operaciones de red dependen del registro configurado.
 
 ---
 
@@ -18,9 +24,9 @@ joss build native [os] [arch] [--gui]
 
 - `server start`: Requiere el punto de entrada `main.joss` e inicia el servidor HTTP multinivel de alto rendimiento.
 - `run [archivo]`: Ejecuta un script `.joss` después de analizar el proyecto. Los errores semánticos bloquean la ejecución; los warnings no.
-- `analyze [archivo]`: Analiza la entrada (por defecto `main.joss`) y los `.joss` del proyecto, incluyendo scopes, símbolos, tipos, argumentos, miembros y flujo. Devuelve código distinto de cero si existen errores y conserva archivo/línea/columna. Consulte [ANALIZADOR.md](ANALIZADOR.md).
+- `analyze [archivo]`: Analiza la entrada (por defecto `main.joss`) y `app/**/*.joss`. No incluye automáticamente `routes.joss`, `api.joss` ni otros hermanos. Devuelve código distinto de cero si existen errores y conserva archivo/línea/columna. Consulte [ANALIZADOR.md](ANALIZADOR.md).
 - `build native [os] [arch]`: Genera un binario independiente para `windows`, `linux` o `darwin`; empaqueta el AST serializado y el runner Go. No es un backend LLVM/AOT del programa Joss. Usa `--gui` para aplicaciones con interfaz de escritorio.
-- `update`: Busca, descarga y aplica actualizaciones automáticas del CLI, SDK y motor Joss.
+- `update`: Usa el actualizador implementado por el CLI y puede requerir red/permisos del sistema. Comprueba sus canales y artefactos reales antes de prometer que una distribución contiene SDK o editor.
 
 ---
 
@@ -104,8 +110,8 @@ joss plugin inspect mi_plugin.jp
 joss plugin verify mi_plugin.jp
 ```
 
-- `plugin compile`: Traduce archivos fuente de **Python, Java, PHP, C/C++ o Rust (Wasm)** a Bytecode Joss binario (`JPBC`) con tree shaking automático y firma Ed25519.
-- `plugin inspect`: Muestra los metadatos internos, permisos WASI requeridos y la tabla de símbolos del paquete `.jp`.
+- `plugin compile`: Produce JPBC firmado desde backends parciales. Python/PHP/Java traducen subconjuntos; la ruta Wasm sólo valida la cabecera y genera stubs de demostración. Consulte [Plugins](PLUGINS.md).
+- `plugin inspect`: Muestra metadatos, permisos declarados y tabla de símbolos del paquete `.jp`.
 - `plugin verify`: Comprueba la firma digital Ed25519 y la integridad estructural del contenedor `.jp`.
 
 ---
@@ -137,14 +143,14 @@ joss check [ruta]
 joss format [ruta] [--write|--check]
 joss lint [ruta] [--json]
 joss fix [ruta] [--dry-run]
-joss test [ruta] [--filter=nombre]
+joss test [--filter=nombre] [ruta]
 ```
 
-- `check`: Pipeline de verificación integral en un solo paso (formato canónico, sintaxis, análisis semántico, verificación estricta de tipos y linter).
-- `format`: Formatea archivos `.joss` según el estándar canónico del lenguaje. `--write` aplica los cambios en disco; `--check` verifica el formato sin mutar archivos (ideal para CI/CD).
+- `check`: Ejecuta formato, sintaxis, análisis y linter. Revisa su salida: un problema de formato se comunica como warning en este pipeline.
+- `format`: En un archivo, modifica por defecto salvo que uses `--check`; en un directorio sólo escribe con `--write`. Usa siempre `joss format ruta --check` en CI.
 - `lint`: Ejecuta análisis estático con reglas de consistencia de tipos, estilo y detección de secretos o credenciales en código duro (`--json` para integración estructurada).
 - `fix`: Aplica correcciones automáticas seguras (visibilidad requerida, formateo) con soporte para `--dry-run`.
-- `test`: Ejecuta la suite de pruebas unitarias (*_test.joss) con primitivas nativas de aserción (`test`, `assert`, `assertEqual`, `assertTrue`, `assertNull`, `assertThrows`).
+- `test`: Ejecuta archivos `*_test.joss` con `test`/`it`, `assert`, `assertTrue`, `assertFalse`, `assertEqual`, `assertNotEqual`, `assertNull`, `assertNotNull` y `assertThrows`. Coloca `--filter` antes de la ruta: el parser de flags deja de leer opciones tras el primer argumento posicional.
 
 ---
 
@@ -177,4 +183,3 @@ joss userstorage sync-local
 ```
 
 - `userstorage`: Conmuta el proveedor de almacenamiento entre disco local y **Oracle Cloud Infrastructure (OCI)**, permitiendo sincronización bidireccional mediante `sync-oci` y `sync-local`.
-

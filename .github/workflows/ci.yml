@@ -33,6 +33,9 @@ jobs:
       - name: Check generated language catalog
         run: go run ./tools/cataloggen --check
 
+      - name: Check generated native documentation
+        run: go run ./tools/docgen --check
+
       - name: Vet
         run: go vet ./...
 

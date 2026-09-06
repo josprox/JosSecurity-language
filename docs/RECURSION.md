@@ -1,5 +1,7 @@
 # Funciones recursivas
 
+[Índice](README.md)
+
 Joss admite recursión directa y mutua. Para obtener comprobación estática útil, declare el tipo de retorno:
 
 ```joss

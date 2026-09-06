@@ -1,13 +1,17 @@
 # WebSockets
 
+[Índice](README.md) · Antes: [HTTP](CONTROLADORES.md), [closures](FUNCIONES.md) · Después: [concurrencia](CONCURRENCIA.md)
+
+Un WebSocket mantiene abierta una conexión para intercambiar mensajes en ambas direcciones. Úsalo para chat o actualizaciones continuas; una consulta puntual puede resolverse con HTTP. Los ejemplos son fragmentos para el servidor integrado.
+
 Las rutas aceptan parámetros dinámicos. El primer argumento del handler es la conexión y después se inyectan los parámetros en orden.
 
 ```joss
 Router::ws("/rooms/{room}/users/{id}", "ChatController@connect")
 
 public class ChatController {
-    public func connect($ws, string $room, string $id) {
-        $ws->onMessage(func($message) {
+    public func connect(WebSocket $ws, string $room, string $id) {
+        $ws->onMessage(func(string $message) {
             $ws->send($message)
         })
     }
@@ -20,17 +24,16 @@ disponibles después de que el handler termina. El estado capturado se conserva
 entre mensajes y sus invocaciones se serializan:
 
 ```joss
-public func connect($ws) {
+public func connect(WebSocket $ws) {
     $count = 0
-    $ws->onMessage(func($message) {
+    $ws->onMessage(func(string $message) {
         $count = $count + 1
         $ws->send("Mensaje " . $count . ": " . $message)
     })
 }
 ```
 
-Los callbacks registrados durante la misma ejecución comparten su entorno. Por
-ejemplo, un `onClose` puede leer el estado que modificó `onMessage`.
+Cada closure conserva su propia captura. No asumas que onClose ve las reasignaciones locales realizadas por otra closure onMessage.
 
 Cada conexión se ejecuta sobre su propio `Runtime.Fork()`, por lo que el
 contexto capturado no se comparte con otras conexiones.

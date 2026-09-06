@@ -1,264 +1,185 @@
-# Sintaxis de Joss
+# Referencia de sintaxis y operadores
 
-## Variables y tipos
+Para aprender: [fundamentos](FUNDAMENTOS.md), [flujo](CONTROL_FLUJO.md),
+[funciones](FUNCIONES.md), [clases](CLASES.md).
+Complementos: [gramática](GRAMATICA.md), [tipos](SISTEMA_TIPOS.md).
 
-Las variables usan `$`. La primera asignación simple infiere un tipo que permanece estable; no convierte la variable en dinámica. `func` es la única palabra para funciones y closures.
+Esta referencia describe el parser y evaluator de esta revisión. Las
+limitaciones observadas se indican como tales; no son propuestas de diseño.
 
-```joss
-$age = 20       // infiere int
-$age = 21       // válido
-var $count = 1  // inferencia explícita
-let $dynamic = 10 // mixed explícito
-int $port = 9000
-string $name = "Ada"
-bool $active = true
-array $items = [1, 2, 3]
-$config = {"port": 8000}
+## Léxico
+
+Las palabras reservadas se obtienen de `parser.KeywordNames()`:
+
+```text
+Init as async break catch class const continue default do echo empty
+extends false foreach func isset let match new nil null print private
+protected public ref return static this throw true try while
 ```
 
-`$age = "veinte"` es un error porque `$age` ya fue inferida como `int`. Sólo `let $dynamic` permite cambiar de tipo deliberadamente. Los tipos reconocidos incluyen `int`, `float`, `string`, `bool`, `array`, `map`, `object`, `channel` y clases. Una declaración numérica explícita puede convertir una cadena completa y válida antes de fallar; nunca trunca `"20.5"` a `int`.
+`var`, `int`, `mixed`, `await` y `make_chan` son identificadores
+interpretados por contexto o nombres de funciones, no keywords del lexer.
+Las constantes internas `IF` y `ELSE` no significan que esas construcciones
+estén disponibles. `if`, `else`, `elif`, `for` y `switch` no son
+estructuras fuente de Joss.
 
-No existe un modo configurable: el tipado fuerte es la regla normal. Únicamente `let $x` y `mixed $x` son dinámicos.
+| Forma | Regla |
+|---|---|
+| Identificador | ASCII: letras, `_` o `@` al inicio; también dígitos después. Evita `@` fuera de APIs concretas; no es un sistema de anotaciones. |
+| Variable | `$nombre`; el token `$` se separa del nombre. `$this` tiene tratamiento propio. |
+| Comentarios | `//` y `#` hasta fin de línea; `/* ... */` sin anidamiento. |
+| Strings | Comillas simples o dobles; escapes `\\n`, `\\t`, `\\r`, `\\'`, `\\"`, `\\\\`; escapes desconocidos conservan la barra. Sin interpolación. |
+| Enteros | Secuencia de dígitos; el parser usa base automática: `010` se lee como octal, `08` falla. Evita ceros iniciales. |
+| Float | Dígitos, punto y más dígitos: `0.5`. No hay literal exponencial, hexadecimal ni separador `_` en el lexer. |
+| Decimal | Entero o fracción con sufijo `m`/`M`: `100m`, `1.25M`. |
+| Ausencia | `null` y `nil` producen el mismo valor. |
+| Separación | Nueva línea o `;`. Los espacios y tabs no delimitan bloques. |
 
-`const $name = valor` declara una constante inferida y `const Tipo $name = valor` una constante tipada. Las uniones se escriben `int|string`; `int?` es el atajo de `int|null`. Las funciones aceptan retorno opcional (`func name(...): Tipo`) y toda función anotada debe retornar o lanzar en cada ruta demostrable. Consulte [Sistema de tipos](SISTEMA_TIPOS.md).
+El lexer elimina BOM UTF-8 inicial. Fuera de strings, omite bytes no ASCII:
+no confíes en identificadores acentuados. Los diagnósticos de strings multilínea
+y texto no ASCII aún tienen limitaciones de posición.
 
-## Operadores y Concatenación
+Además de nombres, literales y keywords, se tokenizan:
 
-- **Concatenación de Cadenas (`.`)**: En Joss, la concatenación de cadenas se realiza **estrictamente mediante el operador punto (`.`)**.
-  ```joss
-  $nombre = "Joss"
-  $mensaje = "Hola " . $nombre . ", bienvenido!"
-  ```
-- **Suma Numérica (`+`)**: El operador `+` se utiliza **exclusivamente para operaciones matemáticas numéricas** (`10 + 5`). Si intentas concatenar texto usando `+`, el runtime arrojará un error explícito solicitando el uso del operador `.`.
-- **Coalescencia Nula (`??`) y Elvis (`?:`)**:
-  ```joss
-  $port = $config["port"] ?? 8000
-  $name = $user_name ?: "Anónimo"
-  ```
-
-
-## Funciones, Closures y Tipado de Parámetros
-
-```joss
-// Funciones globales con tipado y coerción automática inteligente
-public func transferir(int $userId, float $monto, string $concepto) {
-    // Si $monto entra como string "150.50", Joss lo convierte limpiamente al tipo float
-    return "Transferidos $" . $monto . " al usuario #" . $userId
-}
-
-$doble = func(int $valor) {
-    return $valor * 2
-}
+```text
+= + - ! * / % < > == != === !== <=> <= >= << >> && || ++
+, ; : ? ( ) { } [ ] . -> ?-> :: | |> ?? =>
+NEWLINE EOF ILLEGAL
 ```
 
-Todo parámetro necesita tipo. Para un contrato dinámico debe escribirse `mixed $valor`; omitir el tipo ya no equivale a `mixed`.
+No hay `--`, `+=`, exponenciación, AND binario `&` ni OR binario `|`;
+este último separa tipos de una unión.
 
-Las referencias seguras se declaran y pasan explícitamente:
+## Precedencia: de menor a mayor
 
+La tabla reproduce `pkg/parser/parser.go`. A igual nivel, los infijos
+ordinarios agrupan a la izquierda; la asignación analiza toda su derecha.
+
+| Nivel | Operadores / construcciones |
+|---|---|
+| 1 | `=` (derecha) |
+| 2 | `? :`, `?:` |
+| 3 | `??` |
+| 4 | `&&`, `\|\|` |
+| 5 | `==`, `!=`, `===`, `!==`, `<=>` |
+| 6 | `<`, `>`, `<=`, `>=` |
+| 7 | `\|>` |
+| 8 | `+`, `-`, `.` |
+| 9 | `<<`, `>>` |
+| 10 | `*`, `/` |
+| 11 | `%` |
+| 12 | Prefijos `-`, `!`, `ref` |
+| 13 | Llamada `()` |
+| 14 | Índice `[]`, miembros `->`, `?->`, `::`, postfix `++` |
+
+Consecuencias: `%` liga más fuerte que multiplicación y división, mientras
+`&&` y `||` comparten nivel. Usa paréntesis para expresar tu intención.
+Los brazos del ternario se parsean como expresiones completas; parentetiza
+ternarios anidados en vez de trasladar la asociatividad de otro lenguaje.
+
+<!-- joss-run: ["16", "false", "true"] -->
 ```joss
-public func swap(ref int $left, ref int $right): int {
-    $temporary = $left
-    $left = $right
-    $right = $temporary
-    return $left
-}
-
-$a = 1
-$b = 2
-swap(ref $a, ref $b)
+print(8 * 5 % 3)
+print(true || false && false)
+print(true || (false && false))
 ```
 
-## Clases, Visibilidad y Herencia
+Da `16`, `false` y `true`. La primera expresión es `8 * (5 % 3)`.
+No es una tabla de precedencia de PHP o Go.
 
-Joss exige modificadores explícitos de visibilidad. Clases y funciones globales usan `public` o `private`; métodos y propiedades usan `public`, `private` o `protected`. `static` no implica `public`. `Init` y las closures son construcciones especiales y no llevan visibilidad.
+## Evaluación
 
-```joss
-public class BaseController {
-    protected mixed $db
+- `+`, `-`, `*`: enteros exactos con overflow comprobado; promoción si hay
+  float, operaciones decimales si interviene decimal.
+- `/`: resultado float para enteros; decimal si interviene decimal.
+- `%`: resto entero; con float trunca operandos a entero; decimal usa `Mod`.
+- `.`: representa operandos como texto y concatena; `null` contribuye texto vacío.
+- `++`: incrementa y retorna el valor anterior. No se define decremento.
+- `&&`, `||`: cortocircuito y resultado bool. `!`: negación de truthiness.
+- `==`/`!=`: comparación numérica cuando corresponde; fallback mediante
+  representación textual para otros valores. Para colecciones prefiere
+  `===`/`!==`, basados en comparación estructural.
+- `===`: distingue entero, float, string y decimal; normaliza variantes
+  numéricas internas de Go antes de comparar.
+- `<=>`: retorna `-1`, `0` o `1`; compara números, strings, nulos y
+  finalmente representaciones textuales.
+- `??`: evalúa la derecha sólo si la izquierda es nula. **Actualmente recupera
+  cualquier panic de la izquierda** y lo trata como nulo.
+- `?:` (Elvis): conserva la izquierda si es verdadera según truthiness.
+- `?->`: devuelve nulo ante receptor nulo; no valida ni corrige otros accesos.
+- `|>`: antepone el valor izquierdo a los argumentos de una función, llamada
+  o closure. No es concurrencia.
+- `cout << valor`: imprime sin agregar salto y retorna `cout`.
+  `canal << valor`: envía al canal. `cin >> $variable`: lee una palabra.
+  Aunque los tokens se llaman SHIFT, no hay un operador entero de desplazamiento
+  implementado por estas rutas.
 
-    public func constructor() {
-        $this->db = new GranDB()
-    }
+## Verdad de valores
 
-    protected func respondJson(mixed $data, int $code = 200) {
-        return json($data, $code)
-    }
-}
+`isFalsy` considera falsos: `null`, `false`, `int64(0)`, decimal cero,
+`""`, `"0"` y array vacío. Considera verdaderas las instancias.
+**El caso float cero y el mapa vacío no se comprueban y resultan verdaderos**.
+Por eso conviene escribir condiciones bool explícitas. `empty` usa esa misma
+interpretación tras comprobar existencia, no una regla universal de «sin datos».
 
-// Herencia de clases
-public class UserController extends BaseController {
-    private string $secret = "sk_prod_123"
+## Declaraciones y ámbitos
 
-    public static func make() {
-        return new UserController()
-    }
+| Forma | Efecto |
+|---|---|
+| `$x = valor` | Primera asignación declara/infiere; después reasigna. |
+| `var $x = valor` | Declaración con inferencia fija. |
+| `T $x = valor`, `let T $x = valor` | Tipo explícito. |
+| `let $x = valor`, `mixed $x = valor` | Binding dinámico explícito. |
+| `const [T] $x = valor` | Binding constante; requiere inicializador. |
+| `int $a = 1, $b = 2` | Declaración múltiple del mismo tipo. |
+| `public/private func f(T $p): R { ... }` | Función global; retorno opcional, parámetros tipados. |
+| `func(T $p): R { ... }` | Closure sin modificador de visibilidad. |
+| `public/private class C extends B { ... }` | Clase; una superclase opcional. |
+| `Init nombre(...) { ... }` | Inicializador sin modificador. |
 
-    public func index() {
-        $users = $this->db->table("users")->get()
-        return $this->respondJson($users)
-    }
-}
-```
+Las funciones/clases globales se registran antes de analizar cuerpos.
+Las variables de nivel superior no son globals implícitos de funciones con
+nombre. Cada llamada usa su frame; una closure captura un entorno.
+La visibilidad de métodos y propiedades es obligatoria. No hay sobrecargas
+por firma ni sintaxis general de parámetros de tipo.
 
-Las APIs estáticas usan `Clase::metodo()`. Las instancias usan `$object->method()` y `$object->property`.
+## Bloques, colecciones y sentencias
 
-## Control de flujo
+`[]` crea un array, `{}` crea un map vacío en contexto de expresión y
+`{"clave": valor}` crea un map no vacío. Una llave en un lugar que exige un
+cuerpo (función/ciclo) delimita un bloque. Los bloques como expresiones se
+representan internamente como AST y no se ejecutan automáticamente en todo contexto.
 
-En Joss **no existen las sentencias `if`, `else`, `elif`, `switch` ni `for`**. El compilador cuenta con un **Syntax Guard** educacional que detecta estas palabras clave foráneas e indica de inmediato la alternativa nativa de Joss:
+- Ternario: elige un valor o ejecuta el bloque seleccionado; `return` puede
+  salir del callable desde ese bloque.
+- `while (condición) { ... }`: comprueba antes de cada vuelta.
+- `do { ... } while (condición)`: comprueba después.
+- `foreach (array_o_canal as $valor) { ... }`: sólo una variable; mapas mediante
+  `keys`. Sin sintaxis `$clave => $valor`.
+- `break` y `continue`: salir/saltar vuelta. La detección de control dentro
+  de ternarios/match tiene una limitación descrita en [flujo](CONTROL_FLUJO.md).
+- `match (valor) { clave, clave => resultado, default => resultado }`: compara
+  estrictamente, primer brazo coincidente; sin coincidencia/default retorna
+  nulo. **Un brazo que es bloque retorna el bloque AST, no ejecuta su cuerpo**,
+  aunque el analizador lo considere para cobertura de retorno. Usa brazos
+  con valores o llamadas hasta corregir esa discrepancia.
+- `try { ... } catch ($error) { ... }`, `throw expresión`: recuperación
+  runtime. No hay `finally`, `defer` ni captura tipada.
+- `return [expresión]`: sale del callable. No hay retorno múltiple especial;
+  retorna un array o mapa si necesitas varios resultados.
+- `async { ... }`: crea un Future; se recoge con `await(futuro)`.
 
-1. **Operador Ternario**: `$cond ? $a : $b` o bloques expresivos:
-```joss
-($age >= 18) ? {
-    print("Adulto")
-} : {
-    print("Menor")
-}
+## Ausencias y compatibilidad
 
-$label = ($active) ? "activo" : "inactivo"
-```
+No hay imports fuente, namespaces, exports de archivos, interfaces, traits,
+protocolos, ownership, punteros manuales, `switch`, `for`, destructuring,
+comprehensions ni syntax sugar de funciones flecha. `=>` pertenece a `match`.
+`ref` sólo sirve como parámetro/argumento temporal y no es un puntero almacenable.
 
-2. **Estructura Match**: Sustituye a `switch` / `if-else` encadenados:
-```joss
-$message = match ($status) {
-    200, 201 => "correcto",
-    404 => "no encontrado",
-    default => "error"
-}
-```
+`function`, `import`, `@import`, `use`, `Use`, `Import`,
+`namespace` y `Namespace` generan errores de sintaxis eliminada.
+Los nombres heredados de APIs no son necesariamente tipos fuente válidos:
+`is_integer` sigue registrado, `integer $x` no es alias de `int`.
 
-3. **Ciclos Nativos**: Sustituyen a `for` mediante `foreach` y `while`:
-```joss
-foreach ($items as $item) {
-    print($item)
-}
 
-while ($pending > 0) {
-    $pending = $pending - 1
-}
-
-do {
-    $attempts++
-} while ($attempts < 3)
-```
-
-## Ergonomía Moderna de Flujo de Datos
-
-### 1. Operador Pipeline (`|>`)
-Permite encadenar transformaciones de izquierda a derecha de forma expresiva:
-
-```joss
-public func doubleIt(int $x): int {
-    return $x * 2
-}
-public func addN(int $x, int $n): int {
-    return $x + $n
-}
-
-// 5 * 2 = 10 -> 10 + 10 = 20
-int $total = 5 |> doubleIt |> addN(10)
-
-// Con closures anónimas:
-int $res = 10 |> func(int $n): int { return $n * 3 }
-```
-
-### 2. Navegación Segura Null-Safe (`?->`)
-Permite acceder a métodos y propiedades de objetos que pueden ser `null` sin disparar errores en tiempo de ejecución:
-
-```joss
-User|null $user = null
-Profile|null $profile = $user?->profile
-string|null $email = $user?->getProfile()?->email
-```
-
-### 3. Trailing Commas Universales
-Se permiten comas finales en firmas de parámetros, llamadas a funciones, listas y mapas multilínea para mantener diffs limpios en Git:
-
-```joss
-public func setup(
-    string $host,
-    int $port,
-): bool {
-    array<int> $ports = [
-        80,
-        443,
-        8080,
-    ]
-    return true
-}
-```
-
-## Manejo de Excepciones
-
-Joss utiliza `try / catch` para captura de errores recuperables:
-
-```joss
-try {
-    $file = file_get_contents("inexistente.txt")
-} catch ($error) {
-    print("Error capturado: " . $error)
-}
-
-// Aborto irrecuperable
-panic("Error crítico de consistencia")
-```
-
-## Helpers Globales y Entorno
-
-Joss provee funciones de primer nivel integradas para operaciones comunes, optimizadas en memoria:
-
-```joss
-$port = env("PORT", "9000")
-$app = config("APP_ENV", "production")
-$home = view("home", {"user": $user})
-$responseJson = json({"status": "ok"}, 200)
-$red = redirect("/dashboard")
-$b = back()->with("error", "Fallo")
-$email = request("email")
-$userId = session("user_id")
-```
-
-### Funciones Estándar de Utilidad:
-* **Fechas**: `time()`, `date("Y-m-d H:i:s")`, `strtotime("-2 days")`, `now()`, `microtime(true)`.
-* **Cadenas**: `str_contains($str, "foo")`, `str_starts_with`, `str_ends_with`, `str_replace`, `strtolower`, `strtoupper`, `trim`, `substr`, `strpos`, `implode`, `explode`, `md5`, `sha256`, `base64_encode`, `base64_decode`.
-* **Arreglos**: `in_array("admin", $roles)`, `array_key_exists("key", $map)`, `array_merge($arr1, $arr2)`, `array_push($arr, $val)`, `array_pop($arr)`, `array_slice($arr, 0, 10)`, `count($arr)`.
-* **Archivos**: `file_exists($path)`, `file_get_contents($path)`, `file_put_contents($path, $data)`, `unlink($path)`, `mkdir($dir)`, `is_dir($path)`.
-* **Asincronía**: `async { ... }`, `await $future`, `make_chan()`, `send($chan, $val)`, `recv($chan)`.
-
-## GranDB ORM y Bases de Datos Multimotor
-
-GranDB es el ORM fluido nativo de Joss con soporte completo para **SQLite, MySQL, PostgreSQL y Microsoft SQL Server (`sqlserver`/`mssql`)**, con gestión transparente de prefijos de tablas (`DB_PREFIX`):
-
-```joss
-// Consultas fluidas
-$users = GranDB::table("users")
-    ->where("is_active", 1)
-    ->whereIn("role_id", [1, 2])
-    ->orderBy("created_at", "DESC")
-    ->take(10)
-    ->get()
-
-// Mutaciones e inserciones
-$newId = GranDB::table("products")->insertGetId({
-    "name": "Teclado Mecánico",
-    "price": 89.90,
-    "stock": 25,
-    "created_at": now()
-})
-
-GranDB::table("products")->where("id", $newId)->increment("stock", 5)
-
-// Transacciones atómicas
-GranDB::transaction(func($db) {
-    GranDB::table("accounts")->where("id", 1)->decrement("balance", 100)
-    GranDB::table("accounts")->where("id", 2)->increment("balance", 100)
-})
-
-// Cambio dinámico de motor en caliente
-System::change_db("sqlite", {"DB_PATH": "local.sqlite", "DB_PREFIX": "app_"})
-```
-
-## Carga Automática (Zero Imports)
-
-No existen sentencias `import` ni `use`, y no se añadirán en el futuro. Todas las clases del proyecto (`app/controllers/`, `app/models/`, `app/libs/`), así como los plugins instalados (`plugins/` / `joss.yaml`), son indexados y cargados automáticamente. `import`, `@import`, `use`, `Namespace` y la grafía histórica `function` son sintaxis eliminada y el parser las rechaza.
-
-Las funciones pueden anotar su retorno con `: Tipo` y son recursivas. Consulte [Funciones recursivas](RECURSION.md) para frames, límites y casos base.
+[Índice](README.md)

@@ -1,9 +1,13 @@
 # Schema Builder
 
-Schema opera de forma agnóstica sobre **SQLite, MySQL, PostgreSQL y Microsoft SQL Server (`sqlserver`/`mssql`)** y aplica `PREFIX`/`DB_PREFIX` automáticamente.
+Una tabla define qué datos guarda una base de datos. Schema crea o modifica esa estructura; Blueprint describe sus columnas dentro de una closure. Hay adaptadores para SQLite, MySQL, PostgreSQL y SQL Server, con diferencias de dialecto. Schema aplica `PREFIX`/`DB_PREFIX` automáticamente.
+
+[Índice](README.md) · Antes: [modelos](MODELOS.md) · Después: [migraciones](MIGRACIONES.md)
+
+El ejemplo requiere conexión y una tabla owners compatible con la clave compuesta. Es un fragmento de esquema, no un programa independiente.
 
 ```joss
-Schema::create("products", func($table) {
+Schema::create("products", func(Blueprint $table) {
     $table->id()
     $table->string("sku", 50)->unique()
     $table->decimal("price", 10, 2)->default(0)
@@ -20,8 +24,8 @@ Schema::create("products", func($table) {
 
 ## Schema
 
-- `create($table, func($blueprint))`
-- `table($table, func($blueprint))`
+- `create($table, func(Blueprint $blueprint))`
+- `table($table, func(Blueprint $blueprint))`
 - `rename($from, $to)`
 - `drop($table)` y `dropIfExists($table)`
 - `hasTable($table)` y `hasColumn($table, $column)`

@@ -42,7 +42,7 @@ La dirección de dependencias es `parser/typesystem/diagnostics → analyzer →
 - Todo parámetro fuente declara un tipo. Use `mixed $x` explícitamente; `$x` solo ya no conserva compatibilidad legacy.
 - Una inicialización `nil` pospone la inferencia hasta un valor concreto.
 - `T|null` declara una unión nullable; `T?` es sólo su atajo sintáctico y el AST lo normaliza a `T|null`.
-- La coerción de string a número/bool debe ser completa y sin pérdida; use `typesystem.CoerceString` tanto en análisis como en runtime.
+- La coerción textual debe compartir `typesystem.CoerceString` entre análisis y runtime cuando corresponda. No la describa globalmente como «sin pérdida»: algunos caminos usan `float64`, truncan o retornan cero ante entrada inválida; documente cada conversión.
 - Los parámetros tipados conservan su tipo durante el cuerpo.
 - `const $x = ...` infiere un tipo fijo; `const int $x = ...` lo declara. También se protegen propiedades constantes.
 - `func name(...): Type` declara el retorno; analyzer y runtime validan cada retorno explícito y el analyzer exige retorno/throw en todas las rutas demostrables.
@@ -101,8 +101,8 @@ No implemente reglas paralelas en parser, CLI o evaluator. Añada primero la reg
 - `GranDB::get()` retorna lista nativa, no JSON string.
 - GranDB `insert`/`insertGetId` reciben un único mapa; no reintroducir arrays paralelos. Schema `create`/`table` reciben una closure de blueprint.
 - Uploads están en `$file["content"]`. Binarios deben usar `Response::raw` con `Content-Disposition`.
-- El motor de vistas procesa herencia, includes, ternarios de bloque y luego `@foreach`; no usar un ternario de bloque dependiente del item dentro del loop. Precomputar en controller.
-- Las rutas WebSocket son estáticas; autenticar el JWT manualmente antes de usar la sesión.
+- El motor de vistas procesa herencia/includes y compila recursivamente cuerpos `@foreach`, incluidos ternarios que usan el item. Mantenga tests de expresiones anidadas al tocar el compilador de vistas.
+- Las rutas WebSocket aceptan segmentos dinámicos; `$ws` es el primer argumento y los parámetros siguen en orden. Autenticar el JWT manualmente antes de usar la sesión.
 - Los módulos nativos deben preferir `r.Env` sobre `os.Getenv`.
 - Servicios locales deben usar `127.0.0.1` para evitar resolución IPv6 inesperada.
 
@@ -117,6 +117,7 @@ Desde la raíz:
 ```bash
 gofmt -w <archivos-go-modificados>
 go run ./tools/cataloggen --check
+go run ./tools/docgen --check
 go vet ./...
 go test ./...
 go test -race ./pkg/parser ./pkg/typesystem ./pkg/analyzer ./pkg/core
@@ -145,7 +146,7 @@ Los cambios en `joss new` deben pasar `pkg/template.TestGeneratedProjectsUseCano
 
 Los cambios en migraciones/CRUD deben pasar `cmd/joss.TestMigrationAndCRUDGeneratorsWorkTogether`. `make:migration` normaliza `create_x`, `create_x_table` y `x` hacia una tabla lógica plural sin prefijo; `Schema` agrega el prefijo. El runtime crea sus tablas internas mediante `ensureInternalSchemaTable`, no mediante mapas enviados a la API pública `Schema::create/table` (esa compatibilidad fue eliminada). `LogMigration` retorna el error y el runner no puede anunciar éxito si el registro del batch falla. `make:crud` es sólo web, valida identificadores, genera mapas de campos permitidos, usa `POST` para borrar y debe mantener idempotentes rutas/navbar.
 
-`docs/*.md` es la fuente canónica de documentación. La copia publicable de JosSecurity vive en `ejemplos/Joss-Red-JosSecurity/assets/docs/` y debe coincidir archivo por archivo; su menú y el mapa de `DocsController.pageHeading()` deben cubrir exactamente el mismo conjunto. No reintroducir descargas de documentación durante el arranque: la publicación debe ser determinista y versionada.
+`docs/*.md` es la fuente canónica de documentación. La copia publicable de JosSecurity vive en `ejemplos/Joss-Red-JosSecurity/assets/docs/` y debe coincidir archivo por archivo; su menú y el mapa de `DocsController.pageHeading()` deben cubrir exactamente el mismo conjunto. No reintroducir descargas de documentación durante el arranque: la publicación debe ser determinista y versionada. Todo ejemplo completo nuevo debe usar un marcador `joss-run`, `joss-check` o `joss-error` para que `pkg/core.TestDocumentationContracts` valide el texto publicado. Si cambia el registro nativo ejecute `go run ./tools/docgen` y su `--check`.
 
 ## Límites que deben declararse con honestidad
 

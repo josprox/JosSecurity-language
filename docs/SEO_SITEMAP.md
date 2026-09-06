@@ -1,5 +1,10 @@
 # SEO y Sitemap
 
+[Índice](README.md) · Antes: [proyecto web](PROYECTO_WEB.md) · [Clases nativas](MODULOS_NATIVOS.md)
+
+SEO prepara etiquetas para buscadores y redes. Un sitemap enumera URLs que un
+buscador puede visitar; no mejora por sí solo la calidad o autorización de una página.
+
 ```joss
 SEO::title("Productos")
 SEO::description("Catálogo")
@@ -27,23 +32,12 @@ Sitemap::add({
 })
 ```
 
-### 2. Proveedores Dinámicos (Closures)
-Para incluir automáticamente URLs desde la base de datos (por ejemplo, entradas de blog, productos de tienda, paquetes, etc.):
-```joss
-Sitemap::provider(func() {
-    $posts = GranDB::table("cms_posts")->where("status", "published")->get()
-    $items = []
-    foreach ($posts as $p) {
-        $items[] = {
-            "url": "/blog/" . $p["slug"],
-            "lastmod": $p["updated_at"],
-            "changefreq": "daily",
-            "priority": 0.9
-        }
-    }
-    return $items
-})
-```
+### 2. Proveedores dinámicos
+
+`Sitemap::provider` está registrado, pero el handler acepta un
+`parser.FunctionLiteral` mientras una closure evaluada llega como
+`CapturedFunction`. Su funcionamiento fuente no está garantizado. Consulta los
+registros y llama a `Sitemap::add` por cada URL mientras se corrige la frontera.
 
 ### 3. Exclusiones de Rutas
 ```joss
@@ -55,3 +49,6 @@ Sitemap::exclude([
 ```
 
 La URL base usa el request actual, después `APP_URL` y finalmente `http://localhost`. Detrás de un proxy configura correctamente `Host` y `X-Forwarded-Proto`.
+
+`SEO::twitter` no está registrado. `SEO::render` ya agrega una card predeterminada;
+usa `SEO::meta("twitter:...", valor)` para metadata adicional.

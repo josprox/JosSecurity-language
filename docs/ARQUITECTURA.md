@@ -1,5 +1,7 @@
 # Arquitectura del lenguaje Joss
 
+[Índice](README.md) · Antes: [estado](ESTADO_IMPLEMENTACION.md) · Después: [contribuir](CONTRIBUIR.md)
+
 ## Pipeline real
 
 ```text
@@ -11,6 +13,20 @@ fuentes .joss
   → diagnósticos (`pkg/diagnostics`)
   → intérprete AST (`pkg/core/evaluator*.go`, `executor.go`)
   → runtime integrado (`pkg/core`, `pkg/server`)
+```
+
+```mermaid
+flowchart LR
+    S[Fuente .joss] --> L[Lexer]
+    L --> T[Tokens]
+    T --> P[Parser Pratt]
+    P --> A[AST]
+    A --> N[Analyzer]
+    N -->|sin errores| E[Intérprete core]
+    N --> D[Diagnósticos]
+    E --> R[Runtime y servicios]
+    A --> B[JOSSBC2Z para build]
+    B --> E
 ```
 
 `joss analyze` conserva cada archivo como una `analyzer.SourceUnit`; no concatena ASTs perdiendo el origen. Primero registra declaraciones globales de funciones y clases, después analiza cada método con un scope léxico independiente. Las clases nativas provienen de `Runtime.RegisterNativeClasses`; los plugins aportan sus índices de símbolos JP v2.
@@ -26,8 +42,10 @@ fuentes .joss
 | `pkg/core` | Adaptación de catálogos reales al analizador, intérprete y primitivas integradas. |
 | `pkg/runtime/errors` | Error runtime estructurado y frames de stack Joss, sin dependencias de framework. |
 | `pkg/runtime/value` | Semántica de valores independiente del evaluator, incluida indexación Unicode. |
+| `pkg/runtime/plan`, `pkg/runtime/frame` | Planes de callables, slots y representación etiquetada usados para acelerar resolución local; no forman bytecode portable. |
 | `pkg/pluginruntime`, `pkg/pluginpkg` | Carga aislada, verificación y resolución de símbolos de plugins JP v2. |
 | `pkg/bytecode` | Serialización comprimida del AST. No es código máquina ni LLVM IR. |
+| `pkg/vm` | Compilador/VM experimental independientes. El CLI y `pkg/core` no los usan como ruta predeterminada. |
 | `cmd/joss` | CLI, análisis de proyecto, ejecución, build y administración. |
 | `vscode-joss` | LSP/editor. Consume el catálogo generado del núcleo. |
 
@@ -60,9 +78,21 @@ CI ejecuta `go run ./tools/cataloggen --check`; editar a mano el catálogo gener
 
 El modo de desarrollo interpreta el AST. Cada invocación de callable crea un frame léxico independiente; no existe scope dinámico entre caller y callee. Esto evita que una llamada recursiva lea o sobrescriba locales del caller. El runtime limita la profundidad a 1024 frames por defecto y las closures escriben únicamente sobre su entorno capturado. Los tipos de retorno anotados se validan en analyzer/runtime y el analyzer exige terminación exhaustiva demostrable.
 
+Antes de ejecutar un callable, `pkg/runtime/plan` puede asignar slots a parámetros
+y locales. `frame_runtime.go` usa esos slots y conserva un fallback para bindings
+que no caben en el plan. Metadatos de clase, accesos y scopes se cachean; cualquier
+cambio semántico debe comparar la ruta rápida con la ruta general. Los controles
+de loops buscan saltos directos en el AST planificado y hoy no atraviesan todos
+los ternarios/match, un límite registrado en la auditoría.
+
 Las referencias seguras no exponen punteros de Go: `core.VariableReference` conserva el binding de valor/tipo/constancia durante una llamada y el evaluator desreferencia automáticamente. Una referencia no es un valor Joss almacenable ni cruza fronteras async/plugin.
 
 `pkg/bytecode` codifica el AST con `gob` y compresión bajo la única cabecera aceptada `JOSSBC2Z`. Los builds nativos empaquetan ese bytecode junto con el runner Go; actualmente no existe un backend LLVM/Cranelift ni traducción AOT del programa Joss a código máquina. El compilador de plugins sí posee un IR JPBC separado; no debe confundirse con el pipeline del lenguaje principal.
+
+El árbol `pkg/vm` contiene opcodes y una VM experimental. Su aritmética y sus
+errores no definen la semántica publicada mientras no esté conectado al pipeline
+anterior. Del mismo modo, JPBC sólo define ejecución de plugins. Al documentar
+“compilación” indique cuál de las tres representaciones se está usando.
 
 ## Regla de dependencia
 

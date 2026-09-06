@@ -1,5 +1,7 @@
 # Estructura de proyectos
 
+[Índice](README.md)
+
 ## Web
 
 `joss new web mi_app` y `joss new mi_app` crean la plantilla web real del paquete `pkg/template/files`.
@@ -24,7 +26,7 @@ mi_app/
 │   │   └── auth/
 │   ├── services/             # Servicios en segundo plano e integraciones
 │   ├── middleware/           # Middleware de peticiones
-│   ├── libs/
+│   ├── libs/                # Creado por la plantilla, no precargado actualmente por run
 │   └── database/migrations/
 ├── assets/
 ├── public/
@@ -36,6 +38,13 @@ mi_app/
 La plantilla también puede incluir rutas, archivos de autenticación, recursos frontend y colecciones de API. La lista exacta puede crecer; el generador y sus pruebas son la referencia ejecutable.
 
 `main.joss` es obligatorio para `joss server start`. `env.joss` no es código Joss y no debe ejecutarse con `joss run`.
+
+`joss analyze` descubre recursivamente la entrada y `app/`. Al ejecutar, la
+precarga runtime se limita a `controllers`, `models`, `middleware`, `services`,
+`database`, `jobs`, `tasks` y `providers`. Aunque la plantilla crea `app/libs`,
+esa carpeta no se precarga hoy. Colocar allí una declaración puede pasar el
+análisis y faltar en ejecución; mueve el código a un dominio cargado mientras
+se unifican ambas listas.
 
 ## Consola
 

@@ -1,5 +1,7 @@
 # Extensión de Joss para VS Code
 
+[Índice](README.md)
+
 La distribución de Joss incluye el VSIX oficial en el artefacto `jossecurity-vscode.zip`. Instálalo desde VS Code con **Extensions: Install from VSIX...**.
 
 La extensión reconoce `.joss` y `.joss.html`. Indexa clases, propiedades, funciones y métodos; ofrece autocompletado, ayuda de firma, hover, símbolos, definición y referencias. Valida rutas `Controller@method` y aplica tres heurísticas de seguridad basadas en texto: uso de `eval`, SQL interpolado con `DB::query` y coste bajo de bcrypt. No sustituye al parser ni a una auditoría de seguridad.

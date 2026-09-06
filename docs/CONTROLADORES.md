@@ -1,5 +1,9 @@
 # Controladores y HTTP
 
+[Índice](README.md) · Antes: [proyecto web](PROYECTO_WEB.md) · Después: [middleware](MIDDLEWARE.md)
+
+Una petición HTTP es un mensaje que el navegador envía al servidor. Incluye un método (GET para consultar, POST para enviar cambios), una URL y datos opcionales. La respuesta contiene un estado, cabeceras y un cuerpo. Los ejemplos de esta página son fragmentos de una aplicación web: requieren las tablas, vistas y controladores mencionados.
+
 Un controlador es una clase Joss. El dispatcher resuelve `Controller@method` y también closures de ruta.
 
 ```joss
@@ -48,7 +52,7 @@ Router::any("/login", "AuthController@showLogin@doLogin")
 Router::match("GET|POST", "/contact", "ContactController@show@submit")
 
 // Closures
-Router::get("/sound/{id}", func($id) {
+Router::get("/sound/{id}", func(string $id) {
     return Redirect::to("https://example.com/" . $id, 302)
 })
 ```
@@ -63,7 +67,7 @@ El lenguaje incluye la clase nativa `Http` de propósito general para realizar p
 // 1. Peticiones directas (GET, POST, PUT, PATCH, DELETE, QUERY, HEAD, OPTIONS)
 $body = Http::get("https://api.github.com/zen")
 $res = Http::post("https://api.ejemplo.com/item", JSON::stringify({"name": "nuevo"}), {"Authorization": "Bearer TOKEN"})
-$queryResult = Http::query("https://api.ejemplo.com/search", JSON::stringify({"filter": "active"}))
+$queryResult = Http::request("QUERY", "https://api.example.com/search", {"json": {"filter": "active"}})
 
 // 2. Cliente JSON inteligente (serializa y deserializa datos automáticamente)
 $data = Http::json("GET", "https://api.github.com/users/octocat")

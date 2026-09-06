@@ -1,5 +1,7 @@
 # Novedades de Joss v3.6.7.2
 
+[Índice](README.md)
+
 Esta versión consolida el motor alrededor de garantías comprobables: análisis
 antes de ejecutar, tipos estables después de inferirlos, carga automática sin
 imports fuente y tooling que valida los proyectos generados.

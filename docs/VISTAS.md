@@ -1,5 +1,7 @@
 # Vistas
 
+[Índice](README.md)
+
 `view("dashboard.index", $data)` (o `View::render`) busca `app/views/dashboard/index.joss.html` y después `.html`.
 
 ```html

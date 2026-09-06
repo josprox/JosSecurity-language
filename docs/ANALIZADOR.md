@@ -1,6 +1,8 @@
 # Análisis estático (`joss analyze`)
 
-`joss analyze [archivo.joss]` analiza la entrada y todos los `.joss` del proyecto sin ejecutar la aplicación. El pipeline carga cada archivo como una unidad fuente, registra declaraciones globales y después analiza cada callable con su propio scope.
+[Índice](README.md)
+
+`joss analyze [archivo.joss]` analiza la entrada y los archivos `.joss` bajo `app/` sin ejecutar la aplicación. El pipeline carga cada archivo como una unidad fuente, registra declaraciones globales y después analiza cada callable con su propio scope.
 
 ```bash
 joss analyze
@@ -24,7 +26,7 @@ El comando devuelve código de salida distinto de cero si hay errores. Los warni
 
 ## Evidencia e información desconocida
 
-El analizador diferencia `unknown` de inválido y de `mixed`. Los retornos de todas las APIs core tienen contrato explícito; `mixed` identifica las genuinamente polimórficas. Una API nativa sin metadatos de parámetros no produce un error de aridad especulativo; un receptor dinámico no produce un error de miembro; `isset` y `empty` pueden consultar una variable ausente.
+El analizador diferencia `unknown` de inválido y de `mixed`. Los retornos de todas las APIs core tienen metadata explícita, pero algunas entradas no coinciden con todos los resultados runtime (véase [auditoría](DOCUMENTATION_AUDIT.md)). `mixed` representa polimorfismo intencional. Una API nativa sin metadatos de parámetros no produce un error de aridad especulativo; un receptor dinámico no produce un error de miembro; `isset` y `empty` pueden consultar una variable ausente.
 
 ## Salida
 

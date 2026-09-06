@@ -1,161 +1,166 @@
-# Módulos Nativos, Clases y Funciones Globales en Joss
+# Clases nativas y servicios integrados
 
-La tabla enumera la superficie registrada por el runtime. Una llamada estática usa `::`; una instancia usa `->`.
+[Índice](README.md) · [Funciones globales](FUNCIONES_GLOBALES.md) · [Catálogo completo](CATALOGO_NATIVO.md)
 
-| Clase | Métodos implementados |
+Una clase nativa ofrece operaciones implementadas en Go. Se registra al preparar
+el runtime; no requiere imports. Una fachada usa `Clase::metodo(...)`; un objeto
+con estado usa `$objeto->metodo(...)`. El catálogo enumera **cada nombre registrado,
+su retorno publicado y el handler fuente**. Esta guía explica contratos y contexto;
+los aliases del catálogo heredan el contrato de su nombre principal salvo deuda indicada.
+
+Los parámetros entre corchetes son opcionales en la notación de referencia.
+Muchas APIs retornan null/false o imprimen un error en vez de lanzar una excepción.
+Que el analizador acepte una llamada nativa no demuestra aridad correcta: faltan
+metadatos de parámetros en parte de la biblioteca.
+
+## Utilidades sin servicios externos
+
+| Clase y firma | Resultado, errores y ejemplo |
 |---|---|
-| `GranDB` | `table`, `select`, `distinct`, filtros `where*` (`whereIn`, `whereNotIn`, `whereBetween`, `whereNull`, `whereLike`, `whereDate`, etc.), joins (`join`, `leftJoin`, `rightJoin`, `crossJoin`), agregados (`count`, `sum`, `avg`, `min`, `max`), orden (`orderBy`, `latest`, `oldest`, `inRandomOrder`), paginación (`limit`, `offset`, `take`, `skip`, `paginate`), terminales (`get`, `first`, `find`, `value`, `pluck`, `exists`), mutaciones (`insert`, `insertGetId`, `update`, `updateOrInsert`, `increment`, `decrement`, `delete`, `deleteAll`, `truncate`), transacciones (`transaction`), cambio dinámico de motor (`changeDB`, `connection`, `use`). Compatible con **SQLite, MySQL, PostgreSQL y Microsoft SQL Server (`sqlserver`/`mssql`)**. |
-| `Auth` | `hash`, `create`, `attempt`, `login`, `complete2FA`, `check`, `guest`, `user`, `id`, `hasRole`, `verify`, `forgotPassword`, `resetPassword`, `resendVerification`, `refresh`, `update`, `delete`, `logout`, `validateToken` (100% agnóstico mediante GranDB y Schema) |
-| `MFA` / `TwoFactor` | generación y verificación TOTP, códigos de recuperación, consulta de requisito y verificación del segundo factor |
-| `Router` | `get`, `post`, `put`, `patch`, `delete`, `head`, `options`, `query`, `any`, `match`, `api`, `ws`, `group`, `middleware`, `registerMiddleware`, `end` |
-| `Http` | `get`, `post`, `put`, `patch`, `delete`, `head`, `options`, `query`, `json`, `request` *(Cliente HTTP universal de alto rendimiento)* |
-| `Request` | `input`, `post`, `all`, `except`, `file`, `cookie`, `header`, `root` |
-| `Response` | `json`, `error`, `redirect`, `back`, `raw`, `stream` |
-| `WebResponse` | `with`, `withCookie`, `withHeader`, `status` |
-| `Schema` / `Blueprint` | creación y consulta de tablas (`create`, `table`, `drop`, `dropIfExists`, `hasTable`, `hasColumn`, `rename`), tipos y modificadores descritos en [Schema Builder](SCHEMA_BUILDER.md). Compatible con SQLite, MySQL, PostgreSQL y SQL Server. |
-| `Session` | `get`, `put`, `has`, `forget`, `all` |
-| `System` | `change_db` *(cambio de motor SQL en caliente)*, `env`, `Run`, `load_driver`, `driver_call`, `log`, `sleep`, `now` |
-| `Plugin` | `call`, `stream`, `path`, `platform` |
-| `SEO` | `title`, `description`, `keywords`, `canonical`, `og`, `twitter`, `meta` |
-| Utilidades | `Math`, `Str` (`length`, `random`, `startsWith`, `substring`, `indexOf`, `contains`, `trim`, `replace`), `UUID`, `JSON`, `Markdown`, `Cache`, `Zip`, `Stack`, `Queue` |
-| `Redis` | `connect`, `set`, `get`, `del`, `forget`, `has`, `ttl`, `flush`. Conexión automática desde variables de entorno (`REDIS_URL` o `REDIS_HOST`/`REDIS_PORT`/`REDIS_PASSWORD`). |
-| Procesos | `Process`, `Server`, `Stream` |
-| Aplicación | `View`, `Cron`, `Task`, `Lang`, `SEO`, `Sitemap`, `UserStorage`, `SQLite`, `Redis`, `WebSocket` |
+| `Math::random(min,max)` | Entero inclusivo; exige dos int y rango válido; rango invertido puede provocar panic. No criptográfico. Ej.: Math::random(1,6). |
+| `Math::floor(n)`, `ceil(n)`, `abs(n)` | Resultado float para entradas numéricas convertibles; no equivalen en tipo a los helpers globales floor/ceil. |
+| `Str::length(texto)` | Bytes UTF-8, 0 para argumento inválido. |
+| `Str::random([longitud])` | Texto alfanumérico, 16 por defecto, math/rand; no usar como token secreto. Longitud negativa falla. |
+| `Str::startsWith(texto,prefijo)`, `contains(texto,parte)` | Bool; exige strings. |
+| `Str::substring(texto,inicio,[longitud])` | Puntos Unicode; inicio negativo se ajusta a cero. Longitud negativa puede fallar. |
+| `Str::indexOf(texto,parte)` | Índice en puntos Unicode o -1. |
+| `Str::trim(texto)`, `replace(texto,buscar,nuevo)` | String. El orden de replace difiere de str_replace. |
+| `UUID::generate()`, `v4()` | Identificador UUID textual. |
+| `JSON::parse(texto)`, `decode(texto)` | Valor decodificado o null; números JSON son float, no enteros arbitrariamente precisos. |
+| `JSON::stringify(valor)`, `encode(valor)` | JSON compacto o "" al fallar. |
+| `Markdown::toHtml(texto)`, `readFile(ruta)` | HTML renderizado; readFile requiere archivo local. No sustituye autorización sobre la ruta ni saneamiento de contenido no confiable. |
+| `new Stack()` → `push(valor)`, `pop()`, `peek()` | Pila: último en entrar, primero en salir. pop sí elimina; vacío retorna null. |
+| `new Queue()` → `enqueue(valor)`, `dequeue()`, `peek()` | Cola: primero en entrar, primero en salir. dequeue elimina; vacío null. |
+| `new Exception(mensaje,[codigo])` → `getMessage()`, `getCode()` | Objeto de error con campos; código predeterminado 0. No genera por sí mismo un diagnóstico JOSS. |
 
----
+<!-- joss-run: ["abc", "1", "dos", "uno"] -->
+```joss
+print(Str::trim(" abc "))
+print(Str::indexOf("casa", "a"))
+$pila = new Stack()
+$pila->push("uno")
+$pila->push("dos")
+print($pila->pop())
+print($pila->peek())
+```
 
-## Funciones Globales (Built-ins)
+## HTTP saliente
 
-Joss proporciona una amplia biblioteca de funciones globales nativas listas para usar sin necesidad de imports:
+Un cliente HTTP pide información a otro servidor; Router responde a peticiones
+que llegan a tu aplicación. No los confundas.
 
-### 1. Fechas y Tiempo
-* `time()`: Retorna el timestamp Unix actual en segundos (`int64`).
-* `date(format, [timestamp])`: Formatea una fecha según los tokens estándar (`Y-m-d H:i:s`, `d/m/Y`, `H:i`, `c`, `r`, etc.). Si no se proporciona timestamp, usa la hora actual.
-* `strtotime(string, [baseTimestamp])`: Convierte expresiones humanas o fechas textuales a timestamp Unix (`"-2 days"`, `"+1 week"`, `"tomorrow"`, `"yesterday"`, `"2026-08-16 12:00:00"`).
-* `now([format])`: Retorna la fecha y hora actual formateada (por defecto `Y-m-d H:i:s`).
-* `microtime([asFloat])`: Retorna el timestamp con microsegundos (como float o como cadena `"msec sec"`).
-* `sleep(seconds)`: Pausa la ejecución durante el número de segundos especificado.
-* `usleep(microseconds)`: Pausa la ejecución en microsegundos.
+| Firma Http | Retorno y comportamiento |
+|---|---|
+| `get(url,[headers])`, `delete(url,[headers])` | Cuerpo string; error puede verse como "". Timeout 15 segundos. |
+| `post/put/patch(url,[datos,headers])` | Cuerpo string. Map se serializa a JSON, o formulario si Content-Type lo indica. |
+| `head(url,[headers])`, `options(url,[headers])` | Map de primeras cabeceras por nombre; vacío ante ciertos errores. |
+| `json(metodo,url,[datos,headers])` | Valor JSON decodificado; errores pueden convertirse a map error.message. Timeout 30 segundos. Un HTTP 4xx con JSON válido sigue devolviendo ese JSON. |
+| `request(metodo,url,[opciones])` | Map de status, status_text, body, headers, success; puede incluir json o error. success exige 2xx. |
 
-### 2. Conversión de Tipos y Comprobaciones
-* `intval(val)`: Convierte valores a entero (`int64`).
-* `floatval(val)` / `doubleval(val)`: Convierte valores a punto flotante (`float64`).
-* `strval(val)`: Convierte cualquier valor a string.
-* `boolval(val)`: Convierte cualquier valor a booleano evaluando su truthiness.
-* `is_numeric(val)`: Comprueba si un valor es un número o un string numérico válido (`"199.00"` -> `true`).
-* `is_int(val)` / `is_integer(val)`: Comprobación estricta de tipo entero.
-* `is_float(val)` / `is_double(val)`: Comprobación estricta de tipo flotante.
-* `is_string(val)`, `is_array(val)`, `is_null(val)`.
-* `isset(var)`: Evalúa si una variable o índice existe y no es nulo.
-* `empty(var)`: Evalúa si una variable o valor está vacío (`null`, `""`, `0`, `[]`, `{}`).
+Opciones de request: `headers` y `query` como mapas; cuerpo con prioridad
+`body`, luego `json`, luego `form`; `timeout` en segundos (15 si <=0);
+`follow_redirects` bool, true por defecto. La clave json se decodifica
+automáticamente sólo cuando el cuerpo empieza con { o [. Un fallo de red
+da status 0 y error, no una respuesta HTTP satisfactoria.
 
-### 3. Cadenas de Texto y Criptografía
-* `strlen(string)`: Retorna la longitud exacta de la cadena en caracteres (soporta UTF-8).
-* `str_contains(haystack, needle)`: Verifica si `needle` está contenida en `haystack` (booleano).
-* `str_starts_with(haystack, prefix)`: Verifica si la cadena inicia con el prefijo dado.
-* `str_ends_with(haystack, suffix)`: Verifica si la cadena termina con el sufijo dado.
-* `str_replace(search, replace, subject)`: Reemplaza todas las apariciones de `search` por `replace` en `subject`.
-* `str_pad(string, length, [padStr])`: Rellena una cadena hasta la longitud indicada.
-* `str_repeat(string, count)`: Repite una cadena un número determinado de veces.
-* `strtolower(string)` / `to_lower`: Convierte la cadena a minúsculas.
-* `strtoupper(string)` / `to_upper`: Convierte la cadena a mayúsculas.
-* `ucfirst(string)`: Convierte el primer carácter a mayúscula.
-* `lcfirst(string)`: Convierte el primer carácter a minúscula.
-* `ucwords(string)`: Convierte a mayúscula la primera letra de cada palabra.
-* `trim(string, [cutset])`: Elimina espacios o caracteres dados al inicio y final.
-* `ltrim(string, [cutset])` / `rtrim(string, [cutset])`: Recorta espacios a la izquierda o derecha.
-* `substr(string, start, [length])`: Extrae una subcadena soportando índices negativos.
-* `strpos(haystack, needle)`: Encuentra la posición numérica de la primera coincidencia o `false`.
-* `implode(glue, array)` / `join`: Une los elementos de un arreglo en una cadena con el delimitador dado.
-* `explode(delimiter, string)`: Divide una cadena en un arreglo según el delimitador.
-* `md5(string)`: Genera el hash MD5 hexadecimal.
-* `sha1(string)`: Genera el hash SHA-1 hexadecimal.
-* `sha256(string)`: Genera el hash SHA-256 hexadecimal.
-* `base64_encode(string)`: Codifica una cadena en Base64.
-* `base64_decode(string)`: Decodifica una cadena Base64.
-* `html_escape(string)`: Escapa caracteres especiales HTML.
-* `__(key)`: Función de internacionalización / traducción (`i18n`).
-* `csrf_field()`: Retorna el campo `<input type="hidden" name="_token" ...>` para formularios web.
-* `print(args...)`, `echo(args...)`, `printf(format, args...)`.
+Fragmento contextual: requiere un servidor escuchando en esa dirección.
 
-### 4. Matemáticas y Números
-* `round(num, [precision])`: Redondea un número flotante con precisión decimal opcional.
-* `floor(num)`: Redondea hacia abajo al entero más cercano.
-* `ceil(num)`: Redondea hacia arriba al entero más cercano.
-* `abs(num)`: Retorna el valor absoluto de un número.
-* `min(a, b, ...)` o `min([array])`: Obtiene el valor mínimo.
-* `max(a, b, ...)` o `max([array])`: Obtiene el valor máximo.
-* `rand([min], [max])`: Genera un número entero aleatorio.
+<!-- joss-check: necesita servicio HTTP local -->
+```joss
+$respuesta = Http::request("GET", "http://127.0.0.1:8080/saludo/Ana", {"timeout": 3})
+$respuesta["success"] ? {
+    print($respuesta["body"])
+} : {
+    print("No se pudo consultar el servicio")
+}
+```
 
-### 5. Arreglos y Mapas
-* `in_array(needle, haystack)`: Comprueba si un valor existe dentro de un arreglo o lista.
-* `array_key_exists(key, map)`: Comprueba si una clave existe dentro de un mapa.
-* `array_merge(arr1, arr2, ...)`: Fusiona dos o más arreglos o mapas.
-* `array_push(array, ...items)`: Añade uno o más elementos al final del arreglo.
-* `array_pop(array)`: Extrae y retorna el último elemento del arreglo.
-* `array_shift(array)`: Extrae y retorna el primer elemento del arreglo.
-* `array_slice(array, offset, [length])`: Extrae una porción de un arreglo.
-* `array_unique(array)`: Elimina valores duplicados de un arreglo.
-* `array_reverse(array)`: Invierte el orden de los elementos del arreglo.
-* `array_column(array, column)`: Extrae los valores de una columna o clave en una lista de mapas.
-* `keys(map)` / `array_keys`: Retorna una lista con todas las claves de un mapa.
-* `values(map)` / `array_values`: Retorna una lista con todos los valores de un mapa.
-* `end(array)`: Obtiene el último elemento de un arreglo sin modificarlo.
-* `count(item)` / `len(item)`: Retorna la longitud de arreglos, mapas o cadenas.
+`Http::query` tiene código interno pero **no está registrado**. Usa
+`Http::request("QUERY", url, opciones)` si el servidor admite ese método.
 
-### 6. Sistema de Archivos
-* `file_exists(path)`: Comprueba si un archivo o directorio existe.
-* `file_get_contents(path)`: Lee el contenido completo de un archivo como string.
-* `file_put_contents(path, content)`: Escribe datos en un archivo (creándolo si no existe).
-* `unlink(path)` / `file_delete(path)`: Elimina un archivo del sistema de archivos.
-* `mkdir(path)`: Crea un directorio (incluyendo carpetas padre intermedias).
-* `is_dir(path)`: Comprueba si la ruta es un directorio.
-* `is_file(path)`: Comprueba si la ruta es un archivo regular.
+## Servidor, petición y respuesta
 
-### 5. Asincronía, Concurrencia y Canales
-* `async { ... }`: Ejecuta un bloque o función en segundo plano en una goroutine aislada retornando un objeto `Future`.
-* `await $future`: Bloquea hasta que la tarea en segundo plano finalice y retorna su resultado.
-* `make_chan([bufferSize])`: Crea un canal de comunicación concurrente seguro.
-* `send($chan, $val)` o `$chan << $val`: Envía un mensaje por el canal.
-* `recv($chan)`: Recibe un mensaje del canal.
-* `close($chan)`: Cierra el canal.
+| Clase | Contratos |
+|---|---|
+| `Router` | get/post/put/patch/delete/head/options/query(ruta,handler); any(ruta,handler); match(metodos,ruta,handler); api(ruta,handler); ws(ruta,handler). Registra rutas; no hace peticiones salientes. group(nombre,callback), middleware(nombre), registerMiddleware(nombre,callback), end() administran middleware. Véase [HTTP](CONTROLADORES.md) y [middleware](MIDDLEWARE.md). |
+| `Request` | input/post(clave,[default]) obtienen datos combinados; all() y except(arrayClaves) devuelven mapa filtrado por una lista concreta de campos internos. No son validación ni lista de campos permitidos. |
+| `Request` | file(clave) → map con content o null; hasFile/hasfile(clave) → bool; has(clave) exige valor distinto de null y "". |
+| `Request` | cookie(clave,[default]), header(clave), root(), method(), isMethod/ismethod(verbo), path(), url(), ip(), userAgent/useragent(), bearerToken/bearertoken(). url actualmente prioriza _path; no promete URL absoluta. uri no está registrado. Sin contexto varios retornan valores por defecto. |
+| `Response` | json(datos,[status=200]), error(mensaje,[status=400]), redirect(url,[status=302]), back(), raw(cuerpo,[status=200,mime,headers]), stream(callback), download(ruta,[nombre]). Retornan WebResponse; descarga y stream se resuelven al despachar HTTP. |
+| `Redirect` | to(url,[status=302]) → WebResponse. |
+| `WebResponse` | with(clave,valor) añade flash; withCookie(nombre,valor), withHeader(nombre,valor), status(codigo) mutan y devuelven la misma respuesta. |
+| `Session` | get(clave), put(clave,valor), has(clave), forget(clave), all(). Sin sesión inyectada retorna null; no inicia sesión por llamar a la fachada. |
+| `View` | render(nombre,[mapa]), exists(nombre), share(clave,valor) o share(mapa). Véase [vistas](VISTAS.md). |
+| `Stream` | Objeto recibido por callback SSE: send(datos) o send(tipo,datos), close(). Sin writer válido no funciona. |
+| `WebSocket` | send(mensaje), onMessage(callback), onClose(callback), subscribe(canal), unsubscribe(canal), publish(canal,mensaje), subscriberCount(canal), broadcast(mensaje), close(). Hub local al proceso; [contrato completo](WEBSOCKETS.md). |
+| `Server` | start() solicita modo servidor al host; no es un nuevo listener independiente en cualquier contexto. spawn(nombre,comando,puerto) lanza proceso auxiliar y registra proxy según configuración; necesita permiso de ejecución. |
+| `Middleware`, `Migration` | Clases base registradas sin métodos nativos públicos; convenciones del framework, no interfaces del sistema de tipos. |
 
-### 6. Serialización y Formatos
-* `json_encode(data)`: Convierte un objeto/arreglo/mapa en string JSON formateado.
-* `json_decode(string)`: Parsea una cadena JSON a estructuras de datos nativas.
-* `json_verify(string)`: Valida si una cadena es un JSON sintácticamente correcto.
-* `toon_encode(data)`: Serializa estructuras en formato binario TOON de alta velocidad.
-* `toon_decode(string)`: Decodifica un paquete TOON.
-* `toon_verify(string)`: Verifica la integridad de un paquete TOON.
-* `hive_read_box(path)`: Lee y decodifica cajas de almacenamiento local Hive.
+En uploads usa `$archivo["content"]`. Para binarios utiliza raw con MIME y
+Content-Disposition adecuados, o download para archivo. El cuerpo HTML normal
+puede recibir hot reload en desarrollo.
 
-### 7. Helpers de Aplicación Web y Servidor
-* `env(key, [default])`: Lee variables de entorno cargadas desde `.env`.
-* `config(key, [default])`: Alias para configuración y entorno.
-* `view(viewName, [data])`: Renderiza una plantilla de vista con motor Joss Blade.
-* `json(data, [status])`: Emite una respuesta HTTP JSON.
-* `redirect(url)`: Emite una redirección HTTP.
-* `back()`: Redirige a la página anterior con soporte de `.with()`.
-* `response(content, [status])`: Emite una respuesta HTTP raw.
-* `request([key], [default])`: Accede a los parámetros y cuerpo de la petición HTTP.
-### 8. Redis y Almacenamiento en Memoria Distribuida
-* `Redis::set(key, value, [ttlSeconds])`: Almacena un valor en Redis con tiempo de expiración opcional en segundos.
-* `Redis::get(key)`: Obtiene el valor asociado a la clave desde Redis (o `null` si no existe o expiró).
-* `Redis::has(key)`: Comprueba si la clave existe en Redis (`true`/`false`).
-* `Redis::del(key)` / `Redis::forget(key)`: Elimina la clave de Redis.
-* `Redis::ttl(key)`: Retorna los segundos restantes de vida de la clave (o `-1` si no expira / `-2` si no existe).
-* `Redis::flush()`: Vacía la base de datos de Redis actual (`FlushDB`).
-* `Redis::connect(host, [password], [db])`: Conexión manual opcional (por defecto se auto-conecta con las variables de entorno).
+## Datos, estado y almacenamiento
 
----
+| Clase y firmas | Retorno, contexto y errores |
+|---|---|
+| `GranDB` | Builder y operaciones SQL: [referencia completa](MODELOS.md). Requiere DB configurada. |
+| `Schema`, `Blueprint` | Cambios de tablas/columnas: [Schema Builder](SCHEMA_BUILDER.md). Nombres como integer, double y boolean son métodos SQL válidos, no aliases de tipos Joss. |
+| `SQLite::open(ruta)`, `query(sql,[bindings])`, `close()` | Conexión SQLite nativa; open/close bool, query colección o null e impresión de error. Conserva conexión en la instancia. |
+| `Cache::put(clave,valor,[segundos=60])` | Cache global en memoria del proceso; true o null por argumentos inválidos. No persistente. |
+| `Cache::get(clave,[default])`, `has(clave)`, `forget(clave)` | get retorna valor/default/null. Entrada expirada retorna null aun si se entregó default. has bool; forget true/null. |
+| `Redis::connect(host,[password,db])` | Configura cliente; también auto-conecta con REDIS_URL o REDIS_HOST. Requiere Redis externo. |
+| `Redis::set(clave,valor,[ttl])`, `get(clave)`, `has(clave)` | Escritura, lectura o existencia; ausencia/errores pueden producir null/false. Revisa serialización antes de asumir el tipo recuperado. |
+| `Redis::del(clave)`, `forget(clave)`, `ttl(clave)`, `flush()` | Borrado, TTL en segundos (-1 sin expiración, -2 ausente); flush vacía la DB Redis actual. |
+| `UserStorage::put(token,nombre,contenido)` | Bool; almacenamiento local/OCI seleccionado por entorno; requiere configuración y tablas internas. |
+| `UserStorage::get(token,nombre)`, `getToFile(token,nombre,destino)`, `delete(token,nombre)` | String/null, bool y bool respectivamente. Token puede ser usuario con user_token. |
+| `UserStorage::path([ruta])` | Ruta local bajo storage; no descarga objetos OCI. |
+| `Zip::extract(archivo,destino)` | Bool; extrae archivos con comprobación de rutas. Puede escribir antes de encontrar un error posterior: no es operación atómica. |
 
-## Contratos relevantes
+No uses una cache como única copia de información irremplazable. Un map guardado
+en Cache puede seguir compartiendo su contenido: el contenedor concurrente no
+vuelve automáticamente seguros todos los valores almacenados.
 
-- `GranDB::table("users")->get()` retorna una lista nativa de mapas.
-- `first()` retorna un mapa o `nil`.
-- `Auth::user()` retorna una instancia; accede con `$user->email` o `$user->full_name`.
-- `Request::file()` retorna un mapa cuyo contenido está en `content`.
-- `Response::raw($data, $status, $mime, $headers)` evita la transformación HTML y sirve binarios.
-- `Response::error($message, $status)` crea JSON con la clave `error`; el status predeterminado es 400.
-- `System::load_driver($path, $name=nil)` carga una DLL, SO o dylib con la ABI C v1; `driver_call($name, $method, $args=[])` la invoca y decodifica su JSON.
-- `Redis` se inicializa automáticamente si `REDIS_URL` o `REDIS_HOST` están configurados en el archivo `.env` o variables del sistema operativo.
+## Sistema, plugins y tareas
+
+| Firma | Contrato |
+|---|---|
+| `System::env(clave,[default])` | Valor de r.Env o default. |
+| `System::Run(comando,[arrayArgs])` | Ejecuta proceso externo y devuelve salida; exige ALLOW_SYSTEM_RUN=true/1. No evalúa código Joss. |
+| `System::load_driver(ruta,[nombre])` | Bool al cargar DLL/SO/dylib ABI C v1; depende de plataforma/build. |
+| `System::driver_call(nombre,metodo,[args])` | Resultado JSON decodificado, texto o null ante error. |
+| `System::log(mensaje)`, `sleep(segundos)`, `now([dias])` | Log, espera entera y fecha textual con desplazamiento de días. System::now no recibe el formato del helper now. |
+| `Plugin::platform()`, `path(nombre,ruta)` | Plataforma os-arch y ruta de recurso; rutas inválidas pueden lanzar. |
+| `Plugin::call(nombre,metodo,[args])`, `stream(nombre,metodo,[args,callback])` | Puente al plugin; resultados polimórficos y error map/null según ruta. [Plugins](PLUGINS.md). |
+| `new Process(comando,[arrayArgs])` | Prepara proceso; requiere permiso. start() → bool; wait() → exit code o -1; kill() → bool; pid() → entero; stdin(texto) → instancia; stdout_chan()/stderr_chan() → channels. Drena salidas para evitar bloqueo. |
+| `Cron::schedule(nombre,expresion,callback)` | Registra tarea; cron de minutos con gramática limitada y estado local. |
+| `Task::on_request(nombre,intervalo,callback)` | Actualmente inicia goroutine al llamar; intervalo no se utiliza. No promete ejecución por cada petición. |
+
+Para coordinación y cierre de canales lee [concurrencia](CONCURRENCIA.md).
+Los recursos externos no son serializables como datos ordinarios del lenguaje.
+
+## Identidad, traducción y publicación
+
+Auth, AuthLoginResult, MFA y TwoFactor se explican en
+[autenticación](AUTENTICACION.md): necesitan contexto, tablas y una política de
+autorización de la aplicación.
+
+`Lang::get(clave,[reemplazos])` devuelve traducción; `set(locale)` cambia locale;
+`locale()` consulta actual y `locales()` enumera disponibles. Los archivos
+de idioma se cargan por infraestructura de i18n. La traducción no se obtiene
+de la red automáticamente.
+
+`SEO::title(texto)`, `description(texto)`, `keywords(textoOArray)`,
+`canonical(url)`, `og(propiedad,contenido)` y `meta(nombre,contenido)`
+actualizan metadatos; `render()` produce HTML. **SEO::twitter no está registrado**:
+usa meta para nombres twitter:*.
+
+`Sitemap::add(url,[lastmod,changefreq,priority])` o `add(mapa)`, `exclude(rutaOArray)`,
+`generate()`, `xsl()` generan XML/XSL. `provider(callback)` está registrado,
+pero el handler sólo acepta FunctionLiteral y una closure fuente se evalúa como
+CapturedFunction: su registro no está garantizado. Usa add explícito mientras
+se corrige esa frontera. Véase [SEO y sitemap](SEO_SITEMAP.md).
+
+La lista cerrada del [catálogo](CATALOGO_NATIVO.md) permite comprobar qué APIs
+están disponibles. La presencia de una función Go, un comentario o una sugerencia
+del editor no basta para convertirla en método público.

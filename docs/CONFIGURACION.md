@@ -1,10 +1,12 @@
 # Configuración
 
+[Índice](README.md)
+
 El runtime busca `env.joss`, después `env.enc` y finalmente `.env`; en desarrollo también intenta directorios padre. Las variables del sistema operativo sobrescriben el archivo. `System::env("KEY", "default")` consulta el entorno cargado.
 
 ```env
 APP_ENV="development"
-APP_URL="https://localhost:8443"
+APP_URL="https://127.0.0.1:8443"
 PORT="8443"
 PREFIX="js_"
 JWT_SECRET="secreto-largo-y-unico"
@@ -98,7 +100,7 @@ REDIS_DB="0"
 
 - `ALLOW_SYSTEM_RUN=true` habilita `System::Run()`.
 - `JOSS_PLUGIN_SIGNING_KEY` permite seleccionar una llave privada Ed25519 existente para compilar JP. Si no se especifica, Joss genera y gestiona una llave automáticamente por plugin bajo `~/.joss/keys/`.
-- Los plugins `.jp` se ejecutan directamente en memoria (bytecode VM y AST Engine), accediendo de manera segura al mapa de entorno `r.Env` del proyecto.
+- Los plugins `.jp` se ejecutan directamente en memoria (bytecode VM y AST Engine), con acceso al mapa de entorno `r.Env` según su ejecutor; esto no constituye un sandbox del sistema operativo.
 
 No publiques archivos de entorno ni llaves privadas.
 
@@ -111,4 +113,4 @@ joss change db postgres
 joss change db prefix app_
 ```
 
-La migración interactiva `joss change db migrate` sigue orientada a preparar un servidor MySQL nuevo. El runtime, CRUD, migraciones y Schema Builder sí funcionan con los tres motores.
+La migración interactiva `joss change db migrate` sigue orientada a preparar un servidor MySQL nuevo. El runtime, CRUD, migraciones y Schema Builder sí funcionan con adaptadores para cuatro motores, con diferencias por operación.

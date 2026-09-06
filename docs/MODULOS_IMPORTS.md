@@ -1,8 +1,15 @@
 # Módulos, archivos y plugins
 
+[Índice](README.md)
+
 ## Estado actual
 
-El proyecto de aplicación se carga como un conjunto de archivos `.joss`: `main.joss`, rutas y directorios convencionales como `app/`. `joss analyze` descubre esos archivos, conserva su identidad y resuelve sus declaraciones top-level a nivel de proyecto.
+El proyecto se organiza como un conjunto de archivos `.joss`, pero cada comando
+elige una superficie concreta. `joss analyze` carga la entrada indicada y todo
+`app/`; no agrega automáticamente `routes.joss` o `api.joss`. El servidor carga
+sus rutas por infraestructura propia. El runtime de `joss run` precarga sólo los
+dominios estándar bajo `app/` y hoy omite `app/libs`, aunque el analizador sí la
+ve. Esta asimetría está registrada como deuda.
 
 Las formas históricas `import`, `use`, `@import` y `Namespace` fueron eliminadas del conjunto de tokens, AST, ejecutor y compilador de plugins. El parser las rechaza con un mensaje de migración. Esta ausencia es una decisión permanente del lenguaje: no habrá exports, namespaces fuente ni grafo de imports.
 

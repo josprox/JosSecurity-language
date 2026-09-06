@@ -1,5 +1,7 @@
 # Auditoría del runtime antes de optimizar
 
+[Índice](README.md)
+
 Estado auditado: commit `9d27239`, Go 1.26.2, Windows/amd64. Este documento
 describe el runtime anterior a las optimizaciones. Las mediciones reproducibles
 están en `benchmarks/BASELINE_9D27239.md`.

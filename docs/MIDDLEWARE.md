@@ -1,9 +1,11 @@
 # Middleware
 
-Registra middleware con una closure y aplícalo mientras se definen rutas.
+[Índice](README.md) · Antes: [controladores](CONTROLADORES.md) · Después: [servidor](SERVIDOR.md)
+
+Un middleware comprueba o transforma una petición antes de llamar al controlador. Por ejemplo, puede redirigir a quien no haya iniciado sesión. Regístralo con una closure y aplícalo mientras se definen rutas. El siguiente fragmento requiere DashboardController y una ruta /login.
 
 ```joss
-Router::registerMiddleware("auth", func($name) {
+Router::registerMiddleware("auth", func(string $name) {
     (!Auth::check()) ? {
         return Response::redirect("/login")
     } : {}

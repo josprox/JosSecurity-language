@@ -1,5 +1,7 @@
 # Assets
 
+[Índice](README.md)
+
 El servidor sirve `public/` bajo `/public/` y `/assets/`. En desarrollo también expone assets detectados dentro de `node_modules` mediante `/assets/vendor/`.
 
 El detector lee únicamente `dependencies` de `package.json`. Para cada paquete instalado busca `style`, `main` terminado en `.js` y, como fallback, archivos `*.min.css`/`*.min.js` en la raíz o `dist/`. No garantiza detectar todos los formatos modernos de paquetes.

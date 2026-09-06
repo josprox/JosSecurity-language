@@ -1,5 +1,9 @@
 # Migraciones
 
+[Índice](README.md) · Antes: [Schema](SCHEMA_BUILDER.md) · Después: [CLI](CLI.md)
+
+Una migración guarda un cambio de estructura para que distintos entornos puedan aplicarlo en el mismo orden. `up` aplica el cambio; `down` describe cómo revertirlo, aunque no implica que exista un comando de rollback público.
+
 ```bash
 joss make:migration create_products
 joss migrate
@@ -15,7 +19,7 @@ El generador crea una clase que extiende `Migration`, con `up()` y `down()`. El 
 ```joss
 public class CreateProductsTable extends Migration {
     public func up() {
-        Schema::create("products", func($table) {
+        Schema::create("products", func(Blueprint $table) {
             $table->id()
             $table->string("name")
             $table->timestamps()
@@ -36,4 +40,4 @@ Una migración sólo se considera completada después de registrar su nombre y
 batch. Un fallo de lectura, parseo, estructura o registro detiene el comando con
 código de salida distinto de cero.
 
-Compatibilidad implementada: SQLite, MySQL y PostgreSQL. Los detalles de columnas, índices y claves foráneas están en [Schema Builder](SCHEMA_BUILDER.md).
+Hay adaptadores para SQLite, MySQL, PostgreSQL y SQL Server; valida las operaciones concretas en el motor elegido. Los detalles de columnas, índices y claves foráneas están en [Schema Builder](SCHEMA_BUILDER.md).

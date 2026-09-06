@@ -1,150 +1,136 @@
-# Plugins y JP (Joss Plugin Bytecode)
+# Plugins y paquetes
 
-El sistema de plugins de Joss genera, compila, carga y ejecuta paquetes binarios `.jp` (JP v2) de alto rendimiento, portables, aislados y firmados criptográficamente.
+[Índice](README.md) · Antes: [estructura](ESTRUCTURA_PROYECTO.md) · Después: [contribuir](CONTRIBUIR.md)
 
-```bash
-joss pub add mi_plugin ^1.0.0
-joss pub install
-```
+Un **paquete** reúne archivos y metadatos para distribuir una capacidad.
+Un **plugin** incorpora funciones, clases o comandos a una aplicación. Joss
+carga sus paquetes `.jp` automáticamente; no se escribe un import en el programa.
 
-```yaml
-dependencies:
-  mi_plugin: "^1.0.0"
-```
+## Crear un plugin Joss
 
----
+Con el CLI instalado, en una carpeta de trabajo:
 
-## 🛠️ Crear y Compilar Plugins en Joss
-
-Para crear un nuevo proyecto de plugin oficial:
-
-```bash
-joss new plugin mi_plugin
-cd mi_plugin
-```
-
-Esto generará la estructura limpia del proyecto:
-- `joss.yaml`: Manifiesto del paquete.
-- `src/plugin.joss`: Implementación orientada a objetos en Joss.
-- `.github/workflows/release.yml`: Workflow para compilación automática a `.jp` y publicación en GitHub Releases.
-
-Para compilar el plugin a un paquete binario `.jp`:
-
-```bash
+```sh
+joss new plugin calculadora
+cd calculadora
 joss plugin compile .
 ```
 
----
+La plantilla contiene `joss.yaml`, `src/plugin.joss` y un workflow de
+publicación. Lee el manifiesto generado antes de cambiar nombres o exports.
+La variante `joss new package calculadora` produce un paquete más pequeño;
+se construye con `joss build package .`. Las pruebas
+`TestNewPackageAndPluginTemplatesCompileEndToEnd` construyen ambas variantes,
+verifican la firma y decodifican el contenido.
 
-## ⚡ Compilación Multilenguaje a Bytecode Joss (.jp / JPBC)
-
-Joss cuenta con un motor compilador (`joss plugin compile`) que permite desarrollar componentes en **Java, Python, PHP, C/C++, Rust, Kotlin, Dart o Flutter** y traducirlos automáticamente a **Bytecode nativo de Joss (JPBC)**.
-
-### Características del Sistema:
-1. **Tree Shaking Avanzado**: Analiza el Grafo de Llamadas (Call Graph) a partir de las funciones indicadas en `--exports` y elimina automáticamente todo el código muerto, clases e instrucciones no utilizadas.
-2. **Cero Dependencias en el Usuario Final**: El paquete `.jp` resultante (< 1.5 KB a 1 MB) contiene bytecode determinista y optimizado. **El usuario final no requiere tener instalado Java (JVM/JDK), Python, PHP, Node ni compilar nada**.
-3. **Firma Criptográfica Ed25519**: Cada paquete `.jp` es firmado criptográficamente de manera transparente durante la compilación (`~/.joss/keys/<plugin>.ed25519`) para garantizar su integridad y autoría.
-4. **Verificación de Paquetes**: Comando `joss plugin verify mi_plugin.jp` para validar la firma y estructura interna del paquete.
-5. **Índice de Símbolos Estándar (`SymbolIndex`)**: Genera nombres, parámetros y tipos de retorno en `META-INF/joss-symbols.json` para el analyzer y el autocompletado. Paquetes antiguos sin `return_type` conservan retorno `unknown`, no un tipo inventado.
-
-### Ejemplos de Compilación por Lenguaje:
-
-```bash
-# 1. Compilar plugin desarrollado en Java (.class o .jar)
-joss plugin compile MiPlugin.jar --lang=java --name=music-plugin --exports=searchSong,getSong
-
-# 2. Compilar plugin desarrollado en Python (.py)
-joss plugin compile script.py --lang=python --name=tax-plugin --exports=calculate_tax
-
-# 3. Compilar plugin desarrollado en Rust / C / C++ (WebAssembly .wasm)
-joss plugin compile module.wasm --lang=rust --name=crypto-plugin --exports=encrypt_payload --permissions=filesystem.read
-
-# 4. Inspeccionar la firma, funciones exportadas, clases y tamaño de un paquete .jp
-joss plugin inspect music-plugin.jp
-
-# 5. Verificar firma e integridad digital de un paquete .jp
-joss plugin verify music-plugin.jp
+```sh
+joss plugin inspect calculadora.jp
+joss plugin verify calculadora.jp
 ```
 
----
+`inspect` permite descubrir nombres, exports, permisos y símbolos.
+`verify` comprueba integridad y firma Ed25519. La clave pública incluida en
+un archivo demuestra consistencia con su firma; por sí sola **no establece
+que el editor sea alguien de confianza**.
 
-## 🔒 Sandbox WASI y Permisos en el Runtime (`PermissionGuard`)
+## Instalar y utilizar
 
-Los plugins ejecutan en la máquina virtual `JPBCVM` bajo un modelo estricto de **Aislamiento WASI**:
+```sh
+joss pub add nombre_del_paquete ^1.0.0
+joss pub install
+```
 
-- **Permisos Declarativos**: Los permisos requeridos por el plugin se declaran en `joss.yaml` y en el manifiesto interno `META-INF/joss-plugin.json`.
-- **Enforcement en Tiempo de Ejecución**: La máquina virtual valida explícitamente mediante `PermissionGuard` antes de realizar llamadas al sistema host:
-  - `http_get`: Realizar peticiones HTTP salientes.
-  - `file_read` / `file_write`: Acceso a lectura/escritura de archivos locales.
-  - `env_read`: Acceso a variables de entorno del servidor host.
-  - `db_query`: Ejecutar consultas SQL en la base de datos de la aplicación.
+Sustituye el nombre y la versión por un paquete existente en el registro
+configurado. `pub` mantiene dependencias; no agrega sintaxis fuente. Consulta
+[CLI](CLI.md) y la documentación del paquete para su API concreta.
 
-Si un plugin intenta realizar I/O o acceso a red sin contar con el permiso explícito concedido, la máquina virtual bloquea la ejecución de inmediato lanzando una excepción de seguridad.
+Los paquetes declarados en `joss.yaml` o presentes en `plugins/` se descubren
+al preparar el runtime. Su `SymbolIndex` publica parámetros y retornos para
+el analizador. Un paquete antiguo sin retorno publicado aporta `unknown`:
+significa falta de información, no una garantía de compatibilidad.
 
----
+Ejemplo de integración **dependiente de un plugin que exporte estos símbolos**:
 
-## 🚀 Integración y Consumo en Programas Joss
-
-Joss descubre y carga automáticamente los paquetes `.jp` declarados en `joss.yaml` o instalados en el directorio `plugins/`.
-
-### 1. Invocación de Funciones Directas o Calificadas:
 ```joss
-// Llamada calificada por namespace del plugin
-$resultado = joss_ai::predict(5)
-
-// Llamada directa a función exportada
-$descuento = calculate_discount(200, 10)
+$resultado = calculadora::sumar(2, 3)
 ```
 
-### 2. Instanciación de Clases y Llamada a Métodos:
-```joss
-// Instanciación nativa de clases del plugin
-$tax = new TaxService()
-$total = $tax->calculate(100)
-```
+No copies ese nombre sin comprobarlo con `inspect`. Una función exportada
+también puede estar disponible por su nombre directo; las clases exportadas
+se instancian con `new`. No existen namespaces fuente ni módulos con imports.
 
----
+## Qué contiene realmente un JP
 
-## ⚙️ Arquitectura del Runtime (`pkg/pluginruntime` & `pkg/core`)
+El contenedor firmado guarda metadatos, archivos, índice de símbolos y una
+entrada de bytecode. El runtime detecta dos formatos distintos:
 
-```text
-               Programa Joss (Código fuente o bytecode)
-                                 │
-                                 ▼
-                     Evaluator & Resolver (pkg/core)
-                                 │
-                 ┌───────────────┴───────────────┐
-                 │                               │
-                 ▼                               ▼
-       Invocación Calificada            Instanciación
-        (Plugin::function)          (new PluginClass())
-                 │                               │
-                 └───────────────┬───────────────┘
-                                 │
-                                 ▼
-                 PluginRegistry (pkg/pluginruntime)
-                                 │
-                     Detección Dual de Bytecode
-                    /                         \
-                   /                           \
-          JOSSBC2Z                              JPBC
-             │                                    │
-             ▼                                    ▼
-       JossASTExecutor                          JPBCVM (WASI PermissionGuard)
-    (pkg/core AST Engine)               (17 OpCodes Dispatcher + Sandbox)
-             │                                    │
-             └─────────────────┬──────────────────┘
-                               │
-                               ▼
-                   Retorno de Valor Tipado a Joss
-```
+| Contenido | Ejecutor | Alcance |
+|---|---|---|
+| `JOSSBC2Z` | Adaptador AST de `pkg/core` | Árbol Joss serializado y comprimido, interpretado. |
+| `JPBC` | `pkg/pluginruntime.JPBCVM` | Máquina de instrucciones específica de plugins. |
 
----
+Ninguno convierte el programa principal en código máquina LLVM/Cranelift.
+La VM experimental de `pkg/vm` es un tercer componente y no es el ejecutor
+predeterminado de `joss run` o `joss build native`.
 
-## 📚 Plugins Oficiales
+## Compilación desde otros lenguajes: estado y límites
 
-- [joss_ai](https://github.com/joss-language/joss_ai)
-- [joss_notify](https://github.com/joss-language/joss_notify)
-- [joss_backup](https://github.com/joss-language/joss_backup)
-- [joss_bg_remover](https://github.com/joss-language/joss_bg_remover)
-- [joss_brevo](https://github.com/joss-language/joss_brevo)
+`joss plugin compile archivo --lang=... --name=... --exports=...` selecciona
+un backend de `pkg/plugincompiler`. Que un nombre sea aceptado por el CLI
+no significa que todo ese lenguaje esté implementado.
+
+| Entrada | Implementación actual |
+|---|---|
+| Joss / proyecto generado | Empaquetado del AST de Joss. |
+| Python | Traductor de un subconjunto de expresiones y funciones a IR/JPBC; no ejecuta CPython ni incorpora todo su ecosistema. |
+| PHP | Traductor parcial a IR/JPBC; no equivale a un runtime PHP. |
+| Java / Kotlin | Lectura de `.class` o `.jar` y traducción parcial; no ofrece toda la JVM. |
+| Rust, C, C++, Dart, Flutter, Wasm | El backend comprueba la cabecera `\\0asm` y genera por export una función que retorna un texto de demostración. **No interpreta ni traduce las instrucciones Wasm.** |
+
+Por tanto no uses la ruta Wasm para cifrar, transformar archivos ni ejecutar
+una biblioteca real. Un paquete firmado producido por esa ruta puede ser
+estructuralmente válido y aun así no implementar la operación solicitada.
+
+La optimización de plugins elimina funciones no alcanzables desde exports
+según el IR construido. No demuestra equivalencia con cualquier programa
+del lenguaje de origen. El límite de tamaño configurado genera una advertencia,
+no una garantía de tamaño máximo.
+
+## Permisos y aislamiento
+
+`PermissionGuard` comprueba llamadas al host que están mapeadas:
+
+| Operación del host | Permiso |
+|---|---|
+| `http_get`, `http_post`, `fetch` | `network.http` |
+| `file_read`, `file_write` | `filesystem.read`, `filesystem.write` |
+| `env_read`, `env_write` | `env.read`, `env.write` |
+| `db_query`, `db_exec` | `database.query`, `database.exec` |
+
+Comprueba la tabla de `pkg/pluginruntime/jpbc_vm.go` al extender el host.
+Los permisos declarados se conceden al construir el guard; no hay un diálogo
+de aprobación del usuario. Los comodines amplían permisos por prefijo y una
+revocación exacta no anula un comodín concedido.
+
+Esto **no es un sandbox WASI ni aislamiento de proceso o del sistema operativo**.
+La comprobación se limita a las operaciones integradas en esa frontera. Los
+drivers ABI C, procesos externos y el ejecutor AST tienen mecanismos distintos.
+El presupuesto JPBC de instrucciones se aplica por invocación de función;
+no debe anunciarse como límite global de recursos de toda una aplicación.
+
+## Puentes y ciclo de vida
+
+`Plugin::call`, `stream`, `path` y `platform` conectan formatos de plugin;
+`System::load_driver` y `driver_call` cargan bibliotecas ABI C v1 específicas
+de plataforma. Sus contratos están en el [catálogo](CATALOGO_NATIVO.md) y
+la [referencia nativa](MODULOS_NATIVOS.md).
+
+Un fork del runtime comparte el registro de plugins y otros recursos.
+Al liberar una instancia del pool, `Runtime.Free()` limpia también
+`PluginRegistry`; conservar el registro y borrar sólo clases/símbolos rompe
+la siguiente petición. Los plugins no deben asumir que variables de una
+petición anterior siguen disponibles.
+
+Fuentes: [compilador](../pkg/plugincompiler/plugincompiler.go),
+[backend Wasm](../pkg/plugincompiler/backends/nativewasm/nativewasm_backend.go),
+[runtime](../pkg/pluginruntime/), [contenedor](../pkg/pluginpkg/).
