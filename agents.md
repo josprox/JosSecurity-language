@@ -1,153 +1,142 @@
-# Guía de arquitectura para agentes
+# Guía de arquitectura y reglas operativas para agentes y desarrolladores
 
-Este archivo es una guía operativa del repositorio, no un changelog. Antes de modificar semántica, lea `docs/ARQUITECTURA.md`, `docs/SISTEMA_TIPOS.md`, `docs/DIAGNOSTICOS.md` y los tests del subsistema afectado.
+Este archivo es una guía operativa y de gobernanza técnica del repositorio, no un changelog. Antes de modificar semántica, código o documentación, lea `docs/ARQUITECTURA.md`, `docs/SISTEMA_TIPOS.md`, `docs/DIAGNOSTICOS.md`, `docs/DOCUMENTATION_AUDIT.md` y los tests del subsistema afectado.
 
-## Pipeline real
+---
+
+## 1. Principio fundamental de desarrollo
+
+> **El código fuente y sus tests ejecutados son la única fuente de verdad.**
+
+No asuma que un comentario, un archivo histórico o una tesis describe el comportamiento real del sistema:
+- Verifique siempre la implementación concreta en `pkg/parser`, `pkg/typesystem`, `pkg/analyzer` y `pkg/core`.
+- Cualquier cambio en la semántica del lenguaje exige pruebas unitarias, de análisis semántico y de ejecución runtime.
+
+---
+
+## 2. El Pipeline Real de Joss
 
 ```text
 .joss → lexer → parser Pratt → AST → semantic analyzer → diagnostics
-                                      ↓ sin errores
-                                intérprete/runtime Go
+                                      ↓ (si no hay errores)
+                                 intérprete / runtime Go
 ```
 
-- `pkg/parser`: tokens, lexer, parser y AST.
-- `pkg/typesystem`: tipos canónicos, asignabilidad, inferencia y coerción.
-- `pkg/analyzer`: scopes, símbolos, firmas, inferencia de expresiones y flujo.
-- `pkg/diagnostics`: formato estructurado de errores y warnings.
-- `pkg/core`: intérprete, runtime y clases/built-ins integrados; adapta sus registros al analyzer.
-- `pkg/bytecode`: AST serializado y comprimido, no IR de código máquina.
-- `pkg/pluginruntime`, `pkg/pluginpkg`, `pkg/plugincompiler`: runtime, paquetes y JPBC de plugins.
+- `pkg/parser`: Tokens, lexer, parser Pratt con tabla de precedencias y AST.
+- `pkg/typesystem`: Tipos canónicos, compatibilidad de asignación (`Assignable`), inferencia (`MergeInference`) y coerción explícita (`CoerceString`).
+- `pkg/analyzer`: Unidades fuente (`SourceUnit`), scopes léxicos, tablas de símbolos, firmas, comprobación de tipos y flujo alcanzable exhaustivo. No debe importar `pkg/core`.
+- `pkg/diagnostics`: Modelo de errores y advertencias (`Diagnostic`) con código estable, severidad, rango, explicación y sugerencia.
+- `pkg/core`: Evaluador de AST, runtime Go, frames léxicos, slots, built-ins globales y clases nativas integradas; adapta sus registros al analyzer.
+- `pkg/bytecode`: Serialización comprimida del AST (`JOSSBC2Z`), no código máquina ni LLVM IR.
+- `pkg/pluginruntime`, `pkg/pluginpkg`, `pkg/plugincompiler`: Runtime, paquetes y JPBC de plugins.
 - `cmd/joss`: CLI y orquestación del proyecto.
-- `vscode-joss`: LSP; consume el catálogo generado del lenguaje.
+- `vscode-joss`: Servidor de lenguaje (LSP) y extensión de editor.
 
-La dirección de dependencias es `parser/typesystem/diagnostics → analyzer → core adapter`. `pkg/analyzer` no debe importar `pkg/core`.
+La dirección estricta de dependencias es:
+`parser / typesystem / diagnostics → analyzer → core adapter`. `pkg/analyzer` **nunca** debe importar `pkg/core`.
 
-## Fuentes de verdad que no deben duplicarse
+---
 
-- Keywords: tabla de tokens de `pkg/parser/token.go`, proyectada por `parser.KeywordNames()`.
-- Tipos y compatibilidad: `pkg/typesystem`; no reintroducir aliases fuera de la lista canónica.
-- Built-ins globales: nombres en `pkg/core/builtins.go` y retornos en `pkg/core/native_signatures.go`; toda entrada debe tener un caso real en el dispatcher.
-- Clases y métodos nativos: registros ejecutados por `Runtime.RegisterNativeClasses()` y retornos en `pkg/core/native_signatures.go`; usar `GetNativeClassMethods()` para inspección.
-- Plugins: índice `pluginpkg.SymbolIndex` del paquete `.jp`.
-- Diagnósticos: `diagnostics.Diagnostic` y códigos estables del analyzer.
-- VS Code: `vscode-joss/src/server/generated/languageCatalog.json`, generado por `go run ./tools/cataloggen`; nunca editarlo manualmente.
+## 3. Fuentes de verdad canónicas (Nunca duplicar)
 
-## Semántica de variables y tipos
+1. **Keywords**: Definidas exclusivamente en la tabla de tokens de `pkg/parser/token.go` y proyectadas por `parser.KeywordNames()`.
+2. **Tipos y compatibilidad**: Residen exclusivamente en `pkg/typesystem`. No reintroducir aliases fuera de la lista canónica.
+3. **Built-ins globales**: Nombres definidos en `pkg/core/builtins.go` y retornos publicados en `pkg/core/native_signatures.go`. Toda entrada debe tener un `case` alcanzable en el dispatcher correspondiente.
+4. **Clases y métodos nativos**: Registrados en `Runtime.RegisterNativeClasses()` y tipados en `pkg/core/native_signatures.go`. Usar `GetNativeClassMethods()` para inspección.
+5. **Plugins**: Índice `pluginpkg.SymbolIndex` del paquete `.jp`.
+6. **Diagnósticos**: Códigos estables `JOSS-...` emitidos como `diagnostics.Diagnostic`.
+7. **Catálogo de VS Code**: `vscode-joss/src/server/generated/languageCatalog.json`, generado automáticamente por `go run ./tools/cataloggen`. **Nunca editarlo manualmente**.
+8. **Catálogo nativo de documentación**: `docs/CATALOGO_NATIVO.md`, generado automáticamente por `go run ./tools/docgen`. **Nunca editarlo manualmente**.
 
-- `$x = 1`: la primera asignación declara e infiere `int`; las siguientes deben ser compatibles.
-- `var $x = 1`: inferencia explícita, también fija.
-- `int $x = 1` o `let int $x = 1`: tipo explícito.
-- `let $x = 1`: `mixed` explícito; permite cambiar de tipo.
-- `mixed $x = 1`: dinamismo explícito equivalente; no existe un modo de tipado en `joss.yaml`.
-- Todo parámetro fuente declara un tipo. Use `mixed $x` explícitamente; `$x` solo ya no conserva compatibilidad legacy.
-- Una inicialización `nil` pospone la inferencia hasta un valor concreto.
-- `T|null` declara una unión nullable; `T?` es sólo su atajo sintáctico y el AST lo normaliza a `T|null`.
-- La coerción textual debe compartir `typesystem.CoerceString` entre análisis y runtime cuando corresponda. No la describa globalmente como «sin pérdida»: algunos caminos usan `float64`, truncan o retornan cero ante entrada inválida; documente cada conversión.
-- Los parámetros tipados conservan su tipo durante el cuerpo.
-- `const $x = ...` infiere un tipo fijo; `const int $x = ...` lo declara. También se protegen propiedades constantes.
-- `func name(...): Type` declara el retorno; analyzer y runtime validan cada retorno explícito y el analyzer exige retorno/throw en todas las rutas demostrables.
-- Cada invocación de función/método usa un frame aislado. Los callables con nombre sólo ven parámetros, locales, `this` y bindings del host/plugin; no heredan locales del caller. Las closures sí conservan su entorno capturado. La recursión está limitada por `Runtime.MaxCallDepth` (1024 por defecto).
-- `ref T $x` y `call(ref $value)` crean una referencia mutable temporal, invariante y no escapable. Sólo acepta variables no constantes; no admite defaults, campos/índices todavía, almacenamiento, retorno ni paso a nativos/async.
-- Clases y funciones globales exigen `public` o `private`; métodos y propiedades exigen `public`, `protected` o `private`. `static` nunca agrega visibilidad implícita. `Init` y closures no llevan modificador.
+---
 
-No implemente reglas paralelas en parser, CLI o evaluator. Añada primero la regla y tests a `pkg/typesystem`, después consúmala desde analyzer/runtime.
+## 4. Reglas semánticas de variables y tipos
 
-## Scopes, símbolos y falsos positivos
+- `$x = 1`: La primera asignación declara e infiere `int`; las siguientes deben ser compatibles.
+- `var $x = 1`: Inferencia explícita, también fija.
+- `int $x = 1` o `let int $x = 1`: Tipo explícito.
+- `let $x = 1`: `mixed` explícito; permite cambiar de tipo (no significa constante).
+- `mixed $x = 1`: Dinamismo explícito equivalente; no existe un modo de tipado en `joss.yaml`.
+- **Todo parámetro fuente debe declarar un tipo explícito**. Usa `mixed $x` si es dinámico; `$x` sin tipo ya no es válido (`JOSS-TYPE-011`).
+- Los antiguos aliases `integer`, `double`, `boolean`, `dynamic`, `any` y `list` fueron retirados. Usarlos emite `JOSS-TYPE-009`. No deben reintroducirse accidentalmente.
+- Una inicialización con `nil`/`null` pospone la inferencia hasta la asignación de un valor concreto.
+- `T|null` declara una unión nullable; `T?` es solo un atajo sintáctico normalizado a `T|null`.
+- `const $x = ...` infiere un tipo fijo inmutable; `const int $x = ...` lo declara explícitamente. También se protegen propiedades constantes.
+- `public func name(...): Type` declara el tipo de retorno. Analyzer y runtime validan cada retorno explícito (`JOSS-TYPE-008`), y el analyzer exige retorno o throw en todas las rutas demostrables (`JOSS-TYPE-010`).
+- Cada llamada a función o método usa un marco (*frame*) aislado. Las funciones con nombre solo ven sus parámetros, locales, `$this` y bindings del host; no ven variables de nivel superior del archivo ni del caller. Las closures sí capturan su entorno léxico. La recursión está limitada a 1024 llamadas por defecto (`Runtime.MaxCallDepth`).
+- `ref T $x` y `call(ref $valor)` crean una referencia mutable temporal, estrictamente invariante y no escapable. Solo acepta variables no constantes; no admite defaults, campos, índices, almacenamiento en variables, retorno ni paso a llamadas nativas o `async`.
+- Clases y funciones globales exigen `public` o `private`; métodos y propiedades exigen `public`, `protected` o `private`. `static` nunca añade visibilidad implícita. `Init` y closures no llevan modificador.
 
-- Funciones, métodos, `Init` y closures tienen scope de callable independiente.
-- Las declaraciones de funciones y clases top-level se resuelven en dos pasadas a nivel de proyecto. Las variables fuente top-level no son globals implícitos de funciones; use parámetros o closures.
-- `foreach` puede reutilizar un binding existente; el runtime lo trata como asignación.
-- `isset` y `empty` consultan existencia y no deben acusar una variable ausente.
-- `unknown` representa falta de información; `mixed` representa dinamismo explícito. Ninguno prueba invalidez.
-- No valide aridad de una API nativa si sus parámetros no están publicados. Todo retorno nativo debe ser explícito; use `mixed`, no `unknown`, cuando el contrato sea polimórfico.
-- Sólo emita error de miembro cuando el tipo receptor y la tabla de miembros estén resueltos.
+---
 
-## Cómo añadir una característica
+## 5. Reglas obligatorias para nuevas funcionalidades
 
-1. Defina la semántica y sus invariantes, contrastándolas con la tesis y el comportamiento actual.
-2. Si cambia sintaxis, añada token/lexer/parser/AST y tests positivos y negativos.
-3. Añada tipos/compatibilidad a `pkg/typesystem` cuando corresponda.
-4. Añada resolución y diagnóstico a `pkg/analyzer`, conservando unidad fuente y scope.
-5. Implemente el mismo contrato en `pkg/core`; el runtime es defensa, no el primer detector.
-6. Actualice el catálogo generado si cambia un símbolo compartido.
-7. Añada regresión e integración, documentación y valide JosSecurity.
+1. **Definir la semántica antes de programar**: Determine invariantes y posibles casos de borde.
+2. **Cambios sintácticos**:
+   - Agregar tokens en `pkg/parser/token.go`.
+   - Modificar lexer, parser Pratt (`parser.go`, `parser_expressions.go`, `parser_statements.go`) y AST.
+   - Agregar pruebas unitarias positivas y negativas en `pkg/parser/`.
+   - Actualizar la gramática formal en `docs/GRAMATICA.md` y la referencia en `docs/SINTAXIS.md`.
+3. **Cambios en el sistema de tipos**:
+   - Incorporar el `Kind` y nombre canónico en `pkg/typesystem`.
+   - Implementar las reglas en `Assignable`, `MergeInference` y `CoerceString` con tests exhaustivos.
+   - Enseñar al analizador (`pkg/analyzer/infer.go`) a inferirlo.
+   - Enseñar al runtime a reconocerlo y validarlo.
+   - Regenerar catálogos con `go run ./tools/cataloggen`.
+4. **Nuevos diagnósticos**:
+   - Usar un código estable dentro de la familia `JOSS-...`.
+   - Emitir `diagnostics.Diagnostic`, nunca strings libres ni ad-hoc.
+   - Incluir severidad, archivo, rango, explicación y sugerencia útil.
+   - Añadir un caso inválido y su vecino válido en `docs/DIAGNOSTICOS.md`.
+5. **Ejemplos verificables en la documentación**:
+   - Todo ejemplo completo nuevo en `docs/*.md` o `README.md` debe usar un marcador de contrato:
+     - `<!-- joss-run: ["salida esperada"] -->` para ejemplos ejecutables.
+     - `<!-- joss-check: descripción -->` para fragmentos que requieren servidor, base de datos o contexto externo.
+     - `<!-- joss-error: JOSS-CODIGO -->` para verificar la emisión del diagnóstico.
+   - Estos marcadores son validados automáticamente por `pkg/core.TestDocumentationContracts`.
 
-## Cómo añadir un tipo
+---
 
-1. Incorpore el `Kind` y nombre fuente canónico en `pkg/typesystem`; no añada aliases sólo por compatibilidad.
-2. Defina `Assignable`, inferencia, conversión y tests de bordes.
-3. Enseñe al analyzer a inferir sus literales/operadores.
-4. Enseñe al runtime a reconocer y validar el mismo tipo usando el paquete común.
-5. Actualice parser sólo si requiere sintaxis nueva.
-6. Regenerar: `go run ./tools/cataloggen`.
+## 6. Sincronización de documentación y JosSecurity
 
-## Cómo añadir un diagnóstico
+`docs/*.md` es la fuente canónica de documentación del proyecto.
 
-1. Use una familia/código estable `JOSS-...`.
-2. Emita `diagnostics.Diagnostic`, no strings ad hoc.
-3. Incluya severidad, archivo, rango, explicación y sugerencia útil.
-4. Exija evidencia suficiente; una limitación del checker no es error del usuario.
-5. Añada un caso inválido y el caso válido vecino que no debe diagnosticarse.
-6. Documente el código en `docs/DIAGNOSTICOS.md`.
+La copia pública que sirve la aplicación web JosSecurity vive en:
+`ejemplos/Joss-Red-JosSecurity/assets/docs/`
 
-## Convenciones del lenguaje que suelen causar errores
+**Debe coincidir archivo por archivo y byte por byte con `docs/*.md`**:
+- El menú de navegación en `ejemplos/Joss-Red-JosSecurity/app/views/docs/menu.joss.html` debe tener exactamente una entrada `data-page="NOMBRE"` para cada archivo `.md`.
+- El controlador en `ejemplos/Joss-Red-JosSecurity/app/controllers/web/DocsController.joss` debe tener exactamente una entrada en el mapa `$titles` para cada archivo.
+- Todo archivo debe estar enlazado en `docs/README.md`.
+- Ningún enlace relativo Markdown puede estar roto.
+- La prueba `TestDocumentationNavigationAndPublicMirror` en `pkg/core/documentation_test.go` valida automáticamente esta paridad.
 
-- No hay `if/else`; usar ternarios con bloques. `return` burbujea y permite guard clauses.
-- Sólo existe `func`; `function`, `import`, `@import`, `use` y namespaces fuente son sintaxis eliminada. Zero-imports es una decisión permanente: no añadir módulos fuente, exports ni un DAG de imports.
-- `foreach`, `while` y `match` son las estructuras soportadas; `await($future)` evita ambigüedad.
-- Clases estáticas usan `::`; instancias usan `->`; concatenación usa `.`.
-- `Auth::user()` retorna `*Instance`: acceder con `$u->id`; preferir `Auth::id()`.
-- No pasar `Auth::user()` directamente a vistas; extraer campos escalares.
-- `GranDB::get()` retorna lista nativa, no JSON string.
-- GranDB `insert`/`insertGetId` reciben un único mapa; no reintroducir arrays paralelos. Schema `create`/`table` reciben una closure de blueprint.
-- Uploads están en `$file["content"]`. Binarios deben usar `Response::raw` con `Content-Disposition`.
-- El motor de vistas procesa herencia/includes y compila recursivamente cuerpos `@foreach`, incluidos ternarios que usan el item. Mantenga tests de expresiones anidadas al tocar el compilador de vistas.
-- Las rutas WebSocket aceptan segmentos dinámicos; `$ws` es el primer argumento y los parámetros siguen en orden. Autenticar el JWT manualmente antes de usar la sesión.
-- Los módulos nativos deben preferir `r.Env` sobre `os.Getenv`.
-- Servicios locales deben usar `127.0.0.1` para evitar resolución IPv6 inesperada.
+---
 
-## Plugins y lifecycle
+## 7. Comandos de validación obligatorios
 
-Los plugins declarados en `joss.yaml` o presentes en `plugins/` se cargan automáticamente; no requieren imports fuente. `Runtime.Free()` debe borrar `PluginRegistry` junto con símbolos/clases: conservar sólo uno de esos estados rompe la reutilización del pool. Los forks comparten recursos inmutables/seguros y copian variables, tipos, constantes e instancias; cualquier nuevo estado mutable debe tener una decisión explícita de copia o compartición y un test de concurrencia.
-
-## Comandos de validación
-
-Desde la raíz:
+Antes de dar por concluida cualquier modificación:
 
 ```bash
+# Formateo de código Go modificado
 gofmt -w <archivos-go-modificados>
+
+# Verificación de generadores automáticos
 go run ./tools/cataloggen --check
 go run ./tools/docgen --check
+
+# Análisis estático y pruebas en Go
 go vet ./...
 go test ./...
 go test -race ./pkg/parser ./pkg/typesystem ./pkg/analyzer ./pkg/core
 go build ./...
-```
 
-Extensión:
+# Pruebas de documentación y contratos de snippets
+go test ./pkg/core -run TestDocumentation -v
 
-```bash
+# Validación de la extensión VS Code
 cd vscode-joss
 npm ci
 npm run compile
+cd ..
 ```
-
-Integración real:
-
-```bash
-go build -o <temporal>/joss ./cmd/joss
-cd ejemplos/Joss-Red-JosSecurity
-<temporal>/joss analyze main.joss
-```
-
-`joss analyze` debe finalizar con código 0 cuando sólo haya warnings. No edite JosSecurity para silenciar un diagnóstico sin comprobar el símbolo contra el runtime real. CI en `.github/workflows/ci.yml` ejecuta estas familias en push y pull request.
-
-Los cambios en `joss new` deben pasar `pkg/template.TestGeneratedProjectsUseCanonicalParsableJoss` para web/consola y `cmd/joss.TestNewPackageAndPluginTemplatesCompileEndToEnd` para package/plugin. Estas regresiones verifican parser, analyzer, ejecución de consola y archivos JP firmados/decodificables; no añada un template sin extender esa matriz.
-
-Los cambios en migraciones/CRUD deben pasar `cmd/joss.TestMigrationAndCRUDGeneratorsWorkTogether`. `make:migration` normaliza `create_x`, `create_x_table` y `x` hacia una tabla lógica plural sin prefijo; `Schema` agrega el prefijo. El runtime crea sus tablas internas mediante `ensureInternalSchemaTable`, no mediante mapas enviados a la API pública `Schema::create/table` (esa compatibilidad fue eliminada). `LogMigration` retorna el error y el runner no puede anunciar éxito si el registro del batch falla. `make:crud` es sólo web, valida identificadores, genera mapas de campos permitidos, usa `POST` para borrar y debe mantener idempotentes rutas/navbar.
-
-`docs/*.md` es la fuente canónica de documentación. La copia publicable de JosSecurity vive en `ejemplos/Joss-Red-JosSecurity/assets/docs/` y debe coincidir archivo por archivo; su menú y el mapa de `DocsController.pageHeading()` deben cubrir exactamente el mismo conjunto. No reintroducir descargas de documentación durante el arranque: la publicación debe ser determinista y versionada. Todo ejemplo completo nuevo debe usar un marcador `joss-run`, `joss-check` o `joss-error` para que `pkg/core.TestDocumentationContracts` valide el texto publicado. Si cambia el registro nativo ejecute `go run ./tools/docgen` y su `--check`.
-
-## Límites que deben declararse con honestidad
-
-El build principal empaqueta AST serializado comprimido (`JOSSBC2Z`) con el runner Go y continúa interpretándolo; el formato anterior sin compresión ya no se acepta y no hay backend LLVM/Cranelift. Tampoco existen todavía ownership, inmutabilidad por defecto ni taint/escape formal. No habrá grafo de módulos fuente: la modularidad de ALIM se implementa mediante capacidades integradas, organización física y plugins aislados, todos con carga automática. La tesis combina arquitectura objetivo y estado implementado; documente explícitamente esta discrepancia.

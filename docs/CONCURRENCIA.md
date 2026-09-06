@@ -1,21 +1,45 @@
-# Async, espera y comunicación entre tareas
+# Concurrencia, operaciones asíncronas, Future y Canales
 
-Antes: [errores](ERRORES.md). Después: [proyecto de consola](PROYECTO_CONSOLA.md).
-Referencia complementaria: [biblioteca](MODULOS_NATIVOS.md), [arquitectura](ARQUITECTURA.md).
+Antes: [Manejo de errores y excepciones](ERRORES.md). Después: [Proyecto práctico de consola](PROYECTO_CONSOLA.md).
+Referencia técnica: [Módulos nativos](MODULOS_NATIVOS.md), [Arquitectura del runtime](ARQUITECTURA.md).
 
-## Tres conceptos diferentes
+---
 
-Una ejecución **síncrona** realiza una operación y espera a que termine antes
-de continuar. Una operación **asíncrona** permite empezar un trabajo y recoger
-su resultado después. **Concurrencia** significa que varias tareas pueden
-avanzar durante el mismo período. No garantiza que todas se ejecuten al mismo
-instante ni que el programa sea más rápido.
+## ¿Qué vas a aprender aquí?
 
-Un **Future** es el objeto que representa un resultado pendiente. Joss lo crea
-con `async { ... }`. No es un tipo fuente genérico `Future<T>` que puedas
-declarar. El contrato publicado de `async` y `await` es `mixed`.
+En el mundo físico, los seres humanos no hacemos una sola cosa estrictamente después de otra. Mientras la lavadora lava la ropa, tú puedes preparar la comida y escuchar música; no te quedas mirando fijamente la lavadora durante 40 minutos sin hacer nada más.
 
-## Lanzar y esperar
+En la programación tradicional sincrónica, la computadora a menudo se queda "congelada" esperando:
+- Espera a que un servidor remoto al otro lado del mundo responda a una consulta (500 milisegundos).
+- Espera a que un disco duro lea un archivo grande (200 milisegundos).
+- Espera a que se complete una consulta compleja a la base de datos.
+
+Durante esa espera, el procesador está desperdiciando millones de ciclos de cálculo que podrían aprovecharse para atender a otros usuarios o procesar otros datos.
+
+En esta guía aprenderás:
+1. La diferencia conceptual entre operaciones **síncronas**, **asíncronas** y **concurrentes**.
+2. Qué es un **`Future`** (promesa de un resultado futuro).
+3. Cómo delegar tareas a segundo plano con la sintaxis **`async { ... }`**.
+4. Qué significa conceptualmente **`await(...)`**, qué devuelve y cómo propaga errores.
+5. Qué es un **canal (`channel`)**, cómo enviar y recibir datos entre tareas independientes y cómo consumirlos con `foreach`.
+6. Cómo aísla Joss la memoria entre tareas mediante `Runtime.Fork()`.
+7. Cuándo utilizar concurrencia y qué errores clásicos evitar.
+
+---
+
+## 1. Los tres conceptos esenciales
+
+Para evitar confusiones habituales, distingamos con precisión tres términos que a menudo se mezclan:
+
+1. **Síncrono (bloqueante)**: Cada instrucción espera obligatoriamente a que la anterior termine. Si la línea 1 tarda 5 segundos, la línea 2 no empieza hasta que pasen esos 5 segundos.
+2. **Asíncrono (no bloqueante)**: Inicias una tarea que tomará tiempo, pero en lugar de quedarte esperando con los brazos cruzados, el programa continúa inmediatamente haciendo otras cosas útiles mientras la tarea trabaja en segundo plano.
+3. **Concurrente**: Múltiples tareas están en progreso durante el mismo intervalo de tiempo, coordinándose y compartiendo recursos de forma ordenada.
+
+---
+
+## 2. Lanzar tareas en segundo plano: `async` y `*Future`
+
+En Joss, cuando quieres que un bloque de código se ejecute en segundo plano sin detener el flujo principal, utilizas la construcción **`async { ... }`**:
 
 <!-- joss-run: ["Preparando resultado", "42"] -->
 ```joss
@@ -27,24 +51,37 @@ $resultado = await($futuro)
 print($resultado)
 ```
 
-`async` inicia una tarea en una goroutine de Go y devuelve su Future.
-`await($futuro)` significa «espera aquí hasta que termine y dame su resultado».
-Bloquea la tarea que espera; no es un event loop ni una suspensión cooperativa
-como la de algunos otros lenguajes. Puede usarse en código de nivel superior
-o dentro de una función; no exige declarar la función como `async func`.
+### ¿Qué ocurre paso a paso en este programa?
 
-Para obtener un resultado claro, escribe `return` en el bloque. Puedes esperar
-un Future ya completado, incluso más de una vez. `await` sobre un valor que no
-sea Future devuelve `null`; el analizador no prueba por completo esa condición.
+1. `$futuro = async { ... }`:
+   - Joss toma el bloque de código y lo lanza a correr de forma concurrente en un hilo ligero gestionado por el sistema (una *goroutine* de Go).
+   - Inmediatamente, la llamada devuelve un objeto especial llamado **`Future`**. Un `Future` no es el número `42` todavía; es un "ticket de reclamo" que representa un resultado que estará listo más adelante.
+2. `print("Preparando resultado")`:
+   - Esta línea se ejecuta de inmediato, **sin esperar** a que el bloque `async` termine de calcular su suma.
+3. `$resultado = await($futuro)`:
+   - Aquí interviene la función `await`. Conceptual y prácticamente significa:
+     > **"Pausa la ejecución de esta línea hasta que la tarea en segundo plano termine, abre el ticket y deposita su resultado en `$resultado`"**.
+   - Si la tarea ya había terminado, `await` entrega el resultado al instante sin demora.
+4. `print($resultado)`:
+   - Muestra el valor final `42`.
 
-`async(func() { ... })` fue eliminado y el parser lo rechaza. La forma
-`async expresión` todavía se reconoce, pero evalúa el argumento antes de
-entrar al built-in: no la uses para intentar diferir una llamada costosa.
-Utiliza siempre el bloque.
+> [!NOTE]
+> En Joss, `await` es una función nativa (`await($futuro)`), no una palabra reservada prefija. Puede utilizarse en cualquier parte del código: en el nivel superior de un archivo o dentro de cualquier función; no te exige declarar tus funciones como `async func`.
 
-## Trabajo independiente y errores
+---
 
-Lanza ambas tareas antes de esperar si son independientes:
+## 3. Ejecución paralela real: Lanzar primero, esperar después
+
+Uno de los errores más comunes al empezar con asincronía es lanzar una tarea y esperar por ella en la línea inmediatamente siguiente:
+
+```joss
+// INCORRECTO si buscas paralelismo (se vuelve síncrono):
+$a = await(async { return tarea1() })
+$b = await(async { return tarea2() })
+```
+En el código anterior, `tarea2` nunca empieza hasta que `tarea1` haya terminado por completo.
+
+Para lograr un verdadero beneficio de rendimiento cuando tienes tareas independientes (por ejemplo, consultar dos servicios web distintos o procesar dos imágenes), **debes lanzar todas las tareas primero y esperar sus resultados después**:
 
 <!-- joss-run: ["30"] -->
 ```joss
@@ -55,37 +92,38 @@ $b = await($dos)
 print($a + $b)
 ```
 
-El orden en que terminan no está garantizado. Si imprimes desde dos tareas,
-sus mensajes pueden aparecer en distinto orden. Esperar inmediatamente después
-de lanzar cada una puede eliminar el solapamiento que buscabas.
+Ahora, tanto `$uno` como `$dos` se ejecutan al mismo tiempo en núcleos de procesador separados. El tiempo total de espera será el de la tarea más lenta, no la suma de ambas.
 
-Si el bloque lanza un error, el Future lo guarda. `await` vuelve a lanzarlo y
-un `try/catch` alrededor de la espera puede recuperarlo. La implementación
-también imprime `[ASYNC PANIC]` al fallar la tarea; puede perder la estructura
-original al convertir el error a texto. No interpreta el fallo como éxito nulo.
+---
 
-No hay cancelación, timeout de Future, `select`, `await all` ni grupo estructurado
-de tareas en la sintaxis fuente. Espera las tareas que necesitas antes de salir:
-lanzarlas no garantiza que el proceso siga vivo hasta que terminen.
+## 4. Qué sucede si una tarea asíncrona falla
 
-## Qué datos se comparten
+¿Qué ocurre si el código dentro del bloque `async` sufre un error o lanza una excepción con `throw`?
 
-Antes de iniciar la goroutine, el runtime hace un `Fork()`. Copia bindings,
-tipos, constantes y varios contenedores; comparte registros y recursos como
-conexiones de base de datos y canales. La closure que ejecuta el bloque conserva
-su entorno capturado. No es un proceso aislado ni una copia profunda general
-de todos los valores posibles.
+Joss no permite que tu programa colapse silenciosamente:
+1. El `Future` captura internamente la excepción ocurrida.
+2. En el momento en que tú invocas `await($futuro)`, el error **se vuelve a lanzar automáticamente** en el hilo principal.
+3. Puedes capturar y solucionar ese fallo envolviendo el `await` dentro de un bloque `try / catch`:
 
-No coordines tareas reasignando una variable escalar del exterior. Usa el
-valor retornado o un canal. Los recursos compartidos y las colecciones anidadas
-requieren revisar su contrato; las pruebas de carreras cubren casos concretos,
-no una garantía universal.
+```joss
+$tarea = async {
+    throw "Fallo al conectar con el servidor externo"
+}
 
-## Canales: entregar valores
+try {
+    $resultado = await($tarea)
+} catch ($e) {
+    print("Error recuperado con éxito: " . $e)
+}
+```
 
-Un **canal** es un conducto por el que una tarea envía valores y otra los recibe.
-`make_chan(n)` crea un canal con espacio para hasta `n` valores pendientes.
-Sin argumento el espacio es cero: envío y recepción deben encontrarse.
+---
+
+## 5. Canales (`channel`): Comunicación segura entre tareas
+
+Cuando dos tareas concurrentes necesitan pasarse mensajes continuamente (como una línea de ensamblaje donde un proceso descarga datos y otro los procesa), compartir variables globales mutables es muy peligroso porque pueden sobrescribirse y generar condiciones de carrera (*race conditions*).
+
+La solución canónica y segura de Joss son los **canales (`channel`)**. Un canal es una tubería unidireccional: un extremo introduce datos y el otro extremo los extrae en estricto orden de llegada (FIFO).
 
 <!-- joss-run: ["hola"] -->
 ```joss
@@ -95,10 +133,24 @@ print(recv($canal))
 close($canal)
 ```
 
-El buffer de uno permite enviar antes de recibir en la misma tarea. Con
-`make_chan()`, ese orden bloquearía indefinidamente: nadie llegaría a recibir.
+### Operaciones esenciales con canales:
 
-Un productor concurrente permite usar un canal sin buffer:
+1. `make_chan($capacidad)`:
+   - Crea un nuevo canal. El argumento define el tamaño del **búfer** (cuántos mensajes pueden guardarse en la tubería antes de que quien envía tenga que detenerse a esperar a que alguien lea).
+   - Si creas `make_chan(1)`, puedes depositar un mensaje sin esperar a que haya un receptor escuchando en ese preciso milisegundo.
+   - Si creas `make_chan()` (sin argumentos o con `0`), es un canal sin búfer: el emisor se bloqueará hasta que el receptor esté listo para recibir el dato mano a mano.
+2. `send($canal, $valor)` (o el operador `$canal << $valor`):
+   - Envía un dato a través de la tubería.
+3. `recv($canal)`:
+   - Espera a que llegue un mensaje por el canal y lo extrae.
+4. `close($canal)`:
+   - Cierra el canal, avisando a todos los receptores que ya no se enviarán más datos.
+
+---
+
+## 6. Patrón Productor-Consumidor con `foreach`
+
+Una de las características más elegantes del lenguaje es que puedes utilizar un bucle `foreach` ordinario para consumir todos los mensajes de un canal hasta que sea cerrado:
 
 <!-- joss-run: ["10", "20"] -->
 ```joss
@@ -114,37 +166,70 @@ foreach ($canal as $valor) {
 await($productor)
 ```
 
-`foreach` recibe hasta que el canal se cierra y se vacía. El productor cierra
-porque sabe que ya no enviará más. Cerrar dos veces o enviar a un canal cerrado
-produce un fallo. Un tamaño negativo tampoco es válido.
+### ¿Por qué funciona esto tan limpiamente?
+1. El bloque `async` actúa como **productor**: envía `10`, luego `20` y finalmente avisa que terminó cerrando el canal con `close($canal)`.
+2. El bucle `foreach` actúa como **consumidor**: espera pacientemente cada número, lo imprime y, en cuanto detecta que el canal fue cerrado y está vacío, el bucle termina de forma limpia y automática.
 
-| Operación | Comportamiento |
-|---|---|
-| `make_chan([capacidad])` | Crea un `channel`; elementos dinámicos, sin contrato de tipo de elemento. |
-| `send(canal, valor)` | Bloquea si no hay receptor/espacio; retorna `null`. |
-| `canal << valor` | Envía y devuelve el propio canal. |
-| `recv(canal)` | Bloquea hasta recibir; al cerrarse y vaciarse retorna `null`. |
-| `close(canal)` | Cierra; no devuelve un resultado útil. |
+---
 
-`recv` no devuelve una bandera que distinga fin de canal de un mensaje
-`null`. Diseña los mensajes teniendo en cuenta esa ambigüedad. Canales no son
-colas persistentes: viven dentro del proceso.
+## 7. El modelo de aislamiento de memoria: `Runtime.Fork()`
 
-## Cron y Task no son sinónimos de async
+Muchos lenguajes sufren de errores oscuros de concurrencia cuando dos tareas modifican las mismas variables al mismo tiempo.
 
-`Cron::schedule(nombre, expresión, { bloque })` registra un bloque para el
-planificador en memoria. Comprueba cada minuto cinco campos, `*`, `*/n`,
-listas, valores y aliases `hourly`, `daily`, `weekly`, `monthly`. Puede
-registrar estado en SQL si hay conexión. No es una garantía de entrega durable
-ni de ejecución única entre varias réplicas.
+Joss previene esto en su arquitectura interna:
+- Cada vez que ejecutas `async { ... }`, el motor realiza una operación de bifurcación controlada (`Runtime.Fork()`).
+- Esto **copia las variables locales, tipos y constantes** para la nueva tarea, asegurando que la tarea en segundo plano no corrompa los nombres de quien la lanzó.
+- Los recursos que legítimamente deben compartirse (como las conexiones activas a bases de datos y los canales `channel`) se mantienen accesibles para la coordinación.
 
-`Task::on_request(nombre, intervalo, { bloque })` tiene un nombre engañoso:
-el handler actual ignora el intervalo y lanza una goroutine inmediatamente al
-invocarse. No registra por sí mismo una tarea recurrente por petición.
-Ambas APIs reciben bloques, no closures. Consulta el [informe](DOCUMENTATION_AUDIT.md).
+---
 
-Ejercicio: cambia el productor para enviar tres nombres; recibe e imprime cada
-uno y explica por qué el `close` permite terminar el `foreach`.
+## 8. Tareas periódicas: Cron
 
+Para operaciones que deben repetirse periódicamente en el tiempo (como limpiar sesiones inactivas cada medianoche o generar reportes cada hora), Joss incluye la clase nativa `Cron`:
 
-[Índice](README.md)
+```joss
+Cron::schedule("limpieza_diaria", "0 0 * * *", {
+    print("Ejecutando limpieza programada del sistema...")
+})
+```
+
+`Cron::schedule` acepta expresiones estándar de 5 campos cron o atajos comunes como `hourly`, `daily`, `weekly` o `monthly`.
+
+---
+
+## 9. Buenas prácticas y errores comunes
+
+| Situación | Qué debes hacer | Qué debes evitar |
+|---|---|---|
+| Múltiples tareas independientes | Lanza todas con `async` primero y haz `await` al final. | Hacer `await` inmediatamente después de cada `async`. |
+| Comunicación entre tareas | Usa canales (`make_chan`, `send`, `recv`) o el valor devuelto por `return`. | Modificar variables globales compartidas desde distintos hilos. |
+| Canales sin búfer en un solo hilo | Si no usas `async`, dale al menos tamaño 1 (`make_chan(1)`). | Usar `make_chan()` y llamar a `send` antes de `recv` en el mismo hilo (provocará un bloqueo permanente o *deadlock*). |
+| Fin de transmisión en canales | El productor debe llamar siempre a `close($canal)` al terminar de emitir datos. | Dejar un canal abierto indefinidamente si un `foreach` está esperando por él. |
+
+---
+
+## 10. Ejercicio práctico
+
+1. **Simulador de descargas paralelas**:
+   - Crea una función que simule descargar tres archivos:
+     ```joss
+     $f1 = async { return "archivo1.png descargado" }
+     $f2 = async { return "archivo2.pdf descargado" }
+     $f3 = async { return "archivo3.zip descargado" }
+     ```
+   - Espera los tres resultados con `await` e imprime cada uno.
+2. **Cola de tareas con canal**:
+   - Crea un canal con búfer para 3 elementos: `$cola = make_chan(3)`.
+   - Envía tres tareas: `"enviar_correo"`, `"generar_pdf"`, `"actualizar_stock"`.
+   - Cierra el canal.
+   - Recorre el canal con `foreach` e imprime `"Procesando: " . $tarea`.
+
+---
+
+## Siguiente paso
+
+¡Felicidades! Has completado el aprendizaje de todos los fundamentos del lenguaje Joss: tipos, estructuras de control, funciones, colecciones, programación orientada a objetos, excepciones y concurrencia.
+
+Ahora pondremos todo este conocimiento en práctica construyendo proyectos reales paso a paso:
+
+Continúa con: [Construir un proyecto de consola completo](PROYECTO_CONSOLA.md).

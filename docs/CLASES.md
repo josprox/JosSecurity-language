@@ -1,17 +1,37 @@
-# Clases, objetos y métodos
+# Clases, objetos, métodos y herencia
 
-[Índice](README.md)
+Antes: [Funciones y closures](FUNCIONES.md), [Colecciones](COLECCIONES.md). Después: [Manejo de errores y excepciones](ERRORES.md).
+Referencia técnica: [Sistema de tipos](SISTEMA_TIPOS.md), [Catálogo nativo](CATALOGO_NATIVO.md).
 
-Antes: [funciones](FUNCIONES.md) y [colecciones](COLECCIONES.md).
-Después: [errores](ERRORES.md). Referencia: [tipos](SISTEMA_TIPOS.md).
+---
 
-## Datos y comportamiento juntos
+## ¿Qué vas a aprender aquí?
 
-Una **clase** describe un tipo de entidad y sus operaciones. Un **objeto** o
-**instancia** es una entidad concreta creada con esa clase. Una **propiedad**
-guarda un dato del objeto; un **método** es una función asociada a él.
+A medida que una aplicación crece, tener variables dispersas por un lado y funciones sueltas por otro puede volverse caótico:
+- Puedes tener una variable `$usuario_nombre`, otra `$usuario_email`, otra `$usuario_rol`.
+- Si tienes 100 usuarios, ¿cómo mantienes unidos los datos de cada uno con las operaciones que les corresponden (como autenticarse, cambiar contraseña o enviar notificación)?
 
-Piensa en un contador: tiene una cantidad y una operación que la incrementa.
+La **Programación Orientada a Objetos (POO)** resuelve este problema empaquetando datos y comportamientos relacionados en una sola unidad conceptual.
+
+En esta guía aprenderás:
+1. Qué es una **clase** (el plano de diseño) y qué es un **objeto** o **instancia** (la entidad real).
+2. Cómo definir **propiedades** (atributos) y **métodos** (funciones de la clase).
+3. Cómo inicializar objetos con **constructores** e `Init`.
+4. El rol de la variable especial **`$this`**.
+5. Los niveles de visibilidad y encapsulación: `public`, `protected` y `private`.
+6. Miembros estáticos y el operador de resolución de ámbito (`::`).
+7. Cómo reutilizar y especializar código mediante **herencia** con `extends`.
+8. El operador de navegación segura ante nulos (`?->`).
+
+---
+
+## 1. Clases y Objetos: El plano y la casa
+
+Para entender la orientación a objetos, la mejor analogía es la arquitectura:
+- Una **clase** es el **plano arquitectónico**: describe qué habitaciones tendrá la casa, cuántas puertas y qué funciones tiene. El plano no ocupa un terreno físico ni puedes vivir en él.
+- Un **objeto** (o **instancia**) es la **casa física real construida** en un terreno a partir de ese plano. Puedes construir diez casas a partir del mismo plano; pintar una casa de azul no cambia el color de las demás.
+
+Veamos un ejemplo mínimo con un contador:
 
 <!-- joss-run: ["1", "2"] -->
 ```joss
@@ -28,15 +48,22 @@ print($contador->incrementar())
 print($contador->incrementar())
 ```
 
-`new Contador()` crea una instancia. `$this` significa «esta instancia» dentro
-de sus métodos. `->` accede a una propiedad o método de una instancia.
-Dos instancias tienen campos propios; asignar la misma instancia a dos nombres
-no crea un objeto nuevo.
+### ¿Qué elementos componen este código?
 
-## Construcción
+1. `public class Contador`: Declara una clase pública llamada `Contador`. En Joss, las clases a nivel de archivo requieren un modificador de visibilidad (`public` o `private`).
+2. `public int $valor = 0`: Es una **propiedad** (un dato que cada instancia de `Contador` recordará).
+3. `public func incrementar(): int`: Es un **método** (una función que le pertenece a la clase y que puede manipular sus propiedades).
+4. `$this`: Es una palabra reservada que significa "este objeto en particular". Cuando ejecutas `$this->valor`, estás accediendo a la propiedad `$valor` de la instancia que está ejecutando el método.
+5. `new Contador()`: La palabra clave `new` crea una nueva instancia real en la memoria.
+6. `$contador->incrementar()`: El operador flecha `->` se utiliza para acceder a propiedades y métodos de una instancia.
 
-Un **constructor** prepara el objeto al crearlo. En clases fuente puedes usar
-un método llamado `constructor`:
+---
+
+## 2. Inicialización de objetos: Constructores
+
+Cuando creas un objeto, casi siempre necesitas configurarlo con datos iniciales (por ejemplo, el nombre de una persona o las credenciales de una base de datos).
+
+En Joss puedes definir un método `constructor` o un bloque `Init`:
 
 <!-- joss-run: ["Hola, Ada"] -->
 ```joss
@@ -55,31 +82,71 @@ $persona = new Persona("Ada")
 print($persona->saludar())
 ```
 
-La salida es `Hola, Ada`. La propiedad privada obliga a trabajar mediante los
-métodos de la clase. El runtime también reconoce `Init constructor()` y
-`Init main()` como inicializadores; `Init` no lleva visibilidad. Evita definir
-varios inicializadores candidatos: no hay un sistema de sobrecargas por firma.
-No presupongas encadenamiento automático del constructor de la superclase.
+Al escribir `new Persona("Ada")`, Joss llama automáticamente al constructor entregándole el argumento `"Ada"`, el cual queda guardado de forma segura dentro de la propiedad privada `$this->nombre`.
 
-## Visibilidad
+> [!NOTE]
+> Joss también admite la sintaxis de bloque `Init(string $nombre) { ... }`. Los bloques `Init` no llevan modificadores de visibilidad (`public` ni `private`).
 
-La **encapsulación** consiste en exponer operaciones útiles y limitar el acceso
-a detalles que podrían romper el estado del objeto.
+---
 
-| Declaración | Modificadores de acceso |
-|---|---|
-| Clase o función global | `public` o `private`; privada a su archivo. |
-| Método o propiedad | `public`, `protected` o `private`. |
-| `Init` o closure | Sin modificador de acceso. |
+## 3. Encapsulación y modificadores de visibilidad
 
-`public` permite el acceso exterior, `private` lo restringe a la clase propietaria
-del miembro y `protected` permite también acceso desde clases derivadas.
-`static` no agrega visibilidad implícita. Declara explícitamente el acceso.
+La **encapsulación** es el principio de proteger los datos internos de un objeto para evitar que código externo los modifique de forma incorrecta o corrupta.
 
-## Herencia
+Joss ofrece tres modificadores de visibilidad explícitos:
 
-Una clase puede **heredar** de otra para reutilizar miembros. `extends` nombra
-una sola superclase:
+| Modificador | Dónde se puede acceder | Uso recomendado |
+|---|---|---|
+| `public` | Desde **cualquier parte** del programa (dentro de la clase, en subclases y desde código exterior). | Para la API pública del objeto: métodos que los usuarios de tu clase necesitan invocar. |
+| `protected` | Solo **dentro de la propia clase** y **dentro de las subclases** que hereden de ella con `extends`. | Para métodos y propiedades internas que las clases hijas necesitan especializar o consultar. |
+| `private` | **Únicamente dentro de la clase exacta** donde fue declarada. Nadie más puede verla ni modificarla. | Para detalles de implementación íntimos (contraseñas, conexiones crudas, flags de estado). |
+
+```joss
+public class CuentaBancaria {
+    private decimal $saldo = 0.0m
+
+    public func depositar(decimal $monto) {
+        ($monto > 0.0m) ? {
+            $this->saldo = $this->saldo + $monto
+        } : {}
+    }
+
+    public func obtenerSaldo(): decimal {
+        return $this->saldo
+    }
+}
+```
+Al hacer `$saldo` privado, nadie puede escribir `$cuenta->saldo = -5000.0m` desde afuera, garantizando que el dinero solo se modifique bajo las reglas del método `depositar`.
+
+---
+
+## 4. Miembros estáticos y el operador `::`
+
+No todas las propiedades o métodos le pertenecen a una casa individual; algunas operaciones pertenecen al concepto general de la clase o no requieren crear una instancia con `new`.
+
+A estos elementos se les llama **estáticos** y se declaran con la palabra `static`:
+
+```joss
+public class Utilidades {
+    public static func limpiarTexto(string $t): string {
+        return trim($t)
+    }
+}
+```
+
+Para invocar un método estático o leer una propiedad estática, no se utiliza `->`, sino el operador de doble dos puntos **`::`**:
+
+```joss
+$limpio = Utilidades::limpiarTexto("  hola  ")
+```
+
+En Joss, las clases nativas del sistema (como `Auth::user()`, `GranDB::table()`, `Route::get()`, `Cache::put()`) son fachadas que se invocan habitualmente mediante `::`.
+
+---
+
+## 5. Herencia con `extends`
+
+La **herencia** permite crear una clase nueva basada en una clase existente, reutilizando todos sus métodos y propiedades públicas y protegidas sin tener que reescribirlos:
 
 <!-- joss-run: ["hola"] -->
 ```joss
@@ -91,30 +158,53 @@ $aviso = new Aviso()
 print($aviso->texto())
 ```
 
-Usa herencia cuando el nuevo objeto sea una especialización del anterior.
-Si sólo necesitas reutilizar un cálculo, una función suele ser suficiente.
-Joss no tiene interfaces, traits, protocolos ni clases genéricas definibles
-por el usuario. `array<T>` y `map<K,V>` son anotaciones de colecciones, no un
-sistema general para declarar clases parametrizadas.
+- La clase `Mensaje` es la **clase base** (o superclase).
+- La clase `Aviso` es la **clase derivada** (o subclase).
+- `Aviso` hereda automáticamente el método `texto()` de `Mensaje`.
 
-## Clases integradas
+> [!TIP]
+> **Cuándo usar herencia vs cuándo usar composición**:
+> Usa herencia solo cuando exista una relación estricta de tipo "es un" (por ejemplo, `Gato extends Animal` o `AdminUser extends User`). Si solo quieres reutilizar una función utilitaria, no uses herencia; usa funciones o inyecta una clase de servicio.
 
-Una **clase nativa** expone operaciones implementadas en Go, como
-`JSON::stringify` o `GranDB::table`. La convención de acceso estático es `::`;
-el acceso al objeto devuelto por un constructor o builder usa `->`.
+---
 
-No todas las clases nativas representan objetos que debas crear con `new`.
-Algunas son fachadas de servicios y otras requieren estado inicializado por
-una API. Consulta el contrato de cada una en la [biblioteca](MODULOS_NATIVOS.md).
-La presencia de un nombre en el catálogo no prueba que cualquier combinación
-de argumentos vaya a funcionar.
+## 6. Navegación segura contra nulos (`?->`)
 
-## Nulabilidad y acceso seguro
+Si una variable puede contener una instancia o ser `null` (tipo `Persona?`), intentar acceder a un método con `->` sobre un valor nulo podría causar un error.
 
-Una variable puede admitir una instancia o ausencia de valor con `Persona|null`
-o `Persona?`. `?->` devuelve `null` si el receptor es nulo. No corrige un método
-inexistente ni convierte una instancia en un mapa. Para una instancia devuelta
-por `Auth::user()` usa `->`; para un registro de GranDB usa claves `[...]`.
+Joss incluye el operador **null-safe (`?->`)**:
 
-Ejercicio: agrega a `Contador` un método `reiniciar` que asigne cero al campo.
-Comprueba que reiniciar una instancia no cambie otra creada con `new`.
+```joss
+Persona? $usuario = obtenerUsuario(123)
+$nombre = $usuario?->saludar()
+```
+
+Si `$usuario` es `null`, la llamada se cancela de forma silenciosa y segura, y `$nombre` recibirá simplemente `null` sin detener el programa.
+
+---
+
+## 7. Errores comunes en POO con Joss
+
+| Error | Causa | Solución |
+|---|---|---|
+| Confundir `->` con `::` | Escribir `$objeto::metodo()` o `Clase->metodo()`. | Usa `->` para instancias reales creadas con `new` y `::` para llamadas estáticas a clases. |
+| Intentar acceder a un miembro privado | `$cuenta->saldo` cuando es `private`. | Crea un método público *getter* (como `obtenerSaldo()`) para consultar el valor. |
+| Olvidar `new` al instanciar | `$p = Persona()` en vez de `$p = new Persona()`. | La creación de instancias exige la palabra `new`. |
+| Confundir una instancia con un map | Tratar un objeto como array asociativo (`$objeto["campo"]`). | Los objetos usan flecha (`$objeto->campo`), los maps usan corchetes (`$mapa["campo"]`). |
+
+---
+
+## 8. Ejercicio práctico
+
+1. **Jerarquía de vehículos**:
+   - Crea una clase `public class Vehiculo` con una propiedad protegida `protected string $marca` y un método `public func obtenerMarca(): string`.
+   - Crea una clase derivada `public class Auto extends Vehiculo` que tenga una propiedad `public int $puertas = 4`.
+   - Instancia un `Auto`, asígnale marca y muestra su marca y número de puertas en la consola.
+
+---
+
+## Siguiente paso
+
+Incluso en el mejor código orientado a objetos, las cosas pueden fallar: un archivo puede no existir, una base de datos puede estar desconectada o un usuario puede ingresar datos no válidos. Aprenderemos cómo interceptar y solucionar estos problemas con elegancia:
+
+Continúa con: [Manejo de errores, excepciones y try/catch](ERRORES.md).

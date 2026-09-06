@@ -1,113 +1,119 @@
-# Referencia de diagnósticos
+# Catálogo y referencia de diagnósticos del lenguaje
 
-[Índice](README.md) · Antes: [manejo de errores](ERRORES.md) · Después: [analizador](ANALIZADOR.md)
+Antes: [Manejo de errores y excepciones](ERRORES.md). Después: [Analizador semántico AST](ANALIZADOR.md).
+Índice general: [Documentación de Joss](README.md).
 
-Un diagnóstico explica dónde se detectó un problema y qué regla lo origina.
-Empieza por el primero: un token incorrecto puede causar varios mensajes derivados.
-`error` bloquea el análisis/ejecución del CLI; `warning` informa sin cambiar a
-salida fallida en `joss analyze`. Los avisos del linter o del editor no prueban
-por sí solos un fallo de ejecución.
+---
 
-El modelo `diagnostics.Diagnostic` incluye Code, Severity, Message, File,
-Range (línea/columna), Explanation y Suggestion. El runtime también tiene errores
-con stack de llamadas, aunque su adaptación a catch no conserva todos los campos.
+## ¿Qué es un diagnóstico en Joss?
 
-## Parser, carga y símbolos
+Un **diagnóstico** es un informe técnico estructurado emitido por las herramientas de Joss (el compilador, el analizador semántico `joss analyze`, el linter o el runtime defensivo) cuando se detecta una violación a las reglas sintácticas, de tipos o de seguridad del lenguaje.
 
-En las tablas, los fragmentos son ilustraciones de la causa; cuando se necesitan
-varios archivos o contexto se indica. Las pruebas ejecutables de abajo comprueban
-casos completos con su código real.
+A diferencia de los mensajes de error genéricos de herramientas antiguas, cada diagnóstico de Joss está diseñado siguiendo estos principios:
+1. **Identificador único y estable**: Cada regla tiene un código inmutable (por ejemplo `JOSS-TYPE-001`).
+2. **Ubicación exacta**: Archivo, línea y columna precisa donde se originó el conflicto.
+3. **Explicación pedagógica**: Describe claramente qué regla se incumplió y por qué.
+4. **Sugerencia accionable**: Propone la corrección canónica recomendada.
 
-| Código | Causa / ejemplo incorrecto | Solución / caso correcto |
-|---|---|---|
-| JOSS-IO-001 | Archivo fuente que no se puede leer. | Corregir ruta/permisos; usar un archivo existente. |
-| JOSS-PARSE-001 | Token o estructura inválida; `function...`, falta de llave o visibilidad. | Usar sintaxis canónica, por ejemplo `public func f() {}`. |
-| JOSS-SYM-001 | Variable no definida: `print($x)`. | Declarar `$x = 1` antes o pasarla como parámetro. |
-| JOSS-SYM-002 | Redeclaración en el mismo ámbito: dos `int $x`. | Asignar con `$x = ...` si ya existe, o elegir otro nombre. |
-| JOSS-SYM-003 | Función no resuelta: `noExiste()`. | Declarar/cargar la función o corregir nombre. |
-| JOSS-SYM-004 | `new Ausente()`. | Declarar clase pública o instalar plugin que la publique. |
-| JOSS-SYM-005 | `extends Ausente`. | Usar una clase base existente. |
-| JOSS-SYM-006 | `const $x = 1; $x = 2`. | Mantener constante o declarar variable mutable desde el inicio. |
-| JOSS-DECL-001 | Dos funciones globales con igual nombre. | Renombrar o eliminar duplicado; carpetas no crean namespaces. |
-| JOSS-DECL-002 | Dos clases globales con igual nombre. | Mantener una declaración en el proyecto. |
-| JOSS-DECL-003 | Dos métodos homónimos en una clase. | No hay sobrecarga por firma; usar nombres diferentes. |
+### Niveles de severidad
 
-## Tipos y llamadas
+- **`error`**: Impide la ejecución del programa (`joss run` y el compilador se detienen). Representa un fallo estructural o de seguridad.
+- **`warning`**: Aviso informativo (como una variable declarada que nunca se usó o una convención de nombres desalineada). `joss analyze` finaliza con código de salida `0` si solo hay advertencias, permitiendo continuar la ejecución.
 
-| Código | Causa / ejemplo incorrecto | Solución / caso correcto |
-|---|---|---|
-| JOSS-TYPE-001 | Reasignación incompatible: `$x=1; $x="hola"`. | `$x=2`; o mixed explícito si el dominio es variable. |
-| JOSS-TYPE-002 | Inicializador/default incompatible: `int $x="hola"`. | Inicializar con entero o texto numérico aceptado por coerción. |
-| JOSS-TYPE-003 | Argumento incompatible con parámetro conocido. | Pasar int a `func f(int $x)`; validar antes de convertir. |
-| JOSS-TYPE-004 | Operador no admite operandos conocidos. | Usar números para aritmética y punto para concatenación. |
-| JOSS-TYPE-005 | Clave map con tipo no admitido. | Usar string/int según contrato, no array como clave. |
-| JOSS-TYPE-006 | Índice de tipo incorrecto para colección conocida. | Array/string con entero; map con clave admitida. |
-| JOSS-TYPE-007 | Indexación de un valor no indexable, como entero. | Indexar array/map/string o retirar el índice. |
-| JOSS-TYPE-008 | Retorno incompatible con anotación. | `: int { return 1 }`, no texto no numérico. |
-| JOSS-TYPE-009 | Tipo/clase desconocido, incluidos aliases retirados. | Usar int/float/bool/mixed/array o clase declarada. |
-| JOSS-TYPE-010 | Callable anotado puede terminar sin return/throw. | Cubrir cada ruta demostrable con un resultado del tipo declarado. |
-| JOSS-TYPE-011 | Parámetro sin tipo: `func($x) {}`. | `func(mixed $x) {}` o tipo concreto. |
-| JOSS-CALL-001 | Cantidad incorrecta de argumentos en firma conocida. | Respetar parámetros obligatorios/defaults. |
-| JOSS-MEMBER-001 | Método ausente en receptor con clase resuelta. | Corregir método; consultar registro real para clases nativas. |
-| JOSS-ACCESS-001 | Función/clase private usada desde otro archivo. | API public o mantener el uso dentro de su archivo. |
-| JOSS-ACCESS-002 | Miembro private/protected inaccesible. | Acceder mediante método público autorizado o desde ámbito permitido. |
+---
 
-Los aliases fuente eliminados `integer`, `double`, `boolean`, `dynamic`,
-`any` y `list` no se convierten automáticamente en tipos canónicos. Una clase
-declarada con uno de esos nombres se resuelve como clase, no como alias.
+## 1. Parser, carga de proyectos y tabla de símbolos
 
-## Referencias temporales
+| Código | Categoría | Significado y Causa | Ejemplo incorrecto | Solución y Caso correcto |
+|---|---|---|---|---|
+| `JOSS-IO-001` | Entrada / Salida | No se puede leer el archivo fuente en disco (permisos o ruta inexistente). | `joss run fantasma.joss` | Verificar que el archivo exista en la ruta indicada con permisos de lectura. |
+| `JOSS-PARSE-001` | Sintaxis | Token o estructura gramatical inválida: falta una comilla, llave o visibilidad obligatoria. | `class MiClase {}`<br>`func prueba() {}` | Usar sintaxis canónica:<br>`public class MiClase {}`<br>`public func prueba() {}` |
+| `JOSS-SYM-001` | Símbolos | Variable no definida: se intenta leer una variable antes de ser creada. | `print($variable)` | Declarar e inicializar la variable antes de usarla:<br>`$variable = "valor"` |
+| `JOSS-SYM-002` | Símbolos | Redeclaración de variable en el mismo ámbito léxico. | `int $x = 1`<br>`int $x = 2` | Reasignar sin volver a declarar:<br>`$x = 2` |
+| `JOSS-SYM-003` | Símbolos | Función no resuelta: se invoca una función que no existe en el proyecto ni en built-ins. | `calcularTotal()` | Definir la función con `public func` o verificar la ortografía del nombre. |
+| `JOSS-SYM-004` | Símbolos | Clase no resuelta: intento de instanciar (`new`) una clase no declarada ni registrada. | `$p = new Persona()` | Declarar `public class Persona {}` o cargar el plugin que la exponga. |
+| `JOSS-SYM-005` | Símbolos | Herencia inválida: la clase especificada en `extends` no existe. | `public class A extends B {}` | Asegurarse de que la superclase `B` esté declarada en el proyecto. |
+| `JOSS-SYM-006` | Símbolos | Intento de reasignar una constante inmutable. | `const int $MAX = 5`<br>`$MAX = 10` | Si el valor debe cambiar, declararla como variable mutable: `$MAX = 5`. |
+| `JOSS-DECL-001` | Declaraciones | Conflicto de nombres: dos funciones globales tienen exactamente el mismo identificador. | Dos archivos con:<br>`public func procesar() {}` | Renombrar una de las dos funciones. En Joss no hay namespaces fuente por carpeta. |
+| `JOSS-DECL-002` | Declaraciones | Conflicto de clases: dos clases globales tienen el mismo nombre en el proyecto. | Dos archivos con:<br>`public class Usuario {}` | Mantener una única declaración canónica de la clase en todo el proyecto. |
+| `JOSS-DECL-003` | Declaraciones | Métodos duplicados: una misma clase declara dos métodos con el mismo nombre. | `public func id() {}`<br>`public func id(int $x) {}` | Joss no admite sobrecarga de métodos por firma; usa nombres descriptivos distintos. |
 
-| Código | Causa | Solución |
-|---|---|---|
-| JOSS-REF-001 | Falta/sobra marcador bilateral ref o cruce a nativo/async no permitido. | Declarar `ref int $x` y llamar con `f(ref $x)` a función fuente compatible. |
-| JOSS-REF-002 | Se pasa expresión, campo o índice como referencia. | Pasar una variable local mutable simple. |
-| JOSS-REF-003 | La variable referida es constante. | Mantener const y pasar por valor, o diseñar salida retornada. |
-| JOSS-REF-004 | Tipo referido no es exactamente igual al parámetro. | Usar tipo invariante, sin ampliación int→float para ref. |
-| JOSS-REF-005 | Intento de almacenar, retornar o escapar referencia. | Utilizar ref sólo durante una llamada y devolver un valor ordinario. |
-| JOSS-REF-006 | Parámetro ref con default. | Exigir argumento explícito; quitar default. |
+---
 
-## Flujo, linter y vistas
+## 2. Sistema de tipos, llamadas y accesibilidad
 
-| Código | Severidad / causa | Corrección |
-|---|---|---|
-| JOSS-FLOW-001 | Warning: código posterior a terminación incondicional. | Mover antes del return si debe ejecutarse o eliminarlo. |
-| JOSS-LINT-001 | Warning: variable local sin uso. | Usarla o retirar declaración sin efecto necesario. |
-| JOSS-SYNTAX-001 | Error sintáctico envuelto por linter. | Corregir primer error del parser; no es una gramática distinta. |
-| JOSS-LINT-002 | Error de linter: parámetro sin tipo explícito. | Escribir el tipo; puede aparecer junto a TYPE-011. |
-| JOSS-LINT-007 | Warning de nombres fuera de convención. | Clases PascalCase, funciones camelCase según regla del linter. |
-| JOSS-SEC-001 | Warning heurístico: posible secreto literal en fuente. | Leer configuración; comprobar si el hallazgo es real sin publicar el valor. |
-| JOSS-VIEW-001 | Error al compilar plantilla. | Corregir directivas, bloques o archivo requerido. |
-| JOSS-VIEW-SYNTAX | Error sintáctico del Joss embebido en vista. | Corregir la expresión y su contexto de plantilla. |
-| JOSS-VIEW-UNDEF | Warning heurístico de variable sin protección en ternario de vista. | Pasar dato explícitamente o proteger existencia cuando sea opcional. |
+| Código | Categoría | Significado y Causa | Ejemplo incorrecto | Solución y Caso correcto |
+|---|---|---|---|---|
+| `JOSS-TYPE-001` | Tipos | Reasignación incompatible: se asigna un dato de tipo distinto a una variable tipada o inferida. | `$edad = 20`<br>`$edad = "veinte"` | Mantener el tipo homogéneo, o usar dinamismo voluntario:<br>`mixed $edad = 20`<br>`$edad = "veinte"` |
+| `JOSS-TYPE-002` | Tipos | Valor inicial incompatible con la anotación de tipo explícita. | `int $x = "texto"` | Proveer un valor del tipo esperado o una cadena convertible según `CoerceString`. |
+| `JOSS-TYPE-003` | Tipos | Argumento incompatible con el parámetro tipado de una función o método. | `public func f(int $n) {}`<br>`f("hola")` | Pasar el tipo correcto o convertir el argumento antes de la llamada. |
+| `JOSS-TYPE-004` | Tipos | Operador aplicado a operandos no admitidos (ej. sumar texto con `+`). | `"hola" + " mundo"` | Para aritmética usa números; para unir texto usa el operador punto (`.`): `"hola" . " mundo"`. |
+| `JOSS-TYPE-005` | Tipos | Tipo de clave no admitido en un mapa asociativo. | `{[1, 2]: "valor"}` | Las claves de un `map` deben ser de tipo `string`. |
+| `JOSS-TYPE-006` | Tipos | Tipo de índice incorrecto para una colección conocida. | `$arr["clave"]` (en un array)<br>`$map[true]` (en un map) | Los arrays se indexan con enteros (`$arr[0]`); los maps con cadenas (`$map["clave"]`). |
+| `JOSS-TYPE-007` | Tipos | Intento de indexar con `[...]` un valor que no es indexable (ej. un entero o booleano). | `$n = 42`<br>`print($n[0])` | Indexar únicamente arrays, maps, cadenas o instancias compatibles. |
+| `JOSS-TYPE-008` | Tipos | El valor retornado por `return` no coincide con el tipo prometido en la firma `: Tipo`. | `public func f(): int {`<br>`    return "no es int"`<br>`}` | Devolver un valor compatible con la firma declarada. |
+| `JOSS-TYPE-009` | Tipos | Tipo de dato o clase inexistente (incluye aliases eliminados como `integer`, `double`, `boolean`, `any`, `list`). | `integer $x = 10`<br>`boolean $flag = true` | Usar los tipos canónicos de Joss:<br>`int $x = 10`<br>`bool $flag = true` |
+| `JOSS-TYPE-010` | Tipos | Función con tipo de retorno anotado puede terminar sin ejecutar un `return` o `throw`. | `public func f(int $n): string {`<br>`    $n > 0 ? { return "si" } : {}`<br>`}` | Garantizar que todas las rutas posibles retornen un valor del tipo prometido. |
+| `JOSS-TYPE-011` | Tipos | Se declaró un parámetro sin tipo explícito. | `public func f($x) {}` | En Joss todos los parámetros deben declarar su tipo:<br>`public func f(int $x) {}` o `public func f(mixed $x) {}` |
+| `JOSS-CALL-001` | Llamadas | Cantidad incorrecta de argumentos respecto a los parámetros de la firma conocida. | `public func f(int $a, int $b) {}`<br>`f(1)` | Proporcionar todos los argumentos obligatorios requeridos por la función. |
+| `JOSS-MEMBER-001` | Miembros | Se intenta invocar un método que no existe en la clase receptora resuelta. | `$usuario->metodoInexistente()` | Comprobar el nombre del método en la definición de la clase o en el catálogo nativo. |
+| `JOSS-ACCESS-001` | Visibilidad | Se intenta usar una clase o función declarada como `private` desde otro archivo. | Llamar a una función privada de otro archivo. | Declarar la función o clase como `public` si debe ser compartida en el proyecto. |
+| `JOSS-ACCESS-002` | Visibilidad | Intento de acceder a una propiedad o método `private` o `protected` fuera de su ámbito autorizado. | `$cuenta->saldo` (siendo privado) | Acceder a través de métodos públicos autorizados (getters/setters). |
 
-El LSP incluye heurísticas adicionales sobre texto (eval, SQL interpolado,
-coste bcrypt) que no constituyen nuevos códigos estables JOSS. Una cadena
-que mencione una API de otro lenguaje no demuestra que esa API exista en Joss.
+---
 
-## Errores aritméticos e indexación runtime
+## 3. Referencias temporales (`ref`)
 
-| Código | Operación inválida | Corrección |
-|---|---|---|
-| JOSS-ARITH-001 | Operación entera fuera del rango signed de 64 bits. | Comprobar límites o elegir decimal/otro dominio antes del cálculo. |
-| JOSS-ARITH-002 | División o módulo por cero. | Comprobar divisor antes de operar. |
-| JOSS-INDEX-001 | Índice negativo o >= longitud admitida. | Usar rango válido; en strings la indexación cuenta grafemas. |
-| JOSS-INDEX-002 | Tipo de índice no compatible en runtime. | Convertir/validar índice entero o clave según colección. |
+| Código | Categoría | Significado y Causa | Solución |
+|---|---|---|---|
+| `JOSS-REF-001` | Referencias | Falta el marcador bilateral `ref` en la llamada o en la definición, o cruce ilegal a nativo/async. | Si la función espera `ref int $x`, la llamada debe ser `f(ref $x)`. |
+| `JOSS-REF-002` | Referencias | Se pasa una expresión, un literal, un campo de objeto o un índice de array como referencia. | Pasar únicamente variables locales mutables directas (`ref $miVariable`). |
+| `JOSS-REF-003` | Referencias | La variable pasada como referencia es una constante inmutable (`const`). | Una referencia muta el valor original; no puedes pasar constantes a un parámetro `ref`. |
+| `JOSS-REF-004` | Referencias | Discrepancia de tipo en la referencia (el tipo de la variable no coincide exactamente con el parámetro). | Las referencias son estrictamente invariantes: un `ref float` exige exactamente una variable `float`. |
+| `JOSS-REF-005` | Referencias | Intento de almacenar, capturar en closure, retornar o hacer escapar una referencia. | Una referencia solo vive durante la llamada; para devolver datos usa `return`. |
+| `JOSS-REF-006` | Referencias | Parámetro `ref` declarado con un valor por defecto. | Los parámetros por referencia no admiten valores por defecto; quita el `= valor`. |
 
-Estas guardias no cubren automáticamente todas las funciones nativas ni las
-escrituras por índice. Otros errores runtime tienen tipo/mensaje sin código
-JOSS estable; no inventes un código para ellos.
+---
 
-## Casos completos verificados
+## 4. Control de flujo, linter y plantillas
 
-Tipo inexistente:
+| Código | Severidad | Significado y Causa | Solución |
+|---|---|---|---|
+| `JOSS-FLOW-001` | Warning | Código inalcanzable (*dead code*): instrucciones escritas después de un `return` incondicional. | Mover las instrucciones antes del `return` o eliminarlas. |
+| `JOSS-LINT-001` | Warning | Variable local declarada pero nunca leída en el cuerpo. | Utilizar la variable o retirarla para mantener el código limpio. |
+| `JOSS-SYNTAX-001` | Error | Error sintáctico capturado durante la fase de análisis del linter. | Corregir la puntuación o estructura señalada por el parser. |
+| `JOSS-LINT-002` | Error | Parámetro sin tipo explícito reportado por el linter. | Añadir la anotación de tipo correspondiente (`int`, `string`, `mixed`). |
+| `JOSS-LINT-007` | Warning | Desviación de convenciones de nombres del proyecto (clases en PascalCase, funciones en camelCase). | Ajustar el nombre al estándar canónico. |
+| `JOSS-SEC-001` | Warning | Detección heurística de un posible secreto sensible escrito en texto plano (claves API, tokens). | Mover el secreto al archivo de configuración de entorno (`env.joss`). |
+| `JOSS-VIEW-001` | Error | Fallo crítico al compilar o parsear una plantilla de vista HTML. | Verificar el cierre de directivas (`@foreach`, `@endforeach`) y archivos incluidos. |
+| `JOSS-VIEW-SYNTAX` | Error | Expresión de Joss mal formada dentro de una etiqueta de vista `{{ ... }}`. | Corregir la sintaxis de la expresión embebida. |
+| `JOSS-VIEW-UNDEF` | Warning | Variable de vista accedida sin protección ante valores indefinidos o nulos. | Proteger con el operador de coalescencia nula: `{{ $variable ?? 'default' }}`. |
+
+---
+
+## 5. Errores aritméticos e indexación en tiempo de ejecución
+
+| Código | Categoría | Operación inválida en Runtime | Cómo prevenirlo |
+|---|---|---|---|
+| `JOSS-ARITH-001` | Runtime | Desbordamiento de entero con signo de 64 bits (−2⁶³ a 2⁶³−1). | Validar los límites antes de operar o utilizar el tipo `decimal` para cálculos de gran escala. |
+| `JOSS-ARITH-002` | Runtime | División o módulo por cero (`$x / 0` o `$x % 0`). | Comprobar que el divisor sea distinto de cero antes de ejecutar la división: `($divisor != 0) ? ($x / $divisor) : 0.0`. |
+| `JOSS-INDEX-001` | Runtime | Índice fuera de rango: acceso a posición negativa o mayor/igual a la longitud. | Verificar `count($arr)` antes de indexar o comprobar la existencia con `array_key_exists`. |
+| `JOSS-INDEX-002` | Runtime | Tipo de índice no compatible con la estructura de datos. | Indexar arrays con números enteros y maps con cadenas de texto. |
+
+---
+
+## 6. Casos completos de prueba verificados
+
+A continuación se presentan ejemplos ejecutables que validan formalmente la emisión de los diagnósticos y su contraparte correcta:
+
+### Tipo inexistente o alias eliminado (`JOSS-TYPE-009`)
 
 <!-- joss-error: JOSS-TYPE-009 -->
 ```joss-invalid
 integer $edad = 20
 ```
 
-Corrección:
+Caso corregido con el tipo canónico `int`:
 
 <!-- joss-run: ["20"] -->
 ```joss
@@ -115,14 +121,16 @@ int $edad = 20
 print($edad)
 ```
 
-Parámetro sin tipo:
+---
+
+### Parámetro sin tipo explícito (`JOSS-TYPE-011`)
 
 <!-- joss-error: JOSS-TYPE-011 -->
 ```joss-invalid
 public func duplicar($valor) { return $valor * 2 }
 ```
 
-Corrección:
+Caso corregido tipando el parámetro y el retorno:
 
 <!-- joss-run: ["6"] -->
 ```joss
@@ -130,7 +138,9 @@ public func duplicar(int $valor): int { return $valor * 2 }
 print(duplicar(3))
 ```
 
-Reasignación incompatible:
+---
+
+### Reasignación con tipo incompatible (`JOSS-TYPE-001`)
 
 <!-- joss-error: JOSS-TYPE-001 -->
 ```joss-invalid
@@ -138,7 +148,7 @@ $edad = 20
 $edad = "veinte"
 ```
 
-Corrección dinámica sólo cuando se desea ese contrato:
+Caso corregido usando dinamismo voluntario (`mixed`):
 
 <!-- joss-run: ["veinte"] -->
 ```joss
@@ -147,7 +157,9 @@ $dato = "veinte"
 print($dato)
 ```
 
-Retorno ausente:
+---
+
+### Retorno ausente en rutas de flujo (`JOSS-TYPE-010`)
 
 <!-- joss-error: JOSS-TYPE-010 -->
 ```joss-invalid
@@ -156,7 +168,7 @@ public func signo(int $n): string {
 }
 ```
 
-Corrección:
+Caso corregido garantizando retorno en todas las rutas posibles:
 
 <!-- joss-run: ["no positivo"] -->
 ```joss
@@ -166,12 +178,10 @@ public func signo(int $n): string {
 print(signo(0))
 ```
 
-## Política para contribuidores
+---
 
-No inferir invalidez de unknown/mixed, metadatos nativos ausentes o tablas de
-miembros no resueltas. Cada código nuevo exige un caso inválido y su vecino
-válido, archivo/rango, explicación y sugerencia. Conserva códigos estables:
-no uses el mensaje traducido como identificador.
+## Siguiente paso
 
-Fuentes: [analizador](../pkg/analyzer/), [modelo](../pkg/diagnostics/),
-[linter](../pkg/linter/linter.go), [errores runtime](../pkg/runtime/errors/).
+Ahora que conoces todos los diagnósticos y cómo resolverlos, puedes profundizar en cómo el analizador semántico examina el árbol de sintaxis abstracta para emitir estos códigos:
+
+Continúa con: [Analizador estático AST](ANALIZADOR.md).

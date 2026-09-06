@@ -1,15 +1,32 @@
-# Funciones, argumentos y ámbitos
+# Funciones, ámbito de variables, closures y referencias
 
-[Índice](README.md)
+Antes: [Control de flujo y decisiones](CONTROL_FLUJO.md). Después: [Colecciones: Arrays, Maps y Texto](COLECCIONES.md).
+Referencia técnica: [Sintaxis](SINTAXIS.md), [Recursión](RECURSION.md), [Sistema de tipos](SISTEMA_TIPOS.md).
 
-Antes: [control de flujo](CONTROL_FLUJO.md). Después: [colecciones](COLECCIONES.md).
-Profundizar: [recursión](RECURSION.md), [tipos](SISTEMA_TIPOS.md).
+---
 
-## Una operación con nombre
+## ¿Qué vas a aprender aquí?
 
-Una **función** reúne instrucciones para realizar una tarea. Evita repetir
-código y da nombre a una intención: calcular un total o crear un saludo.
-Una **llamada** pide ejecutar esa función.
+A medida que los programas crecen, escribir cientos de instrucciones seguidas se vuelve inmanejable. Si necesitas calcular el total de una factura con impuestos en diez lugares distintos de tu aplicación, copiar y pegar la misma fórmula diez veces es una receta para el desastre: si la ley tributaria cambia, tendrías que buscar y corregir diez archivos, y tarde o temprano olvidarás uno.
+
+En esta guía aprenderás:
+1. Qué es una **función** y por qué es el bloque fundamental de construcción de software.
+2. La diferencia crítica entre **parámetros**, **argumentos** e **impresión** versus **retorno**.
+3. Cómo declarar funciones con tipos seguros y valores predeterminados.
+4. Las reglas de visibilidad obligatoria en Joss (`public` y `private`).
+5. Qué es el **ámbito de variables (scope)** y cómo funciona el aislamiento de memoria en cada llamada.
+6. Qué son las **funciones anónimas (closures)** y cómo capturan datos de su entorno.
+7. Cómo modificar variables externas de forma segura mediante **referencias (`ref`)**.
+8. Cómo encadenar transformaciones de datos limpias con el operador **pipeline (`|>`)**.
+
+---
+
+## 1. ¿Qué es una función?
+
+Una **función** es un bloque autónomo de instrucciones al que le asignamos un nombre. Piensa en ella como una pequeña máquina especializada:
+1. Recibe materias primas (datos de entrada, llamados **argumentos**).
+2. Procesa la información en su interior de forma aislada.
+3. Devuelve un producto terminado (el resultado, llamado **valor de retorno**).
 
 <!-- joss-run: ["5", "12"] -->
 ```joss
@@ -20,20 +37,40 @@ print(sumar(2, 3))
 print(sumar(5, 7))
 ```
 
-`func` declara la función; `sumar` es su nombre. `$a` y `$b` son **parámetros**:
-los nombres que usará el cuerpo. `2` y `3` son **argumentos**: los valores que
-entrega una llamada. `return` termina la llamada y devuelve su resultado.
-El `: int` declara qué tipo de resultado espera quien llama.
+### Anatomía de una función en Joss:
 
-`public` permite usar la función desde otros archivos del proyecto. `private`
-limita su acceso al archivo. Las funciones globales requieren uno de ellos.
-No existe la palabra `function`.
+- `public`: **Modificador de visibilidad**. En Joss, las funciones globales requieren obligatoriamente visibilidad:
+  - `public`: La función está disponible en todo el proyecto y otros archivos pueden usarla sin imports.
+  - `private`: La función solo puede ser llamada desde el mismo archivo donde fue escrita.
+- `func`: Palabra clave que indica el inicio de la declaración (Joss no usa `function`).
+- `sumar`: El nombre de la función.
+- `(int $a, int $b)`: La lista de **parámetros**. Define qué tipos de datos exige la función para trabajar.
+- `: int`: El **tipo de retorno**. Declara qué tipo de valor promete devolver la función a quien la llamó.
+- `{ ... }`: El **cuerpo** de la función, donde se escriben las instrucciones.
+- `return $a + $b`: La instrucción `return` finaliza la ejecución de la función de inmediato y envía el resultado de vuelta al llamador.
 
-## Contratos y valores predeterminados
+---
 
-Todo parámetro requiere tipo, incluso en funciones anónimas. Si admite cualquier
-valor, escribe `mixed`. El tipo de retorno es opcional, pero declararlo permite
-detectar resultados incorrectos antes de ejecutar.
+## 2. Diferencias conceptuales cruciales
+
+### Parámetros vs Argumentos
+- **Parámetro**: Es la variable que declaras en la firma de la función (por ejemplo, `$a` y `$b`). Es la ranura o espacio que espera un valor.
+- **Argumento**: Es el valor concreto que entregas al momento de llamar a la función (por ejemplo, `2` y `3`).
+
+### Retornar (`return`) vs Imprimir (`print`)
+Este es uno de los tropiezos más comunes para quienes empiezan a programar:
+- `print` es una acción física: escribe tinta en la pantalla de la terminal para que un humano lo lea. El resto del programa **no puede reutilizar esa salida**.
+- `return` es una acción de memoria interna: le entrega el dato calculado a la línea que llamó a la función para que pueda seguir operando con él (guardarlo en una variable, guardarlo en una base de datos, enviarlo por internet, etc.).
+
+---
+
+## 3. Contratos de tipos y valores por defecto
+
+En Joss, **todo parámetro fuente debe tener un tipo de dato explícito**. Si una función realmente necesita aceptar cualquier valor dinámico, debes indicarlo escribiendo `mixed`.
+
+### Parámetros con valores predeterminados (Defaults)
+
+Puedes hacer que ciertos argumentos sean opcionales asignándoles un valor por defecto con `=`:
 
 <!-- joss-run: ["Hola, visitante", "Hola, Ada"] -->
 ```joss
@@ -44,11 +81,17 @@ print(saludo())
 print(saludo("Ada"))
 ```
 
-El valor después de `=` se usa cuando falta ese argumento. Coloca los parámetros
-con default al final. Se permiten comas finales en firmas y llamadas. No hay
-parámetros nombrados ni sintaxis de parámetros variádicos para funciones fuente.
+- Si llamas a `saludo()` sin argumentos, Joss utilizará automáticamente `"visitante"`.
+- Si llamas a `saludo("Ada")`, el valor entregado sustituye al valor por defecto.
 
-## Retornar desde una decisión
+> [!TIP]
+> Coloca siempre los parámetros con valor por defecto al final de la lista de parámetros. De lo contrario, Joss no sabría a qué parámetro asignar un argumento si solo pasas uno.
+
+---
+
+## 4. Retorno temprano y cláusulas de guarda (Guard Clauses)
+
+La instrucción `return` detiene la función inmediatamente. Si la colocas dentro de un bloque ternario, puedes verificar errores al principio de la función y salir antes de procesar el resto:
 
 <!-- joss-run: ["agotado", "disponible"] -->
 ```joss
@@ -60,17 +103,23 @@ print(disponibilidad(0))
 print(disponibilidad(2))
 ```
 
-El primer `return` sale de la función completa, aunque esté dentro de un bloque.
-Es una **guarda**: trata primero un caso que no debe seguir por el camino normal.
-Una función con retorno anotado debe retornar o lanzar un error en todas las
-rutas que el analizador puede demostrar. Escribir `return` en un único brazo
-no basta si el otro puede llegar al final.
+A este patrón se le llama **cláusula de guarda**. Evita crear estructuras condicionales profundamente anidadas (*código espagueti*).
 
-## Ámbito: dónde existe cada nombre
+> [!IMPORTANT]
+> **Exhaustividad de retorno (`JOSS-TYPE-010`)**:
+> Si una función declara un tipo de retorno (como `: string`), el analizador semántico exige que **todas las rutas posibles** de ejecución terminen con un `return` del tipo indicado o con una excepción `throw`. No puedes dejar ramas inconclusas donde la función simplemente termine sin devolver nada.
 
-Un **ámbito** o *scope* determina qué nombres puedes usar en un lugar. Cada
-llamada tiene sus propios parámetros y variables locales. La función con nombre
-no hereda las variables de quien la llama ni las variables fuente de nivel superior.
+---
+
+## 5. Ámbito de variables (Scope) y paso por valor
+
+El **ámbito (scope)** es la zona del programa donde una variable existe y es accesible.
+
+En Joss:
+1. Cada llamada a una función crea un **marco de memoria aislado (frame)**.
+2. Los parámetros y las variables declaradas dentro de la función **solo existen mientras la función se está ejecutando**. En cuanto llega a `return`, desaparecen de la memoria.
+3. Las funciones con nombre **no tienen acceso automático a las variables globales del archivo**. Si una función necesita un dato, debes pasárselo como parámetro.
+4. **Paso por valor**: Al pasar un valor primitivo (como un `int` o `string`) a una función, Joss le entrega una copia. Modificar esa variable dentro de la función **no altera la variable original que estaba afuera**:
 
 <!-- joss-run: ["20", "10"] -->
 ```joss
@@ -82,16 +131,15 @@ $numero = 10
 print(duplicar($numero))
 print($numero)
 ```
+La variable original `$numero` conserva su valor `10` intacto.
 
-Reasignar el parámetro no cambia `$numero`. Pasar una colección o una instancia
-no hace una copia profunda: modificar sus elementos puede verse desde fuera.
-Consulta [colecciones](COLECCIONES.md) para distinguir el nombre del contenido.
+---
 
-## Funciones sin nombre y closures
+## 6. Funciones anónimas y Closures
 
-Una función anónima es una función escrita como valor. Una **closure** conserva
-el entorno que existía al crearla, para usarlo cuando se invoque después.
-Esto permite guardar un comportamiento con sus datos:
+Una función no siempre necesita un nombre global. Puedes crear una función como si fuera un valor, guardarla en una variable o pasarla como argumento a otra función. A esto se le llama **función anónima** o **función de primera clase**.
+
+Cuando una función anónima utiliza variables que fueron creadas en el bloque exterior que la rodea, se convierte en una **closure**: "captura" y recuerda esas variables para utilizarlas más tarde, incluso si el bloque exterior ya terminó:
 
 <!-- joss-run: ["Hola, Ada"] -->
 ```joss
@@ -102,19 +150,16 @@ $saludar = func(string $nombre): string {
 print($saludar("Ada"))
 ```
 
-La closure no lleva `public` ni `private`. Su captura conserva bindings en un
-entorno propio; reasignar un escalar capturado no equivale a modificar la
-variable original exterior. Las invocaciones de una misma captura se serializan
-mediante un mutex. No presupongas captura por referencia compartida entre
-closures creadas por separado. La [arquitectura](ARQUITECTURA.md) explica el modelo.
+- Las closures son muy utilizadas como **callbacks**: funciones que le entregas a un servicio (por ejemplo, a un servidor HTTP o un WebSocket) para que las ejecute cuando ocurra un evento (como la llegada de un cliente).
+- Las closures no llevan modificadores de visibilidad (`public` ni `private`).
 
-Una **callback** es simplemente una función que entregas a otra API para que
-la llame cuando corresponda, por ejemplo al recibir un mensaje WebSocket.
+---
 
-## Referencias temporales con ref
+## 7. Referencias mutables temporales con `ref`
 
-A veces la tarea consiste precisamente en actualizar una variable del llamador.
-`ref` expresa esa intención en ambos extremos:
+¿Qué pasa si realmente quieres que una función modifique la variable original que le pasaste desde afuera? En lugar de devolver una copia, Joss permite el uso de **referencias (`ref`)**.
+
+Por seguridad, Joss exige que la intención sea **bilateral**: tanto la firma de la función como la llamada deben incluir la palabra reservada `ref`:
 
 <!-- joss-run: ["2"] -->
 ```joss
@@ -127,28 +172,81 @@ incrementar(ref $contador)
 print($contador)
 ```
 
-Una **referencia** es un acceso temporal al mismo binding. No es una dirección de
-memoria. Sólo acepta una variable mutable del mismo tipo exacto; no constantes,
-expresiones, campos ni índices. No puede almacenarse, retornarse, capturarse,
-tener default o cruzar llamadas nativas, plugins o async. Prefiere retornar un
-nuevo valor cuando no necesitas actualizar el original.
+Ahora `$contador` sí cambió su valor original a `2`.
 
-## Pipelines y recursión
+### Reglas de seguridad de las referencias en Joss:
+1. **Solo variables simples y mutables**: No puedes pasar constantes, expresiones matemáticas ni literales (por ejemplo, `incrementar(ref 5)` es ilegal con `JOSS-REF-002`).
+2. **Invariancia estricta de tipos**: El tipo de la variable debe coincidir exactamente con el tipo del parámetro (no se permite pasar un `int` a un `ref float`).
+3. **No pueden escapar**: Una referencia solo vive durante la llamada. No puedes guardar una referencia en una variable global, ni devolverla con `return`, ni enviarla a través de un canal asíncrono.
 
-El operador `|>` entrega su izquierda como primer argumento de la derecha:
+---
+
+## 8. El operador Pipeline (`|>`)
+
+En programación es muy común tener que pasar un dato a través de una serie de transformaciones sucesivas. En lenguajes clásicos, esto obliga a anidar llamadas de adentro hacia afuera:
+
+```joss
+// Difícil de leer: debes leer de derecha a izquierda o de adentro hacia afuera
+strtoupper(trim("  ada  "))
+```
+
+Joss incluye de forma nativa el operador **Pipeline (`|>`)**, que toma el resultado de la izquierda y lo envía como primer argumento a la función de la derecha:
 
 <!-- joss-run: ["ADA"] -->
 ```joss
 print("  ada  " |> trim |> strtoupper)
 ```
 
-Da `ADA`: primero recorta espacios y después convierte a mayúsculas. También
-admite `valor |> funcion(otroArgumento)`. No implica procesamiento paralelo.
+El flujo se lee de forma natural de izquierda a derecha:
+1. Toma el texto `"  ada  "`.
+2. Pásalo por `trim` (que quita los espacios, resultando en `"ada"`).
+3. Pásalo por `strtoupper` (que convierte a mayúsculas, resultando en `"ADA"`).
+4. Pásalo a `print` para mostrarlo en pantalla.
 
-Una función **recursiva** se llama a sí misma. Debe tener un caso que termine
-sin volver a llamar. Aprende a construirlo en [recursión](RECURSION.md); el
-runtime limita por defecto la profundidad a 1024 llamadas.
+Si la función receptora necesita más de un argumento, escríbelos normalmente entre paréntesis:
+```joss
+$resultado = $texto |> str_replace("a", "o")
+```
+Joss colocará el valor de la izquierda como el primer parámetro de `str_replace`.
 
-Ejercicio: escribe `public func cuadrado(int $n): int` y prueba `cuadrado(4)`.
-Debe devolver `16`. Después explica por qué imprimir dentro de la función no
-es lo mismo que retornar el resultado a su llamador.
+---
+
+## 9. Funciones recursivas
+
+Una función **recursiva** es aquella que se llama a sí misma para resolver un problema dividiéndolo en versiones más pequeñas del mismo problema.
+
+Toda función recursiva debe tener dos componentes indispensables:
+1. **Caso base**: Una condición de parada donde la función retorna un resultado simple sin volverse a llamar.
+2. **Paso recursivo**: Donde la función se llama a sí misma con un dato más cercano al caso base.
+
+Joss protege tu memoria limitando la profundidad máxima de llamadas recursivas a 1024 niveles por defecto (consulta [Recursión](RECURSION.md) para más detalles).
+
+---
+
+## 10. Errores comunes con funciones
+
+| Error | Código / Causa | Solución |
+|---|---|---|
+| Escribir `function f()` | `function` fue eliminada de Joss. | Usa `public func f()` o `private func f()`. |
+| Olvidar `public` o `private` en funciones globales | Las funciones con nombre requieren visibilidad obligatoria. | Agrega `public func nombre(...)` o `private func nombre(...)`. |
+| Parámetro sin tipo: `func($x)` | Los parámetros deben ser tipados (`JOSS-TYPE-011`). | Declara el tipo: `func(int $x)` o `func(mixed $x)`. |
+| Función tipada sin return en todas las rutas | `JOSS-TYPE-010`: El checker detectó un camino que termina sin devolver nada. | Asegúrate de que todas las ramas ternarias retornen o lancen un error. |
+| Olvidar `ref` en la llamada | Llamar `f($x)` cuando la función espera `ref T $param` (`JOSS-REF-001`). | Agrega `ref` en la llamada: `f(ref $x)`. |
+
+---
+
+## 11. Ejercicio práctico
+
+1. **Calculadora con funciones**:
+   - Escribe una función `public func calcularIVA(decimal $subtotal, decimal $tasa = 0.16m): decimal`.
+   - La función debe retornar el monto del impuesto (`$subtotal * $tasa`).
+   - Prueba llamarla con un solo argumento (`calcularIVA(100.0m)`) y luego con una tasa personalizada del 8% (`calcularIVA(100.0m, 0.08m)`).
+   - Muestra ambos resultados en la consola.
+
+---
+
+## Siguiente paso
+
+Ahora que sabes cómo estructurar código modular con funciones seguras, es momento de aprender a manipular colecciones de datos complejas: listas de elementos y mapas asociativos clave-valor.
+
+Continúa con: [Colecciones: Arrays, Maps y Manipulación de Texto](COLECCIONES.md).
