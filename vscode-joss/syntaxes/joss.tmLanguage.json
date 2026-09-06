@@ -32,11 +32,11 @@
       "patterns": [
         {
           "name": "keyword.control.joss",
-          "match": "\\b(foreach|as|return|break|continue|new|this|try|catch|throw|extends|async|await|match|default|use)\\b"
+          "match": "\\b(if|else|while|do|foreach|as|return|break|continue|new|this|try|catch|throw|extends|async|await|match|default)\\b"
         },
         {
           "name": "keyword.other.joss",
-          "match": "\\b(class|Init|Import|Namespace|public|private|protected|function|func)\\b"
+          "match": "\\b(class|Init|public|private|protected|static|func|let|const|ref)\\b"
         },
         {
           "name": "keyword.operator.logical.joss",
@@ -48,7 +48,7 @@
       "patterns": [
         {
           "name": "storage.type.joss",
-          "match": "\\b(int|float|string|bool|array|var|pointer|mixed|const)\\b"
+          "match": "\\b(int|float|decimal|string|bool|array|map|channel|object|mixed|var|pointer|void)\\b"
         }
       ]
     },
@@ -86,7 +86,7 @@
       "patterns": [
         {
           "name": "constant.numeric.joss",
-          "match": "\\b\\d+(\\.\\d+)?\\b"
+          "match": "\\b\\d+(\\.\\d+)?m?\\b"
         }
       ]
     },
@@ -94,7 +94,7 @@
       "patterns": [
         {
           "name": "keyword.operator.comparison.joss",
-          "match": "(==|!=|<=|>=|<|>)"
+          "match": "(===|!==|==|!=|<=>|<=|>=|<|>)"
         },
         {
           "name": "keyword.operator.arithmetic.joss",
@@ -102,7 +102,7 @@
         },
         {
           "name": "keyword.operator.assignment.joss",
-          "match": "(=>|=)"
+          "match": "(=>|\\+\\+|--|=)"
         },
         {
           "name": "keyword.operator.ternary.joss",
@@ -121,12 +121,16 @@
           "match": "(&&|\\|\\||!)"
         },
         {
+          "name": "keyword.operator.bitwise.joss",
+          "match": "(<<|>>)"
+        },
+        {
           "name": "keyword.operator.pipe.joss",
           "match": "(\\|>)"
         },
         {
           "name": "keyword.operator.member.joss",
-          "match": "(-\\>|\\.|::)"
+          "match": "(\\?-\\>|-\\>|\\.|::)"
         }
       ]
     },
@@ -166,7 +170,7 @@
       "patterns": [
         {
           "name": "constant.language.joss",
-          "match": "\\b(true|false|null)\\b"
+          "match": "\\b(true|false|null|nil)\\b"
         }
       ]
     }

@@ -1,5 +1,18 @@
 # Changelog
 
+## [3.6.7] - 2026-09-05
+### Added
+- Full syntax highlighting support for the `decimal` type and decimal literals (`12.34m`, `100m`).
+- Recognition of `channel`, `map`, `object`, and `void` types in storage patterns.
+- Enhanced operator support: strict equality (`===`, `!==`), spaceship (`<=>`), bitwise shifts (`<<`, `>>`), and null-safe method invocation (`?->`).
+- Highlight for canonical language constants including `nil`.
+- Updated TextMate control flow keywords: `if`, `else`, `while`, `do`.
+- Inclusion of modifiers: `static`, `let`, `const`, and `ref`.
+
+### Changed
+- Cleaned deprecated keywords (`Import`, `Namespace`, `use`, `function`) to conform with canonical Joss grammar.
+- Synchronized Language Server Protocol catalog with Joss Core v3.6.7.4.
+
 ## [3.5.0] - 2026-07-14
 ### Added
 - Parameter hints and active-argument highlighting for native and project functions.
