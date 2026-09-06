@@ -27,6 +27,52 @@ export function activate(context: vscode.ExtensionContext) {
         // files use the richer language-server completion provider.
         context.subscriptions.push(getCompletionItemProvider());
 
+        // Document Formatting Provider using 'joss format -'
+        context.subscriptions.push(
+            vscode.languages.registerDocumentFormattingEditProvider('joss', {
+                provideDocumentFormattingEdits(document: vscode.TextDocument): Promise<vscode.TextEdit[]> {
+                    const config = vscode.workspace.getConfiguration('joss');
+                    if (!config.get<boolean>('format.enable', true)) {
+                        return Promise.resolve([]);
+                    }
+                    const jossBin = config.get<string>('executablePath', 'joss') || 'joss';
+
+                    return new Promise((resolve) => {
+                        const text = document.getText();
+                        const proc = cp.spawn(jossBin, ['format', '-'], {
+                            cwd: vscode.workspace.workspaceFolders?.[0]?.uri.fsPath || process.cwd(),
+                            shell: true
+                        });
+
+                        let stdout = '';
+
+                        proc.stdout.on('data', (data) => {
+                            stdout += data.toString();
+                        });
+
+                        proc.on('close', (code) => {
+                            if (code === 0 && stdout && stdout !== text) {
+                                const fullRange = new vscode.Range(
+                                    document.positionAt(0),
+                                    document.positionAt(text.length)
+                                );
+                                resolve([vscode.TextEdit.replace(fullRange, stdout)]);
+                            } else {
+                                resolve([]);
+                            }
+                        });
+
+                        proc.on('error', () => {
+                            resolve([]);
+                        });
+
+                        proc.stdin.write(text);
+                        proc.stdin.end();
+                    });
+                }
+            })
+        );
+
         // Status Bar
         const statusBarItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 100);
         statusBarItem.text = '$(database) Joss';

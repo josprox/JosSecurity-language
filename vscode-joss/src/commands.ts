@@ -331,4 +331,126 @@ export function registerCommands(context: vscode.ExtensionContext, client: Langu
             }
         })
     );
+
+    // Format Document
+    context.subscriptions.push(
+        vscode.commands.registerCommand('joss.formatDocument', async () => {
+            await vscode.commands.executeCommand('editor.action.formatDocument');
+        })
+    );
+
+    // Format Workspace
+    context.subscriptions.push(
+        vscode.commands.registerCommand('joss.formatWorkspace', async () => {
+            const terminal = vscode.window.createTerminal('Joss Format');
+            terminal.show();
+            terminal.sendText('joss format --write .');
+        })
+    );
+
+    // Run Linter
+    context.subscriptions.push(
+        vscode.commands.registerCommand('joss.lint', async () => {
+            const terminal = vscode.window.createTerminal('Joss Lint');
+            terminal.show();
+            terminal.sendText('joss lint');
+        })
+    );
+
+    // Fix Code Issues Automatically
+    context.subscriptions.push(
+        vscode.commands.registerCommand('joss.fix', async () => {
+            const terminal = vscode.window.createTerminal('Joss Fix');
+            terminal.show();
+            terminal.sendText('joss fix');
+        })
+    );
+
+    // Run Tests
+    context.subscriptions.push(
+        vscode.commands.registerCommand('joss.test', async () => {
+            const terminal = vscode.window.createTerminal('Joss Test');
+            terminal.show();
+            terminal.sendText('joss test');
+        })
+    );
+
+    // Check Syntax & Types
+    context.subscriptions.push(
+        vscode.commands.registerCommand('joss.checkSyntax', async () => {
+            const terminal = vscode.window.createTerminal('Joss Check');
+            terminal.show();
+            terminal.sendText('joss check');
+        })
+    );
+
+    // Build Web Application
+    context.subscriptions.push(
+        vscode.commands.registerCommand('joss.buildWeb', async () => {
+            const terminal = vscode.window.createTerminal('Joss Build Web');
+            terminal.show();
+            terminal.sendText('joss build web');
+        })
+    );
+
+    // Build Native Executable
+    context.subscriptions.push(
+        vscode.commands.registerCommand('joss.buildNative', async () => {
+            const terminal = vscode.window.createTerminal('Joss Build Native');
+            terminal.show();
+            terminal.sendText('joss build native');
+        })
+    );
+
+    // Fresh Migrations with Seeders
+    context.subscriptions.push(
+        vscode.commands.registerCommand('joss.migrateFresh', async () => {
+            const terminal = vscode.window.createTerminal('Joss Migrate Fresh');
+            terminal.show();
+            terminal.sendText('joss migrate:fresh');
+        })
+    );
+
+    // Run Database Seeders
+    context.subscriptions.push(
+        vscode.commands.registerCommand('joss.dbSeed', async () => {
+            const terminal = vscode.window.createTerminal('Joss DB Seed');
+            terminal.show();
+            terminal.sendText('joss db:seed');
+        })
+    );
+
+    // Make Middleware
+    context.subscriptions.push(
+        vscode.commands.registerCommand('joss.makeMiddleware', async () => {
+            const name = await vscode.window.showInputBox({
+                prompt: 'Middleware name (e.g., AuthGuard)',
+                placeHolder: 'AuthGuard'
+            });
+
+            if (name) {
+                const terminal = vscode.window.createTerminal('Joss Make Middleware');
+                terminal.show();
+                terminal.sendText(`joss make:middleware ${name}`);
+            }
+        })
+    );
+
+    // Plugin Compile
+    context.subscriptions.push(
+        vscode.commands.registerCommand('joss.pluginCompile', async () => {
+            const terminal = vscode.window.createTerminal('Joss Plugin Compile');
+            terminal.show();
+            terminal.sendText('joss plugin compile');
+        })
+    );
+
+    // Plugin Validate
+    context.subscriptions.push(
+        vscode.commands.registerCommand('joss.pluginValidate', async () => {
+            const terminal = vscode.window.createTerminal('Joss Plugin Validate');
+            terminal.show();
+            terminal.sendText('joss plugin validate');
+        })
+    );
 }

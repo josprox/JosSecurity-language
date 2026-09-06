@@ -2,7 +2,7 @@
   "name": "joss-language",
   "displayName": "Joss Language Support",
   "description": "Joss IntelliSense with parameter hints, project indexing, navigation, diagnostics, and security analysis",
-  "version": "3.6.7",
+  "version": "3.7.0",
   "icon": "images/icon.png",
   "publisher": "jossecurity",
   "engines": {
@@ -149,6 +149,58 @@
       {
         "command": "joss.makeMVC",
         "title": "Joss: Make MVC"
+      },
+      {
+        "command": "joss.formatDocument",
+        "title": "Joss: Format Document"
+      },
+      {
+        "command": "joss.formatWorkspace",
+        "title": "Joss: Format Workspace"
+      },
+      {
+        "command": "joss.lint",
+        "title": "Joss: Run Linter"
+      },
+      {
+        "command": "joss.fix",
+        "title": "Joss: Fix Code Issues"
+      },
+      {
+        "command": "joss.test",
+        "title": "Joss: Run Tests"
+      },
+      {
+        "command": "joss.checkSyntax",
+        "title": "Joss: Check Syntax & Types"
+      },
+      {
+        "command": "joss.buildWeb",
+        "title": "Joss: Build Web Application"
+      },
+      {
+        "command": "joss.buildNative",
+        "title": "Joss: Build Native Executable"
+      },
+      {
+        "command": "joss.migrateFresh",
+        "title": "Joss: Run Fresh Migrations with Seeders"
+      },
+      {
+        "command": "joss.dbSeed",
+        "title": "Joss: Run Database Seeders"
+      },
+      {
+        "command": "joss.makeMiddleware",
+        "title": "Joss: Make Middleware"
+      },
+      {
+        "command": "joss.pluginCompile",
+        "title": "Joss: Compile Plugin (.jp)"
+      },
+      {
+        "command": "joss.pluginValidate",
+        "title": "Joss: Validate Plugin"
       }
     ],
     "configuration": {
@@ -159,6 +211,16 @@
           "type": "boolean",
           "default": true,
           "description": "Enable security analysis"
+        },
+        "joss.executablePath": {
+          "type": "string",
+          "default": "joss",
+          "description": "Path to the Joss binary"
+        },
+        "joss.format.enable": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable formatting for Joss files"
         }
       }
     }

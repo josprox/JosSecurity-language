@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"io"
 	"os"
 
 	"github.com/jossecurity/joss/pkg/formatter"
@@ -23,6 +24,22 @@ func handleFormatCommand(args []string) {
 				targetPath = arg
 			}
 		}
+	}
+
+	if targetPath == "-" {
+		data, err := io.ReadAll(os.Stdin)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error leyendo stdin: %v\n", err)
+			os.Exit(1)
+		}
+		formatted, err := formatter.FormatSource(string(data))
+		if err != nil {
+			// Si hay un error de sintaxis, devolver el código original para no romper el buffer
+			fmt.Print(string(data))
+			return
+		}
+		fmt.Print(formatted)
+		return
 	}
 
 	if targetPath == "" {

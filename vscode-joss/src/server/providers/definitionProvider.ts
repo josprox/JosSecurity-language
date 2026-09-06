@@ -1,6 +1,9 @@
-import { DefinitionParams, Definition } from 'vscode-languageserver/node';
+import { DefinitionParams, Definition, Location } from 'vscode-languageserver/node';
 import { connection, documents, indexer } from '../server';
 import { referenceAtPosition } from '../utils/callContext';
+import * as path from 'path';
+import * as fs from 'fs';
+import { URI } from 'vscode-uri';
 
 export function setupDefinitionProvider() {
     connection.onDefinition(async (params: DefinitionParams): Promise<Definition | null> => {
@@ -13,27 +16,48 @@ export function setupDefinitionProvider() {
             end: { line: position.line, character: 1000 }
         });
 
-        // Check if we're on a Router call like Router::get("/path", "Controller@method")
-        const routerMatch = line.match(/Router::(get|post|put|delete|patch)\s*\(\s*["']([^"']+)["']\s*,\s*["'](\w+)@(\w+)["']/);
+        // 1. Router definitions: Router::get(... "Controller@method")
+        const routerMatch = line.match(/Router::(get|post|put|delete|patch|options|api|match)\s*\([\s\S]*?["']([A-Za-z0-9_]+)@([A-Za-z0-9_]+)["']/);
         if (routerMatch) {
-            const [_, method, path, controller, action] = routerMatch;
+            const controller = routerMatch[2];
+            const action = routerMatch[3];
 
-            // Check if cursor is on controller name
-            const controllerStart = line.indexOf(controller, routerMatch.index!);
+            const controllerStart = line.indexOf(controller);
             const controllerEnd = controllerStart + controller.length;
-
             if (position.character >= controllerStart && position.character <= controllerEnd) {
                 const symbol = await indexer.findSymbol(controller);
                 if (symbol) return symbol.location;
             }
 
-            // Check if cursor is on method name
             const methodStart = line.indexOf(action, controllerStart);
             const methodEnd = methodStart + action.length;
-
             if (position.character >= methodStart && position.character <= methodEnd) {
                 const symbol = await indexer.findMethod(controller, action);
                 if (symbol) return symbol.location;
+            }
+        }
+
+        // 2. View definitions: View::render("users.profile") or View::render("users/profile")
+        const viewMatch = line.match(/View::render\s*\(\s*["']([^"']+)["']/);
+        if (viewMatch) {
+            const viewRaw = viewMatch[1];
+            const viewStart = line.indexOf(viewRaw);
+            const viewEnd = viewStart + viewRaw.length;
+            if (position.character >= viewStart && position.character <= viewEnd) {
+                const location = resolveViewLocation(viewRaw, indexer.getWorkspaceRoot());
+                if (location) return location;
+            }
+        }
+
+        // 3. View template directives: @extends("layouts.app") or @include("partials.header")
+        const templateMatch = line.match(/@(extends|include|section)\s*\(\s*["']([^"']+)["']/);
+        if (templateMatch) {
+            const viewRaw = templateMatch[2];
+            const viewStart = line.indexOf(viewRaw);
+            const viewEnd = viewStart + viewRaw.length;
+            if (position.character >= viewStart && position.character <= viewEnd) {
+                const location = resolveViewLocation(viewRaw, indexer.getWorkspaceRoot());
+                if (location) return location;
             }
         }
 
@@ -56,4 +80,29 @@ export function setupDefinitionProvider() {
 
         return null;
     });
+}
+
+function resolveViewLocation(viewName: string, workspaceRoot: string): Location | null {
+    if (!workspaceRoot) return null;
+    const normalized = viewName.replace(/\./g, '/').replace(/^\/+/, '');
+    const candidatePaths = [
+        path.join(workspaceRoot, 'app', 'views', `${normalized}.joss.html`),
+        path.join(workspaceRoot, 'app', 'views', `${normalized}.html`),
+        path.join(workspaceRoot, 'views', `${normalized}.joss.html`),
+        path.join(workspaceRoot, 'views', `${normalized}.html`),
+        path.join(workspaceRoot, 'resources', 'views', `${normalized}.joss.html`)
+    ];
+
+    for (const candidate of candidatePaths) {
+        if (fs.existsSync(candidate)) {
+            return {
+                uri: URI.file(candidate).toString(),
+                range: {
+                    start: { line: 0, character: 0 },
+                    end: { line: 0, character: 0 }
+                }
+            };
+        }
+    }
+    return null;
 }
